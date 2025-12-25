@@ -1,0 +1,47 @@
+name: Francois Fix and Build
+on:
+  workflow_dispatch: # Membolehkan Kapten tekan butang play manual
+  push:
+    branches: [ main, master ]
+
+jobs:
+  fix-and-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 1. Ambil Kod Kapten
+        uses: actions/checkout@v3
+
+      - name: 2. Setup Java (Enjin Asas)
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 3. Setup Flutter (Enjin Utama)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          
+      - name: 4. PEMBEDAHAN UTAMA (Fix Android)
+        # Langkah ini memadam folder android lama dan buat baru
+        run: |
+          echo "Membuang struktur Android lama..."
+          rm -rf android
+          echo "Menjana struktur Android moden (2025)..."
+          flutter create . --platforms android
+          echo "Selesai pembaikan."
+
+      - name: 5. Download Dependencies
+        run: flutter pub get
+
+      - name: 6. Build APK Release
+        # Membina APK menggunakan kunci debug sementara (selamat untuk test)
+        run: flutter build apk --release --no-sound-null-safety || flutter build apk --release
+
+      - name: 7. Simpan APK untuk Kapten
+        uses: actions/upload-artifact@v4
+        with:
+          name: iHijrah-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 1
