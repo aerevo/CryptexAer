@@ -37,7 +37,7 @@ jobs:
 
       - name: 6. Build APK Release
         # Membina APK menggunakan kunci debug sementara (selamat untuk test)
-        run: flutter build apk --release --no-sound-null-safety || flutter build apk --release
+        run: flutter build apk --release
 
       - name: 7. Simpan APK untuk Kapten
         uses: actions/upload-artifact@v4
