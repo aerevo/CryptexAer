@@ -19,6 +19,7 @@ class MyApp extends StatelessWidget {
           child: CryptexLock(
             controller: ClaController(
               ClaConfig(
+                secret: 'AER-CRY-001',
                 minSolveTime: const Duration(seconds: 2),
                 minShake: 0.2,
               ),
@@ -38,4 +39,5 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
 
