@@ -22,8 +22,10 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> {
-  bool _shakeDetected = true;
-  bool _zeroTrap = false;
+  static const elements = ['KOSONG', 'API', 'AIR', 'KILAT', 'TANAH', 'BAYANG'];
+  final List<int> _selected = [1, 1, 1, 1, 1];
+
+  bool get _zeroTrapHit => _selected.contains(0);
 
   @override
   void initState() {
@@ -31,10 +33,44 @@ class _CryptexLockState extends State<CryptexLock> {
     widget.controller.start();
   }
 
+  Widget _buildWheel(int index) {
+    return SizedBox(
+      width: 60,
+      height: 120,
+      child: CupertinoPicker(
+        itemExtent: 32,
+        selectionOverlay: Container(
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Colors.amber, width: 1),
+              bottom: BorderSide(color: Colors.amber, width: 1),
+            ),
+          ),
+        ),
+        onSelectedItemChanged: (i) {
+          _selected[index] = i;
+        },
+        children: elements
+            .map(
+              (e) => Center(
+                child: Text(
+                  e,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
   void _submit() {
     final result = widget.controller.validate(
-      shakeDetected: _shakeDetected,
-      zeroTrapHit: _zeroTrap,
+      shakeDetected: true, // hook sensor kemudian
+      zeroTrapHit: _zeroTrapHit,
     );
 
     switch (result) {
@@ -53,14 +89,14 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.deepPurple.shade900, Colors.black],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2E1A72), Colors.black],
         ),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.amber, width: 3),
-        borderRadius: BorderRadius.circular(16),
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -68,29 +104,29 @@ class _CryptexLockState extends State<CryptexLock> {
             'CRYPTEX LOCK',
             style: TextStyle(
               color: Colors.amber,
-              fontWeight: FontWeight.bold,
               letterSpacing: 2,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
-          CupertinoPicker(
-            itemExtent: 36,
-            onSelectedItemChanged: (i) {
-              if (i == 0) _zeroTrap = true;
-            },
-            children: const [
-              Text('KOSONG'),
-              Text('API'),
-              Text('AIR'),
-              Text('KILAT'),
-              Text('TANAH'),
-              Text('BAYANG'),
-            ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(5, _buildWheel),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _submit,
-            child: const Text('UNLOCK'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              child: Text('UNLOCK'),
+            ),
           ),
         ],
       ),
