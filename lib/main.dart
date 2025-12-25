@@ -21,7 +21,6 @@ class MyApp extends StatelessWidget {
               ClaConfig(
                 minSolveTime: const Duration(seconds: 2),
                 minShake: 0.2,
-                thresholdAmount: 5000,
               ),
             ),
             onSuccess: () {
@@ -39,3 +38,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
