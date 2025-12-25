@@ -42,6 +42,6 @@ jobs:
       - name: 7. Simpan APK untuk Kapten
         uses: actions/upload-artifact@v4
         with:
-          name: iHijrah-APK
+          name: CryptexAer-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
