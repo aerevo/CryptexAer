@@ -1,4 +1,4 @@
-name: Francois Fix and Build
+name: Francois Fix and Build (Bank Grade)
 on:
   workflow_dispatch: # Membolehkan Kapten tekan butang play manual
   push:
@@ -23,25 +23,33 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. PEMBEDAHAN UTAMA (Fix Android)
-        # Langkah ini memadam folder android lama dan buat baru
+      - name: 4. PEMBEDAHAN UTAMA (Fix Android & Inject Permission)
+        # Langkah ini memadam folder android lama, buat baru, DAN suntik permission
         run: |
           echo "Membuang struktur Android lama..."
           rm -rf android
           echo "Menjana struktur Android moden (2025)..."
           flutter create . --platforms android
-          echo "Selesai pembaikan."
+          
+          echo "MENYUNTIK KEBENARAN VIBRATE (PENTING)..."
+          # Francois menggunakan 'sed' untuk menyelitkan permission getaran secara automatik
+          # Kerana 'flutter create' menghasilkan manifest kosong tanpa permission ini.
+          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+          
+          echo "Selesai pembaikan & suntikan."
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 6. Build APK Release
-        # Membina APK menggunakan kunci debug sementara (selamat untuk test)
-        run: flutter build apk --release
+      - name: 6. Build APK Release (OBFUSCATED - SENJATA SULIT)
+        # INI DIA SENJATA SULIT TERSEBUT
+        # --obfuscate: Mencincang kod manusia jadi kod mesin rahsia
+        # --split-debug-info: Mengasingkan peta kod supaya hacker buntu
+        run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
 
-      - name: 7. Simpan APK untuk Kapten
+      - name: 7. Simpan APK Kebal untuk Kapten
         uses: actions/upload-artifact@v4
         with:
-          name: CryptexAer-APK
+          name: CryptexAer-Secure-BankGrade
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
