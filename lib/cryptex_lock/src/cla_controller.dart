@@ -1,3 +1,4 @@
+import 'dart:async'; // Perlu untuk Timer
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'cla_config.dart';
@@ -5,45 +6,73 @@ import 'cla_config.dart';
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
 
-  // State
+  // Status
   bool _jammed = false;
   DateTime? _jamUntil;
-  late List<int> currentValues;
+  List<int> currentValues = [0, 0, 0, 0, 0];
   
-  // Data Analisis Biometrik
-  List<double> _shakeSamples = [];
-  double debugMaxShake = 0.0;
+  // Bot Simulation State
+  bool isBotRunning = false;
+  Timer? _botTimer;
 
-  ClaController(this.config) {
-    resetWheels();
-  }
-
-  void resetWheels() {
-    final rand = Random();
-    // 5 Roda, nilai rawak mula
-    currentValues = List.generate(5, (index) => rand.nextInt(10));
-    _shakeSamples.clear();
-    debugMaxShake = 0.0;
-    notifyListeners();
-  }
+  ClaController(this.config);
 
   void updateWheel(int index, int value) {
     if (index >= 0 && index < currentValues.length) {
       currentValues[index] = value;
     }
   }
+  
+  // --- FUNGSI BARU: SIMULASI SERANGAN BOT ---
+  void simulateBotAttack(VoidCallback onAttackFinished) {
+    if (isBotRunning || isJammed) return;
 
-  // Merekod data sensor (tanpa notify UI berlebihan untuk performance)
-  void recordShakeSample(double magnitude) {
-    _shakeSamples.add(magnitude);
-    if (magnitude > debugMaxShake) {
-      debugMaxShake = magnitude;
+    isBotRunning = true;
+    notifyListeners(); // Update UI supaya nampak bot tengah jalan
+
+    final rand = Random();
+    int duration = 3000; // Bot menyerang selama 3 saat
+    int tick = 0;
+    
+    // Timer ini akan berjalan sangat laju (setiap 50ms)
+    _botTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      tick += 50;
+      
+      // Bot tukar semua nombor secara rawak
+      for (int i = 0; i < currentValues.length; i++) {
+        currentValues[i] = rand.nextInt(10);
+      }
+      notifyListeners(); // Paksa UI update nampak nombor berkelip
+
+      // Bila masa tamat, berhenti dan cuba unlock
+      if (tick >= duration) {
+        timer.cancel();
+        isBotRunning = false;
+        notifyListeners();
+        onAttackFinished(); // Panggil fungsi 'attemptUnlock' di widget
+      }
+    });
+  }
+
+  void stopBot() {
+    _botTimer?.cancel();
+    isBotRunning = false;
+    notifyListeners();
+  }
+
+  // --- LOGIK ASAS (Kekal Sama) ---
+  bool isTrapTriggered() {
+    return currentValues.contains(0);
+  }
+
+  bool isCodeCorrect() {
+    if (currentValues.length != config.secret.length) return false;
+    for (int i = 0; i < config.secret.length; i++) {
+      if (currentValues[i] != config.secret[i]) {
+        return false;
+      }
     }
-    // Simpan 200 sampel terakhir sahaja (jimat memori)
-    if (_shakeSamples.length > 200) {
-      _shakeSamples.removeAt(0);
-    }
-    // notifyListeners(); // Tutup notify kerap untuk UI silent
+    return true;
   }
 
   bool get isJammed {
@@ -51,6 +80,7 @@ class ClaController extends ChangeNotifier {
     if (DateTime.now().isAfter(_jamUntil!)) {
       _jamUntil = null;
       _jammed = false;
+      notifyListeners();
       return false;
     }
     return true;
@@ -62,50 +92,13 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- LOGIK "PROOF OF HUMANITY" ---
-  bool validateHumanBehavior() {
-    if (_shakeSamples.isEmpty) return false;
-
-    // 1. Analisis Purata (Inersia)
-    double sum = _shakeSamples.reduce((a, b) => a + b);
-    double mean = sum / _shakeSamples.length;
-
-    // 2. Kriteria Lulus:
-    // a. Peak Force: Mesti ada gegaran maksima > 0.15 (Tanda pergerakan sedar)
-    // b. Mean: Purata mesti > 0.02 (Tanda pergerakan mikro berterusan/tangan hidup)
-    bool hasLifeSign = debugMaxShake > config.minShake;
-    bool hasInertia = mean > 0.02; 
-
-    // Reset sampel selepas semakan untuk sesi seterusnya
-    _shakeSamples.clear();
-    debugMaxShake = 0.0;
-
-    return hasLifeSign && hasInertia;
-  }
-
-  bool validateSolveTime(Duration elapsed) {
-    return elapsed >= config.minSolveTime;
-  }
-
   bool shouldRequireLock(double amount) {
     return amount >= config.thresholdAmount;
   }
-
-  bool verifyCode() {
-    // 1. TRAP CHECK (Zero Trap / Honeypot)
-    if (currentValues.contains(0)) {
-      jam(); 
-      return false;
-    }
-
-    // 2. SECRET CODE CHECK
-    if (currentValues.length != config.secret.length) return false;
-    for (int i = 0; i < config.secret.length; i++) {
-      if (currentValues[i] != config.secret[i]) {
-        return false;
-      }
-    }
-    
-    return true;
+  
+  @override
+  void dispose() {
+    _botTimer?.cancel();
+    super.dispose();
   }
 }
