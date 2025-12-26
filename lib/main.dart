@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'cryptex_lock/cryptex_lock.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -19,9 +17,10 @@ class MyApp extends StatelessWidget {
         body: Center(
           child: CryptexLock(
             controller: ClaController(
-              ClaConfig(
-                secret: 'AER-CRY-001',
-                minSolveTime: const Duration(seconds: 2),
+              const ClaConfig(
+                // ⛔ BUKAN STRING
+                secret: [1, 7, 3, 9, 2, 8, 4, 6],
+                minSolveTime: Duration(seconds: 2),
                 minShake: 0.2,
               ),
             ),
@@ -40,6 +39,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-
-
