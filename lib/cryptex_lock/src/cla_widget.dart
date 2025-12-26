@@ -91,7 +91,8 @@ class _CryptexLockState extends State<CryptexLock> {
 
     // 4. Validasi Kod Roda & Perangkap Zero
     if (widget.controller.verifyCode()) {
-      HapticFeedback.success(); // Gegar kejayaan
+      // PEMBETULAN: Menggunakan mediumImpact kerana 'success' tiada dalam SDK standard
+      HapticFeedback.mediumImpact(); 
       widget.onSuccess();
     } else {
       // Jika salah kod ATAU terkena perangkap Zero
