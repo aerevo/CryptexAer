@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Untuk kawalan orientasi
 import 'cryptex_lock/cryptex_lock.dart';
 
 void main() {
+  // Pastikan orientasi kekal Portrait (Bank Grade standard)
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   runApp(const MyApp());
 }
 
@@ -11,12 +18,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false, // Hilangkan banner DEBUG
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFFFD700), // Emas
-          secondary: Color(0xFF00E676), // Hijau Neon
+          primary: Color(0xFFFFD700),
+          secondary: Color(0xFF00E676),
         ),
       ),
       home: Scaffold(
@@ -26,11 +33,10 @@ class MyApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Tajuk Demo
                 const Icon(Icons.shield_moon, size: 80, color: Colors.amber),
                 const SizedBox(height: 20),
                 const Text(
-                  'BANK OF AER',
+                  'AER FINANCIAL',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 24,
@@ -38,50 +44,45 @@ class MyApp extends StatelessWidget {
                     letterSpacing: 3.0,
                   ),
                 ),
-                const SizedBox(height: 10),
-                const Text(
-                  'High Value Transaction Approval',
-                  style: TextStyle(color: Colors.white54),
-                ),
                 const SizedBox(height: 50),
 
-                // WIDGET CRYPTEX LOCK (INTEGRASI PENUH)
+                // WIDGET CRYPTEX (PRODUCTION MODE)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: CryptexLock(
-                    amount: 8000, // Transaksi melebihi threshold
+                    amount: 8000,
                     controller: ClaController(
                       const ClaConfig(
-                        // PENTING: Mesti 5 digit sahaja untuk V2.0 (5-Wheel)
-                        // PENTING: Jangan guna '0' dalam rahsia, '0' adalah perangkap!
                         secret: [1, 7, 3, 9, 2], 
-                        
-                        minSolveTime: Duration(seconds: 2), // Anti-Bot Timer
-                        minShake: 0.20, // Sensitiviti gegaran (Dinaikkan sedikit)
-                        jamCooldown: Duration(seconds: 60), // Tempoh denda
-                        thresholdAmount: 5000, // Had aktif
+                        minSolveTime: Duration(seconds: 2),
+                        minShake: 0.15,
+                        jamCooldown: Duration(seconds: 60),
+                        thresholdAmount: 5000,
                       ),
                     ),
+                    // CALLBACKS KOSONG (SILENT)
+                    // Dalam production, ini akan navigasi ke page lain.
+                    // Jangan print log rahsia di console.
                     onSuccess: () {
-                      debugPrint('CRYPTEX: ACCESS GRANTED');
-                      // Simulasi navigasi ke skrin berjaya
+                      // Logic pindah screen diletakkan di sini nanti
                     },
                     onFail: () {
-                      debugPrint('CRYPTEX: WRONG COMBINATION');
+                      // Logic rekod cubaan gagal ke server (bukan print)
                     },
                     onJammed: () {
-                      debugPrint('CRYPTEX: BOT DETECTED - SYSTEM JAMMED');
+                      // Logic hantar amaran ke HQ
                     },
                   ),
                 ),
                 
                 const SizedBox(height: 50),
+                // Footer No Version untuk keselamatan (Security by Obscurity)
                 const Text(
-                  'SECURED BY CLA V2.0',
+                  'SECURE ENCLAVE ACTIVE',
                   style: TextStyle(
-                    color: Colors.white24, 
-                    fontSize: 10,
-                    letterSpacing: 2.0
+                    color: Colors.white10, 
+                    fontSize: 8,
+                    letterSpacing: 1.0
                   ),
                 ),
               ],
