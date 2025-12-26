@@ -1,48 +1,42 @@
-import 'dart:async';
-import 'cla_models.dart';
+import 'dart:math';
 
 class ClaController {
   final ClaConfig config;
-  late DateTime _start;
+
   bool _jammed = false;
-  bool _motionDetected = false;
+  DateTime? _jamUntil;
 
   ClaController(this.config);
 
-  void start() {
-    _start = DateTime.now();
-    _jammed = false;
-    _motionDetected = false;
+  bool get isJammed {
+    if (_jamUntil == null) return false;
+    if (DateTime.now().isAfter(_jamUntil!)) {
+      _jamUntil = null;
+      _jammed = false;
+      return false;
+    }
+    return true;
   }
 
-  void registerMotion(double magnitude) {
-    if (magnitude >= config.minShake) {
-      _motionDetected = true;
-    }
+  void jam() {
+    _jammed = true;
+    _jamUntil = DateTime.now().add(config.jamCooldown);
   }
 
-  ClaResult validate(List<int> selected) {
-    if (_jammed) return ClaResult.jammed;
-
-    final elapsed = DateTime.now().difference(_start);
-    if (elapsed < config.minSolveTime) return ClaResult.fail;
-    if (!_motionDetected) return ClaResult.fail;
-
-    // Zero Trap
-    if (selected.contains(0)) {
-      _jammed = true;
-      return ClaResult.jammed;
-    }
-
-    // Kombinasi sebenar
-    for (int i = 0; i < config.secret.length; i++) {
-      if (selected[i] != config.secret[i]) {
-        return ClaResult.fail;
-      }
-    }
-
-    return ClaResult.success;
+  bool validateSolveTime(Duration elapsed) {
+    return elapsed >= config.minSolveTime;
   }
 
-  bool get isJammed => _jammed;
+  bool validateShake(double avgShake) {
+    return avgShake >= config.minShake;
+  }
+
+  bool shouldRequireLock(double amount) {
+    return amount >= config.thresholdAmount;
+  }
+
+  int nextTrapIndex(int wheelSize) {
+    final rand = Random();
+    return rand.nextInt(wheelSize);
+  }
 }
