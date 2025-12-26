@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'; // Untuk HapticFeedback
 import 'package:sensors_plus/sensors_plus.dart';
 import 'cla_controller.dart';
 
@@ -31,7 +31,6 @@ class _CryptexLockState extends State<CryptexLock> {
   // Warna Tema
   final Color _goldColor = const Color(0xFFFFD700);
   final Color _dangerColor = const Color(0xFFFF3333);
-  final Color _hudColor = const Color(0xFF00FF00); // Hijau Hacker
 
   @override
   void initState() {
@@ -41,17 +40,15 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _startListening() {
-    // Mula dengar sensor
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      // Formula magnitud mudah
-      final double magnitude = (e.x.abs() + e.y.abs() + e.z.abs()) / 9.8; // Normalize ke ~1G (roughly)
+      // Normalisasi graviti (~9.8 m/s²)
+      final double magnitude = (e.x.abs() + e.y.abs() + e.z.abs()) / 9.8;
       
-      // Tolak 1.0 (graviti) untuk dapatkan gegaran bersih (motion only)
-      // Jika telefon diam, magnitude ~1.0 (graviti). Kita nak perbezaan.
+      // Ambil nilai perbezaan dari 1.0G (Graviti statik)
       double shakeForce = (magnitude - 1.0).abs();
 
+      // Hantar ke controller untuk analisis
       widget.controller.recordShakeSample(shakeForce);
-      // Controller akan notify listeners, jadi UI akan rebuild automatik
     });
   }
 
@@ -62,11 +59,13 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _attemptUnlock() {
+    // 1. Bypass check
     if (!widget.controller.shouldRequireLock(widget.amount)) {
       widget.onSuccess();
       return;
     }
 
+    // 2. Jammed check
     if (widget.controller.isJammed) {
       HapticFeedback.vibrate();
       widget.onJammed();
@@ -74,50 +73,47 @@ class _CryptexLockState extends State<CryptexLock> {
     }
 
     final elapsed = DateTime.now().difference(_startTime);
-    
-    // DEBUG LOG
-    print("ATTEMPT: Time=${elapsed.inSeconds}s | Human=${widget.controller.validateHumanBehavior()}");
 
-    // 1. VALIDASI MANUSIA
+    // 3. VALIDASI MANUSIA (Bio-Signature)
     if (!widget.controller.validateSolveTime(elapsed) ||
         !widget.controller.validateHumanBehavior()) {
       
-      // Jika gagal pengesahan manusia
+      // Gagal ujian manusia -> Bot dikesan -> JAM!
       widget.controller.jam();
       HapticFeedback.vibrate();
       
-      // Tunjuk snackbar untuk debug kenapa gagal
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('BOT DETECTED: No significant movement!'), backgroundColor: Colors.red),
-      );
+      // Visual feedback: Flash merah sebentar (pilihan)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ACCESS DENIED: Bio-signature mismatch'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
       
       widget.onJammed();
       return;
     }
 
-    // 2. VALIDASI KOD
+    // 4. VALIDASI KOD & TRAP
     if (widget.controller.verifyCode()) {
-      HapticFeedback.vibrate(); 
+      HapticFeedback.vibrate(); // Vibrate tanda berjaya
       widget.onSuccess();
     } else {
+      HapticFeedback.vibrate();
       if (widget.controller.isJammed) {
-         HapticFeedback.vibrate();
-         widget.onJammed();
+         widget.onJammed(); // Terkena trap
       } else {
-         HapticFeedback.vibrate();
-         
-         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('WRONG CODE'), backgroundColor: Colors.orange),
-         );
-         
-         widget.onFail();
+         widget.onFail(); // Salah kod
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Rebuild bila controller update (untuk sensor text)
+    // Gunakan AnimatedBuilder untuk kemaskini UI bila controller berubah (cth: Jammed)
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, child) {
@@ -136,37 +132,38 @@ class _CryptexLockState extends State<CryptexLock> {
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _goldColor.withOpacity(0.5), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: _goldColor.withOpacity(0.1),
+            blurRadius: 20,
+            spreadRadius: 2,
+          )
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // HEADER
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.lock_person, color: _goldColor, size: 24),
+              Icon(Icons.lock_outline, color: _goldColor, size: 24),
               const SizedBox(width: 10),
-              Text('CLA SECURE V3', style: TextStyle(color: _goldColor, fontWeight: FontWeight.bold, fontFamily: 'Courier')),
+              Text(
+                'CRYPTEX SECURE',
+                style: TextStyle(
+                  color: _goldColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2.0,
+                  fontFamily: 'Courier',
+                ),
+              ),
             ],
           ),
           
-          // SENSOR HUD (DEBUG MODE) - SUPAYA KAPTEN NAMPAK
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(8),
-            color: Colors.black,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildSensorValue("FORCE", widget.controller.debugCurrentShake),
-                _buildSensorValue("PEAK", widget.controller.debugMaxShake),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 20),
+          const SizedBox(height: 30),
 
-          // WHEELS
+          // 5-WHEEL INTERFACE
           SizedBox(
             height: 150,
             child: Row(
@@ -177,34 +174,23 @@ class _CryptexLockState extends State<CryptexLock> {
           
           const SizedBox(height: 30),
 
-          // BUTTON
           SizedBox(
             width: double.infinity,
             height: 55,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: _goldColor, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _goldColor,
+                foregroundColor: Colors.black,
+              ),
               onPressed: _attemptUnlock,
-              child: const Text('ENGAGE LOCK', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text(
+                'AUTHENTICATE',
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5),
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSensorValue(String label, double value) {
-    return Column(
-      children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10)),
-        Text(
-          value.toStringAsFixed(3), 
-          style: TextStyle(
-            color: value > 0.15 ? _hudColor : Colors.red, // Hijau jika cukup kuat
-            fontFamily: 'Courier', 
-            fontWeight: FontWeight.bold
-          ),
-        ),
-      ],
     );
   }
 
@@ -216,9 +202,7 @@ class _CryptexLockState extends State<CryptexLock> {
         perspective: 0.005,
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (index) {
-          // PAKSA VIBRATE (Kuat)
-          HapticFeedback.vibrate(); 
-          
+          HapticFeedback.vibrate(); // Haptic setiap pusingan
           final value = index % 10;
           widget.controller.updateWheel(wheelIndex, value);
         },
@@ -245,13 +229,32 @@ class _CryptexLockState extends State<CryptexLock> {
   Widget _buildJammedUI() {
     return Container(
       padding: const EdgeInsets.all(30),
-      color: const Color(0xFF200000),
-      child: Center(
-        child: Text(
-          'JAMMED\nBOT DETECTED',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: _dangerColor, fontSize: 24, fontWeight: FontWeight.bold),
-        ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF200000),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _dangerColor, width: 2),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.block, color: _dangerColor, size: 50),
+          const SizedBox(height: 20),
+          Text(
+            'SYSTEM LOCKED',
+            style: TextStyle(
+              color: _dangerColor,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 2.0,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Suspicious activity detected.\nTry again later.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white54),
+          ),
+        ],
       ),
     );
   }
