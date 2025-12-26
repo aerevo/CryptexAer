@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Untuk kawalan orientasi
+import 'package:flutter/services.dart';
 import 'cryptex_lock/cryptex_lock.dart';
 
 void main() {
-  // Pastikan orientasi kekal Portrait (Bank Grade standard)
+  // 1. KUNCI ORIENTASI (Bank Grade Standard)
+  // Aplikasi kewangan tidak boleh pusing-pusing (landscape) untuk elak UI glitch/overlay attack.
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -18,12 +19,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // Hilangkan banner DEBUG
+      debugShowCheckedModeBanner: false, // Hilangkan tanda DEBUG
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFFFD700),
-          secondary: Color(0xFF00E676),
+          primary: Color(0xFFFFD700), // Emas
+          secondary: Color(0xFF00E676), // Hijau
         ),
       ),
       home: Scaffold(
@@ -33,7 +34,7 @@ class MyApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.shield_moon, size: 80, color: Colors.amber),
+                const Icon(Icons.shield, size: 80, color: Colors.amber),
                 const SizedBox(height: 20),
                 const Text(
                   'AER FINANCIAL',
@@ -53,36 +54,35 @@ class MyApp extends StatelessWidget {
                     amount: 8000,
                     controller: ClaController(
                       const ClaConfig(
+                        // RAHSIA 5 DIGIT (Tiada '0' sebab 0 ialah perangkap)
                         secret: [1, 7, 3, 9, 2], 
                         minSolveTime: Duration(seconds: 2),
-                        minShake: 0.15,
+                        minShake: 0.15, // Threshold Biometrik
                         jamCooldown: Duration(seconds: 60),
                         thresholdAmount: 5000,
                       ),
                     ),
-                    // CALLBACKS KOSONG (SILENT)
-                    // Dalam production, ini akan navigasi ke page lain.
-                    // Jangan print log rahsia di console.
+                    // CALLBACKS (SILENT)
+                    // Dalam production, jangan print log. Lakukan aksi terus.
                     onSuccess: () {
-                      // Logic pindah screen diletakkan di sini nanti
+                      // TODO: Navigate to Transfer Success Page
                     },
                     onFail: () {
-                      // Logic rekod cubaan gagal ke server (bukan print)
+                      // TODO: Record failure count secretly
                     },
                     onJammed: () {
-                      // Logic hantar amaran ke HQ
+                      // TODO: Flag device ID as suspicious
                     },
                   ),
                 ),
                 
                 const SizedBox(height: 50),
-                // Footer No Version untuk keselamatan (Security by Obscurity)
                 const Text(
                   'SECURE ENCLAVE ACTIVE',
                   style: TextStyle(
                     color: Colors.white10, 
-                    fontSize: 8,
-                    letterSpacing: 1.0
+                    fontSize: 10,
+                    letterSpacing: 2.0
                   ),
                 ),
               ],
