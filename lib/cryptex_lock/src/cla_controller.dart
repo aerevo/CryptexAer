@@ -1,4 +1,3 @@
-// lib/cryptex_lock/src/cla_controller.dart
 import 'dart:math';
 import 'cla_config.dart';
 
@@ -34,7 +33,8 @@ class ClaController {
 
   /// Validasi gegaran (Physical Presence Defense)
   bool validateShake(double avgShake) {
-    return avgShake >= config.config.minShake;
+    // PEMBETULAN: Membuang '.config' yang berlebihan
+    return avgShake >= config.minShake;
   }
 
   /// Adakah transaksi ini cukup besar untuk memerlukan CLA?
