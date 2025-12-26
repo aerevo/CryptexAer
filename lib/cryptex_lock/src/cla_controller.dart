@@ -10,13 +10,9 @@ class ClaController extends ChangeNotifier {
   DateTime? _jamUntil;
   late List<int> currentValues;
   
-  // DIAGNOSTIK: Untuk paparan di skrin
-  double debugCurrentShake = 0.0;
-  double debugMaxShake = 0.0;
-  double debugAvgShake = 0.0;
-
-  // Simpan data untuk analisis
+  // Data Analisis Biometrik
   List<double> _shakeSamples = [];
+  double debugMaxShake = 0.0;
 
   ClaController(this.config) {
     resetWheels();
@@ -24,6 +20,7 @@ class ClaController extends ChangeNotifier {
 
   void resetWheels() {
     final rand = Random();
+    // 5 Roda, nilai rawak mula
     currentValues = List.generate(5, (index) => rand.nextInt(10));
     _shakeSamples.clear();
     debugMaxShake = 0.0;
@@ -33,26 +30,20 @@ class ClaController extends ChangeNotifier {
   void updateWheel(int index, int value) {
     if (index >= 0 && index < currentValues.length) {
       currentValues[index] = value;
-      // updateWheel tak perlu notifyListeners kerap sangat
     }
   }
 
+  // Merekod data sensor (tanpa notify UI berlebihan untuk performance)
   void recordShakeSample(double magnitude) {
     _shakeSamples.add(magnitude);
-    
-    // Update data diagnostik
-    debugCurrentShake = magnitude;
     if (magnitude > debugMaxShake) {
       debugMaxShake = magnitude;
     }
-    
-    // Limit memori
+    // Simpan 200 sampel terakhir sahaja (jimat memori)
     if (_shakeSamples.length > 200) {
       _shakeSamples.removeAt(0);
     }
-    
-    // Notify supaya UI boleh tunjuk nombor bergerak (Real-time update)
-    notifyListeners();
+    // notifyListeners(); // Tutup notify kerap untuk UI silent
   }
 
   bool get isJammed {
@@ -71,23 +62,23 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // LOGIK V3: LEBIH ROBUST UNTUK HARDWARE BERBEZA
+  // --- LOGIK "PROOF OF HUMANITY" ---
   bool validateHumanBehavior() {
     if (_shakeSamples.isEmpty) return false;
 
-    // Kira Purata
+    // 1. Analisis Purata (Inersia)
     double sum = _shakeSamples.reduce((a, b) => a + b);
     double mean = sum / _shakeSamples.length;
-    debugAvgShake = mean;
 
-    // Kriteria 1: Mesti ada gegaran maksimum yang signifikan (Bukan meja mati)
-    // Meja mati biasanya < 0.05. Tangan manusia biasanya > 0.15
-    bool hasLifeSign = debugMaxShake > 0.15;
+    // 2. Kriteria Lulus:
+    // a. Peak Force: Mesti ada gegaran maksima > 0.15 (Tanda pergerakan sedar)
+    // b. Mean: Purata mesti > 0.02 (Tanda pergerakan mikro berterusan/tangan hidup)
+    bool hasLifeSign = debugMaxShake > config.minShake;
+    bool hasInertia = mean > 0.02; 
 
-    // Kriteria 2: Purata gegaran mesti wujud (tapi tak perlu tinggi sangat)
-    bool hasInertia = mean > 0.02;
-
-    print("DIAGNOSTIC: Max: $debugMaxShake | Mean: $mean | Result: ${hasLifeSign && hasInertia}");
+    // Reset sampel selepas semakan untuk sesi seterusnya
+    _shakeSamples.clear();
+    debugMaxShake = 0.0;
 
     return hasLifeSign && hasInertia;
   }
@@ -101,13 +92,13 @@ class ClaController extends ChangeNotifier {
   }
 
   bool verifyCode() {
-    // 1. Check ZERO TRAP
+    // 1. TRAP CHECK (Zero Trap / Honeypot)
     if (currentValues.contains(0)) {
       jam(); 
       return false;
     }
 
-    // 2. Check SECRET CODE
+    // 2. SECRET CODE CHECK
     if (currentValues.length != config.secret.length) return false;
     for (int i = 0; i < config.secret.length; i++) {
       if (currentValues[i] != config.secret[i]) {
