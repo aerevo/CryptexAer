@@ -16,23 +16,19 @@ class MyApp extends StatelessWidget {
         backgroundColor: Colors.black,
         body: Center(
           child: CryptexLock(
+            amount: 8000, // contoh transaksi
             controller: ClaController(
-              const ClaConfig(
-                // ⛔ BUKAN STRING
-                secret: [1, 7, 3, 9, 2, 8, 4, 6],
-                minSolveTime: Duration(seconds: 2),
-                minShake: 0.2,
+              ClaConfig(
+                secret: const [1, 7, 3, 9, 2, 8, 4, 6],
+                minSolveTime: const Duration(seconds: 2),
+                minShake: 0.15,
+                jamCooldown: const Duration(seconds: 120),
+                thresholdAmount: 5000,
               ),
             ),
-            onSuccess: () {
-              debugPrint('UNLOCK SUCCESS');
-            },
-            onFail: () {
-              debugPrint('UNLOCK FAIL');
-            },
-            onJammed: () {
-              debugPrint('SYSTEM JAMMED');
-            },
+            onSuccess: () => debugPrint('UNLOCK SUCCESS'),
+            onFail: () => debugPrint('UNLOCK FAIL'),
+            onJammed: () => debugPrint('SYSTEM JAMMED'),
           ),
         ),
       ),
