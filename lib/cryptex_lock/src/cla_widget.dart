@@ -1,152 +1,83 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:sensors_plus/sensors_plus.dart';
 import 'cla_controller.dart';
+import 'cla_config.dart';
 
-class CryptexLock extends StatefulWidget {
+class ClaWidget extends StatefulWidget {
   final ClaController controller;
-  final VoidCallback onSuccess;
-  final VoidCallback onFail;
-  final VoidCallback onJammed;
-  final double amount;
 
-  const CryptexLock({
+  const ClaWidget({
     super.key,
     required this.controller,
-    required this.onSuccess,
-    required this.onFail,
-    required this.onJammed,
-    required this.amount,
   });
 
   @override
-  State<CryptexLock> createState() => _CryptexLockState();
+  State<ClaWidget> createState() => _ClaWidgetState();
 }
 
-class _CryptexLockState extends State<CryptexLock> {
-  late final StreamSubscription _accelSub;
-  double _shakeSum = 0;
+class _ClaWidgetState extends State<ClaWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _shakeController;
+
+  double _shakeSum = 0.0;
   int _shakeCount = 0;
-  late final DateTime _startTime;
 
-  final List<String> _wheelItems = [
-    'API',
-    'AIR',
-    'ZERO', // ⛔ TRAP
-    'KILAT',
-    'TANAH',
-  ];
-
-  int _selectedIndex = 0;
+  Timer? _resetTimer;
 
   @override
   void initState() {
     super.initState();
-    _startTime = DateTime.now();
 
-    _accelSub = accelerometerEvents.listen((e) {
-      final magnitude =
-          (e.x.abs() + e.y.abs() + e.z.abs()) / 3.0;
-      _shakeSum += magnitude;
-      _shakeCount++;
-    });
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    )..addListener(_onShakeTick);
+  }
+
+  void _onShakeTick() {
+    final double value =
+        sin(_shakeController.value * pi * 6).abs();
+
+    _shakeSum += value;
+    _shakeCount++;
+
+    _resetTimer?.cancel();
+    _resetTimer = Timer(const Duration(milliseconds: 300), _evaluateShake);
+  }
+
+  void _evaluateShake() {
+    if (!mounted) return;
+
+    final double avgShake =
+        _shakeCount == 0 ? 0.0 : (_shakeSum / _shakeCount).toDouble();
+
+    _shakeSum = 0.0;
+    _shakeCount = 0;
+
+    if (!widget.controller.validateShake(avgShake)) {
+      widget.controller.onInvalidShake();
+    } else {
+      widget.controller.onValidShake();
+    }
   }
 
   @override
   void dispose() {
-    _accelSub.cancel();
+    _resetTimer?.cancel();
+    _shakeController.dispose();
     super.dispose();
-  }
-
-  void _attemptUnlock() {
-    if (!widget.controller.shouldRequireLock(widget.amount)) {
-      widget.onSuccess();
-      return;
-    }
-
-    if (widget.controller.isJammed) {
-      widget.onJammed();
-      return;
-    }
-
-    final elapsed = DateTime.now().difference(_startTime);
-    final avgShake =
-        _shakeCount == 0 ? 0 : _shakeSum / _shakeCount;
-
-    // ZERO trap
-    if (_wheelItems[_selectedIndex] == 'ZERO') {
-      widget.controller.jam();
-      widget.onJammed();
-      return;
-    }
-
-    if (!widget.controller.validateSolveTime(elapsed) ||
-        !widget.controller.validateShake(avgShake)) {
-      widget.controller.jam();
-      widget.onJammed();
-      return;
-    }
-
-    widget.onSuccess();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A002B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.purpleAccent, width: 2),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'CRYPTEX LOCK',
-            style: TextStyle(
-              color: Colors.amber,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 120,
-            child: ListWheelScrollView.useDelegate(
-              itemExtent: 40,
-              physics: const FixedExtentScrollPhysics(),
-              onSelectedItemChanged: (i) {
-                _selectedIndex = i;
-              },
-              childDelegate: ListWheelChildBuilderDelegate(
-                childCount: _wheelItems.length,
-                builder: (context, index) {
-                  return Center(
-                    child: Text(
-                      _wheelItems[index],
-                      style: const TextStyle(
-                        color: Colors.amber,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-            ),
-            onPressed: _attemptUnlock,
-            child: const Text('UNLOCK'),
-          ),
-        ],
-      ),
+    return GestureDetector(
+      onHorizontalDragUpdate: (_) {
+        if (!_shakeController.isAnimating) {
+          _shakeController.forward(from: 0.0);
+        }
+      },
+      child: const SizedBox.expand(),
     );
   }
 }
