@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:math'; // Perlu untuk Random
+import 'dart:math'; // WAJIB
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Library Memori
-import 'cla_models.dart'; // Kita guna Models, BUKAN cla_config.dart lagi
+import 'package:shared_preferences/shared_preferences.dart';
+import 'cla_models.dart';
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
@@ -11,47 +11,56 @@ class ClaController extends ChangeNotifier {
   SecurityState _state = SecurityState.LOCKED;
   SecurityState get state => _state;
 
-  // Ingatan Dosa
+  // Memory
   int _failedAttempts = 0;
   int get failedAttempts => _failedAttempts;
-  
   DateTime? _lockoutUntil;
-  List<int> currentValues = [1, 1, 1, 1, 1];
+  
+  // RODA: Mula dengan senarai kosong dulu
+  List<int> currentValues = [0, 0, 0, 0, 0];
 
-  // Kunci Memori (Database Key)
+  // Keys
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
-  // BOT Variable
   Timer? _botTimer;
 
   ClaController(this.config) {
-    _loadStateFromMemory(); // BACA MEMORI BILA MULA
+    _initSystem();
   }
 
-  // --- 1. MEMORI KEKAL (PERSISTENCE) ---
-  
+  Future<void> _initSystem() async {
+    // 1. Baca Memori Dosa (Persistence)
+    await _loadStateFromMemory();
+    
+    // 2. ANTIBOT UPGRADE: RAWAKKAN POSISI MULA
+    // Kalau sistem tak JAMMED, kita putar roda ke posisi rawak
+    // Bot tak boleh hafal "step" sebab titik mula sentiasa berubah.
+    if (_state != SecurityState.HARD_LOCK) {
+      _randomizeWheels();
+    }
+  }
+
+  // --- ANTIBOT: RANDOMIZER ---
+  void _randomizeWheels() {
+    final rand = Random();
+    // Kita set nilai semasa kepada rawak (0-9)
+    currentValues = List.generate(5, (index) => rand.nextInt(10));
+    notifyListeners();
+  }
+
   Future<void> _loadStateFromMemory() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // 1. Ambil rekod dosa lama
     _failedAttempts = prefs.getInt(KEY_ATTEMPTS) ?? 0;
     
-    // 2. Ambil rekod hukuman (jika ada)
     final lockTimestamp = prefs.getInt(KEY_LOCKOUT);
     if (lockTimestamp != null) {
       _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTimestamp);
-      
-      // Jika masih dalam tempoh hukuman, terus set HARD_LOCK
       if (DateTime.now().isBefore(_lockoutUntil!)) {
         _state = SecurityState.HARD_LOCK;
       } else {
-        // Hukuman dah tamat semasa app tutup
-        _clearMemory(); 
+        await _clearMemory(); 
       }
-    } else {
-      // Jika tiada hukuman, scramble roda (reset)
-      _resetInternal();
     }
     notifyListeners();
   }
@@ -71,15 +80,8 @@ class ClaController extends ChangeNotifier {
     _failedAttempts = 0;
     _lockoutUntil = null;
     _state = SecurityState.LOCKED;
-    _resetInternal(); // Scramble roda balik
-  }
-
-  void _resetInternal() {
-    if (_state != SecurityState.HARD_LOCK) {
-      final rand = Random();
-      currentValues = List.generate(5, (index) => rand.nextInt(10));
-      notifyListeners();
-    }
+    // Selepas berjaya/reset, rawakkan semula untuk sesi depan
+    _randomizeWheels(); 
   }
 
   void updateWheel(int index, int value) {
@@ -92,16 +94,13 @@ class ClaController extends ChangeNotifier {
     }
   }
 
-  // --- 2. ENJIN VALIDASI ---
-
-  Future<void> validateAttempt({required bool hasPhysicalMovement, Duration? solveTime}) async {
-    // Semak status denda
+  Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
     if (_state == SecurityState.HARD_LOCK) {
       if (_lockoutUntil != null && DateTime.now().isAfter(_lockoutUntil!)) {
-        await _clearMemory(); // Bebas dari penjara
+        await _clearMemory();
         notifyListeners();
       } else {
-        return; // Masih dalam penjara
+        return;
       }
     }
 
@@ -110,13 +109,13 @@ class ClaController extends ChangeNotifier {
 
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // ATURAN 1: HONEYPOT (MAUT)
+    // ATURAN 1: HONEYPOT
     if (currentValues.contains(0)) {
       await _triggerHardLock(); 
       return;
     }
 
-    // ATURAN 2: SENSOR FIZIKAL (MAUT)
+    // ATURAN 2: SENSOR FIZIKAL (DELTA MOVEMENT)
     if (!hasPhysicalMovement) {
       await _triggerHardLock();
       return;
@@ -124,19 +123,17 @@ class ClaController extends ChangeNotifier {
 
     // ATURAN 3: KOD RAHSIA
     if (_isCodeCorrect()) {
-      // BERJAYA
-      await _clearMemory(); // Bersihkan rekod dosa
+      await _clearMemory();
       _state = SecurityState.UNLOCKED;
       notifyListeners();
     } else {
-      // GAGAL
       await _handleFailure();
     }
   }
 
   Future<void> _handleFailure() async {
     _failedAttempts++;
-    await _saveStateToMemory(); // SIMPAN DOSA SEGERA
+    await _saveStateToMemory();
 
     if (_failedAttempts >= config.maxAttempts) {
       await _triggerHardLock();
@@ -156,7 +153,7 @@ class ClaController extends ChangeNotifier {
   Future<void> _triggerHardLock() async {
     _state = SecurityState.HARD_LOCK;
     _lockoutUntil = DateTime.now().add(config.jamCooldown);
-    await _saveStateToMemory(); // SIMPAN HUKUMAN SEGERA
+    await _saveStateToMemory();
     notifyListeners();
   }
 
@@ -168,7 +165,16 @@ class ClaController extends ChangeNotifier {
     return true;
   }
 
-  // --- BOT SIMULATION ---
+  // --- UI HELPER ---
+  // UI perlu tahu nilai awal untuk set kedudukan scroll roda
+  // Ini penting supaya UI tak 'jam' visualnya
+  int getInitialValue(int index) {
+    if (index >= 0 && index < currentValues.length) {
+      return currentValues[index];
+    }
+    return 0;
+  }
+
   void startBotSimulation(VoidCallback onFinished) {
     if (_state == SecurityState.HARD_LOCK) return;
     _state = SecurityState.BOT_SIMULATION;
@@ -184,9 +190,8 @@ class ClaController extends ChangeNotifier {
       }
       notifyListeners();
 
-      if (ticks >= 40) { // 2 saat
+      if (ticks >= 40) {
         timer.cancel();
-        // Bot cuba unlock tanpa movement
         validateAttempt(hasPhysicalMovement: false);
       }
     });
