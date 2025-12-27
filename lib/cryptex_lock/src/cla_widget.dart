@@ -27,13 +27,17 @@ class CryptexLock extends StatefulWidget {
 
 class _CryptexLockState extends State<CryptexLock> {
   StreamSubscription<AccelerometerEvent>? _accelSub;
-  bool _hasMoved = false;
+  
+  // SENSOR BARU: TIME-DECAY
+  DateTime _lastMovementTime = DateTime.fromMillisecondsSinceEpoch(0); // Zaman purba
+  double _currentShake = 0.0;
 
-  // Warna Status (Indikator Paling Jelas)
-  final Color _colLocked = const Color(0xFFFFD700); // Emas
-  final Color _colFail = const Color(0xFFFF9800);   // Oren
-  final Color _colJam = const Color(0xFFFF3333);    // Merah Darah
-  final Color _colUnlock = const Color(0xFF00E676); // Hijau
+  // Warna Status
+  final Color _colLocked = const Color(0xFFFFD700);
+  final Color _colFail = const Color(0xFFFF9800);
+  final Color _colJam = const Color(0xFFFF3333);
+  final Color _colUnlock = const Color(0xFF00E676);
+  final Color _colDead = Colors.grey; // Warna untuk status 'Meja/Mati'
 
   @override
   void initState() {
@@ -43,9 +47,21 @@ class _CryptexLockState extends State<CryptexLock> {
 
   void _startListening() {
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
+      // 1. Kira magnitud gegaran (tanpa graviti)
       double magnitude = (e.x.abs() + e.y.abs() + e.z.abs()) / 9.8;
-      if ((magnitude - 1.0).abs() > 0.05) {
-        if (mounted) setState(() => _hasMoved = true);
+      double shake = (magnitude - 1.0).abs();
+
+      // 2. Tentukan ambang sensitiviti
+      // 0.03 adalah sangat sensitif (nafas manusia pun boleh kesan)
+      // Meja batu biasanya < 0.01
+      if (shake > 0.03) {
+        _lastMovementTime = DateTime.now(); // KEMASKINI MASA TERAKHIR BERGERAK
+      }
+
+      if (mounted) {
+        setState(() {
+          _currentShake = shake;
+        });
       }
     });
   }
@@ -57,8 +73,16 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _handleUnlock() {
-    // Panggil Enjin Validasi
-    widget.controller.validateAttempt(hasPhysicalMovement: _hasMoved);
+    // LOGIK PENENTU: ADAKAH BARU BERGERAK?
+    final now = DateTime.now();
+    final difference = now.difference(_lastMovementTime).inMilliseconds;
+
+    // Jika kali terakhir bergerak lebih dari 1000ms (1 saat) yang lalu...
+    // Bermakna telefon sedang diam di atas meja.
+    bool isHoldingPhone = difference < 1000; 
+
+    // Hantar status 'Live' ini ke Controller
+    widget.controller.validateAttempt(hasPhysicalMovement: isHoldingPhone);
   }
 
   @override
@@ -66,7 +90,6 @@ class _CryptexLockState extends State<CryptexLock> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, child) {
-        // Bina UI berdasarkan State Mesin
         return _buildStateUI(widget.controller.state);
       },
     );
@@ -78,12 +101,22 @@ class _CryptexLockState extends State<CryptexLock> {
     IconData statusIcon;
     bool isInputDisabled = false;
 
-    // --- LOGIK STATUS VISUAL ---
+    // Semakan Visual: Adakah telefon 'hidup' (dipegang)?
+    // Kita guna logik sama (1 saat) untuk visual feedback
+    bool isAlive = DateTime.now().difference(_lastMovementTime).inMilliseconds < 1000;
+
     switch (state) {
       case SecurityState.LOCKED:
-        activeColor = _colLocked;
-        statusText = "SECURE LOCK ACTIVE";
-        statusIcon = Icons.lock_outline;
+        // Jika letak atas meja, warna jadi kelabu (DEAD)
+        if (isAlive) {
+          activeColor = _colLocked;
+          statusText = "SECURE LOCK ACTIVE";
+          statusIcon = Icons.lock_outline;
+        } else {
+          activeColor = _colDead;
+          statusText = "LIFT DEVICE TO UNLOCK"; // Arahan jelas
+          statusIcon = Icons.downloading; // Icon letak bawah
+        }
         break;
         
       case SecurityState.VALIDATING:
@@ -93,18 +126,17 @@ class _CryptexLockState extends State<CryptexLock> {
         isInputDisabled = true;
         break;
         
-      case SecurityState.SOFT_LOCK: // FAIL
+      case SecurityState.SOFT_LOCK:
         activeColor = _colFail;
-        // Tunjuk baki nyawa (PENTING)
         statusText = "FAILED (${widget.controller.failedAttempts}/3)";
         statusIcon = Icons.warning_amber_rounded;
         break;
         
-      case SecurityState.HARD_LOCK: // JAM
+      case SecurityState.HARD_LOCK:
         activeColor = _colJam;
         statusText = "SYSTEM JAMMED (${widget.controller.remainingLockoutSeconds}s)";
         statusIcon = Icons.block;
-        isInputDisabled = true; // Roda & Button mati
+        isInputDisabled = true;
         break;
         
       case SecurityState.UNLOCKED:
@@ -112,7 +144,6 @@ class _CryptexLockState extends State<CryptexLock> {
         statusText = "ACCESS GRANTED";
         statusIcon = Icons.check_circle_outline;
         isInputDisabled = true;
-        // Panggil callback kejayaan selepas UI render
         Future.delayed(Duration.zero, widget.onSuccess);
         break;
         
@@ -127,13 +158,12 @@ class _CryptexLockState extends State<CryptexLock> {
       decoration: BoxDecoration(
         color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: activeColor, width: 2), // Border bertukar warna ikut status
+        border: Border.all(color: activeColor, width: 2),
         boxShadow: [BoxShadow(color: activeColor.withOpacity(0.2), blurRadius: 15)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 1. HEADER STATUS
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -148,11 +178,19 @@ class _CryptexLockState extends State<CryptexLock> {
           
           const SizedBox(height: 20),
 
-          // 2. RODA (Input)
+          // DEBUG SENSOR (Untuk Kapten nampak apa berlaku)
+          // Kapten boleh buang ini nanti, tapi sekarang ia penting untuk audit
+          Text(
+            "SENSOR: ${isAlive ? 'HUMAN HAND' : 'STATIC/TABLE'} (${_currentShake.toStringAsFixed(3)})",
+            style: TextStyle(color: isAlive ? Colors.green : Colors.grey, fontSize: 10),
+          ),
+          
+          const SizedBox(height: 10),
+
           SizedBox(
             height: 120,
             child: IgnorePointer(
-              ignoring: isInputDisabled, // Matikan input jika JAMMED/VALIDATING
+              ignoring: isInputDisabled,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(5, (index) => _buildWheel(index, activeColor, isInputDisabled)),
@@ -162,7 +200,6 @@ class _CryptexLockState extends State<CryptexLock> {
           
           const SizedBox(height: 20),
 
-          // 3. BUTANG (Action)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
