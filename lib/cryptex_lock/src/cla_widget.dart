@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math'; // WAJIB UNTUK FORMULA MATEMATIK
+import 'dart:math'; // WAJIB untuk kira sudut
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -29,14 +29,21 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> {
   StreamSubscription<AccelerometerEvent>? _accelSub;
   
-  // DATA SENSOR
-  final List<double> _history = [];
-  double _currentStdDev = 0.0; // Nilai Sisihan Piawai Semasa
-  bool _isHuman = false;       // Keputusan Akhir
+  // --- ALGORITMA BARU: DELTA MOVEMENT (Sudut + Gegar) ---
+  // Kita simpan bacaan accelerometer sebelumnya
+  double _lastX = 0;
+  double _lastY = 0;
+  double _lastZ = 0;
+  
+  // Markah Kemanusiaan (0.0 - 100.0)
+  double _humanScore = 0.0; 
+  bool _isHuman = false;
 
-  // CONFIG SENSITIVITI
-  // 0.002 adalah sangat rendah. Lantai biasanya < 0.002. Tangan > 0.005.
-  static const double HUMAN_THRESHOLD = 0.005; 
+  // SENSITIVITI (Boleh ubah jika terlalu susah/senang)
+  // Lantai (ketuk): Score naik lambat (< 0.5 per frame)
+  // Tangan: Score naik laju (> 2.0 per frame)
+  static const double MOVEMENT_THRESHOLD = 0.3; 
+  static const double DECAY_RATE = 0.5; // Markah turun kalau diam
 
   // WARNA
   final Color _colLocked = const Color(0xFFFFD700);
@@ -53,38 +60,42 @@ class _CryptexLockState extends State<CryptexLock> {
 
   void _startListening() {
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      // 1. Kira Magnitud Mentah
-      // Kita tak tolak 1.0 disini, sebab kita nak tengok variasi, bukan nilai asal.
-      double magnitude = sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
+      // 1. Kira perbezaan (Delta) dari bacaan terakhir
+      // Ini mengukur PERUBAHAN SUDUT, bukan sekadar gegaran hentakan.
+      double deltaX = (e.x - _lastX).abs();
+      double deltaY = (e.y - _lastY).abs();
+      double deltaZ = (e.z - _lastZ).abs();
 
-      // 2. Simpan 50 sampel terakhir (kurang 1 saat data)
-      _history.add(magnitude);
-      if (_history.length > 50) {
-        _history.removeAt(0);
+      // Kemaskini data terakhir
+      _lastX = e.x;
+      _lastY = e.y;
+      _lastZ = e.z;
+
+      // 2. Jumlahkan semua perubahan
+      double totalDelta = deltaX + deltaY + deltaZ;
+
+      // 3. Sistem Pemarkahan (Score Accumulator)
+      if (totalDelta > MOVEMENT_THRESHOLD) {
+        // Kalau bergerak (tangan), markah naik
+        _humanScore += totalDelta;
+      } else {
+        // Kalau diam (lantai), markah turun (reput)
+        _humanScore -= DECAY_RATE;
       }
 
-      // 3. KIRA SISIHAN PIAWAI (STANDARD DEVIATION)
-      // Ini adalah jantung algoritma baru.
-      if (_history.length > 2) {
-        // A. Cari Min (Purata)
-        double mean = _history.reduce((a, b) => a + b) / _history.length;
-        
-        // B. Cari Varians (Jarak setiap titik dari Min)
-        double variance = _history.map((x) => (x - mean) * (x - mean))
-                                  .reduce((a, b) => a + b) / _history.length;
-        
-        // C. Sisihan Piawai = Punca Kuasa Varians
-        double stdDev = sqrt(variance);
+      // Kunci markah antara 0 hingga 50
+      _humanScore = _humanScore.clamp(0.0, 50.0);
 
-        // 4. BANDING DENGAN AMBANG
-        bool detectedHuman = stdDev > HUMAN_THRESHOLD;
+      // 4. Penentuan Mutlak
+      // Markah mesti lebih 10.0 untuk dianggap manusia.
+      // Ketuk skrin di lantai cuma bagi spike sekejap (markah naik sikit, lepas tu turun balik).
+      // Pegang di tangan sentiasa bagi markah tinggi.
+      bool detectedHuman = _humanScore > 10.0;
 
-        if (mounted) {
-          setState(() {
-            _currentStdDev = stdDev;
-            _isHuman = detectedHuman;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _isHuman = detectedHuman;
+        });
       }
     });
   }
@@ -96,8 +107,7 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _handleUnlock() {
-    // Hantar status Holding Phone ke Controller
-    // Kalau _isHuman FALSE (Lantai), sistem akan JAMMED.
+    // Hantar keputusan ke Controller
     widget.controller.validateAttempt(hasPhysicalMovement: _isHuman);
   }
 
@@ -122,19 +132,19 @@ class _CryptexLockState extends State<CryptexLock> {
       case SecurityState.LOCKED:
         if (_isHuman) {
           activeColor = _colLocked;
-          statusText = "BIO-METRIC: ACTIVE";
+          statusText = "BIO-LOCK: ACTIVE";
           statusIcon = Icons.fingerprint;
         } else {
           activeColor = _colDead;
-          statusText = "DEVICE IS STATIC (LIFT UP)";
-          statusIcon = Icons.place;
+          statusText = "DEVICE STATIC (TILT PHONE)";
+          statusIcon = Icons.screen_rotation; // Icon suruh pusing sikit
         }
         break;
         
       case SecurityState.VALIDATING:
         activeColor = Colors.white;
-        statusText = "ANALYZING STABILITY...";
-        statusIcon = Icons.query_stats;
+        statusText = "VERIFYING BIOMETRICS...";
+        statusIcon = Icons.radar;
         isInputDisabled = true;
         break;
         
@@ -168,10 +178,10 @@ class _CryptexLockState extends State<CryptexLock> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF050505),
+        color: const Color(0xFF000000),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: activeColor, width: 2),
-        boxShadow: [BoxShadow(color: activeColor.withOpacity(0.15), blurRadius: 20)],
+        boxShadow: [BoxShadow(color: activeColor.withOpacity(0.2), blurRadius: 20)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -190,44 +200,42 @@ class _CryptexLockState extends State<CryptexLock> {
           
           const SizedBox(height: 20),
 
-          // --- LIVE DEBUG PANEL (UNTUK KAPTEN) ---
-          // Tengok nombor ni. Kalau lantai, dia mesti 0.00something
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[800]!),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("VARIANCE (STD-DEV)", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                    Text(
-                      _currentStdDev.toStringAsFixed(5), // Tunjuk 5 titik perpuluhan
-                      style: TextStyle(
-                        color: _isHuman ? _colUnlock : _colJam,
-                        fontSize: 16,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold
-                      ),
-                    ),
-                  ],
+          // --- BAR DEBUG SENSITIVITI ---
+          // Ini untuk Kapten nampak beza ketuk lantai vs pegang tangan
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("MOVEMENT SCORE", style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+                  Text(
+                    _humanScore.toStringAsFixed(1), 
+                    style: TextStyle(
+                      color: _isHuman ? _colUnlock : _colJam, 
+                      fontWeight: FontWeight.bold
+                    )
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: _humanScore / 50.0, // Skala penuh 50
+                  backgroundColor: Colors.grey[900],
+                  color: _isHuman ? _colUnlock : _colJam,
+                  minHeight: 6,
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text("THRESHOLD", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                    const Text("0.00500", style: TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace')),
-                  ],
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "REQUIRED: 10.0", 
+                style: TextStyle(color: Colors.grey[600], fontSize: 9)
+              ),
+            ],
           ),
-          
+
           const SizedBox(height: 20),
 
           SizedBox(
@@ -281,7 +289,7 @@ class _CryptexLockState extends State<CryptexLock> {
               child: Text(
                 '$num',
                 style: TextStyle(
-                  color: disabled ? Colors.grey[700] : (num == 0 ? _colJam : Colors.white),
+                  color: disabled ? Colors.grey[800] : (num == 0 ? _colJam : Colors.white),
                   fontSize: 26,
                   fontWeight: FontWeight.bold
                 ),
