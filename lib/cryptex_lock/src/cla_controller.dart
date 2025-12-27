@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:math'; // Perlu untuk Random
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // WAJIB ADA
-import 'cla_config.dart';
-import 'cla_models.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Library Memori
+import 'cla_models.dart'; // Kita guna Models, BUKAN cla_config.dart lagi
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
@@ -21,6 +21,9 @@ class ClaController extends ChangeNotifier {
   // Kunci Memori (Database Key)
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
+
+  // BOT Variable
+  Timer? _botTimer;
 
   ClaController(this.config) {
     _loadStateFromMemory(); // BACA MEMORI BILA MULA
@@ -46,6 +49,9 @@ class ClaController extends ChangeNotifier {
         // Hukuman dah tamat semasa app tutup
         _clearMemory(); 
       }
+    } else {
+      // Jika tiada hukuman, scramble roda (reset)
+      _resetInternal();
     }
     notifyListeners();
   }
@@ -65,10 +71,22 @@ class ClaController extends ChangeNotifier {
     _failedAttempts = 0;
     _lockoutUntil = null;
     _state = SecurityState.LOCKED;
+    _resetInternal(); // Scramble roda balik
+  }
+
+  void _resetInternal() {
+    if (_state != SecurityState.HARD_LOCK) {
+      final rand = Random();
+      currentValues = List.generate(5, (index) => rand.nextInt(10));
+      notifyListeners();
+    }
   }
 
   void updateWheel(int index, int value) {
-    if (_state == SecurityState.HARD_LOCK || _state == SecurityState.VALIDATING) return;
+    if (_state == SecurityState.HARD_LOCK || 
+        _state == SecurityState.VALIDATING ||
+        _state == SecurityState.BOT_SIMULATION) return;
+        
     if (index >= 0 && index < currentValues.length) {
       currentValues[index] = value;
     }
@@ -76,7 +94,7 @@ class ClaController extends ChangeNotifier {
 
   // --- 2. ENJIN VALIDASI ---
 
-  Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
+  Future<void> validateAttempt({required bool hasPhysicalMovement, Duration? solveTime}) async {
     // Semak status denda
     if (_state == SecurityState.HARD_LOCK) {
       if (_lockoutUntil != null && DateTime.now().isAfter(_lockoutUntil!)) {
@@ -150,8 +168,38 @@ class ClaController extends ChangeNotifier {
     return true;
   }
 
+  // --- BOT SIMULATION ---
+  void startBotSimulation(VoidCallback onFinished) {
+    if (_state == SecurityState.HARD_LOCK) return;
+    _state = SecurityState.BOT_SIMULATION;
+    notifyListeners();
+
+    final rand = Random();
+    int ticks = 0;
+    
+    _botTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      ticks++;
+      for (int i = 0; i < currentValues.length; i++) {
+        currentValues[i] = rand.nextInt(10);
+      }
+      notifyListeners();
+
+      if (ticks >= 40) { // 2 saat
+        timer.cancel();
+        // Bot cuba unlock tanpa movement
+        validateAttempt(hasPhysicalMovement: false);
+      }
+    });
+  }
+
   int get remainingLockoutSeconds {
     if (_lockoutUntil == null) return 0;
     return _lockoutUntil!.difference(DateTime.now()).inSeconds;
+  }
+  
+  @override
+  void dispose() {
+    _botTimer?.cancel();
+    super.dispose();
   }
 }
