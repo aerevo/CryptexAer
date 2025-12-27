@@ -1,4 +1,4 @@
-name: Francois Build (Bank Grade - Blackout Mode)
+name: Francois Build (Blackout + Smuggling Mode)
 on:
   workflow_dispatch:
   push:
@@ -23,27 +23,18 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. PEMBEDAHAN & SUNTIK GEGAR (VIBRATE)
+      - name: 4. SUNTIKAN PERISAI (Vibrate & Blackout)
         run: |
-          echo "Membuang struktur Android lama..."
+          echo "Membersihkan & Menjana Android..."
           rm -rf android
-          echo "Menjana struktur Android moden..."
           flutter create . --platforms android
           
-          echo "MENYUNTIK PERMISSION VIBRATE..."
+          echo "Menyuntik Vibrate Permission..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
 
-      - name: 4b. SUNTIK MATA BUTA (ANTI-SCREENSHOT)
-        # INI BAHAGIAN YANG KAPTEN TERTINGGAL TADI
-        # Robot akan mencari fail MainActivity.kt dan paksa masukkan kod 'FLAG_SECURE'
-        run: |
-          echo "Mencari lokasi MainActivity.kt..."
+          echo "Menyuntik Anti-Screenshot (Blackout)..."
           FILE_PATH=$(find android/app/src/main/kotlin -name "MainActivity.kt")
-          
-          # Simpan baris 'package' asal supaya tak error
           PACKAGE_LINE=$(head -n 1 $FILE_PATH)
-          
-          echo "Menulis semula fail dengan Perisai FLAG_SECURE..."
           
           cat > $FILE_PATH <<EOF
           $PACKAGE_LINE
@@ -55,7 +46,6 @@ jobs:
           class MainActivity: FlutterActivity() {
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
-                  // ARAHAN BLACKOUT: Halang screenshot & preview
                   window.setFlags(
                       WindowManager.LayoutParams.FLAG_SECURE,
                       WindowManager.LayoutParams.FLAG_SECURE
@@ -63,7 +53,6 @@ jobs:
               }
           }
           EOF
-          echo "Suntikan Blackout berjaya."
 
       - name: 5. Download Dependencies
         run: flutter pub get
@@ -71,9 +60,18 @@ jobs:
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
 
-      - name: 7. Simpan APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: CryptexAer-Blackout-Edition
-          path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 1
+      - name: 7. PENYELUDUPAN APK (Bypass GitHub Storage)
+        # Kita guna curl untuk upload ke file.io sebab GitHub Artifact penuh.
+        # Link akan keluar dalam log hitam skrin Kapten.
+        run: |
+          echo "GitHub Storage Penuh. Mengaktifkan Protokol Penyeludupan..."
+          echo "Uploading to File.io..."
+          
+          # Upload dan simpan response
+          RESPONSE=$(curl -F "file=@build/app/outputs/flutter-apk/app-release.apk" https://file.io)
+          
+          echo "---------------------------------------------------"
+          echo "APK SIAP! KLIK LINK DI BAWAH UNTUK DOWNLOAD:"
+          echo $RESPONSE
+          echo "---------------------------------------------------"
+          echo "Nota: Link ini hanya sah untuk SEKALI download sahaja."
