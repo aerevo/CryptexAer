@@ -16,8 +16,10 @@ class ClaController extends ChangeNotifier {
   int get failedAttempts => _failedAttempts;
   DateTime? _lockoutUntil;
   
-  // RODA: Mula dengan senarai kosong dulu
-  List<int> currentValues = [0, 0, 0, 0, 0];
+  // --- PEMBAIKAN UTAMA DI SINI ---
+  // Jangan mula dengan [0,0,0,0,0].
+  // Jana terus nombor rawak SEBELUM apa-apa berlaku.
+  late List<int> currentValues;
 
   // Keys
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
@@ -26,28 +28,16 @@ class ClaController extends ChangeNotifier {
   Timer? _botTimer;
 
   ClaController(this.config) {
-    _initSystem();
-  }
-
-  Future<void> _initSystem() async {
-    // 1. Baca Memori Dosa (Persistence)
-    await _loadStateFromMemory();
-    
-    // 2. ANTIBOT UPGRADE: RAWAKKAN POSISI MULA
-    // Kalau sistem tak JAMMED, kita putar roda ke posisi rawak
-    // Bot tak boleh hafal "step" sebab titik mula sentiasa berubah.
-    if (_state != SecurityState.HARD_LOCK) {
-      _randomizeWheels();
-    }
-  }
-
-  // --- ANTIBOT: RANDOMIZER ---
-  void _randomizeWheels() {
+    // 1. RAWAKKAN SERTA MERTA (Synchronous)
+    // Ini pastikan bila UI tanya "Initial Value", nombor dah siap berterabur.
     final rand = Random();
-    // Kita set nilai semasa kepada rawak (0-9)
     currentValues = List.generate(5, (index) => rand.nextInt(10));
-    notifyListeners();
+    
+    // 2. Baru panggil memori (Async)
+    _loadStateFromMemory();
   }
+
+  // --- MEMORI & STATE ---
 
   Future<void> _loadStateFromMemory() async {
     final prefs = await SharedPreferences.getInstance();
@@ -56,13 +46,15 @@ class ClaController extends ChangeNotifier {
     final lockTimestamp = prefs.getInt(KEY_LOCKOUT);
     if (lockTimestamp != null) {
       _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTimestamp);
+      
+      // Semak penjara
       if (DateTime.now().isBefore(_lockoutUntil!)) {
         _state = SecurityState.HARD_LOCK;
+        notifyListeners(); // Update UI jadi Merah
       } else {
         await _clearMemory(); 
       }
     }
-    notifyListeners();
   }
 
   Future<void> _saveStateToMemory() async {
@@ -80,8 +72,10 @@ class ClaController extends ChangeNotifier {
     _failedAttempts = 0;
     _lockoutUntil = null;
     _state = SecurityState.LOCKED;
-    // Selepas berjaya/reset, rawakkan semula untuk sesi depan
-    _randomizeWheels(); 
+    
+    // Selepas berjaya unlock, rawakkan semula untuk pusingan seterusnya
+    final rand = Random();
+    currentValues = List.generate(5, (index) => rand.nextInt(10));
   }
 
   void updateWheel(int index, int value) {
@@ -93,6 +87,8 @@ class ClaController extends ChangeNotifier {
       currentValues[index] = value;
     }
   }
+
+  // --- LOGIK VALIDASI ---
 
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
     if (_state == SecurityState.HARD_LOCK) {
@@ -165,16 +161,15 @@ class ClaController extends ChangeNotifier {
     return true;
   }
 
-  // --- UI HELPER ---
-  // UI perlu tahu nilai awal untuk set kedudukan scroll roda
-  // Ini penting supaya UI tak 'jam' visualnya
+  // Helper untuk UI dapatkan nilai awal (PENTING)
   int getInitialValue(int index) {
     if (index >= 0 && index < currentValues.length) {
       return currentValues[index];
     }
-    return 0;
+    return 0; // Default fallback
   }
 
+  // --- BOT SIMULATION ---
   void startBotSimulation(VoidCallback onFinished) {
     if (_state == SecurityState.HARD_LOCK) return;
     _state = SecurityState.BOT_SIMULATION;
