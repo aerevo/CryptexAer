@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'cryptex_lock/cryptex_lock.dart';
+import 'cryptex_lock/cryptex_lock.dart'; // Pintu masuk library
 
 void main() {
-  // 1. KUNCI ORIENTASI (Bank Grade Standard)
-  // Aplikasi kewangan tidak boleh pusing-pusing (landscape) untuk elak UI glitch/overlay attack.
   WidgetsFlutterBinding.ensureInitialized();
+  // KUNCI ORIENTASI: Portrait Sahaja (Bank Grade)
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -19,12 +18,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // Hilangkan tanda DEBUG
+      debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFFFD700), // Emas
-          secondary: Color(0xFF00E676), // Hijau
+          primary: Color(0xFFFFD700),
         ),
       ),
       home: Scaffold(
@@ -34,7 +32,7 @@ class MyApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.shield, size: 80, color: Colors.amber),
+                const Icon(Icons.shield_moon, size: 80, color: Colors.amber),
                 const SizedBox(height: 20),
                 const Text(
                   'AER FINANCIAL',
@@ -47,31 +45,30 @@ class MyApp extends StatelessWidget {
                 ),
                 const SizedBox(height: 50),
 
-                // WIDGET CRYPTEX (PRODUCTION MODE)
+                // WIDGET BLACKBOX
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: CryptexLock(
                     amount: 8000,
                     controller: ClaController(
                       const ClaConfig(
-                        // RAHSIA 5 DIGIT (Tiada '0' sebab 0 ialah perangkap)
+                        // RAHSIA 5 DIGIT
                         secret: [1, 7, 3, 9, 2], 
                         minSolveTime: Duration(seconds: 2),
-                        minShake: 0.15, // Threshold Biometrik
+                        minShake: 0.15,
                         jamCooldown: Duration(seconds: 60),
                         thresholdAmount: 5000,
                       ),
                     ),
-                    // CALLBACKS (SILENT)
-                    // Dalam production, jangan print log. Lakukan aksi terus.
+                    // CALLBACKS
                     onSuccess: () {
-                      // TODO: Navigate to Transfer Success Page
+                      // Navigate to success
                     },
                     onFail: () {
-                      // TODO: Record failure count secretly
+                      // Log failure
                     },
                     onJammed: () {
-                      // TODO: Flag device ID as suspicious
+                      // Log threat
                     },
                   ),
                 ),
