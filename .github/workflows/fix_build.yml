@@ -1,55 +1,79 @@
-name: Francois Fix and Build (Bank Grade)
+name: Francois Build (Bank Grade - Blackout Mode)
 on:
-  workflow_dispatch: # Membolehkan Kapten tekan butang play manual
+  workflow_dispatch:
   push:
     branches: [ main, master ]
 
 jobs:
-  fix-and-build:
+  build-secure-apk:
     runs-on: ubuntu-latest
     
     steps:
       - name: 1. Ambil Kod Kapten
         uses: actions/checkout@v3
 
-      - name: 2. Setup Java (Enjin Asas)
+      - name: 2. Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 3. Setup Flutter (Enjin Utama)
+      - name: 3. Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           
-      - name: 4. PEMBEDAHAN UTAMA (Fix Android & Inject Permission)
-        # Langkah ini memadam folder android lama, buat baru, DAN suntik permission
+      - name: 4. PEMBEDAHAN & SUNTIK GEGAR (VIBRATE)
         run: |
           echo "Membuang struktur Android lama..."
           rm -rf android
-          echo "Menjana struktur Android moden (2025)..."
+          echo "Menjana struktur Android moden..."
           flutter create . --platforms android
           
-          echo "MENYUNTIK KEBENARAN VIBRATE (PENTING)..."
-          # Francois menggunakan 'sed' untuk menyelitkan permission getaran secara automatik
-          # Kerana 'flutter create' menghasilkan manifest kosong tanpa permission ini.
+          echo "MENYUNTIK PERMISSION VIBRATE..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+
+      - name: 4b. SUNTIK MATA BUTA (ANTI-SCREENSHOT)
+        # INI BAHAGIAN YANG KAPTEN TERTINGGAL TADI
+        # Robot akan mencari fail MainActivity.kt dan paksa masukkan kod 'FLAG_SECURE'
+        run: |
+          echo "Mencari lokasi MainActivity.kt..."
+          FILE_PATH=$(find android/app/src/main/kotlin -name "MainActivity.kt")
           
-          echo "Selesai pembaikan & suntikan."
+          # Simpan baris 'package' asal supaya tak error
+          PACKAGE_LINE=$(head -n 1 $FILE_PATH)
+          
+          echo "Menulis semula fail dengan Perisai FLAG_SECURE..."
+          
+          cat > $FILE_PATH <<EOF
+          $PACKAGE_LINE
+          
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import android.view.WindowManager
+          
+          class MainActivity: FlutterActivity() {
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  // ARAHAN BLACKOUT: Halang screenshot & preview
+                  window.setFlags(
+                      WindowManager.LayoutParams.FLAG_SECURE,
+                      WindowManager.LayoutParams.FLAG_SECURE
+                  )
+              }
+          }
+          EOF
+          echo "Suntikan Blackout berjaya."
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 6. Build APK Release (OBFUSCATED - SENJATA SULIT)
-        # INI DIA SENJATA SULIT TERSEBUT
-        # --obfuscate: Mencincang kod manusia jadi kod mesin rahsia
-        # --split-debug-info: Mengasingkan peta kod supaya hacker buntu
+      - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
 
-      - name: 7. Simpan APK Kebal untuk Kapten
+      - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: CryptexAer-Secure-BankGrade
+          name: CryptexAer-Blackout-Edition
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
