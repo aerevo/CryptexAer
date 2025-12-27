@@ -1,114 +1,146 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // WAJIB ADA
 import 'cla_config.dart';
-import 'cla_models.dart'; // Import Model Baru
+import 'cla_models.dart';
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
 
-  // --- STATE (STATUS) ---
+  // State Machine
   SecurityState _state = SecurityState.LOCKED;
   SecurityState get state => _state;
 
-  // --- MEMORY (INGATAN) ---
+  // Ingatan Dosa
   int _failedAttempts = 0;
-  DateTime? _lockoutUntil;
-  List<int> currentValues = [0, 0, 0, 0, 0];
+  int get failedAttempts => _failedAttempts;
   
-  // --- BOT SIMULATION VARS ---
-  Timer? _botTimer;
+  DateTime? _lockoutUntil;
+  List<int> currentValues = [1, 1, 1, 1, 1];
 
-  // Constructor
+  // Kunci Memori (Database Key)
+  static const String KEY_ATTEMPTS = 'cla_failed_attempts';
+  static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
+
   ClaController(this.config) {
-    _resetInternal();
+    _loadStateFromMemory(); // BACA MEMORI BILA MULA
   }
 
-  // Reset dalaman (Private)
-  void _resetInternal() {
-    // Hanya reset jika sistem tidak JAMMED
-    if (_state != SecurityState.HARD_LOCK) {
-      final rand = Random();
-      // Scramble nombor untuk keselamatan (Anti-Pattern)
-      currentValues = List.generate(5, (index) => rand.nextInt(10));
-      notifyListeners();
+  // --- 1. MEMORI KEKAL (PERSISTENCE) ---
+  
+  Future<void> _loadStateFromMemory() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // 1. Ambil rekod dosa lama
+    _failedAttempts = prefs.getInt(KEY_ATTEMPTS) ?? 0;
+    
+    // 2. Ambil rekod hukuman (jika ada)
+    final lockTimestamp = prefs.getInt(KEY_LOCKOUT);
+    if (lockTimestamp != null) {
+      _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTimestamp);
+      
+      // Jika masih dalam tempoh hukuman, terus set HARD_LOCK
+      if (DateTime.now().isBefore(_lockoutUntil!)) {
+        _state = SecurityState.HARD_LOCK;
+      } else {
+        // Hukuman dah tamat semasa app tutup
+        _clearMemory(); 
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> _saveStateToMemory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(KEY_ATTEMPTS, _failedAttempts);
+    if (_lockoutUntil != null) {
+      await prefs.setInt(KEY_LOCKOUT, _lockoutUntil!.millisecondsSinceEpoch);
     }
   }
 
-  // Update Roda (Dipanggil oleh UI)
+  Future<void> _clearMemory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(KEY_ATTEMPTS);
+    await prefs.remove(KEY_LOCKOUT);
+    _failedAttempts = 0;
+    _lockoutUntil = null;
+    _state = SecurityState.LOCKED;
+  }
+
   void updateWheel(int index, int value) {
-    // Kalau sistem tengah sibuk atau jammed, tolak input
-    if (_state == SecurityState.HARD_LOCK || 
-        _state == SecurityState.VALIDATING || 
-        _state == SecurityState.BOT_SIMULATION) return;
-    
+    if (_state == SecurityState.HARD_LOCK || _state == SecurityState.VALIDATING) return;
     if (index >= 0 && index < currentValues.length) {
       currentValues[index] = value;
-      // notifyListeners(); // Optional: Optimization (Silent Update)
     }
   }
 
-  // --- LOGIK TERAS (THE BLACK BOX LOGIC) ---
+  // --- 2. ENJIN VALIDASI ---
 
-  // 1. Semak Denda (Perlu dipanggil sentiasa oleh UI)
-  void checkLockStatus() {
-    if (_lockoutUntil != null) {
-      if (DateTime.now().isAfter(_lockoutUntil!)) {
-        // Denda tamat -> Bebaskan sistem
-        _lockoutUntil = null;
-        _state = SecurityState.LOCKED;
-        _failedAttempts = 0; // Reset dosa
-        _resetInternal(); // Scramble roda balik
+  Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
+    // Semak status denda
+    if (_state == SecurityState.HARD_LOCK) {
+      if (_lockoutUntil != null && DateTime.now().isAfter(_lockoutUntil!)) {
+        await _clearMemory(); // Bebas dari penjara
         notifyListeners();
+      } else {
+        return; // Masih dalam penjara
       }
-      // Jika belum tamat, kekal dalam HARD_LOCK
     }
-  }
 
-  // 2. Fungsi Validasi Utama (Jantung Sistem)
-  Future<void> validateAttempt({
-    required bool hasPhysicalMovement,
-    required Duration solveTime,
-  }) async {
-    
-    // Semak jika sistem masih kena denda
-    checkLockStatus();
-    if (_state == SecurityState.HARD_LOCK || _state == SecurityState.SOFT_LOCK) return;
-
-    // Tukar status ke 'VALIDATING' (UI akan tunjuk loading)
     _state = SecurityState.VALIDATING;
     notifyListeners();
 
-    // Simulasi pengiraan kriptografi (rasa 'berat' sikit)
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    // A. SEMAK HONEYPOT (DOSA BESAR)
-    // Jika ada '0', sistem tahu ini serangan rawak -> HARD LOCK
+    // ATURAN 1: HONEYPOT (MAUT)
     if (currentValues.contains(0)) {
-      _triggerHardLock();
+      await _triggerHardLock(); 
       return;
     }
 
-    // B. SEMAK FIZIKAL (DOSA BESAR)
-    // Jika tiada gegaran tangan -> HARD LOCK
+    // ATURAN 2: SENSOR FIZIKAL (MAUT)
     if (!hasPhysicalMovement) {
-      _triggerHardLock();
+      await _triggerHardLock();
       return;
     }
 
-    // C. SEMAK KOD RAHSIA (KUNCI UTAMA)
+    // ATURAN 3: KOD RAHSIA
     if (_isCodeCorrect()) {
       // BERJAYA
+      await _clearMemory(); // Bersihkan rekod dosa
       _state = SecurityState.UNLOCKED;
-      _failedAttempts = 0;
       notifyListeners();
     } else {
-      // GAGAL (Salah Kod)
-      _handleSoftFail();
+      // GAGAL
+      await _handleFailure();
     }
   }
 
-  // --- FUNGSI SOKONGAN (PRIVATE) ---
+  Future<void> _handleFailure() async {
+    _failedAttempts++;
+    await _saveStateToMemory(); // SIMPAN DOSA SEGERA
+
+    if (_failedAttempts >= config.maxAttempts) {
+      await _triggerHardLock();
+    } else {
+      _state = SecurityState.SOFT_LOCK;
+      notifyListeners();
+      
+      Future.delayed(const Duration(seconds: 2), () {
+        if (_state == SecurityState.SOFT_LOCK) {
+          _state = SecurityState.LOCKED;
+          notifyListeners();
+        }
+      });
+    }
+  }
+
+  Future<void> _triggerHardLock() async {
+    _state = SecurityState.HARD_LOCK;
+    _lockoutUntil = DateTime.now().add(config.jamCooldown);
+    await _saveStateToMemory(); // SIMPAN HUKUMAN SEGERA
+    notifyListeners();
+  }
 
   bool _isCodeCorrect() {
     if (currentValues.length != config.secret.length) return false;
@@ -118,68 +150,8 @@ class ClaController extends ChangeNotifier {
     return true;
   }
 
-  void _handleSoftFail() {
-    _failedAttempts++;
-    if (_failedAttempts >= config.maxAttempts) {
-      // Dosa dah penuh (3x salah) -> HARD LOCK
-      _triggerHardLock();
-    } else {
-      // Dosa kecil -> SOFT LOCK (Amaran)
-      _state = SecurityState.SOFT_LOCK;
-      notifyListeners();
-      
-      // Auto-release soft lock lepas 3 saat
-      Future.delayed(config.softLockCooldown, () {
-        if (_state == SecurityState.SOFT_LOCK) {
-          _state = SecurityState.LOCKED;
-          notifyListeners();
-        }
-      });
-    }
-  }
-
-  void _triggerHardLock() {
-    _state = SecurityState.HARD_LOCK;
-    _lockoutUntil = DateTime.now().add(config.jamCooldown);
-    notifyListeners();
-  }
-
-  // --- MOD UJIAN (BOT SIMULATION) ---
-  void startBotSimulation(VoidCallback onFinished) {
-    if (_state == SecurityState.HARD_LOCK) return;
-    
-    _state = SecurityState.BOT_SIMULATION;
-    notifyListeners();
-
-    final rand = Random();
-    int ticks = 0;
-    
-    _botTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      ticks++;
-      // Bot pusing roda rawak laju-laju
-      for (int i = 0; i < currentValues.length; i++) {
-        currentValues[i] = rand.nextInt(10);
-      }
-      notifyListeners();
-
-      if (ticks >= 40) { // 2 saat
-        timer.cancel();
-        // Bot cuba unlock (tapi tanpa movement fizikal)
-        validateAttempt(hasPhysicalMovement: false, solveTime: Duration.zero);
-      }
-    });
-  }
-
-  // Helper untuk UI tahu berapa lama lagi jammed
-  String get remainingLockoutTime {
-    if (_lockoutUntil == null) return "";
-    final diff = _lockoutUntil!.difference(DateTime.now());
-    return "${diff.inSeconds}";
-  }
-
-  @override
-  void dispose() {
-    _botTimer?.cancel();
-    super.dispose();
+  int get remainingLockoutSeconds {
+    if (_lockoutUntil == null) return 0;
+    return _lockoutUntil!.difference(DateTime.now()).inSeconds;
   }
 }
