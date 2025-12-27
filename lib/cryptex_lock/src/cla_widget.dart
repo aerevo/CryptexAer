@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math'; // WAJIB UNTUK FORMULA MATEMATIK
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -28,13 +29,16 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> {
   StreamSubscription<AccelerometerEvent>? _accelSub;
   
-  // SENSOR BARU: HUMAN TREMOR AVERAGING
-  // Kita simpan 50 data terakhir untuk cari purata
-  final List<double> _shakeHistory = [];
-  double _averageShake = 0.0;
-  bool _isStableSurface = true; // Default anggap di meja (Safety First)
+  // DATA SENSOR
+  final List<double> _history = [];
+  double _currentStdDev = 0.0; // Nilai Sisihan Piawai Semasa
+  bool _isHuman = false;       // Keputusan Akhir
 
-  // Warna Status
+  // CONFIG SENSITIVITI
+  // 0.002 adalah sangat rendah. Lantai biasanya < 0.002. Tangan > 0.005.
+  static const double HUMAN_THRESHOLD = 0.005; 
+
+  // WARNA
   final Color _colLocked = const Color(0xFFFFD700);
   final Color _colFail = const Color(0xFFFF9800);
   final Color _colJam = const Color(0xFFFF3333);
@@ -48,35 +52,39 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _startListening() {
-    // Sampling rate accelerometer biasanya 60Hz (60 kali sesaat)
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      // 1. Kira magnitud gegaran
-      double magnitude = (e.x.abs() + e.y.abs() + e.z.abs()) / 9.8;
-      double shake = (magnitude - 1.0).abs();
+      // 1. Kira Magnitud Mentah
+      // Kita tak tolak 1.0 disini, sebab kita nak tengok variasi, bukan nilai asal.
+      double magnitude = sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
 
-      // 2. Masukkan dalam sejarah (Rolling Buffer)
-      _shakeHistory.add(shake);
-      if (_shakeHistory.length > 50) {
-        _shakeHistory.removeAt(0); // Buang data lama
+      // 2. Simpan 50 sampel terakhir (kurang 1 saat data)
+      _history.add(magnitude);
+      if (_history.length > 50) {
+        _history.removeAt(0);
       }
 
-      // 3. Kira Purata (Average)
-      // Ini yang membezakan 'Ketuk Skrin' vs 'Pegang Tangan'
-      // Ketuk skrin = Spike sekejap, tapi purata rendah.
-      // Pegang tangan = Sentiasa ada gegaran kecil, purata tinggi.
-      double sum = _shakeHistory.fold(0, (p, c) => p + c);
-      double avg = _shakeHistory.isEmpty ? 0 : sum / _shakeHistory.length;
+      // 3. KIRA SISIHAN PIAWAI (STANDARD DEVIATION)
+      // Ini adalah jantung algoritma baru.
+      if (_history.length > 2) {
+        // A. Cari Min (Purata)
+        double mean = _history.reduce((a, b) => a + b) / _history.length;
+        
+        // B. Cari Varians (Jarak setiap titik dari Min)
+        double variance = _history.map((x) => (x - mean) * (x - mean))
+                                  .reduce((a, b) => a + b) / _history.length;
+        
+        // C. Sisihan Piawai = Punca Kuasa Varians
+        double stdDev = sqrt(variance);
 
-      // THRESHOLD MAUT: 0.02
-      // Di lantai: avg biasanya 0.001 - 0.005 (Sangat rendah)
-      // Di tangan: avg biasanya 0.02 - 0.05 (Walaupun cuba diam)
-      bool detectedSurface = avg < 0.02;
+        // 4. BANDING DENGAN AMBANG
+        bool detectedHuman = stdDev > HUMAN_THRESHOLD;
 
-      if (mounted) {
-        setState(() {
-          _averageShake = avg;
-          _isStableSurface = detectedSurface;
-        });
+        if (mounted) {
+          setState(() {
+            _currentStdDev = stdDev;
+            _isHuman = detectedHuman;
+          });
+        }
       }
     });
   }
@@ -88,11 +96,9 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _handleUnlock() {
-    // JIKA SURFACE STABIL (MEJA/LANTAI) -> GAGAL
-    // Kita hantar 'false' ke controller jika ia dikesan stabil
-    bool hasHumanTremor = !_isStableSurface;
-    
-    widget.controller.validateAttempt(hasPhysicalMovement: hasHumanTremor);
+    // Hantar status Holding Phone ke Controller
+    // Kalau _isHuman FALSE (Lantai), sistem akan JAMMED.
+    widget.controller.validateAttempt(hasPhysicalMovement: _isHuman);
   }
 
   @override
@@ -111,26 +117,24 @@ class _CryptexLockState extends State<CryptexLock> {
     IconData statusIcon;
     bool isInputDisabled = false;
 
-    // Logik Paparan Status (Real-time)
-    bool isHuman = !_isStableSurface;
-
+    // Logik Paparan
     switch (state) {
       case SecurityState.LOCKED:
-        if (isHuman) {
+        if (_isHuman) {
           activeColor = _colLocked;
-          statusText = "BIO-ID: HUMAN DETECTED";
+          statusText = "BIO-METRIC: ACTIVE";
           statusIcon = Icons.fingerprint;
         } else {
           activeColor = _colDead;
-          statusText = "SURFACE DETECTED (LIFT PHONE)";
-          statusIcon = Icons.phonelink_erase;
+          statusText = "DEVICE IS STATIC (LIFT UP)";
+          statusIcon = Icons.place;
         }
         break;
         
       case SecurityState.VALIDATING:
         activeColor = Colors.white;
-        statusText = "ANALYZING MICRO-TREMORS...";
-        statusIcon = Icons.graphic_eq;
+        statusText = "ANALYZING STABILITY...";
+        statusIcon = Icons.query_stats;
         isInputDisabled = true;
         break;
         
@@ -164,10 +168,10 @@ class _CryptexLockState extends State<CryptexLock> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF050505),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: activeColor, width: 2),
-        boxShadow: [BoxShadow(color: activeColor.withOpacity(0.2), blurRadius: 15)],
+        boxShadow: [BoxShadow(color: activeColor.withOpacity(0.15), blurRadius: 20)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -179,44 +183,52 @@ class _CryptexLockState extends State<CryptexLock> {
               const SizedBox(width: 10),
               Text(
                 statusText,
-                style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, letterSpacing: 1.0),
               ),
             ],
           ),
           
           const SizedBox(height: 20),
 
-          // DEBUG BAR (WAJIB TENGOK)
-          // Bar ini akan penuh kalau ada tangan, kosong kalau di lantai
-          Column(
-            children: [
-              Text(
-                "STABILITY INDEX: ${_averageShake.toStringAsFixed(4)}",
-                style: TextStyle(
-                  color: isHuman ? Colors.green : Colors.red,
-                  fontSize: 10,
-                  fontFamily: 'monospace'
+          // --- LIVE DEBUG PANEL (UNTUK KAPTEN) ---
+          // Tengok nombor ni. Kalau lantai, dia mesti 0.00something
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[800]!),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("VARIANCE (STD-DEV)", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                    Text(
+                      _currentStdDev.toStringAsFixed(5), // Tunjuk 5 titik perpuluhan
+                      style: TextStyle(
+                        color: _isHuman ? _colUnlock : _colJam,
+                        fontSize: 16,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 5),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: LinearProgressIndicator(
-                  value: (_averageShake * 20).clamp(0.0, 1.0), // Scale up visual
-                  backgroundColor: Colors.grey[900],
-                  color: isHuman ? Colors.green : Colors.red,
-                  minHeight: 4,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text("THRESHOLD", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                    const Text("0.00500", style: TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace')),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                 isHuman ? "PASS" : "FAIL (TOO STABLE)",
-                 style: TextStyle(color: isHuman ? Colors.green : Colors.red, fontSize: 10),
-              )
-            ],
+              ],
+            ),
           ),
-
-          const SizedBox(height: 10),
+          
+          const SizedBox(height: 20),
 
           SizedBox(
             height: 120,
@@ -235,12 +247,16 @@ class _CryptexLockState extends State<CryptexLock> {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: isInputDisabled ? Colors.grey[800] : activeColor,
+                backgroundColor: isInputDisabled ? Colors.grey[900] : activeColor,
                 foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 15),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: isInputDisabled ? null : _handleUnlock,
-              child: Text(state == SecurityState.HARD_LOCK ? "LOCKED" : "AUTHENTICATE"),
+              child: Text(
+                state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "AUTHENTICATE",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -265,8 +281,8 @@ class _CryptexLockState extends State<CryptexLock> {
               child: Text(
                 '$num',
                 style: TextStyle(
-                  color: disabled ? Colors.grey : (num == 0 ? _colJam : Colors.white),
-                  fontSize: 24,
+                  color: disabled ? Colors.grey[700] : (num == 0 ? _colJam : Colors.white),
+                  fontSize: 26,
                   fontWeight: FontWeight.bold
                 ),
               ),
