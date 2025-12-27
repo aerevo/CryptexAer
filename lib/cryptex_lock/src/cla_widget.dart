@@ -28,16 +28,18 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> {
   StreamSubscription<AccelerometerEvent>? _accelSub;
   
-  // SENSOR BARU: TIME-DECAY
-  DateTime _lastMovementTime = DateTime.fromMillisecondsSinceEpoch(0); // Zaman purba
-  double _currentShake = 0.0;
+  // SENSOR BARU: HUMAN TREMOR AVERAGING
+  // Kita simpan 50 data terakhir untuk cari purata
+  final List<double> _shakeHistory = [];
+  double _averageShake = 0.0;
+  bool _isStableSurface = true; // Default anggap di meja (Safety First)
 
   // Warna Status
   final Color _colLocked = const Color(0xFFFFD700);
   final Color _colFail = const Color(0xFFFF9800);
   final Color _colJam = const Color(0xFFFF3333);
   final Color _colUnlock = const Color(0xFF00E676);
-  final Color _colDead = Colors.grey; // Warna untuk status 'Meja/Mati'
+  final Color _colDead = Colors.grey; 
 
   @override
   void initState() {
@@ -46,21 +48,34 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _startListening() {
+    // Sampling rate accelerometer biasanya 60Hz (60 kali sesaat)
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      // 1. Kira magnitud gegaran (tanpa graviti)
+      // 1. Kira magnitud gegaran
       double magnitude = (e.x.abs() + e.y.abs() + e.z.abs()) / 9.8;
       double shake = (magnitude - 1.0).abs();
 
-      // 2. Tentukan ambang sensitiviti
-      // 0.03 adalah sangat sensitif (nafas manusia pun boleh kesan)
-      // Meja batu biasanya < 0.01
-      if (shake > 0.03) {
-        _lastMovementTime = DateTime.now(); // KEMASKINI MASA TERAKHIR BERGERAK
+      // 2. Masukkan dalam sejarah (Rolling Buffer)
+      _shakeHistory.add(shake);
+      if (_shakeHistory.length > 50) {
+        _shakeHistory.removeAt(0); // Buang data lama
       }
+
+      // 3. Kira Purata (Average)
+      // Ini yang membezakan 'Ketuk Skrin' vs 'Pegang Tangan'
+      // Ketuk skrin = Spike sekejap, tapi purata rendah.
+      // Pegang tangan = Sentiasa ada gegaran kecil, purata tinggi.
+      double sum = _shakeHistory.fold(0, (p, c) => p + c);
+      double avg = _shakeHistory.isEmpty ? 0 : sum / _shakeHistory.length;
+
+      // THRESHOLD MAUT: 0.02
+      // Di lantai: avg biasanya 0.001 - 0.005 (Sangat rendah)
+      // Di tangan: avg biasanya 0.02 - 0.05 (Walaupun cuba diam)
+      bool detectedSurface = avg < 0.02;
 
       if (mounted) {
         setState(() {
-          _currentShake = shake;
+          _averageShake = avg;
+          _isStableSurface = detectedSurface;
         });
       }
     });
@@ -73,16 +88,11 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _handleUnlock() {
-    // LOGIK PENENTU: ADAKAH BARU BERGERAK?
-    final now = DateTime.now();
-    final difference = now.difference(_lastMovementTime).inMilliseconds;
-
-    // Jika kali terakhir bergerak lebih dari 1000ms (1 saat) yang lalu...
-    // Bermakna telefon sedang diam di atas meja.
-    bool isHoldingPhone = difference < 1000; 
-
-    // Hantar status 'Live' ini ke Controller
-    widget.controller.validateAttempt(hasPhysicalMovement: isHoldingPhone);
+    // JIKA SURFACE STABIL (MEJA/LANTAI) -> GAGAL
+    // Kita hantar 'false' ke controller jika ia dikesan stabil
+    bool hasHumanTremor = !_isStableSurface;
+    
+    widget.controller.validateAttempt(hasPhysicalMovement: hasHumanTremor);
   }
 
   @override
@@ -101,28 +111,26 @@ class _CryptexLockState extends State<CryptexLock> {
     IconData statusIcon;
     bool isInputDisabled = false;
 
-    // Semakan Visual: Adakah telefon 'hidup' (dipegang)?
-    // Kita guna logik sama (1 saat) untuk visual feedback
-    bool isAlive = DateTime.now().difference(_lastMovementTime).inMilliseconds < 1000;
+    // Logik Paparan Status (Real-time)
+    bool isHuman = !_isStableSurface;
 
     switch (state) {
       case SecurityState.LOCKED:
-        // Jika letak atas meja, warna jadi kelabu (DEAD)
-        if (isAlive) {
+        if (isHuman) {
           activeColor = _colLocked;
-          statusText = "SECURE LOCK ACTIVE";
-          statusIcon = Icons.lock_outline;
+          statusText = "BIO-ID: HUMAN DETECTED";
+          statusIcon = Icons.fingerprint;
         } else {
           activeColor = _colDead;
-          statusText = "LIFT DEVICE TO UNLOCK"; // Arahan jelas
-          statusIcon = Icons.downloading; // Icon letak bawah
+          statusText = "SURFACE DETECTED (LIFT PHONE)";
+          statusIcon = Icons.phonelink_erase;
         }
         break;
         
       case SecurityState.VALIDATING:
         activeColor = Colors.white;
-        statusText = "VERIFYING...";
-        statusIcon = Icons.hourglass_empty;
+        statusText = "ANALYZING MICRO-TREMORS...";
+        statusIcon = Icons.graphic_eq;
         isInputDisabled = true;
         break;
         
@@ -134,7 +142,7 @@ class _CryptexLockState extends State<CryptexLock> {
         
       case SecurityState.HARD_LOCK:
         activeColor = _colJam;
-        statusText = "SYSTEM JAMMED (${widget.controller.remainingLockoutSeconds}s)";
+        statusText = "JAMMED (${widget.controller.remainingLockoutSeconds}s)";
         statusIcon = Icons.block;
         isInputDisabled = true;
         break;
@@ -142,7 +150,7 @@ class _CryptexLockState extends State<CryptexLock> {
       case SecurityState.UNLOCKED:
         activeColor = _colUnlock;
         statusText = "ACCESS GRANTED";
-        statusIcon = Icons.check_circle_outline;
+        statusIcon = Icons.lock_open;
         isInputDisabled = true;
         Future.delayed(Duration.zero, widget.onSuccess);
         break;
@@ -178,13 +186,36 @@ class _CryptexLockState extends State<CryptexLock> {
           
           const SizedBox(height: 20),
 
-          // DEBUG SENSOR (Untuk Kapten nampak apa berlaku)
-          // Kapten boleh buang ini nanti, tapi sekarang ia penting untuk audit
-          Text(
-            "SENSOR: ${isAlive ? 'HUMAN HAND' : 'STATIC/TABLE'} (${_currentShake.toStringAsFixed(3)})",
-            style: TextStyle(color: isAlive ? Colors.green : Colors.grey, fontSize: 10),
+          // DEBUG BAR (WAJIB TENGOK)
+          // Bar ini akan penuh kalau ada tangan, kosong kalau di lantai
+          Column(
+            children: [
+              Text(
+                "STABILITY INDEX: ${_averageShake.toStringAsFixed(4)}",
+                style: TextStyle(
+                  color: isHuman ? Colors.green : Colors.red,
+                  fontSize: 10,
+                  fontFamily: 'monospace'
+                ),
+              ),
+              const SizedBox(height: 5),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: LinearProgressIndicator(
+                  value: (_averageShake * 20).clamp(0.0, 1.0), // Scale up visual
+                  backgroundColor: Colors.grey[900],
+                  color: isHuman ? Colors.green : Colors.red,
+                  minHeight: 4,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                 isHuman ? "PASS" : "FAIL (TOO STABLE)",
+                 style: TextStyle(color: isHuman ? Colors.green : Colors.red, fontSize: 10),
+              )
+            ],
           ),
-          
+
           const SizedBox(height: 10),
 
           SizedBox(
