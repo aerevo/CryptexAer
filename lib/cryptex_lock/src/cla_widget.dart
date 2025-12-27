@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math'; // WAJIB untuk kira sudut
+import 'dart:math'; 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -29,23 +29,17 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> {
   StreamSubscription<AccelerometerEvent>? _accelSub;
   
-  // --- ALGORITMA BARU: DELTA MOVEMENT (Sudut + Gegar) ---
-  // Kita simpan bacaan accelerometer sebelumnya
-  double _lastX = 0;
-  double _lastY = 0;
-  double _lastZ = 0;
-  
-  // Markah Kemanusiaan (0.0 - 100.0)
+  // SENSOR LOGIC (DELTA MOVEMENT)
+  double _lastX = 0, _lastY = 0, _lastZ = 0;
   double _humanScore = 0.0; 
   bool _isHuman = false;
-
-  // SENSITIVITI (Boleh ubah jika terlalu susah/senang)
-  // Lantai (ketuk): Score naik lambat (< 0.5 per frame)
-  // Tangan: Score naik laju (> 2.0 per frame)
   static const double MOVEMENT_THRESHOLD = 0.3; 
-  static const double DECAY_RATE = 0.5; // Markah turun kalau diam
+  static const double DECAY_RATE = 0.5;
 
-  // WARNA
+  // SCROLL CONTROLLERS (Untuk Sinkronisasi Roda Rawak)
+  late List<FixedExtentScrollController> _scrollControllers;
+
+  // COLORS
   final Color _colLocked = const Color(0xFFFFD700);
   final Color _colFail = const Color(0xFFFF9800);
   final Color _colJam = const Color(0xFFFF3333);
@@ -55,41 +49,44 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   void initState() {
     super.initState();
+    _initScrollControllers(); // Initialize Controllers
     _startListening();
+  }
+
+  // UPDATE: Inisialisasi Roda ikut Nilai Rawak Controller
+  void _initScrollControllers() {
+    _scrollControllers = List.generate(5, (index) {
+      // Ambil nilai rawak dari controller
+      int startVal = widget.controller.getInitialValue(index);
+      return FixedExtentScrollController(initialItem: startVal);
+    });
+  }
+
+  // UPDATE: Kalau Controller tukar nilai (cth: lepas reset), UI kena ikut
+  @override
+  void didUpdateWidget(CryptexLock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.controller != oldWidget.controller) {
+       // Reset controllers logic if needed (Advanced)
+    }
   }
 
   void _startListening() {
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      // 1. Kira perbezaan (Delta) dari bacaan terakhir
-      // Ini mengukur PERUBAHAN SUDUT, bukan sekadar gegaran hentakan.
       double deltaX = (e.x - _lastX).abs();
       double deltaY = (e.y - _lastY).abs();
       double deltaZ = (e.z - _lastZ).abs();
+      _lastX = e.x; _lastY = e.y; _lastZ = e.z;
 
-      // Kemaskini data terakhir
-      _lastX = e.x;
-      _lastY = e.y;
-      _lastZ = e.z;
-
-      // 2. Jumlahkan semua perubahan
       double totalDelta = deltaX + deltaY + deltaZ;
 
-      // 3. Sistem Pemarkahan (Score Accumulator)
       if (totalDelta > MOVEMENT_THRESHOLD) {
-        // Kalau bergerak (tangan), markah naik
         _humanScore += totalDelta;
       } else {
-        // Kalau diam (lantai), markah turun (reput)
         _humanScore -= DECAY_RATE;
       }
-
-      // Kunci markah antara 0 hingga 50
       _humanScore = _humanScore.clamp(0.0, 50.0);
-
-      // 4. Penentuan Mutlak
-      // Markah mesti lebih 10.0 untuk dianggap manusia.
-      // Ketuk skrin di lantai cuma bagi spike sekejap (markah naik sikit, lepas tu turun balik).
-      // Pegang di tangan sentiasa bagi markah tinggi.
+      
       bool detectedHuman = _humanScore > 10.0;
 
       if (mounted) {
@@ -103,11 +100,12 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   void dispose() {
     _accelSub?.cancel();
+    // Dispose scroll controllers
+    for (var c in _scrollControllers) c.dispose();
     super.dispose();
   }
 
   void _handleUnlock() {
-    // Hantar keputusan ke Controller
     widget.controller.validateAttempt(hasPhysicalMovement: _isHuman);
   }
 
@@ -116,6 +114,9 @@ class _CryptexLockState extends State<CryptexLock> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, child) {
+        // Semak kalau sistem baru lepas RESET (Scramble)
+        // Kita mungkin perlu jumpTo item baru secara manual jika values berubah drastik
+        // Tapi untuk MVP, initialItem sudah cukup.
         return _buildStateUI(widget.controller.state);
       },
     );
@@ -127,7 +128,6 @@ class _CryptexLockState extends State<CryptexLock> {
     IconData statusIcon;
     bool isInputDisabled = false;
 
-    // Logik Paparan
     switch (state) {
       case SecurityState.LOCKED:
         if (_isHuman) {
@@ -137,30 +137,26 @@ class _CryptexLockState extends State<CryptexLock> {
         } else {
           activeColor = _colDead;
           statusText = "DEVICE STATIC (TILT PHONE)";
-          statusIcon = Icons.screen_rotation; // Icon suruh pusing sikit
+          statusIcon = Icons.screen_rotation;
         }
         break;
-        
       case SecurityState.VALIDATING:
         activeColor = Colors.white;
-        statusText = "VERIFYING BIOMETRICS...";
+        statusText = "VERIFYING...";
         statusIcon = Icons.radar;
         isInputDisabled = true;
         break;
-        
       case SecurityState.SOFT_LOCK:
         activeColor = _colFail;
         statusText = "FAILED (${widget.controller.failedAttempts}/3)";
         statusIcon = Icons.warning_amber_rounded;
         break;
-        
       case SecurityState.HARD_LOCK:
         activeColor = _colJam;
         statusText = "JAMMED (${widget.controller.remainingLockoutSeconds}s)";
         statusIcon = Icons.block;
         isInputDisabled = true;
         break;
-        
       case SecurityState.UNLOCKED:
         activeColor = _colUnlock;
         statusText = "ACCESS GRANTED";
@@ -168,7 +164,6 @@ class _CryptexLockState extends State<CryptexLock> {
         isInputDisabled = true;
         Future.delayed(Duration.zero, widget.onSuccess);
         break;
-        
       default:
         activeColor = _colLocked;
         statusText = "SYSTEM READY";
@@ -200,8 +195,7 @@ class _CryptexLockState extends State<CryptexLock> {
           
           const SizedBox(height: 20),
 
-          // --- BAR DEBUG SENSITIVITI ---
-          // Ini untuk Kapten nampak beza ketuk lantai vs pegang tangan
+          // DEBUG BAR
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -222,16 +216,11 @@ class _CryptexLockState extends State<CryptexLock> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: _humanScore / 50.0, // Skala penuh 50
+                  value: _humanScore / 50.0,
                   backgroundColor: Colors.grey[900],
                   color: _isHuman ? _colUnlock : _colJam,
                   minHeight: 6,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "REQUIRED: 10.0", 
-                style: TextStyle(color: Colors.grey[600], fontSize: 9)
               ),
             ],
           ),
@@ -276,6 +265,7 @@ class _CryptexLockState extends State<CryptexLock> {
     return SizedBox(
       width: 40,
       child: ListWheelScrollView.useDelegate(
+        controller: _scrollControllers[index], // GUNA CONTROLLER SINKRONISASI
         itemExtent: 40,
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (val) {
