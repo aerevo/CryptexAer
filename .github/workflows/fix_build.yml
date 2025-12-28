@@ -1,4 +1,4 @@
-name: Francois Build (Bank Grade - Official Storage)
+name: Francois Build (Bank Grade - Fix JVM Conflict)
 on:
   workflow_dispatch:
   push:
@@ -58,9 +58,11 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      # --- SUNTIKAN WAJIB (FIX LIBRARY LAMA) ---
-      # Tanpa langkah ini, build akan gagal sebab namespace error
-      - name: 5b. BEDAH LIBRARY (Fix Namespace)
+      # --- PEMBEDAHAN LIBRARY (UPDATE KRITIKAL) ---
+      # Langkah ini membaiki DUA masalah library lama:
+      # 1. Masalah Namespace (Wajib untuk Android moden)
+      # 2. Masalah JVM Target (Wajib untuk Java 17)
+      - name: 5b. BEDAH LIBRARY (Fix Namespace & JVM 17)
         run: |
           echo "Mencari lokasi library flutter_jailbreak_detection..."
           PLUGIN_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
@@ -68,19 +70,35 @@ jobs:
           if [ -z "$PLUGIN_GRADLE" ]; then
             echo "AMARAN: Library tidak dijumpai! Pastikan dependency wujud."
           else
-            echo "Menyuntik namespace ke: $PLUGIN_GRADLE"
+            echo "Menyuntik namespace dan memaksa Java 17 pada: $PLUGIN_GRADLE"
+            
+            # 1. Fix Namespace
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $PLUGIN_GRADLE
-            echo "Pembedahan berjaya."
+            
+            # 2. Fix JVM Conflict (Force Java 17)
+            # Kita tambah blok konfigurasi di hujung fail untuk override setting lama
+            cat >> $PLUGIN_GRADLE <<EOF
+            
+            android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                kotlinOptions {
+                    jvmTarget = '17'
+                }
+            }
+            EOF
+            
+            echo "Pembedahan JVM berjaya. Library kini serasi dengan Java 17."
           fi
 
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
 
-      # --- KEMBALI KE PROTOKOL ASAL ---
-      # Simpan fail terus di dalam GitHub Artifact
       - name: 7. Simpan APK (Rasmi)
         uses: actions/upload-artifact@v4
         with:
-          name: CryptexAer-Secure-Final
+          name: CryptexAer-Secure-JVM-Fix
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
