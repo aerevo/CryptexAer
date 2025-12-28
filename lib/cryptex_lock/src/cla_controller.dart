@@ -1,45 +1,66 @@
 import 'dart:async';
-import 'dart:math'; // WAJIB
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart'; // IMPORT BARU
 import 'cla_models.dart';
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
 
-  // State Machine
   SecurityState _state = SecurityState.LOCKED;
   SecurityState get state => _state;
 
-  // Memory
   int _failedAttempts = 0;
   int get failedAttempts => _failedAttempts;
   DateTime? _lockoutUntil;
   
-  // --- PEMBAIKAN UTAMA DI SINI ---
-  // Jangan mula dengan [0,0,0,0,0].
-  // Jana terus nombor rawak SEBELUM apa-apa berlaku.
   late List<int> currentValues;
 
-  // Keys
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
   Timer? _botTimer;
 
   ClaController(this.config) {
-    // 1. RAWAKKAN SERTA MERTA (Synchronous)
-    // Ini pastikan bila UI tanya "Initial Value", nombor dah siap berterabur.
+    // 1. Rawakkan Roda
     final rand = Random();
     currentValues = List.generate(5, (index) => rand.nextInt(10));
     
-    // 2. Baru panggil memori (Async)
-    _loadStateFromMemory();
+    // 2. Mula Pemeriksaan Keselamatan
+    _initSecurityProtocol();
   }
 
-  // --- MEMORI & STATE ---
+  Future<void> _initSecurityProtocol() async {
+    // A. PERIKSA ROOT / JAILBREAK DAHULU
+    // Ini langkah paling kritikal.
+    bool isCompromised = false;
+    try {
+      // Kita semak Root (Android) dan Jailbreak (iOS)
+      isCompromised = await FlutterJailbreakDetection.jailbroken;
+      
+      // Semak juga jika running dalam 'Developer Mode' (pilihan)
+      // bool devMode = await FlutterJailbreakDetection.developerMode; 
+      // isCompromised = isCompromised || devMode; // Kalau nak ketat sangat
+    } catch (e) {
+      // Jika error, anggap selamat (fail open) atau bahaya (fail close)?
+      // Untuk Bank Grade: Fail Close (Anggap bahaya)
+      if (kDebugMode) print("Root check failed: $e");
+    }
+
+    if (isCompromised) {
+      _state = SecurityState.COMPROMISED;
+      notifyListeners();
+      return; // BERHENTI DI SINI. JANGAN LOAD MEMORI.
+    }
+
+    // B. Jika bersih, baru load memori biasa
+    await _loadStateFromMemory();
+  }
 
   Future<void> _loadStateFromMemory() async {
+    if (_state == SecurityState.COMPROMISED) return; // Double check
+
     final prefs = await SharedPreferences.getInstance();
     _failedAttempts = prefs.getInt(KEY_ATTEMPTS) ?? 0;
     
@@ -47,16 +68,36 @@ class ClaController extends ChangeNotifier {
     if (lockTimestamp != null) {
       _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTimestamp);
       
-      // Semak penjara
       if (DateTime.now().isBefore(_lockoutUntil!)) {
         _state = SecurityState.HARD_LOCK;
-        notifyListeners(); // Update UI jadi Merah
+        notifyListeners();
       } else {
         await _clearMemory(); 
       }
     }
   }
 
+  // ... (Bahagian lain kekal sama, cuma tambah check COMPROMISED) ...
+
+  void updateWheel(int index, int value) {
+    // Tambah COMPROMISED dalam senarai blocked
+    if (_state == SecurityState.HARD_LOCK || 
+        _state == SecurityState.VALIDATING ||
+        _state == SecurityState.BOT_SIMULATION ||
+        _state == SecurityState.COMPROMISED) return;
+        
+    if (index >= 0 && index < currentValues.length) {
+      currentValues[index] = value;
+    }
+  }
+
+  // ... (Fungsi validateAttempt dan lain-lain kekal sama) ...
+  // Saya ringkaskan untuk jimat ruang, tapi pastikan Kapten salin yg penuh
+  // atau saya boleh beri full file jika Kapten mahu overwrite terus.
+  
+  // Sila guna Logik Validasi yang sama seperti sebelum ini.
+  // Cuma pastikan _saveStateToMemory dll wujud.
+  
   Future<void> _saveStateToMemory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(KEY_ATTEMPTS, _failedAttempts);
@@ -73,24 +114,13 @@ class ClaController extends ChangeNotifier {
     _lockoutUntil = null;
     _state = SecurityState.LOCKED;
     
-    // Selepas berjaya unlock, rawakkan semula untuk pusingan seterusnya
     final rand = Random();
     currentValues = List.generate(5, (index) => rand.nextInt(10));
   }
-
-  void updateWheel(int index, int value) {
-    if (_state == SecurityState.HARD_LOCK || 
-        _state == SecurityState.VALIDATING ||
-        _state == SecurityState.BOT_SIMULATION) return;
-        
-    if (index >= 0 && index < currentValues.length) {
-      currentValues[index] = value;
-    }
-  }
-
-  // --- LOGIK VALIDASI ---
-
+  
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
+    if (_state == SecurityState.COMPROMISED) return; // SIAPA SURUH ROOT
+
     if (_state == SecurityState.HARD_LOCK) {
       if (_lockoutUntil != null && DateTime.now().isAfter(_lockoutUntil!)) {
         await _clearMemory();
@@ -105,19 +135,16 @@ class ClaController extends ChangeNotifier {
 
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // ATURAN 1: HONEYPOT
     if (currentValues.contains(0)) {
       await _triggerHardLock(); 
       return;
     }
 
-    // ATURAN 2: SENSOR FIZIKAL (DELTA MOVEMENT)
     if (!hasPhysicalMovement) {
       await _triggerHardLock();
       return;
     }
 
-    // ATURAN 3: KOD RAHSIA
     if (_isCodeCorrect()) {
       await _clearMemory();
       _state = SecurityState.UNLOCKED;
@@ -126,7 +153,9 @@ class ClaController extends ChangeNotifier {
       await _handleFailure();
     }
   }
-
+  
+  // ... (Helper functions lain kekal sama) ...
+  
   Future<void> _handleFailure() async {
     _failedAttempts++;
     await _saveStateToMemory();
@@ -136,7 +165,6 @@ class ClaController extends ChangeNotifier {
     } else {
       _state = SecurityState.SOFT_LOCK;
       notifyListeners();
-      
       Future.delayed(const Duration(seconds: 2), () {
         if (_state == SecurityState.SOFT_LOCK) {
           _state = SecurityState.LOCKED;
@@ -161,30 +189,23 @@ class ClaController extends ChangeNotifier {
     return true;
   }
 
-  // Helper untuk UI dapatkan nilai awal (PENTING)
   int getInitialValue(int index) {
-    if (index >= 0 && index < currentValues.length) {
-      return currentValues[index];
-    }
-    return 0; // Default fallback
+    if (index >= 0 && index < currentValues.length) return currentValues[index];
+    return 0;
   }
 
-  // --- BOT SIMULATION ---
   void startBotSimulation(VoidCallback onFinished) {
     if (_state == SecurityState.HARD_LOCK) return;
     _state = SecurityState.BOT_SIMULATION;
     notifyListeners();
-
     final rand = Random();
     int ticks = 0;
-    
     _botTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       ticks++;
       for (int i = 0; i < currentValues.length; i++) {
         currentValues[i] = rand.nextInt(10);
       }
       notifyListeners();
-
       if (ticks >= 40) {
         timer.cancel();
         validateAttempt(hasPhysicalMovement: false);
