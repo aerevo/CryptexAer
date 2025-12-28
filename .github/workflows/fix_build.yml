@@ -1,4 +1,4 @@
-name: Francois Build (Blackout + Smuggling Mode)
+name: Francois Build (Bank Grade - Official Storage)
 on:
   workflow_dispatch:
   push:
@@ -46,6 +46,7 @@ jobs:
           class MainActivity: FlutterActivity() {
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
+                  // ARAHAN BLACKOUT: Halang screenshot & preview
                   window.setFlags(
                       WindowManager.LayoutParams.FLAG_SECURE,
                       WindowManager.LayoutParams.FLAG_SECURE
@@ -57,21 +58,29 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
+      # --- SUNTIKAN WAJIB (FIX LIBRARY LAMA) ---
+      # Tanpa langkah ini, build akan gagal sebab namespace error
+      - name: 5b. BEDAH LIBRARY (Fix Namespace)
+        run: |
+          echo "Mencari lokasi library flutter_jailbreak_detection..."
+          PLUGIN_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
+          
+          if [ -z "$PLUGIN_GRADLE" ]; then
+            echo "AMARAN: Library tidak dijumpai! Pastikan dependency wujud."
+          else
+            echo "Menyuntik namespace ke: $PLUGIN_GRADLE"
+            sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $PLUGIN_GRADLE
+            echo "Pembedahan berjaya."
+          fi
+
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
 
-      - name: 7. PENYELUDUPAN APK (Bypass GitHub Storage)
-        # Kita guna curl untuk upload ke file.io sebab GitHub Artifact penuh.
-        # Link akan keluar dalam log hitam skrin Kapten.
-        run: |
-          echo "GitHub Storage Penuh. Mengaktifkan Protokol Penyeludupan..."
-          echo "Uploading to File.io..."
-          
-          # Upload dan simpan response
-          RESPONSE=$(curl -F "file=@build/app/outputs/flutter-apk/app-release.apk" https://file.io)
-          
-          echo "---------------------------------------------------"
-          echo "APK SIAP! KLIK LINK DI BAWAH UNTUK DOWNLOAD:"
-          echo $RESPONSE
-          echo "---------------------------------------------------"
-          echo "Nota: Link ini hanya sah untuk SEKALI download sahaja."
+      # --- KEMBALI KE PROTOKOL ASAL ---
+      # Simpan fail terus di dalam GitHub Artifact
+      - name: 7. Simpan APK (Rasmi)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CryptexAer-Secure-Final
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 1
