@@ -1,4 +1,4 @@
-name: Francois Build (Bank Grade - Fix JVM Conflict)
+name: Francois Build (Bank Grade - Bulletproof Fix)
 on:
   workflow_dispatch:
   push:
@@ -58,10 +58,8 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      # --- PEMBEDAHAN LIBRARY (UPDATE KRITIKAL) ---
-      # Langkah ini membaiki DUA masalah library lama:
-      # 1. Masalah Namespace (Wajib untuk Android moden)
-      # 2. Masalah JVM Target (Wajib untuk Java 17)
+      # --- PEMBEDAHAN LIBRARY (TEKNIK ECHO KUKUH) ---
+      # Kita guna 'echo' baris demi baris untuk elak error EOF.
       - name: 5b. BEDAH LIBRARY (Fix Namespace & JVM 17)
         run: |
           echo "Mencari lokasi library flutter_jailbreak_detection..."
@@ -72,23 +70,20 @@ jobs:
           else
             echo "Menyuntik namespace dan memaksa Java 17 pada: $PLUGIN_GRADLE"
             
-            # 1. Fix Namespace
+            # 1. Fix Namespace (Guna sed)
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $PLUGIN_GRADLE
             
-            # 2. Fix JVM Conflict (Force Java 17)
-            # Kita tambah blok konfigurasi di hujung fail untuk override setting lama
-            cat >> $PLUGIN_GRADLE <<EOF
-            
-            android {
-                compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
-                }
-                kotlinOptions {
-                    jvmTarget = '17'
-                }
-            }
-            EOF
+            # 2. Fix JVM Conflict (Guna Echo berulang - Lebih Selamat)
+            echo "" >> $PLUGIN_GRADLE
+            echo "android {" >> $PLUGIN_GRADLE
+            echo "    compileOptions {" >> $PLUGIN_GRADLE
+            echo "        sourceCompatibility JavaVersion.VERSION_17" >> $PLUGIN_GRADLE
+            echo "        targetCompatibility JavaVersion.VERSION_17" >> $PLUGIN_GRADLE
+            echo "    }" >> $PLUGIN_GRADLE
+            echo "    kotlinOptions {" >> $PLUGIN_GRADLE
+            echo "        jvmTarget = '17'" >> $PLUGIN_GRADLE
+            echo "    }" >> $PLUGIN_GRADLE
+            echo "}" >> $PLUGIN_GRADLE
             
             echo "Pembedahan JVM berjaya. Library kini serasi dengan Java 17."
           fi
@@ -99,6 +94,6 @@ jobs:
       - name: 7. Simpan APK (Rasmi)
         uses: actions/upload-artifact@v4
         with:
-          name: CryptexAer-Secure-JVM-Fix
+          name: CryptexAer-Secure-Final
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
