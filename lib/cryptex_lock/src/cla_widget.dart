@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math'; 
+import 'dart:math'; // WAJIB untuk kira sudut
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -29,64 +29,74 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> {
   StreamSubscription<AccelerometerEvent>? _accelSub;
   
-  // SENSOR LOGIC (DELTA MOVEMENT)
-  double _lastX = 0, _lastY = 0, _lastZ = 0;
+  // --- ALGORITMA: DELTA MOVEMENT (Sudut + Gegar) ---
+  double _lastX = 0;
+  double _lastY = 0;
+  double _lastZ = 0;
+  
+  // Markah Kemanusiaan (0.0 - 50.0)
   double _humanScore = 0.0; 
   bool _isHuman = false;
+
+  // SENSITIVITI
   static const double MOVEMENT_THRESHOLD = 0.3; 
-  static const double DECAY_RATE = 0.5;
+  static const double DECAY_RATE = 0.5; // Markah turun kalau diam
 
   // SCROLL CONTROLLERS (Untuk Sinkronisasi Roda Rawak)
   late List<FixedExtentScrollController> _scrollControllers;
 
-  // COLORS
-  final Color _colLocked = const Color(0xFFFFD700);
-  final Color _colFail = const Color(0xFFFF9800);
-  final Color _colJam = const Color(0xFFFF3333);
-  final Color _colUnlock = const Color(0xFF00E676);
-  final Color _colDead = Colors.grey; 
+  // WARNA STATUS
+  final Color _colLocked = const Color(0xFFFFD700); // Emas (Sedia)
+  final Color _colFail = const Color(0xFFFF9800);   // Oren (Salah)
+  final Color _colJam = const Color(0xFFFF3333);    // Merah (Jammed)
+  final Color _colUnlock = const Color(0xFF00E676); // Hijau (Berjaya)
+  final Color _colDead = Colors.grey;               // Kelabu (Lantai/Meja)
+  final Color _colRoot = Colors.purpleAccent;       // Ungu (Root/Jailbreak)
 
   @override
   void initState() {
     super.initState();
-    _initScrollControllers(); // Initialize Controllers
+    _initScrollControllers();
     _startListening();
   }
 
-  // UPDATE: Inisialisasi Roda ikut Nilai Rawak Controller
+  // Inisialisasi Roda ikut Nilai Rawak Controller
   void _initScrollControllers() {
     _scrollControllers = List.generate(5, (index) {
-      // Ambil nilai rawak dari controller
+      // Ambil nilai rawak dari controller supaya UI tak lari
       int startVal = widget.controller.getInitialValue(index);
       return FixedExtentScrollController(initialItem: startVal);
     });
   }
 
-  // UPDATE: Kalau Controller tukar nilai (cth: lepas reset), UI kena ikut
-  @override
-  void didUpdateWidget(CryptexLock oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.controller != oldWidget.controller) {
-       // Reset controllers logic if needed (Advanced)
-    }
-  }
-
   void _startListening() {
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
+      // 1. Kira perbezaan (Delta) dari bacaan terakhir
       double deltaX = (e.x - _lastX).abs();
       double deltaY = (e.y - _lastY).abs();
       double deltaZ = (e.z - _lastZ).abs();
-      _lastX = e.x; _lastY = e.y; _lastZ = e.z;
 
+      // Kemaskini data terakhir
+      _lastX = e.x;
+      _lastY = e.y;
+      _lastZ = e.z;
+
+      // 2. Jumlahkan semua perubahan
       double totalDelta = deltaX + deltaY + deltaZ;
 
+      // 3. Sistem Pemarkahan (Score Accumulator)
       if (totalDelta > MOVEMENT_THRESHOLD) {
+        // Kalau bergerak (tangan), markah naik
         _humanScore += totalDelta;
       } else {
+        // Kalau diam (lantai), markah turun (reput)
         _humanScore -= DECAY_RATE;
       }
+
+      // Kunci markah antara 0 hingga 50
       _humanScore = _humanScore.clamp(0.0, 50.0);
-      
+
+      // 4. Penentuan Mutlak (Markah Lulus: 10.0)
       bool detectedHuman = _humanScore > 10.0;
 
       if (mounted) {
@@ -100,12 +110,12 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   void dispose() {
     _accelSub?.cancel();
-    // Dispose scroll controllers
     for (var c in _scrollControllers) c.dispose();
     super.dispose();
   }
 
   void _handleUnlock() {
+    // Hantar keputusan Bio-Metric ke Controller
     widget.controller.validateAttempt(hasPhysicalMovement: _isHuman);
   }
 
@@ -114,9 +124,6 @@ class _CryptexLockState extends State<CryptexLock> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, child) {
-        // Semak kalau sistem baru lepas RESET (Scramble)
-        // Kita mungkin perlu jumpTo item baru secara manual jika values berubah drastik
-        // Tapi untuk MVP, initialItem sudah cukup.
         return _buildStateUI(widget.controller.state);
       },
     );
@@ -128,6 +135,7 @@ class _CryptexLockState extends State<CryptexLock> {
     IconData statusIcon;
     bool isInputDisabled = false;
 
+    // Logik Paparan
     switch (state) {
       case SecurityState.LOCKED:
         if (_isHuman) {
@@ -137,26 +145,38 @@ class _CryptexLockState extends State<CryptexLock> {
         } else {
           activeColor = _colDead;
           statusText = "DEVICE STATIC (TILT PHONE)";
-          statusIcon = Icons.screen_rotation;
+          statusIcon = Icons.screen_rotation; 
         }
         break;
+        
       case SecurityState.VALIDATING:
         activeColor = Colors.white;
-        statusText = "VERIFYING...";
+        statusText = "VERIFYING SECURITY...";
         statusIcon = Icons.radar;
         isInputDisabled = true;
         break;
+        
       case SecurityState.SOFT_LOCK:
         activeColor = _colFail;
         statusText = "FAILED (${widget.controller.failedAttempts}/3)";
         statusIcon = Icons.warning_amber_rounded;
         break;
+        
       case SecurityState.HARD_LOCK:
         activeColor = _colJam;
         statusText = "JAMMED (${widget.controller.remainingLockoutSeconds}s)";
         statusIcon = Icons.block;
         isInputDisabled = true;
         break;
+      
+      // --- UPDATE BARU: ROOT / JAILBREAK ---
+      case SecurityState.COMPROMISED:
+        activeColor = _colRoot;
+        statusText = "SECURITY RISK: ROOTED";
+        statusIcon = Icons.phonelink_erase;
+        isInputDisabled = true;
+        break;
+
       case SecurityState.UNLOCKED:
         activeColor = _colUnlock;
         statusText = "ACCESS GRANTED";
@@ -164,10 +184,17 @@ class _CryptexLockState extends State<CryptexLock> {
         isInputDisabled = true;
         Future.delayed(Duration.zero, widget.onSuccess);
         break;
+        
+      // Default / Bot Simulation
       default:
         activeColor = _colLocked;
         statusText = "SYSTEM READY";
         statusIcon = Icons.lock;
+    }
+
+    // Kalau COMPROMISED (Root), kita bagi UI khas yang menakutkan sikit
+    if (state == SecurityState.COMPROMISED) {
+        return _buildCompromisedUI(activeColor, statusText, statusIcon);
     }
 
     return Container(
@@ -181,6 +208,7 @@ class _CryptexLockState extends State<CryptexLock> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 1. HEADER STATUS
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -195,7 +223,7 @@ class _CryptexLockState extends State<CryptexLock> {
           
           const SizedBox(height: 20),
 
-          // DEBUG BAR
+          // 2. BAR DEBUG SENSITIVITI (Untuk Kapten Audit)
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -216,17 +244,23 @@ class _CryptexLockState extends State<CryptexLock> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: _humanScore / 50.0,
+                  value: _humanScore / 50.0, // Skala penuh 50
                   backgroundColor: Colors.grey[900],
                   color: _isHuman ? _colUnlock : _colJam,
                   minHeight: 6,
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "REQUIRED: 10.0 (ANTI-STATIC)", 
+                style: TextStyle(color: Colors.grey[600], fontSize: 9)
               ),
             ],
           ),
 
           const SizedBox(height: 20),
 
+          // 3. RODA EMAS
           SizedBox(
             height: 120,
             child: IgnorePointer(
@@ -240,6 +274,7 @@ class _CryptexLockState extends State<CryptexLock> {
           
           const SizedBox(height: 20),
 
+          // 4. BUTANG UTAMA
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -261,11 +296,48 @@ class _CryptexLockState extends State<CryptexLock> {
     );
   }
 
+  // UI KHAS UNTUK PERANTI ROOTED
+  Widget _buildCompromisedUI(Color color, String text, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A001A), // Ungu Gelap
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color, width: 2),
+        boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 30)],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 48),
+          const SizedBox(height: 20),
+          Text(
+            "ACCESS DENIED",
+            style: TextStyle(
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 2.0,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            "This device is compromised (Rooted/Jailbroken).\nBank-grade security protocols prevent execution.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 20),
+          LinearProgressIndicator(color: color, backgroundColor: Colors.black),
+        ],
+      ),
+    );
+  }
+
   Widget _buildWheel(int index, Color color, bool disabled) {
     return SizedBox(
       width: 40,
       child: ListWheelScrollView.useDelegate(
-        controller: _scrollControllers[index], // GUNA CONTROLLER SINKRONISASI
+        controller: _scrollControllers[index], // GUNA CONTROLLER
         itemExtent: 40,
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (val) {
