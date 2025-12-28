@@ -1,24 +1,21 @@
-/// STATUS KESELAMATAN (STATE MACHINE)
-/// Ini adalah bahasa yang digunakan oleh Blackbox untuk bercakap dengan UI.
 enum SecurityState {
-  LOCKED,           // Sedia untuk input
-  VALIDATING,       // Sedang memproses (Loading...)
-  UNLOCKED,         // Berjaya (Access Granted)
-  SOFT_LOCK,        // Amaran (Salah kod / Terlalu laju) - Denda 3 saat
-  HARD_LOCK,        // JAMMED (Bot/Honeypot) - Denda lama (System Lockdown)
-  BOT_SIMULATION    // Mod Ujian (Kapten test sendiri)
+  LOCKED,           // Sedia
+  VALIDATING,       // Proses
+  UNLOCKED,         // Berjaya
+  SOFT_LOCK,        // Amaran (Salah kod)
+  HARD_LOCK,        // JAMMED (Bot/Honeypot)
+  BOT_SIMULATION,   // Ujian
+  COMPROMISED       // BARU: Telefon Root/Jailbreak (DILARANG MASUK)
 }
 
-/// KONFIGURASI BLACKBOX
-/// Ini adalah setting yang Bank boleh ubah bila beli SDK Kapten.
 class ClaConfig {
-  final List<int> secret;          // Kod Rahsia
-  final Duration minSolveTime;     // Masa minimum (Anti-Macro)
-  final double minShake;           // Ambang biometrik
-  final Duration jamCooldown;      // Masa denda Hard Lock
-  final Duration softLockCooldown; // Masa denda Soft Lock
-  final int maxAttempts;           // Had percubaan sebelum Hard Lock
-  final double thresholdAmount;    // Nilai transaksi minimum
+  final List<int> secret;
+  final Duration minSolveTime;
+  final double minShake;
+  final Duration jamCooldown;
+  final Duration softLockCooldown;
+  final int maxAttempts;
+  final double thresholdAmount;
 
   const ClaConfig({
     required this.secret,
