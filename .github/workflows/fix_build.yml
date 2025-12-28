@@ -1,4 +1,4 @@
-name: Francois Build (Bank Grade - Bulletproof Fix)
+name: Francois Build (Bank Grade - Final Surgery)
 on:
   workflow_dispatch:
   push:
@@ -58,22 +58,25 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      # --- PEMBEDAHAN LIBRARY (TEKNIK ECHO KUKUH) ---
-      # Kita guna 'echo' baris demi baris untuk elak error EOF.
-      - name: 5b. BEDAH LIBRARY (Fix Namespace & JVM 17)
+      # --- PEMBEDAHAN LIBRARY LENGKAP (UPDATE TERKINI) ---
+      # 1. Fix Namespace & JVM (Gradle)
+      # 2. Fix Duplicate Package Error (Manifest) - INI YANG BARU
+      - name: 5b. BEDAH LIBRARY (Fix Namespace, JVM & Manifest)
         run: |
-          echo "Mencari lokasi library flutter_jailbreak_detection..."
+          echo "Memulakan pembedahan library flutter_jailbreak_detection..."
+          
+          # --- PART 1: BEDAH GRADLE (JAVA 17 & NAMESPACE) ---
           PLUGIN_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           
           if [ -z "$PLUGIN_GRADLE" ]; then
-            echo "AMARAN: Library tidak dijumpai! Pastikan dependency wujud."
+            echo "AMARAN: Fail Gradle Library tidak dijumpai!"
           else
-            echo "Menyuntik namespace dan memaksa Java 17 pada: $PLUGIN_GRADLE"
+            echo "Memperbaiki Gradle di: $PLUGIN_GRADLE"
             
-            # 1. Fix Namespace (Guna sed)
+            # Suntik Namespace
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $PLUGIN_GRADLE
             
-            # 2. Fix JVM Conflict (Guna Echo berulang - Lebih Selamat)
+            # Paksa Java 17 (Guna teknik Echo selamat)
             echo "" >> $PLUGIN_GRADLE
             echo "android {" >> $PLUGIN_GRADLE
             echo "    compileOptions {" >> $PLUGIN_GRADLE
@@ -84,9 +87,22 @@ jobs:
             echo "        jvmTarget = '17'" >> $PLUGIN_GRADLE
             echo "    }" >> $PLUGIN_GRADLE
             echo "}" >> $PLUGIN_GRADLE
-            
-            echo "Pembedahan JVM berjaya. Library kini serasi dengan Java 17."
           fi
+
+          # --- PART 2: BEDAH MANIFEST (BUANG PACKAGE ATTRIBUTE) ---
+          # Ini membaiki error "Incorrect package found in source AndroidManifest.xml"
+          PLUGIN_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
+          
+          if [ -z "$PLUGIN_MANIFEST" ]; then
+             echo "AMARAN: Fail Manifest Library tidak dijumpai!"
+          else
+             echo "Membuang atribut 'package' lama di: $PLUGIN_MANIFEST"
+             # Gunakan sed untuk memadam teks 'package="appmire.be.flutterjailbreakdetection"'
+             sed -i 's/package="appmire.be.flutterjailbreakdetection"//g' $PLUGIN_MANIFEST
+             echo "Atribut lama berjaya dibuang."
+          fi
+          
+          echo "Semua pembedahan selesai."
 
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
