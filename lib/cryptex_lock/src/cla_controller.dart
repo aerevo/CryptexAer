@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart'; // IMPORT BARU
+import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 import 'cla_models.dart';
 
 class ClaController extends ChangeNotifier {
@@ -22,44 +22,59 @@ class ClaController extends ChangeNotifier {
 
   Timer? _botTimer;
 
+  // Variable untuk simpan jenis ancaman (Paparan UI)
+  String _threatMessage = "";
+  String get threatMessage => _threatMessage;
+
   ClaController(this.config) {
-    // 1. Rawakkan Roda
     final rand = Random();
     currentValues = List.generate(5, (index) => rand.nextInt(10));
-    
-    // 2. Mula Pemeriksaan Keselamatan
     _initSecurityProtocol();
   }
 
   Future<void> _initSecurityProtocol() async {
-    // A. PERIKSA ROOT / JAILBREAK DAHULU
-    // Ini langkah paling kritikal.
-    bool isCompromised = false;
+    bool isRooted = false;
+    bool isUsbDebug = false;
+
     try {
-      // Kita semak Root (Android) dan Jailbreak (iOS)
-      isCompromised = await FlutterJailbreakDetection.jailbroken;
+      // 1. Cek Root (Anjing Biasa)
+      isRooted = await FlutterJailbreakDetection.jailbroken;
       
-      // Semak juga jika running dalam 'Developer Mode' (pilihan)
-      // bool devMode = await FlutterJailbreakDetection.developerMode; 
-      // isCompromised = isCompromised || devMode; // Kalau nak ketat sangat
+      // 2. Cek USB Debugging (Lawan Kabel & Developer Mode)
+      isUsbDebug = await FlutterJailbreakDetection.developerMode;
+      
     } catch (e) {
-      // Jika error, anggap selamat (fail open) atau bahaya (fail close)?
-      // Untuk Bank Grade: Fail Close (Anggap bahaya)
-      if (kDebugMode) print("Root check failed: $e");
+      if (kDebugMode) print("Security check failed: $e");
     }
 
-    if (isCompromised) {
-      _state = SecurityState.COMPROMISED;
+    // --- LOGIK HUKUMAN ---
+    if (isRooted) {
+      _threatMessage = "PERANTI ROOT DIKESAN";
+      _state = SecurityState.ROOT_WARNING; // Trigger Borang Amaran
       notifyListeners();
-      return; // BERHENTI DI SINI. JANGAN LOAD MEMORI.
+      return; 
+    }
+    
+    if (isUsbDebug) {
+      _threatMessage = "MOD PEMAJU / USB AKTIF";
+      _state = SecurityState.ROOT_WARNING; // Trigger Borang Amaran juga
+      notifyListeners();
+      return;
     }
 
-    // B. Jika bersih, baru load memori biasa
     await _loadStateFromMemory();
+  }
+  
+  // --- INI FUNGSI YANG HILANG TADI ---
+  // Fungsi ini dipanggil bila user tekan "Saya Setuju Tanggung Risiko"
+  void userAcceptsRisk() {
+    _state = SecurityState.LOCKED;
+    notifyListeners();
+    _loadStateFromMemory(); // Sambung kerja loading biasa
   }
 
   Future<void> _loadStateFromMemory() async {
-    if (_state == SecurityState.COMPROMISED) return; // Double check
+    if (_state == SecurityState.ROOT_WARNING) return;
 
     final prefs = await SharedPreferences.getInstance();
     _failedAttempts = prefs.getInt(KEY_ATTEMPTS) ?? 0;
@@ -77,13 +92,12 @@ class ClaController extends ChangeNotifier {
     }
   }
 
-  // ... (Bahagian lain kekal sama, cuma tambah check COMPROMISED) ...
-
   void updateWheel(int index, int value) {
-    // Tambah COMPROMISED dalam senarai blocked
+    // Halang input jika dalam mod Warning
     if (_state == SecurityState.HARD_LOCK || 
         _state == SecurityState.VALIDATING ||
         _state == SecurityState.BOT_SIMULATION ||
+        _state == SecurityState.ROOT_WARNING || 
         _state == SecurityState.COMPROMISED) return;
         
     if (index >= 0 && index < currentValues.length) {
@@ -91,13 +105,6 @@ class ClaController extends ChangeNotifier {
     }
   }
 
-  // ... (Fungsi validateAttempt dan lain-lain kekal sama) ...
-  // Saya ringkaskan untuk jimat ruang, tapi pastikan Kapten salin yg penuh
-  // atau saya boleh beri full file jika Kapten mahu overwrite terus.
-  
-  // Sila guna Logik Validasi yang sama seperti sebelum ini.
-  // Cuma pastikan _saveStateToMemory dll wujud.
-  
   Future<void> _saveStateToMemory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(KEY_ATTEMPTS, _failedAttempts);
@@ -119,7 +126,7 @@ class ClaController extends ChangeNotifier {
   }
   
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
-    if (_state == SecurityState.COMPROMISED) return; // SIAPA SURUH ROOT
+    if (_state == SecurityState.ROOT_WARNING) return; 
 
     if (_state == SecurityState.HARD_LOCK) {
       if (_lockoutUntil != null && DateTime.now().isAfter(_lockoutUntil!)) {
@@ -153,8 +160,6 @@ class ClaController extends ChangeNotifier {
       await _handleFailure();
     }
   }
-  
-  // ... (Helper functions lain kekal sama) ...
   
   Future<void> _handleFailure() async {
     _failedAttempts++;
