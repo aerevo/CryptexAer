@@ -46,7 +46,7 @@ class _CryptexLockState extends State<CryptexLock> {
   final Color _colJam = const Color(0xFFFF3333);    
   final Color _colUnlock = const Color(0xFF00E676); 
   final Color _colDead = Colors.grey;               
-  final Color _colWarning = Colors.redAccent;       // Merah Garang
+  final Color _colWarning = Colors.redAccent;
 
   @override
   void initState() {
@@ -151,7 +151,6 @@ class _CryptexLockState extends State<CryptexLock> {
         isInputDisabled = true;
         break;
       
-      // --- PAPARAN BORANG INDEMNITY ---
       case SecurityState.ROOT_WARNING:
         return _buildLiabilityWaiverUI();
 
@@ -176,10 +175,6 @@ class _CryptexLockState extends State<CryptexLock> {
         statusIcon = Icons.lock;
     }
 
-    if (state == SecurityState.COMPROMISED) {
-        return _buildCompromisedUI();
-    }
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -202,40 +197,9 @@ class _CryptexLockState extends State<CryptexLock> {
               ),
             ],
           ),
-          
           const SizedBox(height: 20),
-
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("MOVEMENT SCORE", style: TextStyle(color: Colors.grey[600], fontSize: 10)),
-                  Text(
-                    _humanScore.toStringAsFixed(1), 
-                    style: TextStyle(
-                      color: _isHuman ? _colUnlock : _colJam, 
-                      fontWeight: FontWeight.bold
-                    )
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: _humanScore / 50.0,
-                  backgroundColor: Colors.grey[900],
-                  color: _isHuman ? _colUnlock : _colJam,
-                  minHeight: 6,
-                ),
-              ),
-            ],
-          ),
-
+          _buildScoreBar(activeColor),
           const SizedBox(height: 20),
-
           SizedBox(
             height: 120,
             child: IgnorePointer(
@@ -246,111 +210,115 @@ class _CryptexLockState extends State<CryptexLock> {
               ),
             ),
           ),
-          
           const SizedBox(height: 20),
-
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isInputDisabled ? Colors.grey[900] : activeColor,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: isInputDisabled ? null : _handleUnlock,
-              child: Text(
-                state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "AUTHENTICATE",
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
+          _buildAuthButton(state, activeColor, isInputDisabled),
         ],
       ),
     );
   }
 
-  // --- UI BARU: AMARAN KERAS (BAPA GARANG) ---
+  Widget _buildScoreBar(Color activeColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text("MOVEMENT SCORE", style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+            Text(
+              _humanScore.toStringAsFixed(1), 
+              style: TextStyle(color: _isHuman ? _colUnlock : _colJam, fontWeight: FontWeight.bold)
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: _humanScore / 50.0,
+            backgroundColor: Colors.grey[900],
+            color: _isHuman ? _colUnlock : _colJam,
+            minHeight: 6,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAuthButton(SecurityState state, Color activeColor, bool isInputDisabled) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isInputDisabled ? Colors.grey[900] : activeColor,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onPressed: isInputDisabled ? null : _handleUnlock,
+        child: Text(
+          state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "AUTHENTICATE",
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  // --- BORANG MAUT VERSI AER KORPORAT ---
   Widget _buildLiabilityWaiverUI() {
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
-        color: const Color(0xFF150505), // Merah Gelap
+        color: const Color(0xFF150505),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.redAccent, width: 2),
-        boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.2), blurRadius: 20)],
+        boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.3), blurRadius: 30)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.report_problem, color: Colors.redAccent, size: 50),
+          const Icon(Icons.gpp_maybe, color: Colors.redAccent, size: 60),
           const SizedBox(height: 20),
           const Text(
-            "AMARAN KESELAMATAN KRITIKAL",
-            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
+            "PERANTI TIDAK DISOKONG",
+            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.2),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 15),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: Colors.black,
-              border: Border.all(color: Colors.grey[800]!),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.black.withOpacity(0.5),
+              border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(10),
             ),
-            // TEKS PEDAS DI SINI
             child: const Text(
-              "Peranti ini telah dikesan TIDAK SESUAI untuk transaksi keselamatan tinggi (Rooted/Jailbroken). Sistem AerSecurity seboleh-bolehnya MENOLAK penggunaan persekitaran yang telah dikompromi ini.\n\nKami memberi akses KALI INI SAHAJA atas risiko anda sendiri. Sila dapatkan bantuan sokongan di cawangan berhampiran untuk memulihkan peranti anda ke tetapan kilang yang selamat.",
-              style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
+              "Sistem AerSecurity mengesan persekitaran peranti anda telah diubahsuai (Root/Developer Mode). Kami seboleh-bolehnya MENOLAK akses bagi menjamin keselamatan data perbankan.\n\n"
+              "Akses ini diberikan KALI INI SAHAJA sebagai kelonggaran khas. Sila MATIKAN 'Developer Settings' dan pastikan peranti anda tidak di-root untuk penggunaan masa hadapan.\n\n"
+              "Sila dapatkan sokongan teknikal di cawangan (Branch) berhampiran jika masalah berterusan.",
+              style: TextStyle(color: Colors.white, fontSize: 12, height: 1.6),
               textAlign: TextAlign.justify,
             ),
           ),
-          const SizedBox(height: 20),
-          
-          // Butang Setuju
+          const SizedBox(height: 25),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red[900],
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () {
-                // Panggil fungsi Controller untuk terima risiko
-                widget.controller.userAcceptsRisk();
-              },
-              child: const Text(
-                "SAYA SETUJU & TANGGUNG RISIKO",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
+              onPressed: () => widget.controller.userAcceptsRisk(),
+              child: const Text("SAYA FAHAM & SETUJU TANGGUNG RISIKO", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           TextButton(
-            onPressed: widget.onFail, // Keluar app
-            child: const Text("BATAL & KELUAR", style: TextStyle(color: Colors.grey)),
+            onPressed: widget.onFail,
+            child: const Text("KELUAR DARI SISTEM", style: TextStyle(color: Colors.grey, fontSize: 12)),
           )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompromisedUI() {
-    return Container(
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(
-        color: Colors.black,
-        border: Border.all(color: Colors.purple, width: 2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.block, color: Colors.purple, size: 40),
-          SizedBox(height: 20),
-          Text("AKSES DIHALANG KEKAL", style: TextStyle(color: Colors.purple)),
         ],
       ),
     );
@@ -374,7 +342,7 @@ class _CryptexLockState extends State<CryptexLock> {
               child: Text(
                 '$num',
                 style: TextStyle(
-                  color: disabled ? Colors.grey[800] : (num == 0 ? _colJam : Colors.white),
+                  color: disabled ? Colors.grey[800] : (num == 0 ? Colors.red : Colors.white),
                   fontSize: 26,
                   fontWeight: FontWeight.bold
                 ),
@@ -382,6 +350,24 @@ class _CryptexLockState extends State<CryptexLock> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  // Fallback UI jika sistem diserang hebat
+  Widget _buildCompromisedUI() {
+    return Container(
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.purple, width: 2), borderRadius: BorderRadius.circular(20)),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.security_update_warning, color: Colors.purple, size: 50),
+          SizedBox(height: 20),
+          Text("SYSTEM HARD-LOCKED", style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
+          SizedBox(height: 10),
+          Text("Peranti anda tidak lagi dibenarkan mengakses perisian ini.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11)),
+        ],
       ),
     );
   }
