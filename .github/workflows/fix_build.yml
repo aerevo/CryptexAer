@@ -1,4 +1,4 @@
-name: Francois Build (Bank Grade - Final Surgery)
+name: Francois Build (Final Billion Dollar Fix)
 on:
   workflow_dispatch:
   push:
@@ -23,11 +23,12 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI (Vibrate & Blackout)
+      - name: 4. SUNTIKAN PERISAI (Fix Package Name)
         run: |
-          echo "Membersihkan & Menjana Android..."
+          echo "Membersihkan & Menjana Android dengan nama cryptex_aer..."
           rm -rf android
-          flutter create . --platforms android
+          # Paksa nama projek jadi huruf kecil untuk elak error Dart
+          flutter create . --platforms android --project-name cryptex_aer
           
           echo "Menyuntik Vibrate Permission..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
@@ -46,7 +47,6 @@ jobs:
           class MainActivity: FlutterActivity() {
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
-                  // ARAHAN BLACKOUT: Halang screenshot & preview
                   window.setFlags(
                       WindowManager.LayoutParams.FLAG_SECURE,
                       WindowManager.LayoutParams.FLAG_SECURE
@@ -58,58 +58,25 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      # --- PEMBEDAHAN LIBRARY LENGKAP (UPDATE TERKINI) ---
-      # 1. Fix Namespace & JVM (Gradle)
-      # 2. Fix Duplicate Package Error (Manifest) - INI YANG BARU
-      - name: 5b. BEDAH LIBRARY (Fix Namespace, JVM & Manifest)
+      - name: 5b. BEDAH LIBRARY (Final Surgery)
         run: |
-          echo "Memulakan pembedahan library flutter_jailbreak_detection..."
-          
-          # --- PART 1: BEDAH GRADLE (JAVA 17 & NAMESPACE) ---
           PLUGIN_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
-          
-          if [ -z "$PLUGIN_GRADLE" ]; then
-            echo "AMARAN: Fail Gradle Library tidak dijumpai!"
-          else
-            echo "Memperbaiki Gradle di: $PLUGIN_GRADLE"
-            
-            # Suntik Namespace
+          if [ ! -z "$PLUGIN_GRADLE" ]; then
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $PLUGIN_GRADLE
-            
-            # Paksa Java 17 (Guna teknik Echo selamat)
-            echo "" >> $PLUGIN_GRADLE
-            echo "android {" >> $PLUGIN_GRADLE
-            echo "    compileOptions {" >> $PLUGIN_GRADLE
-            echo "        sourceCompatibility JavaVersion.VERSION_17" >> $PLUGIN_GRADLE
-            echo "        targetCompatibility JavaVersion.VERSION_17" >> $PLUGIN_GRADLE
-            echo "    }" >> $PLUGIN_GRADLE
-            echo "    kotlinOptions {" >> $PLUGIN_GRADLE
-            echo "        jvmTarget = '17'" >> $PLUGIN_GRADLE
-            echo "    }" >> $PLUGIN_GRADLE
-            echo "}" >> $PLUGIN_GRADLE
+            echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = '17' } }" >> $PLUGIN_GRADLE
           fi
 
-          # --- PART 2: BEDAH MANIFEST (BUANG PACKAGE ATTRIBUTE) ---
-          # Ini membaiki error "Incorrect package found in source AndroidManifest.xml"
           PLUGIN_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
-          
-          if [ -z "$PLUGIN_MANIFEST" ]; then
-             echo "AMARAN: Fail Manifest Library tidak dijumpai!"
-          else
-             echo "Membuang atribut 'package' lama di: $PLUGIN_MANIFEST"
-             # Gunakan sed untuk memadam teks 'package="appmire.be.flutterjailbreakdetection"'
+          if [ ! -z "$PLUGIN_MANIFEST" ]; then
              sed -i 's/package="appmire.be.flutterjailbreakdetection"//g' $PLUGIN_MANIFEST
-             echo "Atribut lama berjaya dibuang."
           fi
-          
-          echo "Semua pembedahan selesai."
 
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
 
-      - name: 7. Simpan APK (Rasmi)
+      - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: CryptexAer-Secure-Final
+          name: cryptex-aer-billion-dollar-fix
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
