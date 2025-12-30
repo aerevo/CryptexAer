@@ -1,4 +1,4 @@
-name: Francois Build (Final Billion Dollar Fix)
+name: Francois Build (Vibration Fix)
 on:
   workflow_dispatch:
   push:
@@ -23,11 +23,10 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI (Fix Package Name)
+      - name: 4. SUNTIKAN PERISAI (Fresh Android)
         run: |
           echo "Membersihkan & Menjana Android dengan nama cryptex_aer..."
           rm -rf android
-          # Paksa nama projek jadi huruf kecil untuk elak error Dart
           flutter create . --platforms android --project-name cryptex_aer
           
           echo "Menyuntik Vibrate Permission..."
@@ -58,16 +57,19 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 5b. BEDAH LIBRARY (Final Surgery)
+      - name: 5b. BEDAH LIBRARY (Fix Namespace & JVM)
         run: |
+          # Bedah jailbreak_detection sahaja
           PLUGIN_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           if [ ! -z "$PLUGIN_GRADLE" ]; then
+            echo "Membedah Gradle Library..."
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $PLUGIN_GRADLE
             echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = '17' } }" >> $PLUGIN_GRADLE
           fi
 
           PLUGIN_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
           if [ ! -z "$PLUGIN_MANIFEST" ]; then
+             echo "Membedah Manifest Library..."
              sed -i 's/package="appmire.be.flutterjailbreakdetection"//g' $PLUGIN_MANIFEST
           fi
 
@@ -77,6 +79,6 @@ jobs:
       - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-billion-dollar-fix
+          name: cryptex-aer-secure-build
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
