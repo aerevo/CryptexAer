@@ -175,6 +175,10 @@ class _CryptexLockState extends State<CryptexLock> {
         statusIcon = Icons.lock;
     }
 
+    if (state == SecurityState.COMPROMISED) {
+      return _buildCompromisedUI();
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -332,7 +336,8 @@ class _CryptexLockState extends State<CryptexLock> {
         itemExtent: 40,
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (val) {
-          HapticFeedback.selectionClick();
+          // BILLION DOLLAR TOUCH: Guna mediumImpact untuk rasa 'solid'
+          HapticFeedback.mediumImpact(); 
           widget.controller.updateWheel(index, val % 10);
         },
         childDelegate: ListWheelChildBuilderDelegate(
@@ -354,7 +359,6 @@ class _CryptexLockState extends State<CryptexLock> {
     );
   }
 
-  // Fallback UI jika sistem diserang hebat
   Widget _buildCompromisedUI() {
     return Container(
       padding: const EdgeInsets.all(30),
