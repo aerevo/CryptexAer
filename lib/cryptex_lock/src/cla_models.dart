@@ -2,10 +2,11 @@ enum SecurityState {
   LOCKED,           // Sedia
   VALIDATING,       // Proses
   UNLOCKED,         // Berjaya
-  SOFT_LOCK,        // Amaran (Salah kod)
-  HARD_LOCK,        // JAMMED (Bot/Honeypot)
+  SOFT_LOCK,        // Amaran Salah
+  HARD_LOCK,        // JAMMED
   BOT_SIMULATION,   // Ujian
-  COMPROMISED       // BARU: Telefon Root/Jailbreak (DILARANG MASUK)
+  ROOT_WARNING,     // <--- INI PERKATAAN BARU YG HILANG TADI
+  COMPROMISED       // Jika perlu hard block
 }
 
 class ClaConfig {
