@@ -12,8 +12,7 @@ dependencies:
   sensors_plus: ^5.0.0
   shared_preferences: ^2.2.0
   flutter_jailbreak_detection: ^1.1.0
-  vibration: ^1.8.4
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^9.0.0 # Kekalkan ini untuk fasa Billion Dollar
 
 dev_dependencies:
   flutter_test:
