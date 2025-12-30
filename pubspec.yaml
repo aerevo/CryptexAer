@@ -1,3 +1,10 @@
+name: cryptex_aer
+description: Secure Biometric Authentication System by Captain Aer.
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
 dependencies:
   flutter:
     sdk: flutter
@@ -5,6 +12,13 @@ dependencies:
   sensors_plus: ^5.0.0
   shared_preferences: ^2.2.0
   flutter_jailbreak_detection: ^1.1.0
-  # --- SENJATA BARU ---
-  vibration: ^1.8.4        # Untuk getaran premium
-  flutter_secure_storage: ^9.0.0 # Untuk peti besi rahsia
+  vibration: ^1.8.4
+  flutter_secure_storage: ^9.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
