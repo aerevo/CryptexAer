@@ -1,4 +1,4 @@
-name: Francois Build (Twin Surgery Fix)
+name: Francois Build (SDK 34 Fix)
 on:
   workflow_dispatch:
   push:
@@ -30,10 +30,8 @@ jobs:
           flutter create . --platforms android --project-name cryptex_aer
           
           echo "Menyuntik Vibrate Permission..."
-          # Kita cari tag <manifest> dan selitkan permission betul-betul di bawahnya
           sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.VIBRATE"/>|g' android/app/src/main/AndroidManifest.xml
           
-          # Backup: Double check kalau tag manifest ada attribute lain
           if ! grep -q "android.permission.VIBRATE" android/app/src/main/AndroidManifest.xml; then
              sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
           fi
@@ -63,19 +61,21 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      # --- ZON PEMBEDAHAN BERKEMBAR (UPDATE KRITIKAL) ---
-      # Kita membaiki DUA library sekaligus:
-      # 1. flutter_jailbreak_detection
-      # 2. flutter_vibrate (Pasien Baru)
-      - name: 5b. BEDAH LIBRARY (Jailbreak & Vibrate)
+      # --- ZON PEMBEDAHAN BERKEMBAR (SDK 34 UPGRADE) ---
+      # Kita PAKSA library lama guna SDK 34 supaya kenal 'lStar'
+      - name: 5b. BEDAH LIBRARY (Fix lStar Error)
         run: |
-          echo "=== MEMULAKAN PEMBEDAHAN BERKEMBAR ==="
+          echo "=== MEMULAKAN PEMBEDAHAN SDK 34 ==="
 
           # --- PASIEN 1: JAILBREAK DETECTION ---
-          echo "1. Membedah Jailbreak Detection..."
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           if [ ! -z "$JB_GRADLE" ]; then
+            # Fix Namespace
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
+            # FORCE SDK 34 (PUNCA ERROR lStar)
+            sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 34/g' $JB_GRADLE
+            sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 34/g' $JB_GRADLE
+            # Fix Java
             echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = '17' } }" >> $JB_GRADLE
           fi
           
@@ -85,23 +85,23 @@ jobs:
           fi
 
           # --- PASIEN 2: FLUTTER VIBRATE ---
-          echo "2. Membedah Flutter Vibrate..."
           VIB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_vibrate-*/android -name "build.gradle")
           if [ ! -z "$VIB_GRADLE" ]; then
-            # Masukkan namespace manual
+            # Fix Namespace
             sed -i 's/android {/android { namespace "flutter.vibrate"/g' $VIB_GRADLE
-            # Paksa keserasian Java 17
+            # FORCE SDK 34 (CRITICAL FIX)
+            sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 34/g' $VIB_GRADLE
+            sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 34/g' $VIB_GRADLE
+            # Fix Java
             echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; }" >> $VIB_GRADLE
           fi
           
-          # Buang package attribute lama dalam manifest (punca error namespace conflict)
           VIB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_vibrate-*/android/src/main -name "AndroidManifest.xml")
           if [ ! -z "$VIB_MANIFEST" ]; then
-             # Teknik Regex: Buang apa sahaja dalam attribute package="..."
              sed -i 's/package="[^"]*"//g' $VIB_MANIFEST
           fi
           
-          echo "=== PEMBEDAHAN SELESAI. SYSTEM READY. ==="
+          echo "=== PEMBEDAHAN SELESAI. SDK UPDATED. ==="
 
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
@@ -109,6 +109,6 @@ jobs:
       - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-final-vibrate
+          name: cryptex-aer-sdk34-fix
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
