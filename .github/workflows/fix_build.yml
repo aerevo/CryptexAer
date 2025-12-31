@@ -1,4 +1,4 @@
-name: Francois Build (Final Native Fix)
+name: Francois Build (JVM Harmony Fix)
 on:
   workflow_dispatch:
   push:
@@ -29,18 +29,35 @@ jobs:
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
-          echo "Menyuntik Vibrate Permission (Hard-Coded)..."
+          echo "Menyuntik Vibrate Permission..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 5b. BEDAH JAILBREAK ONLY
+      - name: 5b. BEDAH JAILBREAK (JVM 17 Harmony)
         run: |
-          # Hanya bedah satu library ini sahaja yang memang perlu
+          echo "Memulakan pembedahan JVM Target..."
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
+          
           if [ ! -z "$JB_GRADLE" ]; then
+            # Set Namespace
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
+            
+            # PAKSA JAVA & KOTLIN KE JVM 17 (Menyelesaikan Inconsistent JVM Target)
+            cat >> $JB_GRADLE <<EOF
+
+            android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                kotlinOptions {
+                    jvmTarget = '17'
+                }
+            }
+          EOF
+            echo "Pembedahan JVM 17 selesai pada $JB_GRADLE"
           fi
 
       - name: 6. Build APK Release (Obfuscated)
@@ -49,5 +66,5 @@ jobs:
       - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-native-vibrate
+          name: cryptex-aer-final-v2
           path: build/app/outputs/flutter-apk/app-release.apk
