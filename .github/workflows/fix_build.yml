@@ -1,4 +1,4 @@
-name: Francois Build (Vibration Fix)
+name: Francois Build (Force Vibrate Fix)
 on:
   workflow_dispatch:
   push:
@@ -23,14 +23,20 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI (Fresh Android)
+      - name: 4. SUNTIKAN PERISAI (Permission Jitu)
         run: |
           echo "Membersihkan & Menjana Android dengan nama cryptex_aer..."
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
-          echo "Menyuntik Vibrate Permission..."
-          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+          echo "Menyuntik Vibrate Permission (Teknik Agresif)..."
+          # Kita cari tag <manifest> dan selitkan permission betul-betul di bawahnya
+          sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.VIBRATE"/>|g' android/app/src/main/AndroidManifest.xml
+          
+          # Double check kalau tag manifest ada attribute lain, kita cuba match umum
+          if ! grep -q "android.permission.VIBRATE" android/app/src/main/AndroidManifest.xml; then
+             sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+          fi
 
           echo "Menyuntik Anti-Screenshot (Blackout)..."
           FILE_PATH=$(find android/app/src/main/kotlin -name "MainActivity.kt")
@@ -59,7 +65,7 @@ jobs:
 
       - name: 5b. BEDAH LIBRARY (Fix Namespace & JVM)
         run: |
-          # Bedah jailbreak_detection sahaja
+          # Bedah jailbreak_detection
           PLUGIN_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           if [ ! -z "$PLUGIN_GRADLE" ]; then
             echo "Membedah Gradle Library..."
@@ -79,6 +85,6 @@ jobs:
       - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-secure-build
+          name: cryptex-aer-force-vibrate
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
