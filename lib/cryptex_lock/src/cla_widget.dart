@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'package:flutter_vibrate/flutter_vibrate.dart'; // LIBRARY BARU
 import 'cla_controller.dart';
 import 'cla_models.dart';
 
@@ -34,6 +35,7 @@ class _CryptexLockState extends State<CryptexLock> {
   double _lastZ = 0;
   double _humanScore = 0.0; 
   bool _isHuman = false;
+  bool _canVibrate = false; // Status motor
 
   static const double MOVEMENT_THRESHOLD = 0.3; 
   static const double DECAY_RATE = 0.5;
@@ -51,8 +53,16 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   void initState() {
     super.initState();
+    _initVibration(); // Cek motor dulu
     _initScrollControllers();
     _startListening();
+  }
+
+  Future<void> _initVibration() async {
+    bool canVibrate = await Vibrate.canVibrate;
+    setState(() {
+      _canVibrate = canVibrate;
+    });
   }
 
   void _initScrollControllers() {
@@ -100,6 +110,14 @@ class _CryptexLockState extends State<CryptexLock> {
 
   void _handleUnlock() {
     widget.controller.validateAttempt(hasPhysicalMovement: _isHuman);
+  }
+
+  // FUNGSI GETARAN PAKSA (MECHANICAL CLICK)
+  void _triggerHaptic() {
+    if (_canVibrate) {
+      // Getar 15ms - Cukup untuk rasa "Tik", tak cukup untuk rasa "Bzzzt"
+      Vibrate.vibrateWithDuration(const Duration(milliseconds: 15));
+    }
   }
 
   @override
@@ -268,7 +286,6 @@ class _CryptexLockState extends State<CryptexLock> {
     );
   }
 
-  // --- BORANG MAUT VERSI AER KORPORAT ---
   Widget _buildLiabilityWaiverUI() {
     return Container(
       padding: const EdgeInsets.all(25),
@@ -336,8 +353,7 @@ class _CryptexLockState extends State<CryptexLock> {
         itemExtent: 40,
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (val) {
-          // BILLION DOLLAR TOUCH: Guna mediumImpact untuk rasa 'solid'
-          HapticFeedback.mediumImpact(); 
+          _triggerHaptic(); // GETAR 15ms
           widget.controller.updateWheel(index, val % 10);
         },
         childDelegate: ListWheelChildBuilderDelegate(
