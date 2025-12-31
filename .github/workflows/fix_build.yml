@@ -1,4 +1,4 @@
-name: Francois Build (Force Vibrate Fix)
+name: Francois Build (Twin Surgery Fix)
 on:
   workflow_dispatch:
   push:
@@ -29,11 +29,11 @@ jobs:
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
-          echo "Menyuntik Vibrate Permission (Teknik Agresif)..."
+          echo "Menyuntik Vibrate Permission..."
           # Kita cari tag <manifest> dan selitkan permission betul-betul di bawahnya
           sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.VIBRATE"/>|g' android/app/src/main/AndroidManifest.xml
           
-          # Double check kalau tag manifest ada attribute lain, kita cuba match umum
+          # Backup: Double check kalau tag manifest ada attribute lain
           if ! grep -q "android.permission.VIBRATE" android/app/src/main/AndroidManifest.xml; then
              sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
           fi
@@ -63,21 +63,45 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 5b. BEDAH LIBRARY (Fix Namespace & JVM)
+      # --- ZON PEMBEDAHAN BERKEMBAR (UPDATE KRITIKAL) ---
+      # Kita membaiki DUA library sekaligus:
+      # 1. flutter_jailbreak_detection
+      # 2. flutter_vibrate (Pasien Baru)
+      - name: 5b. BEDAH LIBRARY (Jailbreak & Vibrate)
         run: |
-          # Bedah jailbreak_detection
-          PLUGIN_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
-          if [ ! -z "$PLUGIN_GRADLE" ]; then
-            echo "Membedah Gradle Library..."
-            sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $PLUGIN_GRADLE
-            echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = '17' } }" >> $PLUGIN_GRADLE
+          echo "=== MEMULAKAN PEMBEDAHAN BERKEMBAR ==="
+
+          # --- PASIEN 1: JAILBREAK DETECTION ---
+          echo "1. Membedah Jailbreak Detection..."
+          JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
+          if [ ! -z "$JB_GRADLE" ]; then
+            sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
+            echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = '17' } }" >> $JB_GRADLE
+          fi
+          
+          JB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
+          if [ ! -z "$JB_MANIFEST" ]; then
+             sed -i 's/package="appmire.be.flutterjailbreakdetection"//g' $JB_MANIFEST
           fi
 
-          PLUGIN_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
-          if [ ! -z "$PLUGIN_MANIFEST" ]; then
-             echo "Membedah Manifest Library..."
-             sed -i 's/package="appmire.be.flutterjailbreakdetection"//g' $PLUGIN_MANIFEST
+          # --- PASIEN 2: FLUTTER VIBRATE ---
+          echo "2. Membedah Flutter Vibrate..."
+          VIB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_vibrate-*/android -name "build.gradle")
+          if [ ! -z "$VIB_GRADLE" ]; then
+            # Masukkan namespace manual
+            sed -i 's/android {/android { namespace "flutter.vibrate"/g' $VIB_GRADLE
+            # Paksa keserasian Java 17
+            echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; }" >> $VIB_GRADLE
           fi
+          
+          # Buang package attribute lama dalam manifest (punca error namespace conflict)
+          VIB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_vibrate-*/android/src/main -name "AndroidManifest.xml")
+          if [ ! -z "$VIB_MANIFEST" ]; then
+             # Teknik Regex: Buang apa sahaja dalam attribute package="..."
+             sed -i 's/package="[^"]*"//g' $VIB_MANIFEST
+          fi
+          
+          echo "=== PEMBEDAHAN SELESAI. SYSTEM READY. ==="
 
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
@@ -85,6 +109,6 @@ jobs:
       - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-force-vibrate
+          name: cryptex-aer-final-vibrate
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 1
