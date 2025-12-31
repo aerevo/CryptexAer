@@ -59,7 +59,6 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   Future<void> _initVibration() async {
-    // Cek hardware motor
     bool canVibrate = await Vibrate.canVibrate;
     setState(() {
       _canVibrate = canVibrate;
@@ -113,12 +112,12 @@ class _CryptexLockState extends State<CryptexLock> {
     widget.controller.validateAttempt(hasPhysicalMovement: _isHuman);
   }
 
-  // --- FUNGSI GETARAN YANG DIBETULKAN ---
+  // --- PEMBETULAN GETARAN: "TIK" PENDEK ---
   void _triggerHaptic() {
     if (_canVibrate) {
-      // FeedbackType.medium rasa seperti gear besi berpusing.
-      // Ia lebih kuat dari 'selection' biasa.
-      Vibrate.feedback(FeedbackType.medium);
+      // FeedbackType.selection adalah getaran paling pendek (Micro-tick).
+      // Ia tidak akan rasa "laggy" bila pusing laju.
+      Vibrate.feedback(FeedbackType.selection);
     }
   }
 
@@ -355,7 +354,7 @@ class _CryptexLockState extends State<CryptexLock> {
         itemExtent: 40,
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (val) {
-          _triggerHaptic(); // PANGGIL FUNGSI GETARAN MEDIUM
+          _triggerHaptic(); // Panggil fungsi getaran "SELECTION" (Paling Pendek)
           widget.controller.updateWheel(index, val % 10);
         },
         childDelegate: ListWheelChildBuilderDelegate(
