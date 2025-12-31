@@ -1,4 +1,4 @@
-name: Francois Build (The Manifest Eraser)
+name: Francois Build (SDK 34 Fix)
 on:
   workflow_dispatch:
   push:
@@ -23,53 +23,85 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI (Android Clean)
+      - name: 4. SUNTIKAN PERISAI (Permission Jitu)
         run: |
-          echo "Membersihkan & Menjana Android..."
+          echo "Membersihkan & Menjana Android dengan nama cryptex_aer..."
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
           echo "Menyuntik Vibrate Permission..."
-          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+          sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.VIBRATE"/>|g' android/app/src/main/AndroidManifest.xml
+          
+          if ! grep -q "android.permission.VIBRATE" android/app/src/main/AndroidManifest.xml; then
+             sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+          fi
+
+          echo "Menyuntik Anti-Screenshot (Blackout)..."
+          FILE_PATH=$(find android/app/src/main/kotlin -name "MainActivity.kt")
+          PACKAGE_LINE=$(head -n 1 $FILE_PATH)
+          
+          cat > $FILE_PATH <<EOF
+          $PACKAGE_LINE
+          
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import android.view.WindowManager
+          
+          class MainActivity: FlutterActivity() {
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  window.setFlags(
+                      WindowManager.LayoutParams.FLAG_SECURE,
+                      WindowManager.LayoutParams.FLAG_SECURE
+                  )
+              }
+          }
+          EOF
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 5b. PEMBEDAHAN RADIKAL (Manifest & JVM)
+      # --- ZON PEMBEDAHAN BERKEMBAR (SDK 34 UPGRADE) ---
+      # Kita PAKSA library lama guna SDK 34 supaya kenal 'lStar'
+      - name: 5b. BEDAH LIBRARY (Fix lStar Error)
         run: |
-          echo "Memulakan Pembedahan Radikal pada flutter_jailbreak_detection..."
-          
-          # 1. Cari & Bedah build.gradle
+          echo "=== MEMULAKAN PEMBEDAHAN SDK 34 ==="
+
+          # --- PASIEN 1: JAILBREAK DETECTION ---
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           if [ ! -z "$JB_GRADLE" ]; then
-            echo "Membedah: $JB_GRADLE"
-            # Set Namespace
+            # Fix Namespace
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
-            # Paksa JVM 17
-            cat >> $JB_GRADLE <<EOF
-            android {
-                compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
-                }
-                kotlinOptions {
-                    jvmTarget = '17'
-                }
-            }
-          EOF
-          fi
-
-          # 2. Cari & Bedah AndroidManifest.xml (MEMBUANG ATRIBUT PACKAGE HARAM)
-          JB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
-          if [ ! -z "$JB_MANIFEST" ]; then
-            echo "Membedah Manifest: $JB_MANIFEST"
-            # Guna sed untuk buang keseluruhan perkataan package="xxx"
-            sed -i 's/package="[^"]*"//g' $JB_MANIFEST
-            # Bersihkan lebihan ruang kosong jika ada
-            sed -i 's/  >/ >/g' $JB_MANIFEST
+            # FORCE SDK 34 (PUNCA ERROR lStar)
+            sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 34/g' $JB_GRADLE
+            sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 34/g' $JB_GRADLE
+            # Fix Java
+            echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = '17' } }" >> $JB_GRADLE
           fi
           
-          echo "Pembedahan selesai. Semua halangan dibuang."
+          JB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
+          if [ ! -z "$JB_MANIFEST" ]; then
+             sed -i 's/package="appmire.be.flutterjailbreakdetection"//g' $JB_MANIFEST
+          fi
+
+          # --- PASIEN 2: FLUTTER VIBRATE ---
+          VIB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_vibrate-*/android -name "build.gradle")
+          if [ ! -z "$VIB_GRADLE" ]; then
+            # Fix Namespace
+            sed -i 's/android {/android { namespace "flutter.vibrate"/g' $VIB_GRADLE
+            # FORCE SDK 34 (CRITICAL FIX)
+            sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 34/g' $VIB_GRADLE
+            sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 34/g' $VIB_GRADLE
+            # Fix Java
+            echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; }" >> $VIB_GRADLE
+          fi
+          
+          VIB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_vibrate-*/android/src/main -name "AndroidManifest.xml")
+          if [ ! -z "$VIB_MANIFEST" ]; then
+             sed -i 's/package="[^"]*"//g' $VIB_MANIFEST
+          fi
+          
+          echo "=== PEMBEDAHAN SELESAI. SDK UPDATED. ==="
 
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
@@ -77,5 +109,6 @@ jobs:
       - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-secure-final
+          name: cryptex-aer-sdk34-fix
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 1
