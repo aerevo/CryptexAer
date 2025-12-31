@@ -1,4 +1,4 @@
-name: Francois Build (JVM Harmony Fix)
+name: Francois Build (The Manifest Eraser)
 on:
   workflow_dispatch:
   push:
@@ -35,18 +35,18 @@ jobs:
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 5b. BEDAH JAILBREAK (JVM 17 Harmony)
+      - name: 5b. PEMBEDAHAN RADIKAL (Manifest & JVM)
         run: |
-          echo "Memulakan pembedahan JVM Target..."
-          JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
+          echo "Memulakan Pembedahan Radikal pada flutter_jailbreak_detection..."
           
+          # 1. Cari & Bedah build.gradle
+          JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           if [ ! -z "$JB_GRADLE" ]; then
+            echo "Membedah: $JB_GRADLE"
             # Set Namespace
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
-            
-            # PAKSA JAVA & KOTLIN KE JVM 17 (Menyelesaikan Inconsistent JVM Target)
+            # Paksa JVM 17
             cat >> $JB_GRADLE <<EOF
-
             android {
                 compileOptions {
                     sourceCompatibility JavaVersion.VERSION_17
@@ -57,8 +57,19 @@ jobs:
                 }
             }
           EOF
-            echo "Pembedahan JVM 17 selesai pada $JB_GRADLE"
           fi
+
+          # 2. Cari & Bedah AndroidManifest.xml (MEMBUANG ATRIBUT PACKAGE HARAM)
+          JB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
+          if [ ! -z "$JB_MANIFEST" ]; then
+            echo "Membedah Manifest: $JB_MANIFEST"
+            # Guna sed untuk buang keseluruhan perkataan package="xxx"
+            sed -i 's/package="[^"]*"//g' $JB_MANIFEST
+            # Bersihkan lebihan ruang kosong jika ada
+            sed -i 's/  >/ >/g' $JB_MANIFEST
+          fi
+          
+          echo "Pembedahan selesai. Semua halangan dibuang."
 
       - name: 6. Build APK Release (Obfuscated)
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
@@ -66,5 +77,5 @@ jobs:
       - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-final-v2
+          name: cryptex-aer-secure-final
           path: build/app/outputs/flutter-apk/app-release.apk
