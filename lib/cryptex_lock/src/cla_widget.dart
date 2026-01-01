@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
-import 'package:flutter_vibrate/flutter_vibrate.dart'; // Library Stabil
 import 'cla_controller.dart';
 import 'cla_models.dart';
 
@@ -35,35 +34,24 @@ class _CryptexLockState extends State<CryptexLock> {
   double _lastZ = 0;
   double _humanScore = 0.0; 
   bool _isHuman = false;
-  bool _canVibrate = false; 
 
   static const double MOVEMENT_THRESHOLD = 0.3; 
   static const double DECAY_RATE = 0.5;
 
   late List<FixedExtentScrollController> _scrollControllers;
 
-  // WARNA STATUS
+  // WARNA STATUS PREMIUM
   final Color _colLocked = const Color(0xFFFFD700); 
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam = const Color(0xFFFF3333);    
   final Color _colUnlock = const Color(0xFF00E676); 
   final Color _colDead = Colors.grey;               
-  final Color _colWarning = Colors.redAccent;
 
   @override
   void initState() {
     super.initState();
-    _initVibration();
     _initScrollControllers();
     _startListening();
-  }
-
-  Future<void> _initVibration() async {
-    // Cek hardware motor
-    bool canVibrate = await Vibrate.canVibrate;
-    setState(() {
-      _canVibrate = canVibrate;
-    });
   }
 
   void _initScrollControllers() {
@@ -94,7 +82,7 @@ class _CryptexLockState extends State<CryptexLock> {
       _humanScore = _humanScore.clamp(0.0, 50.0);
       bool detectedHuman = _humanScore > 10.0;
 
-      if (mounted) {
+      if (mounted && _isHuman != detectedHuman) {
         setState(() {
           _isHuman = detectedHuman;
         });
@@ -113,12 +101,9 @@ class _CryptexLockState extends State<CryptexLock> {
     widget.controller.validateAttempt(hasPhysicalMovement: _isHuman);
   }
 
-  // --- PEMBETULAN UTAMA: GUNA BAHASA LIBRARY BARU ---
+  // GETARAN "TIK" PALING SEDAP (SELECTION CLICK)
   void _triggerHaptic() {
-    if (_canVibrate) {
-      // Kita guna 'medium' untuk rasa besi berlaga (Mechanical Feel)
-      Vibrate.feedback(FeedbackType.medium);
-    }
+    HapticFeedback.selectionClick();
   }
 
   @override
@@ -173,13 +158,6 @@ class _CryptexLockState extends State<CryptexLock> {
       case SecurityState.ROOT_WARNING:
         return _buildLiabilityWaiverUI();
 
-      case SecurityState.COMPROMISED:
-        activeColor = Colors.purple;
-        statusText = "SYSTEM COMPROMISED";
-        statusIcon = Icons.phonelink_erase;
-        isInputDisabled = true;
-        break;
-
       case SecurityState.UNLOCKED:
         activeColor = _colUnlock;
         statusText = "ACCESS GRANTED";
@@ -192,10 +170,6 @@ class _CryptexLockState extends State<CryptexLock> {
         activeColor = _colLocked;
         statusText = "SYSTEM READY";
         statusIcon = Icons.lock;
-    }
-
-    if (state == SecurityState.COMPROMISED) {
-      return _buildCompromisedUI();
     }
 
     return Container(
@@ -294,52 +268,23 @@ class _CryptexLockState extends State<CryptexLock> {
         color: const Color(0xFF150505),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.redAccent, width: 2),
-        boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.3), blurRadius: 30)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.gpp_maybe, color: Colors.redAccent, size: 60),
-          const SizedBox(height: 20),
-          const Text(
-            "PERANTI TIDAK DISOKONG",
-            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.2),
-            textAlign: TextAlign.center,
-          ),
           const SizedBox(height: 15),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Text(
-              "Sistem AerSecurity mengesan persekitaran peranti anda telah diubahsuai (Root/Developer Mode). Kami seboleh-bolehnya MENOLAK akses bagi menjamin keselamatan data perbankan.\n\n"
-              "Akses ini diberikan KALI INI SAHAJA sebagai kelonggaran khas. Sila MATIKAN 'Developer Settings' dan pastikan peranti anda tidak di-root untuk penggunaan masa hadapan.\n\n"
-              "Sila dapatkan sokongan teknikal di cawangan (Branch) berhampiran jika masalah berterusan.",
-              style: TextStyle(color: Colors.white, fontSize: 12, height: 1.6),
-              textAlign: TextAlign.justify,
-            ),
+          const Text("DEVICE UNSUPPORTED", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          const Text(
+            "Security protocols detected a modified environment (Root/Jailbreak). Usage is restricted.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
-          const SizedBox(height: 25),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red[900],
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () => widget.controller.userAcceptsRisk(),
-              child: const Text("SAYA FAHAM & SETUJU TANGGUNG RISIKO", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: widget.onFail,
-            child: const Text("KELUAR DARI SISTEM", style: TextStyle(color: Colors.grey, fontSize: 12)),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () => widget.controller.userAcceptsRisk(),
+            child: const Text("PROCEED AT OWN RISK"),
           )
         ],
       ),
@@ -354,7 +299,7 @@ class _CryptexLockState extends State<CryptexLock> {
         itemExtent: 40,
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (val) {
-          _triggerHaptic(); // Panggil fungsi getaran yang BETUL
+          _triggerHaptic(); // Getaran "Tik"
           widget.controller.updateWheel(index, val % 10);
         },
         childDelegate: ListWheelChildBuilderDelegate(
@@ -372,23 +317,6 @@ class _CryptexLockState extends State<CryptexLock> {
             );
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildCompromisedUI() {
-    return Container(
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.purple, width: 2), borderRadius: BorderRadius.circular(20)),
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.security_update_warning, color: Colors.purple, size: 50),
-          SizedBox(height: 20),
-          Text("SYSTEM HARD-LOCKED", style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
-          SizedBox(height: 10),
-          Text("Peranti anda tidak lagi dibenarkan mengakses perisian ini.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11)),
-        ],
       ),
     );
   }
