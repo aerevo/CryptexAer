@@ -27,12 +27,14 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
   StreamSubscription<AccelerometerEvent>? _accelSub;
   
-  double _lastX = 0, _lastY = 0, _lastZ = 0;
+  // GRAVITY FILTER: Untuk asingkan graviti bumi dari gerakan tangan
+  double _gravX = 0, _gravY = 0, _gravZ = 0;
   
-  // ABSORBER: Variable untuk simpan data yang dah "dilembutkan"
-  double _smoothedMagnitude = 0.0; 
-  
-  // UI State for Smooth Animation
+  // RATE LIMITER: Untuk elak sensor spam 2000 kali sesaat
+  int _lastUpdateTimestamp = 0;
+  static const int UPDATE_INTERVAL_MS = 30; // 30ms = ~33Hz (Cukup untuk kesan tangan)
+
+  // UI State
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
   
@@ -59,7 +61,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300), // Masa untuk jarum bergerak
+      duration: const Duration(milliseconds: 300),
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
       CurvedAnimation(parent: _progressController, curve: Curves.easeOutQuad),
@@ -74,25 +76,32 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _startListening() {
-    // Kita set interval supaya tak "spam" (walaupun sensor laju)
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      double deltaX = (e.x - _lastX);
-      double deltaY = (e.y - _lastY);
-      double deltaZ = (e.z - _lastZ);
+      final now = DateTime.now().millisecondsSinceEpoch;
       
-      double rawMagnitude = deltaX.abs() + deltaY.abs() + deltaZ.abs();
-      _lastX = e.x; _lastY = e.y; _lastZ = e.z;
+      // 1. RATE LIMITER: Kalau data datang terlalu laju (<30ms), ABAIKAN.
+      // Ini ubat untuk masalah "0.5 milisaat" Kapten.
+      if (now - _lastUpdateTimestamp < UPDATE_INTERVAL_MS) return;
+      _lastUpdateTimestamp = now;
 
-      // 🛑 TEKNIK ABSORBER (LOW-PASS FILTER)
-      // Alpha 0.85 bermaksud: "Ambil 85% data lama, campur 15% data baru"
-      // Ini mematikan 'spike' 2ms yang gila tu.
-      _smoothedMagnitude = (_smoothedMagnitude * 0.85) + (rawMagnitude * 0.15);
+      // 2. GRAVITY FILTER (Alpha 0.8)
+      // Kita asingkan Graviti (0.8) dari Gerakan Tangan (0.2)
+      // Ini standard matematik sensor (High-Pass Filter).
+      _gravX = 0.8 * _gravX + 0.2 * e.x;
+      _gravY = 0.8 * _gravY + 0.2 * e.y;
+      _gravZ = 0.8 * _gravZ + 0.2 * e.z;
 
-      // Kita hantar data yang dah stabil sikit ke Controller
-      // (Tapi hantar juga delta mentah untuk pengiraan entropy)
-      widget.controller.registerShake(_smoothedMagnitude, deltaX, deltaY, deltaZ);
+      // Dapat gerakan LINEAR (Tangan semata-mata, tanpa graviti bumi)
+      double linearX = e.x - _gravX;
+      double linearY = e.y - _gravY;
+      double linearZ = e.z - _gravZ;
       
-      // Update UI Bar hanya jika perubahan ketara (Jimat bateri)
+      double rawMagnitude = linearX.abs() + linearY.abs() + linearZ.abs();
+
+      // Hantar data bersih ke Controller
+      widget.controller.registerShake(rawMagnitude, linearX, linearY, linearZ);
+      
+      // Update UI dengan cekap
       if ((_progressController.value - widget.controller.liveConfidence).abs() > 0.01) {
          _animateScoreBar(widget.controller.liveConfidence);
       }
@@ -104,7 +113,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       begin: _progressController.value,
       end: target,
     ).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOut));
-    
     _progressController.forward(from: 0);
   }
 
@@ -140,7 +148,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       // Confidence threshold 50% untuk nampak "Active"
+       // Ambang 50% untuk nampak "Active"
        if (widget.controller.liveConfidence > 0.5) {
          activeColor = _colLocked;
          statusText = "BIO-LOCK: ACTIVE";
@@ -152,7 +160,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
        }
     } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
-        statusText = "ANALYZING SIGNATURE...";
+        statusText = "VERIFYING SIGNATURE...";
         statusIcon = Icons.radar;
         isInputDisabled = true;
     } else if (state == SecurityState.SOFT_LOCK) {
@@ -223,7 +231,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           
           const SizedBox(height: 25),
           
-          // WHEELS
+          // WHEELS & PRIVACY BLUR
           SizedBox(
             height: 120,
             child: IgnorePointer(
