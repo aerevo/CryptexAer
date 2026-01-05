@@ -1,12 +1,12 @@
 enum SecurityState {
   LOCKED,           // Sedia
-  VALIDATING,       // Proses
+  VALIDATING,       // Sedang semak
   UNLOCKED,         // Berjaya
-  SOFT_LOCK,        // Amaran Salah
-  HARD_LOCK,        // JAMMED
-  BOT_SIMULATION,   // Ujian
-  ROOT_WARNING,     // <--- INI PERKATAAN BARU YG HILANG TADI
-  COMPROMISED       // Jika perlu hard block
+  SOFT_LOCK,        // Salah Key in (Amaran)
+  HARD_LOCK,        // Jammed (Kena tunggu)
+  BOT_SIMULATION,   // Mode Test Robot
+  ROOT_WARNING,     // Anjing Penjaga Menggonggong
+  COMPROMISED       // Kena Block Terus
 }
 
 class ClaConfig {
@@ -17,6 +17,7 @@ class ClaConfig {
   final Duration softLockCooldown;
   final int maxAttempts;
   final double thresholdAmount;
+  final bool enableSensors; // Master Switch
 
   const ClaConfig({
     required this.secret,
@@ -26,5 +27,6 @@ class ClaConfig {
     this.softLockCooldown = const Duration(seconds: 3),
     this.maxAttempts = 3, 
     required this.thresholdAmount,
+    this.enableSensors = true,
   });
 }
