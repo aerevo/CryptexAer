@@ -51,7 +51,7 @@ class BiometricSignature {
   final bool isPotentiallyHuman;
 
   BiometricSignature({
-    required this.averageMagnitude,\
+    required this.averageMagnitude, // <-- SIMBOL '\' SUDAH DIBUANG DI SINI
     required this.frequencyVariance,
     required this.patternEntropy,
     required this.uniqueGestureCount,
