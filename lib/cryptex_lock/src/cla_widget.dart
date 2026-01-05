@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Wajib untuk Haptic
+import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
 import 'cla_controller.dart';
 import 'cla_models.dart';
@@ -30,17 +30,16 @@ class _CryptexLockState extends State<CryptexLock> {
   double _humanScore = 0.0;
   bool _isHuman = false;
 
-  // --- TUNING SENSOR BARU (LEBIH SENSITIF) ---
-  // Dulu 0.3 (Terlalu berat), Sekarang 0.05 (Detect Nadi/Micro-tremor)
-  static const double MOVEMENT_THRESHOLD = 0.05; 
-  // Dulu 0.5 (Turun laju), Sekarang 0.1 (Turun perlahan bila tangan diam)
-  static const double DECAY_RATE = 0.1; 
-  // BOOSTER: Gandaan input supaya bar penuh cepat
-  static const double SENSITIVITY_BOOST = 5.0; 
+  // --- KALIBRASI ANTI-LANTAI (REFINED) ---
+  // Kita naikkan ambang sikit supaya 'noise' lantai tak lepas.
+  static const double MOVEMENT_THRESHOLD = 0.15; 
+  // Kadar penurunan markah yang lebih adil.
+  static const double DECAY_RATE = 0.3; 
+  // Gandaan yang lebih waras (Bukan jet, cuma turbo).
+  static const double SENSITIVITY_BOOST = 2.5; 
 
   late List<FixedExtentScrollController> _scrollControllers;
 
-  // WARNA STATUS
   final Color _colLocked = const Color(0xFFFFD700); 
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam = const Color(0xFFFF3333);    
@@ -63,7 +62,6 @@ class _CryptexLockState extends State<CryptexLock> {
 
   void _startListening() {
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      // 1. Kira Delta (Perubahan)
       double deltaX = (e.x - _lastX).abs();
       double deltaY = (e.y - _lastY).abs();
       double deltaZ = (e.z - _lastZ).abs();
@@ -71,30 +69,25 @@ class _CryptexLockState extends State<CryptexLock> {
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
       double totalDelta = deltaX + deltaY + deltaZ;
 
-      // 2. Logik Pemarkahan "Overclocked"
+      // --- PENAPIS HINGAR (DEAD-ZONE) ---
       if (totalDelta > MOVEMENT_THRESHOLD) {
-        // Kalau bergerak, kita boost gila-gila
+        // Hanya jika gegaran lebih kuat dari 'noise' lantai
         _humanScore += (totalDelta * SENSITIVITY_BOOST);
       } else {
-        // Kalau diam, kita tolak sikit-sikit je
+        // Jika di bawah threshold (Lantai/Statik), markah jatuh
         _humanScore -= DECAY_RATE;
       }
 
-      // Clamp max 50.0
       _humanScore = _humanScore.clamp(0.0, 50.0);
       
-      // Threshold untuk dianggap manusia (rendahkan sikit ke 5.0 supaya responsif)
-      bool detectedHuman = _humanScore > 5.0;
+      // Manusia perlu capai 15.0 untuk dianggap 'Active'
+      bool detectedHuman = _humanScore > 15.0;
 
-      // Hantar data mentah ke Controller (Otak)
       widget.controller.registerShake(totalDelta);
 
       if (mounted && _isHuman != detectedHuman) {
-        setState(() {
-          _isHuman = detectedHuman;
-        });
+        setState(() => _isHuman = detectedHuman);
       } else if (mounted) {
-         // Force rebuild untuk update progress bar smooth (60fps)
          setState(() {});
       }
     });
@@ -109,10 +102,6 @@ class _CryptexLockState extends State<CryptexLock> {
 
   void _triggerHaptic() {
     HapticFeedback.selectionClick();
-  }
-
-  void _handleAuth() {
-    widget.controller.validateAttempt(hasPhysicalMovement: _isHuman);
   }
 
   @override
@@ -218,7 +207,7 @@ class _CryptexLockState extends State<CryptexLock> {
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 18),
               ),
-              onPressed: isInputDisabled ? null : _handleAuth,
+              onPressed: isInputDisabled ? null : () => widget.controller.validateAttempt(hasPhysicalMovement: _isHuman),
               child: Text(state == SecurityState.HARD_LOCK ? "LOCKED" : "AUTHENTICATE", style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
