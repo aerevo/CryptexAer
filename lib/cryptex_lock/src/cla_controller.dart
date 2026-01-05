@@ -17,29 +17,44 @@ class ClaController extends ChangeNotifier {
   
   late List<int> currentValues;
   
-  // Advanced biometric tracking
-  final List<MotionEvent> _motionHistory = [];
-  double _accumulatedShake = 0;
+  // ═══════════════════════════════════════════════════════════
+  // 📡 SIGNAL PROCESSING PIPELINE (DSP ENGINE)
+  // ═══════════════════════════════════════════════════════════
   
-  // Pattern recognition state
-  final Map<String, int> _patternFrequency = {};
+  // Rolling average buffer (10 frames = ~160ms history)
+  final List<double> _rawBuffer = [];
+  static const int BUFFER_SIZE = 10;
+  
+  // 1. NOISE GATE: Anything below this is floor noise/static
+  static const double NOISE_GATE = 0.5;
+  
+  // 2. SPIKE REJECTION: Ignore sudden jumps > 5x the median
+  static const double SPIKE_THRESHOLD_MULTIPLIER = 5.0;
+  
+  // 3. SMOOTHING: 0.15 means we trust new data 15%, old data 85%
+  static const double SMOOTHING_FACTOR = 0.15;
+  
+  // 4. NORMALIZATION: Map sensor input (0-15) to UI (0-1)
+  static const double SENSOR_MAX_INPUT = 15.0;
+
+  // Internal tracker for smoothed value
+  double _internalSmoothedValue = 0.0;
+  
+  // ═══════════════════════════════════════════════════════════
   
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
-  static const int MAX_HISTORY_SIZE = 100;
-  static const double ELECTRONIC_NOISE_FLOOR = 0.12; // High-pass filter threshold
 
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
   
-  // Live Confidence Score for UI
+  // Live Confidence Score for UI (0.0 - 1.0 Clean)
   double _liveConfidence = 0.0;
   double get liveConfidence => _liveConfidence;
 
   ClaController(this.config) {
     final rand = Random();
     currentValues = List.generate(5, (index) => rand.nextInt(10));
-    // Initialization is now called explicitly to avoid constructor async issues
     _initSecurityProtocol();
   }
 
@@ -77,84 +92,61 @@ class ClaController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🧬 ADVANCED SENSOR LOGIC (BIO-SIGMA)
+  // 🎛️ THE DSP PIPELINE IMPLEMETATION
   // ═══════════════════════════════════════════════════════════
 
-  void registerShake(double rawMagnitude, double dx, dy, dz) {
+  void registerShake(double rawInput, double dx, dy, dz) {
     if (_state == SecurityState.HARD_LOCK || _state == SecurityState.ROOT_WARNING) return;
 
-    // 1. High-Pass Filter (Dead-zone for floor noise)
-    if (rawMagnitude < ELECTRONIC_NOISE_FLOOR) return;
-
-    final now = DateTime.now();
-    
-    // 2. Prepare Data
-    final newEvent = MotionEvent(
-      magnitude: rawMagnitude, 
-      timestamp: now,
-      deltaX: dx, deltaY: dy, deltaZ: dz
-    );
-    
-    // Quantize movement into 'buckets' to detect robotic loops
-    String movementHash = "${rawMagnitude.toStringAsFixed(1)}:${dx.sign}:${dy.sign}";
-
-    // 3. Manage Circular Buffer & MATH INTEGRITY FIX
-    if (_motionHistory.length >= MAX_HISTORY_SIZE) {
-      final oldEvent = _motionHistory.removeAt(0);
-      
-      // FIX: Subtract old magnitude from accumulator
-      _accumulatedShake -= oldEvent.magnitude;
-      if (_accumulatedShake < 0) _accumulatedShake = 0; // Floating point safety
-
-      // FIX: Decrement old pattern frequency
-      String oldHash = "${oldEvent.magnitude.toStringAsFixed(1)}:${oldEvent.deltaX.sign}:${oldEvent.deltaY.sign}";
-      if (_patternFrequency.containsKey(oldHash)) {
-        _patternFrequency[oldHash] = (_patternFrequency[oldHash]! - 1);
-        if (_patternFrequency[oldHash]! <= 0) {
-          _patternFrequency.remove(oldHash);
-        }
-      }
+    // [STAGE 1] NOISE GATE
+    // If signal is weak (table vibration), kill it instantly.
+    double cleanInput = rawInput;
+    if (cleanInput < NOISE_GATE) {
+      cleanInput = 0.0;
     }
-    
-    // Add New Data
-    _motionHistory.add(newEvent);
-    _accumulatedShake += rawMagnitude;
-    _patternFrequency[movementHash] = (_patternFrequency[movementHash] ?? 0) + 1;
 
-    // 4. Update Live Confidence Score (For UI)
-    _updateBiometricState();
-  }
-
-  void _updateBiometricState() {
-    if (_motionHistory.isEmpty) return;
-
-    // Calculate Variance (Human jitter vs Robot Smoothness)
-    double mean = _accumulatedShake / _motionHistory.length;
-    double variance = 0;
-    for (var m in _motionHistory) {
-      variance += pow(m.magnitude - mean, 2);
+    // [STAGE 2] ROLLING BUFFER
+    // Add to history
+    _rawBuffer.add(cleanInput);
+    if (_rawBuffer.length > BUFFER_SIZE) {
+      _rawBuffer.removeAt(0);
     }
-    variance = variance / _motionHistory.length;
 
-    // Calculate Shannon Entropy (Randomness)
-    double entropy = 0;
-    int totalPatterns = _motionHistory.length;
-    _patternFrequency.forEach((key, count) {
-      double p = count / totalPatterns;
-      if (p > 0) entropy -= p * log(p); // Shannon formula
-    });
+    // Need enough data to perform advanced filtering
+    if (_rawBuffer.length < 3) return;
 
-    // Create Signature
-    final signature = BiometricSignature(
-      averageMagnitude: mean,
-      frequencyVariance: variance,
-      patternEntropy: entropy,
-      uniqueGestureCount: _patternFrequency.length,
-      timestamp: DateTime.now(),
-      isPotentiallyHuman: true,
-    );
+    // [STAGE 3] MEDIAN FILTER (Anti-Spike)
+    // Sort buffer to find median (middle value)
+    List<double> sorted = List.from(_rawBuffer)..sort();
+    double median = sorted[sorted.length ~/ 2];
+    
+    // If new value is HUGE compared to median, it's a glitch (Ghost Spike). Ignore it.
+    // Except if median is 0 (start of movement), then allow it.
+    if (median > 0.1 && cleanInput > (median * SPIKE_THRESHOLD_MULTIPLIER)) {
+      // Reject this specific sample, use median instead
+      cleanInput = median;
+    }
 
-    _liveConfidence = signature.humanConfidence;
+    // [STAGE 4] ROLLING AVERAGE
+    // Smooth out the bumps
+    double average = _rawBuffer.reduce((a, b) => a + b) / _rawBuffer.length;
+
+    // [STAGE 5] EXPONENTIAL SMOOTHING (The "Heavy" Feel)
+    // Formula: New = (Old * 0.85) + (Input * 0.15)
+    _internalSmoothedValue = (_internalSmoothedValue * (1 - SMOOTHING_FACTOR)) + (average * SMOOTHING_FACTOR);
+
+    // [STAGE 6] NORMALIZATION
+    // Map 0.0 -> 15.0  TO  0.0 -> 1.0
+    double normalizedScore = (_internalSmoothedValue / SENSOR_MAX_INPUT).clamp(0.0, 1.0);
+
+    // Update Public State
+    _liveConfidence = normalizedScore;
+    
+    // Auto-Notify logic is handled by Widget Ticker, 
+    // but we notify here if specific thresholds are met for logic updates
+    if (_liveConfidence > 0.01) {
+       // Optional: Trigger specific logic logic
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -199,9 +191,8 @@ class ClaController extends ChangeNotifier {
     await prefs.remove(KEY_ATTEMPTS);
     await prefs.remove(KEY_LOCKOUT);
     _failedAttempts = 0;
-    _accumulatedShake = 0;
-    _motionHistory.clear();
-    _patternFrequency.clear();
+    _internalSmoothedValue = 0;
+    _rawBuffer.clear();
     _liveConfidence = 0.0;
     _lockoutUntil = null;
     _state = SecurityState.LOCKED;
@@ -217,9 +208,10 @@ class ClaController extends ChangeNotifier {
 
     // 1. BIOMETRIC CHECK
     if (config.enableSensors) {
-       // Check if confidence matches Human Standards
-       if (_liveConfidence < config.botDetectionSensitivity) {
-         ClaAudit.log('BOT DETECTED: Score $_liveConfidence < ${config.botDetectionSensitivity}');
+       // Human must maintain at least 20% intensity during unlock
+       // Or have a history of movement. 
+       if (_liveConfidence < 0.2 && _internalSmoothedValue < 1.0) {
+         ClaAudit.log('FAIL: Too static. Bot or Table detected.');
          await _handleFailure();
          return;
        }
@@ -265,10 +257,6 @@ class ClaController extends ChangeNotifier {
     }
     return true;
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // 📊 UTILITY GETTERS
-  // ═══════════════════════════════════════════════════════════
   
   int getInitialValue(int index) {
     if (index >= 0 && index < currentValues.length) return currentValues[index];
@@ -281,7 +269,6 @@ class ClaController extends ChangeNotifier {
   }
 }
 
-// Log kosmetik sementara
 class ClaAudit {
   static void log(String msg) {
     if (kDebugMode) print("[CRYPTEX AUDIT] $msg");
