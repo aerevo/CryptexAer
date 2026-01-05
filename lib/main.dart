@@ -37,20 +37,20 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void initState() {
     super.initState();
-    // Konfigurasi BIO-SIGMA GRED TENTERA
+    // Konfigurasi BIO-SIGMA (AUDIT VERSION)
+    // Parameter 'humanTremorFrequency' telah dibuang oleh Gemini kerana
+    // logik dalaman Controller sekarang mengiranya secara automatik.
     _controller = ClaController(
       const ClaConfig(
         secret: [1, 7, 3, 9, 2],       
         minSolveTime: Duration(seconds: 2),
         minShake: 0.15,                 // Min shake for trigger
-        thresholdAmount: 1.0,           // Legacy param
+        thresholdAmount: 1.0,           
         jamCooldown: Duration(minutes: 5), // Hukuman Jammed: 5 Minit!
         maxAttempts: 3,
         
-        // TUNING BARU (Shannon Entropy & Human Frequency)
-        humanTremorFrequency: 10.0,     // 10Hz (Gegaran tangan manusia)
-        botDetectionSensitivity: 0.5,   // 0.5 = Balance (Tak terlalu strict sampai user marah)
-        minimumGestureSequence: 5,
+        // TUNING BARU (Clean Version)
+        botDetectionSensitivity: 0.5,   // 0.5 = Balance
         enableSensors: true,
       ),
     );
