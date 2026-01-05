@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'cryptex_lock/src/cla_widget.dart';
 import 'cryptex_lock/src/cla_controller.dart';
-import 'cryptex_lock/src/cla_models.dart'; // Import betul untuk ClaConfig
+import 'cryptex_lock/src/cla_models.dart'; 
 
 void main() {
   runApp(const MyApp());
@@ -14,9 +14,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'CryptexAer Legacy',
+      title: 'CryptexAer Bio-Sigma',
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        scaffoldBackgroundColor: const Color(0xFF050505),
         primaryColor: Colors.amber,
       ),
       home: const LockScreen(),
@@ -37,15 +37,21 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void initState() {
     super.initState();
-    // Konfigurasi Canggih (Legacy)
+    // Konfigurasi BIO-SIGMA GRED TENTERA
     _controller = ClaController(
       const ClaConfig(
-        secret: [1, 7, 3, 9, 2],       // PASSWORD
+        secret: [1, 7, 3, 9, 2],       
         minSolveTime: Duration(seconds: 2),
-        minShake: 1.5,                 // Sensitiviti Gegaran
-        jamCooldown: Duration(seconds: 30),
-        thresholdAmount: 5000.0,
-        enableSensors: true,           // Hidupkan Sensor Delta
+        minShake: 0.15,                 // Min shake for trigger
+        thresholdAmount: 1.0,           // Legacy param
+        jamCooldown: Duration(minutes: 5), // Hukuman Jammed: 5 Minit!
+        maxAttempts: 3,
+        
+        // TUNING BARU (Shannon Entropy & Human Frequency)
+        humanTremorFrequency: 10.0,     // 10Hz (Gegaran tangan manusia)
+        botDetectionSensitivity: 0.5,   // 0.5 = Balance (Tak terlalu strict sampai user marah)
+        minimumGestureSequence: 5,
+        enableSensors: true,
       ),
     );
   }
@@ -64,14 +70,14 @@ class _LockScreenState extends State<LockScreen> {
         backgroundColor: Colors.green[900],
         title: const Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.white),
+            Icon(Icons.verified_user, color: Colors.white),
             SizedBox(width: 10),
-            Text("ACCESS GRANTED", style: TextStyle(color: Colors.white)),
+            Text("BIO-SIGMA VERIFIED", style: TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
         content: const Text(
-          "Welcome back, Captain Aer.\nIdentity Verified: HUMAN.",
-          style: TextStyle(color: Colors.white70),
+          "Identity Confirmed: HUMAN.\nMicro-tremors analysis passed.\nEntropy check passed.",
+          style: TextStyle(color: Colors.white70, fontSize: 12),
         ),
         actions: [
           TextButton(
@@ -79,7 +85,7 @@ class _LockScreenState extends State<LockScreen> {
               Navigator.pop(context);
               _controller.userAcceptsRisk(); // Reset untuk demo
             },
-            child: const Text("CLOSE", style: TextStyle(color: Colors.white)),
+            child: const Text("ENTER VAULT", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -89,9 +95,9 @@ class _LockScreenState extends State<LockScreen> {
   void _onFail() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("Authentication Failed"), 
+        content: Text("Access Denied: Biometric mismatch or Wrong Code"), 
         backgroundColor: Colors.red,
-        duration: Duration(seconds: 1),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -99,10 +105,11 @@ class _LockScreenState extends State<LockScreen> {
   void _onJammed() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => const AlertDialog(
         backgroundColor: Colors.red,
-        title: Text("SYSTEM JAMMED", style: TextStyle(color: Colors.white)),
-        content: Text("Too many attempts or Bot Detected.\nSystem locked for 30 seconds."),
+        title: Text("SECURITY LOCKOUT", style: TextStyle(color: Colors.white)),
+        content: Text("Multiple failures detected.\nSystem locked to prevent brute-force."),
       ),
     );
   }
@@ -116,25 +123,25 @@ class _LockScreenState extends State<LockScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.shield_moon, size: 60, color: Colors.amber),
+              const Icon(Icons.fingerprint, size: 50, color: Colors.grey),
               const SizedBox(height: 20),
               const Text(
-                "AER SECURITY VAULT",
+                "AER BIO-VAULT",
                 style: TextStyle(
-                  fontSize: 24, 
+                  fontSize: 22, 
                   fontWeight: FontWeight.bold, 
-                  letterSpacing: 2,
-                  color: Colors.amber
+                  letterSpacing: 3,
+                  color: Colors.white
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                "Legacy Protocol v1.0",
-                style: TextStyle(color: Colors.grey, fontSize: 12),
+              Text(
+                "Class 4 Security Protocol",
+                style: TextStyle(color: Colors.grey[700], fontSize: 10),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 50),
               
-              // WIDGET UTAMA (DIBETULKAN: Tiada lagi parameter 'amount')
+              // WIDGET
               CryptexLock(
                 controller: _controller,
                 onSuccess: _onSuccess,
@@ -142,10 +149,10 @@ class _LockScreenState extends State<LockScreen> {
                 onJammed: _onJammed,
               ),
               
-              const SizedBox(height: 30),
-              const Text(
-                "SECURED BY FRANCOIS PROTOCOL",
-                style: TextStyle(color: Colors.grey, fontSize: 10),
+              const SizedBox(height: 40),
+              Text(
+                "POWERED BY BIO-SIGMA ENGINE",
+                style: TextStyle(color: Colors.grey[800], fontSize: 9),
               ),
             ],
           ),
