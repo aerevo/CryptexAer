@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui'; // Perlu untuk lerpDouble
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
@@ -25,19 +24,14 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin, WidgetsBindingObserver {
-  // GUNA USERACCELEROMETER (GRAVITY FREE)
   StreamSubscription<UserAccelerometerEvent>? _accelSub;
   
-  // VARIABLE UNTUK SMOOTHING (PEMBERAT)
-  double _smoothMagnitude = 0.0;
-  
-  // UI State
+  // UI Animation State
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
   
   // Privacy Shield
   int? _activeWheelIndex;
-  
   late List<FixedExtentScrollController> _scrollControllers;
   
   // Colors
@@ -50,35 +44,36 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // Register Lifecycle Observer
+    WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
     _initAnimations();
     _startListening();
     
-    // LISTEN TO CONTROLLER STATE (Fixes Build Phase Race Condition)
+    // Listen to logic state changes
     widget.controller.addListener(_handleControllerChange);
   }
   
   void _handleControllerChange() {
+    // 1. Check Security State
     if (widget.controller.state == SecurityState.UNLOCKED) {
       widget.onSuccess();
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
       widget.onJammed();
     }
+    
+    // 2. Check Sensor Confidence (Manual Ticker Trigger)
+    // We update the animation target here whenever the controller notifies
+    if (mounted) {
+       _animateScoreBar(widget.controller.liveConfidence);
+    }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 🔋 BATTERY SAVER PROTOCOL (LIFECYCLE)
-  // ═══════════════════════════════════════════════════════════
-  
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      // Pause sensors immediately when backgrounded
       _accelSub?.cancel();
       _accelSub = null;
     } else if (state == AppLifecycleState.resumed) {
-      // Resume sensors only if we are still active
       if (_accelSub == null) {
         _startListening();
       }
@@ -88,10 +83,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 150),
+      duration: const Duration(milliseconds: 200), // Slightly slower for elegance
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _progressController, curve: Curves.linear),
+      CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic),
     );
   }
 
@@ -103,27 +98,24 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _startListening() {
-    // Prevent double subscription
     _accelSub?.cancel();
     
-    // GUNA 'userAccelerometerEvents' (Auto-Filter Gravity)
+    // We just feed raw data to the controller.
+    // The Controller does ALL the math now.
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
+      // Calculate raw magnitude
+      double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
       
-      // Kira kekuatan gegaran (Magnitude)
-      double rawMagnitude = e.x.abs() + e.y.abs() + e.z.abs();
-
-      // Exponential Moving Average (Absorber)
-      _smoothMagnitude = lerpDouble(_smoothMagnitude, rawMagnitude, 0.1)!;
-
-      // Hantar data ke Controller
-      widget.controller.registerShake(_smoothMagnitude, e.x, e.y, e.z);
+      // Pass to DSP Pipeline
+      widget.controller.registerShake(rawMag, e.x, e.y, e.z);
       
-      // UI UPDATE LOGIC
-      double currentUiValue = _progressAnimation.value;
-      double targetValue = widget.controller.liveConfidence;
-
-      if ((currentUiValue - targetValue).abs() > 0.02) {
-         _animateScoreBar(targetValue);
+      // Note: We don't update UI here directly anymore. 
+      // We wait for the Controller to process it and notify us, 
+      // OR we can poll the controller value in a Ticker if needed for 60fps.
+      // For battery saving, listener-based update (in _handleControllerChange) is better.
+      // But to ensure smoothness, let's force a check if value changed significantly:
+      if ((_progressController.value - widget.controller.liveConfidence).abs() > 0.01) {
+         _animateScoreBar(widget.controller.liveConfidence);
       }
     });
   }
@@ -140,8 +132,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // Unregister Observer
-    widget.controller.removeListener(_handleControllerChange); // Clean listener
+    WidgetsBinding.instance.removeObserver(this);
+    widget.controller.removeListener(_handleControllerChange);
     _accelSub?.cancel();
     _progressController.dispose();
     for (var c in _scrollControllers) c.dispose();
@@ -157,7 +149,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, child) {
-        // NOTE: Success logic moved to _handleControllerChange to prevent build errors
         return _buildStateUI(widget.controller.state);
       },
     );
@@ -170,18 +161,19 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       if (widget.controller.liveConfidence > 0.4) { 
+       // Visual Feedback Logic
+       if (widget.controller.liveConfidence > 0.2) { 
          activeColor = _colLocked;
          statusText = "BIO-LOCK: ACTIVE";
          statusIcon = Icons.fingerprint;
        } else {
          activeColor = _colDead;
-         statusText = "READY";
-         statusIcon = Icons.sensors; 
+         statusText = "SYSTEM STABILIZED"; // Teks baru menandakan sensor tenang
+         statusIcon = Icons.shield_moon; 
        }
     } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
-        statusText = "VERIFYING...";
+        statusText = "PROCESSING...";
         statusIcon = Icons.radar;
         isInputDisabled = true;
     } else if (state == SecurityState.SOFT_LOCK) {
@@ -190,14 +182,14 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         statusIcon = Icons.warning_amber_rounded;
     } else if (state == SecurityState.HARD_LOCK) {
         activeColor = _colJam;
-        statusText = "JAMMED (${widget.controller.remainingLockoutSeconds}s)";
+        statusText = "LOCKED (${widget.controller.remainingLockoutSeconds}s)";
         statusIcon = Icons.block;
         isInputDisabled = true;
     } else if (state == SecurityState.ROOT_WARNING) {
         return _buildLiabilityWaiverUI();
     } else { 
         activeColor = _colUnlock;
-        statusText = "IDENTITY VERIFIED";
+        statusText = "ACCESS GRANTED";
         statusIcon = Icons.lock_open;
         isInputDisabled = true;
     }
@@ -232,7 +224,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                  Row(
                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                    children: [
-                     Text("BIO-SIGMA STABILITY", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
+                     Text("BIO-SIGMA RESONANCE", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
                      Text("${(_progressAnimation.value * 100).toInt()}%", style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, fontSize: 10)),
                    ],
                  ),
@@ -252,7 +244,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           
           const SizedBox(height: 25),
           
-          // WHEELS & PRIVACY BLUR
+          // WHEELS
           SizedBox(
             height: 120,
             child: IgnorePointer(
@@ -354,14 +346,14 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           const SizedBox(height: 20),
           const Text("SYSTEM HARD-LOCKED", style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          const Text("Peranti anda tidak lagi dibenarkan mengakses perisian ini.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11)),
+          const Text("Device compromised. Access revoked permanently.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11)),
           if (widget.controller.threatMessage.isNotEmpty)
              Padding(
                padding: const EdgeInsets.only(top:10),
                child: Text(widget.controller.threatMessage, style: TextStyle(color: Colors.red, fontSize: 10)),
              ),
           const SizedBox(height: 20),
-          ElevatedButton(onPressed: () => widget.controller.userAcceptsRisk(), child: const Text("FORCE OVERRIDE (LOGGED)"))
+          ElevatedButton(onPressed: () => widget.controller.userAcceptsRisk(), child: const Text("FORCE OVERRIDE"))
         ],
       ),
     );
