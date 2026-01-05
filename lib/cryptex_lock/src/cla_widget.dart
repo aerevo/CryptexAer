@@ -27,15 +27,20 @@ class _CryptexLockState extends State<CryptexLock> {
   StreamSubscription<AccelerometerEvent>? _accelSub;
   
   double _lastX = 0, _lastY = 0, _lastZ = 0;
-  double _humanScore = 0.0; // Ini yang "Chatgpt upgrade" buang tadi
+  double _humanScore = 0.0;
   bool _isHuman = false;
 
-  static const double MOVEMENT_THRESHOLD = 0.3; 
-  static const double DECAY_RATE = 0.5;
+  // --- TUNING SENSOR BARU (LEBIH SENSITIF) ---
+  // Dulu 0.3 (Terlalu berat), Sekarang 0.05 (Detect Nadi/Micro-tremor)
+  static const double MOVEMENT_THRESHOLD = 0.05; 
+  // Dulu 0.5 (Turun laju), Sekarang 0.1 (Turun perlahan bila tangan diam)
+  static const double DECAY_RATE = 0.1; 
+  // BOOSTER: Gandaan input supaya bar penuh cepat
+  static const double SENSITIVITY_BOOST = 5.0; 
 
   late List<FixedExtentScrollController> _scrollControllers;
 
-  // WARNA STATUS (Canggih)
+  // WARNA STATUS
   final Color _colLocked = const Color(0xFFFFD700); 
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam = const Color(0xFFFF3333);    
@@ -58,6 +63,7 @@ class _CryptexLockState extends State<CryptexLock> {
 
   void _startListening() {
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
+      // 1. Kira Delta (Perubahan)
       double deltaX = (e.x - _lastX).abs();
       double deltaY = (e.y - _lastY).abs();
       double deltaZ = (e.z - _lastZ).abs();
@@ -65,23 +71,31 @@ class _CryptexLockState extends State<CryptexLock> {
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
       double totalDelta = deltaX + deltaY + deltaZ;
 
-      // Logik "Nadi" Manusia
+      // 2. Logik Pemarkahan "Overclocked"
       if (totalDelta > MOVEMENT_THRESHOLD) {
-        _humanScore += totalDelta;
+        // Kalau bergerak, kita boost gila-gila
+        _humanScore += (totalDelta * SENSITIVITY_BOOST);
       } else {
+        // Kalau diam, kita tolak sikit-sikit je
         _humanScore -= DECAY_RATE;
       }
 
+      // Clamp max 50.0
       _humanScore = _humanScore.clamp(0.0, 50.0);
-      bool detectedHuman = _humanScore > 10.0;
+      
+      // Threshold untuk dianggap manusia (rendahkan sikit ke 5.0 supaya responsif)
+      bool detectedHuman = _humanScore > 5.0;
 
-      // Hantar data mentah ke Controller juga
+      // Hantar data mentah ke Controller (Otak)
       widget.controller.registerShake(totalDelta);
 
       if (mounted && _isHuman != detectedHuman) {
         setState(() {
           _isHuman = detectedHuman;
         });
+      } else if (mounted) {
+         // Force rebuild untuk update progress bar smooth (60fps)
+         setState(() {});
       }
     });
   }
@@ -94,7 +108,6 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _triggerHaptic() {
-    // Guna Native Haptic (Build lulus, Rasa sedap)
     HapticFeedback.selectionClick();
   }
 
@@ -107,7 +120,6 @@ class _CryptexLockState extends State<CryptexLock> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, child) {
-        // Callback UI Logic
         if (widget.controller.state == SecurityState.UNLOCKED) {
            Future.delayed(Duration.zero, widget.onSuccess);
         }
@@ -130,7 +142,7 @@ class _CryptexLockState extends State<CryptexLock> {
           statusIcon = Icons.fingerprint;
         } else {
           activeColor = _colDead;
-          statusText = "DEVICE STATIC"; // Kesan letak atas meja
+          statusText = "DEVICE STATIC"; 
           statusIcon = Icons.screen_rotation; 
         }
         break;
@@ -185,7 +197,6 @@ class _CryptexLockState extends State<CryptexLock> {
             ],
           ),
           const SizedBox(height: 20),
-          // Bar Sensor yang Canggih
           _buildScoreBar(activeColor), 
           const SizedBox(height: 20),
           SizedBox(
@@ -262,7 +273,7 @@ class _CryptexLockState extends State<CryptexLock> {
         itemExtent: 40,
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (val) {
-          _triggerHaptic(); // Tik!
+          _triggerHaptic(); 
           widget.controller.updateWheel(index, val % 10);
         },
         childDelegate: ListWheelChildBuilderDelegate(
