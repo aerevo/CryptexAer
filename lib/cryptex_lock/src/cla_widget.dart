@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
@@ -23,34 +24,43 @@ class CryptexLock extends StatefulWidget {
   State<CryptexLock> createState() => _CryptexLockState();
 }
 
-class _CryptexLockState extends State<CryptexLock> {
+class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
   StreamSubscription<AccelerometerEvent>? _accelSub;
   
   double _lastX = 0, _lastY = 0, _lastZ = 0;
-  double _humanScore = 0.0;
-  bool _isHuman = false;
-
-  // --- KALIBRASI ANTI-LANTAI (REFINED) ---
-  // Kita naikkan ambang sikit supaya 'noise' lantai tak lepas.
-  static const double MOVEMENT_THRESHOLD = 0.15; 
-  // Kadar penurunan markah yang lebih adil.
-  static const double DECAY_RATE = 0.3; 
-  // Gandaan yang lebih waras (Bukan jet, cuma turbo).
-  static const double SENSITIVITY_BOOST = 2.5; 
-
+  
+  // UI State for Smooth Animation
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
+  
+  // Privacy Shield - Track which wheel is being touched
+  int? _activeWheelIndex;
+  
   late List<FixedExtentScrollController> _scrollControllers;
-
+  
+  // Colors
   final Color _colLocked = const Color(0xFFFFD700); 
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam = const Color(0xFFFF3333);    
   final Color _colUnlock = const Color(0xFF00E676); 
-  final Color _colDead = Colors.grey;               
+  final Color _colDead = Colors.grey; 
 
   @override
   void initState() {
     super.initState();
     _initScrollControllers();
+    _initAnimations();
     _startListening();
+  }
+  
+  void _initAnimations() {
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _progressController, curve: Curves.easeOut),
+    );
   }
 
   void _initScrollControllers() {
@@ -62,40 +72,37 @@ class _CryptexLockState extends State<CryptexLock> {
 
   void _startListening() {
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      double deltaX = (e.x - _lastX).abs();
-      double deltaY = (e.y - _lastY).abs();
-      double deltaZ = (e.z - _lastZ).abs();
+      double deltaX = (e.x - _lastX);
+      double deltaY = (e.y - _lastY);
+      double deltaZ = (e.z - _lastZ);
+      
+      // Calculate Magnitude
+      double rawMagnitude = deltaX.abs() + deltaY.abs() + deltaZ.abs();
 
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
-      double totalDelta = deltaX + deltaY + deltaZ;
-
-      // --- PENAPIS HINGAR (DEAD-ZONE) ---
-      if (totalDelta > MOVEMENT_THRESHOLD) {
-        // Hanya jika gegaran lebih kuat dari 'noise' lantai
-        _humanScore += (totalDelta * SENSITIVITY_BOOST);
-      } else {
-        // Jika di bawah threshold (Lantai/Statik), markah jatuh
-        _humanScore -= DECAY_RATE;
-      }
-
-      _humanScore = _humanScore.clamp(0.0, 50.0);
       
-      // Manusia perlu capai 15.0 untuk dianggap 'Active'
-      bool detectedHuman = _humanScore > 15.0;
-
-      widget.controller.registerShake(totalDelta);
-
-      if (mounted && _isHuman != detectedHuman) {
-        setState(() => _isHuman = detectedHuman);
-      } else if (mounted) {
-         setState(() {});
-      }
+      // Send FULL PHYSICS data to Controller
+      widget.controller.registerShake(rawMagnitude, deltaX, deltaY, deltaZ);
+      
+      // Update UI Bar smoothly
+      _animateScoreBar(widget.controller.liveConfidence);
     });
+  }
+  
+  void _animateScoreBar(double target) {
+    if ((_progressController.value - target).abs() > 0.05) {
+      _progressAnimation = Tween<double>(
+        begin: _progressController.value,
+        end: target,
+      ).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOut));
+      _progressController.forward(from: 0);
+    }
   }
 
   @override
   void dispose() {
     _accelSub?.cancel();
+    _progressController.dispose();
     for (var c in _scrollControllers) c.dispose();
     super.dispose();
   }
@@ -123,56 +130,47 @@ class _CryptexLockState extends State<CryptexLock> {
     IconData statusIcon;
     bool isInputDisabled = false;
 
-    switch (state) {
-      case SecurityState.LOCKED:
-        if (_isHuman) {
-          activeColor = _colLocked;
-          statusText = "BIO-LOCK: ACTIVE";
-          statusIcon = Icons.fingerprint;
-        } else {
-          activeColor = _colDead;
-          statusText = "DEVICE STATIC"; 
-          statusIcon = Icons.screen_rotation; 
-        }
-        break;
-      case SecurityState.VALIDATING:
+    // Logic Warna Pintar
+    if (state == SecurityState.LOCKED) {
+       if (widget.controller.liveConfidence > 0.5) {
+         activeColor = _colLocked;
+         statusText = "BIO-LOCK: ACTIVE";
+         statusIcon = Icons.fingerprint;
+       } else {
+         activeColor = _colDead;
+         statusText = "AWAITING BIO-INPUT";
+         statusIcon = Icons.back_hand; 
+       }
+    } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
-        statusText = "VERIFYING...";
+        statusText = "ANALYZING SIGNATURE...";
         statusIcon = Icons.radar;
         isInputDisabled = true;
-        break;
-      case SecurityState.SOFT_LOCK:
+    } else if (state == SecurityState.SOFT_LOCK) {
         activeColor = _colFail;
-        statusText = "FAILED (${widget.controller.failedAttempts}/3)";
+        statusText = "MISMATCH (${widget.controller.failedAttempts}/3)";
         statusIcon = Icons.warning_amber_rounded;
-        break;
-      case SecurityState.HARD_LOCK:
+    } else if (state == SecurityState.HARD_LOCK) {
         activeColor = _colJam;
         statusText = "JAMMED (${widget.controller.remainingLockoutSeconds}s)";
         statusIcon = Icons.block;
         isInputDisabled = true;
-        break;
-      case SecurityState.ROOT_WARNING:
+    } else if (state == SecurityState.ROOT_WARNING) {
         return _buildLiabilityWaiverUI();
-      case SecurityState.UNLOCKED:
+    } else { // UNLOCKED
         activeColor = _colUnlock;
-        statusText = "ACCESS GRANTED";
+        statusText = "IDENTITY VERIFIED";
         statusIcon = Icons.lock_open;
         isInputDisabled = true;
-        break;
-      default:
-        activeColor = _colLocked;
-        statusText = "SYSTEM READY";
-        statusIcon = Icons.lock;
     }
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF000000),
+        color: const Color(0xFF050505),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: activeColor, width: 2),
-        boxShadow: [BoxShadow(color: activeColor.withOpacity(0.2), blurRadius: 20)],
+        border: Border.all(color: activeColor.withOpacity(0.5), width: 1.5),
+        boxShadow: [BoxShadow(color: activeColor.withOpacity(0.15), blurRadius: 25)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -180,25 +178,71 @@ class _CryptexLockState extends State<CryptexLock> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(statusIcon, color: activeColor),
+              Icon(statusIcon, color: activeColor, size: 18),
               const SizedBox(width: 10),
-              Text(statusText, style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+              Text(statusText, style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 13)),
             ],
           ),
-          const SizedBox(height: 20),
-          _buildScoreBar(activeColor), 
-          const SizedBox(height: 20),
+          const SizedBox(height: 25),
+          
+          // BIO-SIGMA BAR 2.0 (Smooth Animation)
+          AnimatedBuilder(
+            animation: _progressController,
+            builder: (context, child) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                 Row(
+                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                   children: [
+                     Text("BIO-SIGMA CONFIDENCE", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
+                     Text("${(_progressAnimation.value * 100).toInt()}%", style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, fontSize: 10)),
+                   ],
+                 ),
+                 const SizedBox(height: 6),
+                 ClipRRect(
+                   borderRadius: BorderRadius.circular(2),
+                   child: LinearProgressIndicator(
+                     value: _progressAnimation.value,
+                     backgroundColor: Colors.grey[900],
+                     color: activeColor,
+                     minHeight: 3,
+                   ),
+                 ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 25),
+          
+          // PRIVACY SHIELD WHEELS
           SizedBox(
             height: 120,
             child: IgnorePointer(
               ignoring: isInputDisabled,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(5, (index) => _buildWheel(index, activeColor, isInputDisabled)),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is ScrollStartNotification || notification is ScrollUpdateNotification) {
+                     // Cari roda mana yang bergerak (Logic kasar, idealnya guna gesture detector per roda)
+                     // Tapi untuk simplicity, kita nyalakan semua bila ada interaksi
+                     if (_activeWheelIndex == null) {
+                       setState(() => _activeWheelIndex = 1); // Activate Glow
+                     }
+                  } else if (notification is ScrollEndNotification) {
+                     Future.delayed(const Duration(milliseconds: 500), () {
+                       if (mounted) setState(() => _activeWheelIndex = null); // Deactivate Glow
+                     });
+                  }
+                  return false;
+                },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(5, (index) => _buildPrivacyWheel(index, activeColor, isInputDisabled)),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          
+          const SizedBox(height: 25),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -206,71 +250,86 @@ class _CryptexLockState extends State<CryptexLock> {
                 backgroundColor: isInputDisabled ? Colors.grey[900] : activeColor,
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: isInputDisabled ? null : () => widget.controller.validateAttempt(hasPhysicalMovement: _isHuman),
-              child: Text(state == SecurityState.HARD_LOCK ? "LOCKED" : "AUTHENTICATE", style: const TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: isInputDisabled ? null : () => widget.controller.validateAttempt(hasPhysicalMovement: true),
+              child: Text(
+                state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "AUTHENTICATE", 
+                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)
+              ),
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildScoreBar(Color activeColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text("BIO-SIGMA DETECTOR", style: TextStyle(color: Colors.grey[600], fontSize: 10)),
-            Text(_humanScore.toStringAsFixed(1), style: TextStyle(color: _isHuman ? _colUnlock : _colJam, fontWeight: FontWeight.bold)),
-          ],
+  
+  // Roda dengan Privacy Blur
+  Widget _buildPrivacyWheel(int index, Color color, bool disabled) {
+    // Kalau active, opacity 1.0 (Jelas). Kalau tak, 0.1 (Gelap/Blur).
+    final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.15;
+    
+    return SizedBox(
+      width: 45,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: disabled ? 0.3 : opacity,
+        child: ListWheelScrollView.useDelegate(
+          controller: _scrollControllers[index],
+          itemExtent: 45,
+          perspective: 0.005,
+          diameterRatio: 1.2,
+          physics: const FixedExtentScrollPhysics(),
+          onSelectedItemChanged: (val) {
+            _triggerHaptic(); 
+            widget.controller.updateWheel(index, val % 10);
+            // Keep glow alive
+            if (_activeWheelIndex == null) setState(() => _activeWheelIndex = 1);
+          },
+          childDelegate: ListWheelChildBuilderDelegate(
+            builder: (context, i) {
+              final num = i % 10;
+              return Center(
+                child: Text(
+                  '$num',
+                  style: TextStyle(
+                    color: (num == 0 ? Colors.redAccent : Colors.white),
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      if (_activeWheelIndex != null) 
+                        BoxShadow(color: color.withOpacity(0.8), blurRadius: 10)
+                    ]
+                  ),
+                ),
+              );
+            },
+          ),
         ),
-        const SizedBox(height: 5),
-        LinearProgressIndicator(
-          value: _humanScore / 50.0,
-          backgroundColor: Colors.grey[900],
-          color: _isHuman ? _colUnlock : _colJam,
-          minHeight: 4,
-        ),
-      ],
+      ),
     );
   }
 
   Widget _buildLiabilityWaiverUI() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.red[900], borderRadius: BorderRadius.circular(15)),
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.purple, width: 2), borderRadius: BorderRadius.circular(20)),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.warning, color: Colors.white, size: 50),
+          const Icon(Icons.security_update_warning, color: Colors.purple, size: 50),
+          const SizedBox(height: 20),
+          const Text("SYSTEM HARD-LOCKED", style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          const Text("SECURITY COMPROMISED", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          ElevatedButton(onPressed: () => widget.controller.userAcceptsRisk(), child: const Text("RISK ACCEPTED"))
+          const Text("Peranti anda tidak lagi dibenarkan mengakses perisian ini.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11)),
+          if (widget.controller.threatMessage.isNotEmpty)
+             Padding(
+               padding: const EdgeInsets.only(top:10),
+               child: Text(widget.controller.threatMessage, style: TextStyle(color: Colors.red, fontSize: 10)),
+             ),
+          const SizedBox(height: 20),
+          ElevatedButton(onPressed: () => widget.controller.userAcceptsRisk(), child: const Text("FORCE OVERRIDE (LOGGED)"))
         ],
-      ),
-    );
-  }
-
-  Widget _buildWheel(int index, Color color, bool disabled) {
-    return SizedBox(
-      width: 40,
-      child: ListWheelScrollView.useDelegate(
-        controller: _scrollControllers[index],
-        itemExtent: 40,
-        physics: const FixedExtentScrollPhysics(),
-        onSelectedItemChanged: (val) {
-          _triggerHaptic(); 
-          widget.controller.updateWheel(index, val % 10);
-        },
-        childDelegate: ListWheelChildBuilderDelegate(
-          builder: (context, i) {
-            final num = i % 10;
-            return Center(child: Text('$num', style: TextStyle(color: disabled ? Colors.grey : Colors.white, fontSize: 26, fontWeight: FontWeight.bold)));
-          },
-        ),
       ),
     );
   }
