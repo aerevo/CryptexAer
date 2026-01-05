@@ -1,4 +1,4 @@
-name: Francois Build (Final Clean Build)
+name: Francois Build (Clean Native)
 on:
   workflow_dispatch:
   push:
@@ -23,29 +23,50 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI
+      - name: 4. SUNTIKAN PERISAI (Manifest)
         run: |
+          echo "Membersihkan & Menjana Android..."
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
-          # Inject Permissions
+          echo "Menyuntik Vibrate Permission..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 5b. BEDAH LIBRARY JAILBREAK
+      - name: 5b. BEDAH LIBRARY JAILBREAK (Satu-satunya yang tinggal)
         run: |
-          JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
-          if [ ! -z "$JB_GRADLE" ]; then
-            sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
-            echo "android { compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }; kotlinOptions { jvmTarget = '17' } }" >> $JB_GRADLE
-          fi
+          echo "Membedah flutter_jailbreak_detection..."
           
+          # 1. Cari fail Gradle library ini
+          JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
+          
+          if [ ! -z "$JB_GRADLE" ]; then
+            # Set Namespace (Ubat Ralat Namespace)
+            sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
+            
+            # Paksa JVM 17 (Ubat Ralat Inconsistent JVM)
+            cat >> $JB_GRADLE <<EOF
+            android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                kotlinOptions {
+                    jvmTarget = '17'
+                }
+            }
+          EOF
+          fi
+
+          # 2. Buang 'package=' dari AndroidManifest (Ubat Ralat AGP 8.0)
           JB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
           if [ ! -z "$JB_MANIFEST" ]; then
-             sed -i 's/package="appmire.be.flutterjailbreakdetection"//g' $JB_MANIFEST
+             sed -i 's/package="[^"]*"//g' $JB_MANIFEST
           fi
+          
+          echo "Pembedahan Selesai."
 
       - name: 6. Build APK Release
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
@@ -53,5 +74,5 @@ jobs:
       - name: 7. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-secure-final
+          name: cryptex-aer-bank-grade
           path: build/app/outputs/flutter-apk/app-release.apk
