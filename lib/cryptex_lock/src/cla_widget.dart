@@ -29,11 +29,14 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   
   double _lastX = 0, _lastY = 0, _lastZ = 0;
   
+  // ABSORBER: Variable untuk simpan data yang dah "dilembutkan"
+  double _smoothedMagnitude = 0.0; 
+  
   // UI State for Smooth Animation
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
   
-  // Privacy Shield - Track which wheel is being touched
+  // Privacy Shield
   int? _activeWheelIndex;
   
   late List<FixedExtentScrollController> _scrollControllers;
@@ -56,10 +59,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300), // Masa untuk jarum bergerak
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _progressController, curve: Curves.easeOut),
+      CurvedAnimation(parent: _progressController, curve: Curves.easeOutQuad),
     );
   }
 
@@ -71,32 +74,38 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _startListening() {
+    // Kita set interval supaya tak "spam" (walaupun sensor laju)
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
       double deltaX = (e.x - _lastX);
       double deltaY = (e.y - _lastY);
       double deltaZ = (e.z - _lastZ);
       
-      // Calculate Magnitude
       double rawMagnitude = deltaX.abs() + deltaY.abs() + deltaZ.abs();
-
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
+
+      // 🛑 TEKNIK ABSORBER (LOW-PASS FILTER)
+      // Alpha 0.85 bermaksud: "Ambil 85% data lama, campur 15% data baru"
+      // Ini mematikan 'spike' 2ms yang gila tu.
+      _smoothedMagnitude = (_smoothedMagnitude * 0.85) + (rawMagnitude * 0.15);
+
+      // Kita hantar data yang dah stabil sikit ke Controller
+      // (Tapi hantar juga delta mentah untuk pengiraan entropy)
+      widget.controller.registerShake(_smoothedMagnitude, deltaX, deltaY, deltaZ);
       
-      // Send FULL PHYSICS data to Controller
-      widget.controller.registerShake(rawMagnitude, deltaX, deltaY, deltaZ);
-      
-      // Update UI Bar smoothly
-      _animateScoreBar(widget.controller.liveConfidence);
+      // Update UI Bar hanya jika perubahan ketara (Jimat bateri)
+      if ((_progressController.value - widget.controller.liveConfidence).abs() > 0.01) {
+         _animateScoreBar(widget.controller.liveConfidence);
+      }
     });
   }
   
   void _animateScoreBar(double target) {
-    if ((_progressController.value - target).abs() > 0.05) {
-      _progressAnimation = Tween<double>(
-        begin: _progressController.value,
-        end: target,
-      ).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOut));
-      _progressController.forward(from: 0);
-    }
+    _progressAnimation = Tween<double>(
+      begin: _progressController.value,
+      end: target,
+    ).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOut));
+    
+    _progressController.forward(from: 0);
   }
 
   @override
@@ -130,16 +139,16 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     IconData statusIcon;
     bool isInputDisabled = false;
 
-    // Logic Warna Pintar
     if (state == SecurityState.LOCKED) {
+       // Confidence threshold 50% untuk nampak "Active"
        if (widget.controller.liveConfidence > 0.5) {
          activeColor = _colLocked;
          statusText = "BIO-LOCK: ACTIVE";
          statusIcon = Icons.fingerprint;
        } else {
          activeColor = _colDead;
-         statusText = "AWAITING BIO-INPUT";
-         statusIcon = Icons.back_hand; 
+         statusText = "STABILIZING...";
+         statusIcon = Icons.waves; 
        }
     } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
@@ -157,7 +166,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         isInputDisabled = true;
     } else if (state == SecurityState.ROOT_WARNING) {
         return _buildLiabilityWaiverUI();
-    } else { // UNLOCKED
+    } else { 
         activeColor = _colUnlock;
         statusText = "IDENTITY VERIFIED";
         statusIcon = Icons.lock_open;
@@ -185,7 +194,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ),
           const SizedBox(height: 25),
           
-          // BIO-SIGMA BAR 2.0 (Smooth Animation)
+          // BIO-SIGMA BAR
           AnimatedBuilder(
             animation: _progressController,
             builder: (context, child) => Column(
@@ -194,7 +203,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                  Row(
                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                    children: [
-                     Text("BIO-SIGMA CONFIDENCE", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
+                     Text("BIO-SIGMA STABILITY", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
                      Text("${(_progressAnimation.value * 100).toInt()}%", style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, fontSize: 10)),
                    ],
                  ),
@@ -214,7 +223,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           
           const SizedBox(height: 25),
           
-          // PRIVACY SHIELD WHEELS
+          // WHEELS
           SizedBox(
             height: 120,
             child: IgnorePointer(
@@ -222,14 +231,12 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               child: NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
                   if (notification is ScrollStartNotification || notification is ScrollUpdateNotification) {
-                     // Cari roda mana yang bergerak (Logic kasar, idealnya guna gesture detector per roda)
-                     // Tapi untuk simplicity, kita nyalakan semua bila ada interaksi
                      if (_activeWheelIndex == null) {
-                       setState(() => _activeWheelIndex = 1); // Activate Glow
+                       setState(() => _activeWheelIndex = 1); 
                      }
                   } else if (notification is ScrollEndNotification) {
                      Future.delayed(const Duration(milliseconds: 500), () {
-                       if (mounted) setState(() => _activeWheelIndex = null); // Deactivate Glow
+                       if (mounted) setState(() => _activeWheelIndex = null); 
                      });
                   }
                   return false;
@@ -254,7 +261,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               ),
               onPressed: isInputDisabled ? null : () => widget.controller.validateAttempt(hasPhysicalMovement: true),
               child: Text(
-                state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "AUTHENTICATE", 
+                state == SecurityState.HARD_LOCK ? "LOCKED" : "AUTHENTICATE", 
                 style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)
               ),
             ),
@@ -264,9 +271,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
   
-  // Roda dengan Privacy Blur
   Widget _buildPrivacyWheel(int index, Color color, bool disabled) {
-    // Kalau active, opacity 1.0 (Jelas). Kalau tak, 0.1 (Gelap/Blur).
     final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.15;
     
     return SizedBox(
@@ -283,7 +288,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           onSelectedItemChanged: (val) {
             _triggerHaptic(); 
             widget.controller.updateWheel(index, val % 10);
-            // Keep glow alive
             if (_activeWheelIndex == null) setState(() => _activeWheelIndex = 1);
           },
           childDelegate: ListWheelChildBuilderDelegate(
