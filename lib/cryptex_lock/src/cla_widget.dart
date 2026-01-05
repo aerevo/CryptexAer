@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui'; // Perlu untuk lerpDouble
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
@@ -49,20 +50,17 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _initAnimations();
     _startListening();
     
-    // Listen to logic state changes
     widget.controller.addListener(_handleControllerChange);
   }
   
   void _handleControllerChange() {
-    // 1. Check Security State
     if (widget.controller.state == SecurityState.UNLOCKED) {
       widget.onSuccess();
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
       widget.onJammed();
     }
     
-    // 2. Check Sensor Confidence (Manual Ticker Trigger)
-    // We update the animation target here whenever the controller notifies
+    // Smooth update bar ikut score Controller
     if (mounted) {
        _animateScoreBar(widget.controller.liveConfidence);
     }
@@ -83,7 +81,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200), // Slightly slower for elegance
+      duration: const Duration(milliseconds: 300), 
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
       CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic),
@@ -100,23 +98,11 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _startListening() {
     _accelSub?.cancel();
     
-    // We just feed raw data to the controller.
-    // The Controller does ALL the math now.
+    // SENSOR (20% WEIGHT) - Cuma cek "Device Hidup"
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
-      // Calculate raw magnitude
       double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
-      
-      // Pass to DSP Pipeline
-      widget.controller.registerShake(rawMag, e.x, e.y, e.z);
-      
-      // Note: We don't update UI here directly anymore. 
-      // We wait for the Controller to process it and notify us, 
-      // OR we can poll the controller value in a Ticker if needed for 60fps.
-      // For battery saving, listener-based update (in _handleControllerChange) is better.
-      // But to ensure smoothness, let's force a check if value changed significantly:
-      if ((_progressController.value - widget.controller.liveConfidence).abs() > 0.01) {
-         _animateScoreBar(widget.controller.liveConfidence);
-      }
+      // Tak perlu filter gila-gila. Cuma lapor aktiviti.
+      widget.controller.registerMotionActivity(rawMag);
     });
   }
   
@@ -161,19 +147,23 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       // Visual Feedback Logic
-       if (widget.controller.liveConfidence > 0.2) { 
-         activeColor = _colLocked;
-         statusText = "BIO-LOCK: ACTIVE";
+       // Logic Text
+       if (widget.controller.liveConfidence > 0.8) { 
+         activeColor = _colUnlock;
+         statusText = "BIOMETRIC MATCH (EXCELLENT)";
          statusIcon = Icons.fingerprint;
+       } else if (widget.controller.liveConfidence > 0.4) {
+         activeColor = _colLocked;
+         statusText = "GATHERING TOUCH DATA...";
+         statusIcon = Icons.touch_app; 
        } else {
          activeColor = _colDead;
-         statusText = "SYSTEM STABILIZED"; // Teks baru menandakan sensor tenang
-         statusIcon = Icons.shield_moon; 
+         statusText = "WAITING FOR INPUT";
+         statusIcon = Icons.lock_outline; 
        }
     } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
-        statusText = "PROCESSING...";
+        statusText = "ANALYZING PATTERN...";
         statusIcon = Icons.radar;
         isInputDisabled = true;
     } else if (state == SecurityState.SOFT_LOCK) {
@@ -224,7 +214,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                  Row(
                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                    children: [
-                     Text("BIO-SIGMA RESONANCE", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
+                     Text("HYBRID CONFIDENCE SCORE", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
                      Text("${(_progressAnimation.value * 100).toInt()}%", style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, fontSize: 10)),
                    ],
                  ),
@@ -244,21 +234,26 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           
           const SizedBox(height: 25),
           
-          // WHEELS
+          // WHEELS WITH TOUCH DETECTION
           SizedBox(
             height: 120,
             child: IgnorePointer(
               ignoring: isInputDisabled,
               child: NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
-                  if (notification is ScrollStartNotification || notification is ScrollUpdateNotification) {
-                      if (_activeWheelIndex == null) {
-                        setState(() => _activeWheelIndex = 1); 
-                      }
+                  // 🖐️ INI RAHSIA DIA: KESAN TOUCH
+                  if (notification is ScrollUpdateNotification) {
+                     // Beritahu otak ada interaksi manusia
+                     widget.controller.registerScrollInteraction(); 
+                     
+                     // Privacy Shield Logic
+                     if (_activeWheelIndex == null) {
+                       setState(() => _activeWheelIndex = 1); 
+                     }
                   } else if (notification is ScrollEndNotification) {
-                      Future.delayed(const Duration(milliseconds: 500), () {
-                        if (mounted) setState(() => _activeWheelIndex = null); 
-                      });
+                     Future.delayed(const Duration(milliseconds: 500), () {
+                       if (mounted) setState(() => _activeWheelIndex = null); 
+                     });
                   }
                   return false;
                 },
@@ -309,7 +304,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           onSelectedItemChanged: (val) {
             _triggerHaptic(); 
             widget.controller.updateWheel(index, val % 10);
-            if (_activeWheelIndex == null) setState(() => _activeWheelIndex = 1);
           },
           childDelegate: ListWheelChildBuilderDelegate(
             builder: (context, i) {
@@ -346,7 +340,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           const SizedBox(height: 20),
           const Text("SYSTEM HARD-LOCKED", style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          const Text("Device compromised. Access revoked permanently.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11)),
+          const Text("Critical Security Breach.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11)),
           if (widget.controller.threatMessage.isNotEmpty)
              Padding(
                padding: const EdgeInsets.only(top:10),
