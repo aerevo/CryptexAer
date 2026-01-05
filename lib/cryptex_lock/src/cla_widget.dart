@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui';
+import 'dart:ui'; // Perlu untuk lerpDouble
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
@@ -25,15 +25,12 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
-  StreamSubscription<AccelerometerEvent>? _accelSub;
+  StreamSubscription<UserAccelerometerEvent>? _accelSub; // TUKAR JENIS EVENT
   
-  // GRAVITY FILTER: Untuk asingkan graviti bumi dari gerakan tangan
-  double _gravX = 0, _gravY = 0, _gravZ = 0;
+  // VARIABLE UNTUK SMOOTHING (PEMBERAT)
+  // Kita simpan nilai purata supaya graf tak melompat
+  double _smoothMagnitude = 0.0;
   
-  // RATE LIMITER: Untuk elak sensor spam 2000 kali sesaat
-  int _lastUpdateTimestamp = 0;
-  static const int UPDATE_INTERVAL_MS = 30; // 30ms = ~33Hz (Cukup untuk kesan tangan)
-
   // UI State
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
@@ -61,10 +58,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 150), // Laju sikit supaya responsif
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _progressController, curve: Curves.easeOutQuad),
+      CurvedAnimation(parent: _progressController, curve: Curves.linear),
     );
   }
 
@@ -76,34 +73,30 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _startListening() {
-    _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      final now = DateTime.now().millisecondsSinceEpoch;
+    // 1. GUNA 'userAccelerometerEvents'
+    // Stream ini automatik BUANG GRAVITI. Bacaan meja statik akan jadi 0.0 (Sangat bersih)
+    _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
       
-      // 1. RATE LIMITER: Kalau data datang terlalu laju (<30ms), ABAIKAN.
-      // Ini ubat untuk masalah "0.5 milisaat" Kapten.
-      if (now - _lastUpdateTimestamp < UPDATE_INTERVAL_MS) return;
-      _lastUpdateTimestamp = now;
+      // Kira kekuatan gegaran (Magnitude)
+      double rawMagnitude = e.x.abs() + e.y.abs() + e.z.abs();
 
-      // 2. GRAVITY FILTER (Alpha 0.8)
-      // Kita asingkan Graviti (0.8) dari Gerakan Tangan (0.2)
-      // Ini standard matematik sensor (High-Pass Filter).
-      _gravX = 0.8 * _gravX + 0.2 * e.x;
-      _gravY = 0.8 * _gravY + 0.2 * e.y;
-      _gravZ = 0.8 * _gravZ + 0.2 * e.z;
+      // 2. TEKNIK 'HEAVY SMOOTHING' (Exponential Moving Average)
+      // Rumus: (Data Lama * 0.9) + (Data Baru * 0.1)
+      // Maksudnya: Kita percayakan data lama 90%. Data baru cuma ubah sikit je.
+      // Ini akan matikan semua 'spike' gila (0 ke 19) tu.
+      _smoothMagnitude = lerpDouble(_smoothMagnitude, rawMagnitude, 0.1)!;
 
-      // Dapat gerakan LINEAR (Tangan semata-mata, tanpa graviti bumi)
-      double linearX = e.x - _gravX;
-      double linearY = e.y - _gravY;
-      double linearZ = e.z - _gravZ;
+      // Hantar data yang dah lembut ke Controller
+      widget.controller.registerShake(_smoothMagnitude, e.x, e.y, e.z);
       
-      double rawMagnitude = linearX.abs() + linearY.abs() + linearZ.abs();
+      // 3. UI UPDATE LOGIC
+      // Kita update UI guna data 'Smooth' tadi.
+      double currentUiValue = _progressAnimation.value;
+      double targetValue = widget.controller.liveConfidence;
 
-      // Hantar data bersih ke Controller
-      widget.controller.registerShake(rawMagnitude, linearX, linearY, linearZ);
-      
-      // Update UI dengan cekap
-      if ((_progressController.value - widget.controller.liveConfidence).abs() > 0.01) {
-         _animateScoreBar(widget.controller.liveConfidence);
+      // Cuma update animasi kalau perbezaan ketara (jimat bateri & GPU)
+      if ((currentUiValue - targetValue).abs() > 0.02) {
+         _animateScoreBar(targetValue);
       }
     });
   }
@@ -112,7 +105,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _progressAnimation = Tween<double>(
       begin: _progressController.value,
       end: target,
-    ).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOut));
+    ).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic));
+    
     _progressController.forward(from: 0);
   }
 
@@ -148,19 +142,18 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       // Ambang 50% untuk nampak "Active"
-       if (widget.controller.liveConfidence > 0.5) {
+       if (widget.controller.liveConfidence > 0.4) { // Rendahkan sikit threshold sebab data dah bersih
          activeColor = _colLocked;
          statusText = "BIO-LOCK: ACTIVE";
          statusIcon = Icons.fingerprint;
        } else {
          activeColor = _colDead;
-         statusText = "STABILIZING...";
-         statusIcon = Icons.waves; 
+         statusText = "READY";
+         statusIcon = Icons.sensors; 
        }
     } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
-        statusText = "VERIFYING SIGNATURE...";
+        statusText = "VERIFYING...";
         statusIcon = Icons.radar;
         isInputDisabled = true;
     } else if (state == SecurityState.SOFT_LOCK) {
