@@ -11,14 +11,14 @@ class ClaWheel extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 120,
-      width: 50, // Bagi lebar sikit supaya jari selesa
+      width: 50, 
       child: CupertinoPicker(
         itemExtent: 40,
-        squeeze: 1.2, // Rapatkan sikit supaya nampak padat
+        squeeze: 1.2,
         useMagnifier: true,
         magnification: 1.1,
         onSelectedItemChanged: (index) {
-          // --- SUNTIKAN ROH 1: GETARAN ---
+          // --- GETARAN DIHIDUPKAN SEMULA ---
           HapticFeedback.selectionClick(); 
           onChanged(index);
         },
