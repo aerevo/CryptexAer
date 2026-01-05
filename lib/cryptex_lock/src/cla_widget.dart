@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui'; // Perlu untuk lerpDouble
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
@@ -24,68 +24,57 @@ class CryptexLock extends StatefulWidget {
   State<CryptexLock> createState() => _CryptexLockState();
 }
 
-class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin, WidgetsBindingObserver {
-  StreamSubscription<UserAccelerometerEvent>? _accelSub;
+class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
+  StreamSubscription<AccelerometerEvent>? _accelSub;
   
-  // UI Animation State
-  late AnimationController _progressController;
-  late Animation<double> _progressAnimation;
+  double _lastX = 0, _lastY = 0, _lastZ = 0;
+  double _humanScore = 0.0;
+  bool _isHuman = false;
   
-  // Privacy Shield
+  // Privacy Shield - Track which wheel is being touched
   int? _activeWheelIndex;
-  late List<FixedExtentScrollController> _scrollControllers;
+  final Map<int, double> _wheelOpacity = {0: 0.1, 1: 0.1, 2: 0.1, 3: 0.1, 4: 0.1};
   
-  // Colors
+  // Advanced motion detection parameters
+  static const double MOVEMENT_THRESHOLD = 0.12; // Electronic noise floor
+  static const double DECAY_RATE = 0.5; // Natural score decay
+  static const double SENSITIVITY_BOOST = 3.2; // Human motion amplification
+  static const double HUMAN_ACTIVATION_THRESHOLD = 18.0; // Score needed for "human" status
+  static const double MAX_SCORE = 60.0; // Score ceiling
+  
+  // Frequency analysis for tremor detection
+  final List<double> _recentMagnitudes = [];
+  static const int FREQUENCY_WINDOW = 20;
+  
+  late List<FixedExtentScrollController> _scrollControllers;
+  late AnimationController _glowController;
+  late AnimationController _pulseController;
+
+  // Color scheme
   final Color _colLocked = const Color(0xFFFFD700); 
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam = const Color(0xFFFF3333);    
   final Color _colUnlock = const Color(0xFF00E676); 
-  final Color _colDead = Colors.grey; 
+  final Color _colDead = const Color(0xFF424242);
+  final Color _colValidating = const Color(0xFF00BCD4);
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
-    _initAnimations();
     _startListening();
     
-    widget.controller.addListener(_handleControllerChange);
-  }
-  
-  void _handleControllerChange() {
-    if (widget.controller.state == SecurityState.UNLOCKED) {
-      widget.onSuccess();
-    } else if (widget.controller.state == SecurityState.HARD_LOCK) {
-      widget.onJammed();
-    }
-    
-    // Smooth update bar ikut score Controller
-    if (mounted) {
-       _animateScoreBar(widget.controller.liveConfidence);
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _accelSub?.cancel();
-      _accelSub = null;
-    } else if (state == AppLifecycleState.resumed) {
-      if (_accelSub == null) {
-        _startListening();
-      }
-    }
-  }
-  
-  void _initAnimations() {
-    _progressController = AnimationController(
+    // Glow animation for active elements
+    _glowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300), 
-    );
-    _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic),
-    );
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+    
+    // Pulse animation for biometric bar
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
   }
 
   void _initScrollControllers() {
@@ -96,33 +85,76 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _startListening() {
-    _accelSub?.cancel();
-    
-    // SENSOR (20% WEIGHT) - Cuma cek "Device Hidup"
-    _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
-      double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
-      // Tak perlu filter gila-gila. Cuma lapor aktiviti.
-      widget.controller.registerMotionActivity(rawMag);
+    _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
+      double deltaX = (e.x - _lastX).abs();
+      double deltaY = (e.y - _lastY).abs();
+      double deltaZ = (e.z - _lastZ).abs();
+
+      _lastX = e.x; 
+      _lastY = e.y; 
+      _lastZ = e.z;
+      
+      double totalDelta = deltaX + deltaY + deltaZ;
+
+      // High-pass filter: Only process significant movements
+      if (totalDelta > MOVEMENT_THRESHOLD) {
+        // Natural human tremor amplification
+        _humanScore += (totalDelta * SENSITIVITY_BOOST);
+        
+        // Track for frequency analysis
+        _recentMagnitudes.add(totalDelta);
+        if (_recentMagnitudes.length > FREQUENCY_WINDOW) {
+          _recentMagnitudes.removeAt(0);
+        }
+        
+        // Register to controller with full delta information
+        widget.controller.registerShake(
+          totalDelta,
+          dx: deltaX,
+          dy: deltaY,
+          dz: deltaZ,
+        );
+      } else {
+        // Below noise threshold - apply natural decay
+        _humanScore -= DECAY_RATE;
+      }
+
+      // Apply score boundaries
+      _humanScore = _humanScore.clamp(0.0, MAX_SCORE);
+      
+      // Human detection with hysteresis (prevent flickering)
+      bool detectedHuman = _humanScore > HUMAN_ACTIVATION_THRESHOLD;
+
+      if (mounted && _isHuman != detectedHuman) {
+        setState(() => _isHuman = detectedHuman);
+      } else if (mounted) {
+        setState(() {}); // Update score display
+      }
     });
   }
-  
-  void _animateScoreBar(double target) {
-    if (!mounted) return;
-    _progressAnimation = Tween<double>(
-      begin: _progressController.value,
-      end: target,
-    ).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic));
+
+  /// Calculate tremor frequency variance (humans: 8-12 Hz, bots: 0 Hz or perfect sine)
+  double _calculateFrequencyVariance() {
+    if (_recentMagnitudes.length < 5) return 0.0;
     
-    _progressController.forward(from: 0);
+    double mean = _recentMagnitudes.reduce((a, b) => a + b) / _recentMagnitudes.length;
+    double variance = 0.0;
+    
+    for (var val in _recentMagnitudes) {
+      variance += (val - mean) * (val - mean);
+    }
+    
+    return variance / _recentMagnitudes.length;
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    widget.controller.removeListener(_handleControllerChange);
     _accelSub?.cancel();
-    _progressController.dispose();
-    for (var c in _scrollControllers) c.dispose();
+    for (var c in _scrollControllers) {
+      c.dispose();
+    }
+    _glowController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -130,11 +162,37 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     HapticFeedback.selectionClick();
   }
 
+  // Privacy Shield: Mark wheel as active on scroll
+  void _onWheelScrollStart(int index) {
+    setState(() {
+      _activeWheelIndex = index;
+      _wheelOpacity[index] = 1.0; // Full opacity
+    });
+  }
+
+  void _onWheelScrollEnd() {
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _activeWheelIndex = null;
+          for (int i = 0; i < 5; i++) {
+            _wheelOpacity[i] = 0.1; // Blur all wheels
+          }
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, child) {
+        if (widget.controller.state == SecurityState.UNLOCKED) {
+          Future.delayed(Duration.zero, widget.onSuccess);
+        } else if (widget.controller.state == SecurityState.HARD_LOCK) {
+          Future.delayed(Duration.zero, widget.onJammed);
+        }
         return _buildStateUI(widget.controller.state);
       },
     );
@@ -146,139 +204,415 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     IconData statusIcon;
     bool isInputDisabled = false;
 
-    if (state == SecurityState.LOCKED) {
-       // Logic Text
-       if (widget.controller.liveConfidence > 0.8) { 
-         activeColor = _colUnlock;
-         statusText = "BIOMETRIC MATCH (EXCELLENT)";
-         statusIcon = Icons.fingerprint;
-       } else if (widget.controller.liveConfidence > 0.4) {
-         activeColor = _colLocked;
-         statusText = "GATHERING TOUCH DATA...";
-         statusIcon = Icons.touch_app; 
-       } else {
-         activeColor = _colDead;
-         statusText = "WAITING FOR INPUT";
-         statusIcon = Icons.lock_outline; 
-       }
-    } else if (state == SecurityState.VALIDATING) {
-        activeColor = Colors.white;
-        statusText = "ANALYZING PATTERN...";
-        statusIcon = Icons.radar;
+    switch (state) {
+      case SecurityState.LOCKED:
+        if (_isHuman) {
+          activeColor = _colLocked;
+          statusText = "BIO-LOCK ARMED";
+          statusIcon = Icons.fingerprint;
+        } else {
+          activeColor = _colDead;
+          statusText = "AWAITING BIOMETRIC"; 
+          statusIcon = Icons.sensors_off; 
+        }
+        break;
+      case SecurityState.VALIDATING:
+        activeColor = _colValidating;
+        statusText = "ANALYZING SIGNATURE...";
+        statusIcon = Icons.psychology;
         isInputDisabled = true;
-    } else if (state == SecurityState.SOFT_LOCK) {
+        break;
+      case SecurityState.SOFT_LOCK:
         activeColor = _colFail;
-        statusText = "MISMATCH (${widget.controller.failedAttempts}/3)";
+        statusText = "ACCESS DENIED (${widget.controller.failedAttempts}/${widget.controller.config.maxAttempts})";
         statusIcon = Icons.warning_amber_rounded;
-    } else if (state == SecurityState.HARD_LOCK) {
-        activeColor = _colJam;
-        statusText = "LOCKED (${widget.controller.remainingLockoutSeconds}s)";
-        statusIcon = Icons.block;
         isInputDisabled = true;
-    } else if (state == SecurityState.ROOT_WARNING) {
+        break;
+      case SecurityState.HARD_LOCK:
+        activeColor = _colJam;
+        int remaining = widget.controller.remainingLockoutSeconds;
+        statusText = "LOCKOUT ACTIVE (${remaining}s)";
+        statusIcon = Icons.lock_clock;
+        isInputDisabled = true;
+        break;
+      case SecurityState.ROOT_WARNING:
         return _buildLiabilityWaiverUI();
-    } else { 
+      case SecurityState.UNLOCKED:
         activeColor = _colUnlock;
         statusText = "ACCESS GRANTED";
-        statusIcon = Icons.lock_open;
+        statusIcon = Icons.verified_user;
         isInputDisabled = true;
+        break;
+      default:
+        activeColor = _colLocked;
+        statusText = "SYSTEM INITIALIZED";
+        statusIcon = Icons.shield;
     }
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF050505),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: activeColor.withOpacity(0.5), width: 1.5),
-        boxShadow: [BoxShadow(color: activeColor.withOpacity(0.15), blurRadius: 25)],
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF0A0A0A),
+            const Color(0xFF1A1A1A),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: activeColor.withOpacity(0.5), 
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: activeColor.withOpacity(0.3),
+            blurRadius: 30,
+            spreadRadius: 2,
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(statusIcon, color: activeColor, size: 18),
-              const SizedBox(width: 10),
-              Text(statusText, style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 25),
-          
-          // BIO-SIGMA BAR
-          AnimatedBuilder(
-            animation: _progressController,
-            builder: (context, child) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          _buildHeader(statusIcon, statusText, activeColor),
+          const SizedBox(height: 20),
+          _buildBiometricDisplay(activeColor),
+          const SizedBox(height: 24),
+          _buildWheelArray(activeColor, isInputDisabled),
+          const SizedBox(height: 24),
+          _buildActionButton(activeColor, isInputDisabled, state),
+          if (widget.controller.threatMessage.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildThreatAlert(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(IconData icon, String text, Color color) {
+    return AnimatedBuilder(
+      animation: _glowController,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon, 
+              color: color.withOpacity(0.7 + (_glowController.value * 0.3)),
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              text,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+                fontSize: 16,
+                shadows: [
+                  Shadow(
+                    color: color.withOpacity(0.5),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildBiometricDisplay(Color activeColor) {
+    double variance = _calculateFrequencyVariance();
+    double confidence = widget.controller.biometricScore;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
               children: [
-                 Row(
-                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                   children: [
-                     Text("HYBRID CONFIDENCE SCORE", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
-                     Text("${(_progressAnimation.value * 100).toInt()}%", style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, fontSize: 10)),
-                   ],
-                 ),
-                 const SizedBox(height: 6),
-                 ClipRRect(
-                   borderRadius: BorderRadius.circular(2),
-                   child: LinearProgressIndicator(
-                     value: _progressAnimation.value,
-                     backgroundColor: Colors.grey[900],
-                     color: activeColor,
-                     minHeight: 3,
-                   ),
-                 ),
+                Icon(Icons.radar, size: 14, color: Colors.grey[600]),
+                const SizedBox(width: 6),
+                Text(
+                  "BIO-SIGMA ANALYZER",
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.0,
+                  ),
+                ),
               ],
             ),
-          ),
-          
-          const SizedBox(height: 25),
-          
-          // WHEELS WITH TOUCH DETECTION
-          SizedBox(
-            height: 120,
-            child: IgnorePointer(
-              ignoring: isInputDisabled,
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  // 🖐️ INI RAHSIA DIA: KESAN TOUCH
-                  if (notification is ScrollUpdateNotification) {
-                     // Beritahu otak ada interaksi manusia
-                     widget.controller.registerScrollInteraction(); 
-                     
-                     // Privacy Shield Logic
-                     if (_activeWheelIndex == null) {
-                       setState(() => _activeWheelIndex = 1); 
-                     }
-                  } else if (notification is ScrollEndNotification) {
-                     Future.delayed(const Duration(milliseconds: 500), () {
-                       if (mounted) setState(() => _activeWheelIndex = null); 
-                     });
-                  }
-                  return false;
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(5, (index) => _buildPrivacyWheel(index, activeColor, isInputDisabled)),
+            Row(
+              children: [
+                Text(
+                  _humanScore.toStringAsFixed(1),
+                  style: TextStyle(
+                    color: _isHuman ? _colUnlock : _colJam,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
+                Text(
+                  " / ${MAX_SCORE.toInt()}",
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Stack(
+                children: [
+                  LinearProgressIndicator(
+                    value: _humanScore / MAX_SCORE,
+                    backgroundColor: Colors.grey[900],
+                    color: _isHuman ? _colUnlock : _colJam,
+                    minHeight: 6,
+                  ),
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withOpacity(0.0),
+                            Colors.white.withOpacity(0.2 * _pulseController.value),
+                            Colors.white.withOpacity(0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildMetric("VARIANCE", variance.toStringAsFixed(2), variance > 0.1),
+            _buildMetric("PATTERNS", "${widget.controller.uniqueGestureCount}", widget.controller.uniqueGestureCount >= 3),
+            _buildMetric("CONFIDENCE", "${(confidence * 100).toStringAsFixed(0)}%", confidence > 0.7),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetric(String label, String value, bool isGood) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey[700],
+            fontSize: 8,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: isGood ? _colUnlock : _colFail,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWheelArray(Color color, bool disabled) {
+    return SizedBox(
+      height: 130,
+      child: IgnorePointer(
+        ignoring: disabled,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(
+            5, 
+            (index) => _buildQuantumWheel(index, color, disabled),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuantumWheel(int index, Color color, bool disabled) {
+    double opacity = _wheelOpacity[index] ?? 0.1;
+    bool isActive = _activeWheelIndex == index;
+    
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is ScrollStartNotification) {
+          _onWheelScrollStart(index);
+        } else if (notification is ScrollEndNotification) {
+          _onWheelScrollEnd();
+        }
+        return true;
+      },
+      child: Container(
+        width: 48,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: isActive 
+                ? color.withOpacity(0.8) 
+                : Colors.grey[800]!,
+            width: isActive ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isActive ? [
+            BoxShadow(
+              color: color.withOpacity(0.4),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ] : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: isActive ? 0 : 5,
+              sigmaY: isActive ? 0 : 5,
+            ),
+            child: ListWheelScrollView.useDelegate(
+              controller: _scrollControllers[index],
+              itemExtent: 44,
+              diameterRatio: 1.2,
+              physics: const FixedExtentScrollPhysics(),
+              onSelectedItemChanged: (val) {
+                _triggerHaptic();
+                widget.controller.updateWheel(index, val % 10);
+              },
+              childDelegate: ListWheelChildBuilderDelegate(
+                builder: (context, i) {
+                  final num = i % 10;
+                  return Center(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      opacity: opacity,
+                      child: Text(
+                        '$num',
+                        style: TextStyle(
+                          color: disabled ? Colors.grey[800] : Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          shadows: isActive ? [
+                            Shadow(
+                              color: color,
+                              blurRadius: 8,
+                            ),
+                          ] : null,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
-          
-          const SizedBox(height: 25),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isInputDisabled ? Colors.grey[900] : activeColor,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(Color color, bool disabled, SecurityState state) {
+    String label = state == SecurityState.HARD_LOCK 
+        ? "SYSTEM LOCKED" 
+        : "AUTHENTICATE";
+    
+    return AnimatedBuilder(
+      animation: _glowController,
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: disabled 
+                ? LinearGradient(colors: [Colors.grey[900]!, Colors.grey[800]!])
+                : LinearGradient(
+                    colors: [
+                      color.withOpacity(0.8),
+                      color,
+                    ],
+                  ),
+            boxShadow: disabled ? null : [
+              BoxShadow(
+                color: color.withOpacity(0.3 + (_glowController.value * 0.2)),
+                blurRadius: 20,
+                spreadRadius: 2,
               ),
-              onPressed: isInputDisabled ? null : () => widget.controller.validateAttempt(hasPhysicalMovement: true),
-              child: Text(
-                state == SecurityState.HARD_LOCK ? "LOCKED" : "AUTHENTICATE", 
-                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)
+            ],
+          ),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: disabled 
+                ? null 
+                : () => widget.controller.validateAttempt(
+                      hasPhysicalMovement: _isHuman,
+                    ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: disabled ? Colors.grey[700] : Colors.black,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildThreatAlert() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _colJam.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _colJam.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: _colJam, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              widget.controller.threatMessage,
+              style: TextStyle(
+                color: _colJam,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -286,68 +620,75 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       ),
     );
   }
-  
-  Widget _buildPrivacyWheel(int index, Color color, bool disabled) {
-    final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.15;
-    
-    return SizedBox(
-      width: 45,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: disabled ? 0.3 : opacity,
-        child: ListWheelScrollView.useDelegate(
-          controller: _scrollControllers[index],
-          itemExtent: 45,
-          perspective: 0.005,
-          diameterRatio: 1.2,
-          physics: const FixedExtentScrollPhysics(),
-          onSelectedItemChanged: (val) {
-            _triggerHaptic(); 
-            widget.controller.updateWheel(index, val % 10);
-          },
-          childDelegate: ListWheelChildBuilderDelegate(
-            builder: (context, i) {
-              final num = i % 10;
-              return Center(
-                child: Text(
-                  '$num',
-                  style: TextStyle(
-                    color: (num == 0 ? Colors.redAccent : Colors.white),
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    shadows: [
-                      if (_activeWheelIndex != null) 
-                        BoxShadow(color: color.withOpacity(0.8), blurRadius: 10)
-                    ]
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildLiabilityWaiverUI() {
     return Container(
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.purple, width: 2), borderRadius: BorderRadius.circular(20)),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF330000),
+            const Color(0xFF660000),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _colJam, width: 2),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.security_update_warning, color: Colors.purple, size: 50),
+          Icon(Icons.security, color: Colors.white, size: 60),
+          const SizedBox(height: 16),
+          Text(
+            "SECURITY COMPROMISE DETECTED",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.controller.threatMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
           const SizedBox(height: 20),
-          const Text("SYSTEM HARD-LOCKED", style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          const Text("Critical Security Breach.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 11)),
-          if (widget.controller.threatMessage.isNotEmpty)
-             Padding(
-               padding: const EdgeInsets.only(top:10),
-               child: Text(widget.controller.threatMessage, style: TextStyle(color: Colors.red, fontSize: 10)),
-             ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              "⚠️ This device's security integrity has been compromised. Proceeding may expose sensitive data to unauthorized access.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
-          ElevatedButton(onPressed: () => widget.controller.userAcceptsRisk(), child: const Text("FORCE OVERRIDE"))
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _colJam,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            ),
+            icon: const Icon(Icons.shield_outlined, color: Colors.white),
+            label: const Text(
+              "ACKNOWLEDGE RISK & PROCEED",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            onPressed: () => widget.controller.userAcceptsRisk(),
+          ),
         ],
       ),
     );
