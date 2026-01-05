@@ -18,28 +18,21 @@ class ClaController extends ChangeNotifier {
   late List<int> currentValues;
   
   // ═══════════════════════════════════════════════════════════
-  // 📡 SIGNAL PROCESSING PIPELINE (DSP ENGINE)
+  // 🖐️ HYBRID ENGINE (TOUCH + MOTION)
   // ═══════════════════════════════════════════════════════════
   
-  // Rolling average buffer (10 frames = ~160ms history)
-  final List<double> _rawBuffer = [];
-  static const int BUFFER_SIZE = 10;
+  // 1. TOUCH METRICS (80% WEIGHT)
+  final List<int> _scrollTimestamps = []; // Rekod masa setiap sentuhan
+  int _interactionCount = 0;
   
-  // 1. NOISE GATE: Anything below this is floor noise/static
-  static const double NOISE_GATE = 0.5;
+  // 2. MOTION METRICS (20% WEIGHT)
+  double _accumulatedMotion = 0.0;
+  bool _hasLivingSensor = false; // Sensor hidup atau mati (Emulator = Mati)
   
-  // 2. SPIKE REJECTION: Ignore sudden jumps > 5x the median
-  static const double SPIKE_THRESHOLD_MULTIPLIER = 5.0;
-  
-  // 3. SMOOTHING: 0.15 means we trust new data 15%, old data 85%
-  static const double SMOOTHING_FACTOR = 0.15;
-  
-  // 4. NORMALIZATION: Map sensor input (0-15) to UI (0-1)
-  static const double SENSOR_MAX_INPUT = 15.0;
+  // Live Confidence (Gabungan Touch + Motion)
+  double _liveConfidence = 0.0;
+  double get liveConfidence => _liveConfidence;
 
-  // Internal tracker for smoothed value
-  double _internalSmoothedValue = 0.0;
-  
   // ═══════════════════════════════════════════════════════════
   
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
@@ -47,10 +40,6 @@ class ClaController extends ChangeNotifier {
 
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
-  
-  // Live Confidence Score for UI (0.0 - 1.0 Clean)
-  double _liveConfidence = 0.0;
-  double get liveConfidence => _liveConfidence;
 
   ClaController(this.config) {
     final rand = Random();
@@ -75,13 +64,6 @@ class ClaController extends ChangeNotifier {
       notifyListeners();
       return; 
     }
-    
-    if (isUsbDebug && !kDebugMode) {
-      _threatMessage = "WARNING: USB DEBUGGING ACTIVE";
-      _state = SecurityState.ROOT_WARNING;
-      notifyListeners();
-    }
-
     await _loadStateFromMemory();
   }
   
@@ -92,61 +74,66 @@ class ClaController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎛️ THE DSP PIPELINE IMPLEMETATION
+  // 🧠 THE HYBRID BRAIN
   // ═══════════════════════════════════════════════════════════
 
-  void registerShake(double rawInput, double dx, dy, dz) {
-    if (_state == SecurityState.HARD_LOCK || _state == SecurityState.ROOT_WARNING) return;
-
-    // [STAGE 1] NOISE GATE
-    // If signal is weak (table vibration), kill it instantly.
-    double cleanInput = rawInput;
-    if (cleanInput < NOISE_GATE) {
-      cleanInput = 0.0;
-    }
-
-    // [STAGE 2] ROLLING BUFFER
-    // Add to history
-    _rawBuffer.add(cleanInput);
-    if (_rawBuffer.length > BUFFER_SIZE) {
-      _rawBuffer.removeAt(0);
-    }
-
-    // Need enough data to perform advanced filtering
-    if (_rawBuffer.length < 3) return;
-
-    // [STAGE 3] MEDIAN FILTER (Anti-Spike)
-    // Sort buffer to find median (middle value)
-    List<double> sorted = List.from(_rawBuffer)..sort();
-    double median = sorted[sorted.length ~/ 2];
+  // Dipanggil bila roda dipusing (Input Manusia)
+  void registerScrollInteraction() {
+    if (_state != SecurityState.LOCKED) return;
     
-    // If new value is HUGE compared to median, it's a glitch (Ghost Spike). Ignore it.
-    // Except if median is 0 (start of movement), then allow it.
-    if (median > 0.1 && cleanInput > (median * SPIKE_THRESHOLD_MULTIPLIER)) {
-      // Reject this specific sample, use median instead
-      cleanInput = median;
-    }
-
-    // [STAGE 4] ROLLING AVERAGE
-    // Smooth out the bumps
-    double average = _rawBuffer.reduce((a, b) => a + b) / _rawBuffer.length;
-
-    // [STAGE 5] EXPONENTIAL SMOOTHING (The "Heavy" Feel)
-    // Formula: New = (Old * 0.85) + (Input * 0.15)
-    _internalSmoothedValue = (_internalSmoothedValue * (1 - SMOOTHING_FACTOR)) + (average * SMOOTHING_FACTOR);
-
-    // [STAGE 6] NORMALIZATION
-    // Map 0.0 -> 15.0  TO  0.0 -> 1.0
-    double normalizedScore = (_internalSmoothedValue / SENSOR_MAX_INPUT).clamp(0.0, 1.0);
-
-    // Update Public State
-    _liveConfidence = normalizedScore;
+    int now = DateTime.now().millisecondsSinceEpoch;
+    _scrollTimestamps.add(now);
+    _interactionCount++;
     
-    // Auto-Notify logic is handled by Widget Ticker, 
-    // but we notify here if specific thresholds are met for logic updates
-    if (_liveConfidence > 0.01) {
-       // Optional: Trigger specific logic logic
+    // Limit sejarah (untuk jimat memori)
+    if (_scrollTimestamps.length > 20) _scrollTimestamps.removeAt(0);
+    
+    _calculateHybridScore();
+  }
+
+  // Dipanggil oleh sensor (Check denyut nadi device)
+  void registerMotionActivity(double magnitude) {
+    if (_state != SecurityState.LOCKED) return;
+    
+    // Mudah je: Kalau ada gerak sikit (> 0.05), device ni HIDUP.
+    // Emulator biasanya 0.000000.
+    if (magnitude > 0.05) {
+      _accumulatedMotion += magnitude;
+      _hasLivingSensor = true;
     }
+    
+    // Kita update score, tapi sensor cuma sumbang sikit je.
+    // Jangan bagi dia kuasa penuh sampai meter menggila.
+    if (_interactionCount > 0) { // Cuma update kalau user dah mula tekan
+       _calculateHybridScore();
+    }
+  }
+
+  void _calculateHybridScore() {
+    // 1. TOUCH SCORE (80%)
+    // Manusia perlukan sekurang-kurangnya 3-5 interaksi untuk nampak "Real"
+    double touchScore = (_interactionCount / 5.0).clamp(0.0, 1.0);
+    
+    // Analisis Masa (Manusia tak konsisten)
+    if (_scrollTimestamps.length >= 3) {
+      // Kalau user tekan terlalu laju (< 50ms beza), itu BOT.
+      int lastDelta = _scrollTimestamps.last - _scrollTimestamps[_scrollTimestamps.length-2];
+      if (lastDelta < 50) {
+        touchScore = 0.0; // PENALTI BOT
+      }
+    }
+
+    // 2. SENSOR SCORE (20%)
+    // Kalau sensor hidup, bagi markah penuh 1.0 untuk bahagian ni.
+    // Kalau mati (0.0), bagi 0.
+    double sensorScore = _hasLivingSensor ? 1.0 : 0.0;
+    
+    // 3. FINAL FORMULA (WEIGHTED AVERAGE)
+    // Touch = 0.8, Sensor = 0.2
+    _liveConfidence = (touchScore * 0.8) + (sensorScore * 0.2);
+    
+    // Notify UI (untuk gerakkan bar)
+    notifyListeners();
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -191,8 +178,10 @@ class ClaController extends ChangeNotifier {
     await prefs.remove(KEY_ATTEMPTS);
     await prefs.remove(KEY_LOCKOUT);
     _failedAttempts = 0;
-    _internalSmoothedValue = 0;
-    _rawBuffer.clear();
+    _interactionCount = 0;
+    _scrollTimestamps.clear();
+    _accumulatedMotion = 0;
+    _hasLivingSensor = false;
     _liveConfidence = 0.0;
     _lockoutUntil = null;
     _state = SecurityState.LOCKED;
@@ -204,17 +193,15 @@ class ClaController extends ChangeNotifier {
     _state = SecurityState.VALIDATING;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 600)); // Suspense
+    await Future.delayed(const Duration(milliseconds: 600)); 
 
-    // 1. BIOMETRIC CHECK
-    if (config.enableSensors) {
-       // Human must maintain at least 20% intensity during unlock
-       // Or have a history of movement. 
-       if (_liveConfidence < 0.2 && _internalSmoothedValue < 1.0) {
-         ClaAudit.log('FAIL: Too static. Bot or Table detected.');
-         await _handleFailure();
-         return;
-       }
+    // 1. HYBRID CHECK
+    // Score mesti > 50% untuk lulus.
+    // Bermaksud: Mesti ada sentuhan manusia yang cukup DAN sensor hidup.
+    if (_liveConfidence < 0.5) {
+       ClaAudit.log('REJECTED: Low Hybrid Score ($_liveConfidence)');
+       await _handleFailure();
+       return;
     }
 
     // 2. CODE CHECK
