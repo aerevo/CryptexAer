@@ -39,6 +39,7 @@ class ClaController extends ChangeNotifier {
   ClaController(this.config) {
     final rand = Random();
     currentValues = List.generate(5, (index) => rand.nextInt(10));
+    // Initialization is now called explicitly to avoid constructor async issues
     _initSecurityProtocol();
   }
 
@@ -87,23 +88,37 @@ class ClaController extends ChangeNotifier {
 
     final now = DateTime.now();
     
-    // 2. Record Motion Event
-    _motionHistory.add(MotionEvent(
+    // 2. Prepare Data
+    final newEvent = MotionEvent(
       magnitude: rawMagnitude, 
       timestamp: now,
       deltaX: dx, deltaY: dy, deltaZ: dz
-    ));
+    );
     
-    // Keep buffer size managed
-    if (_motionHistory.length > MAX_HISTORY_SIZE) {
-      _motionHistory.removeAt(0);
-    }
-    
-    _accumulatedShake += rawMagnitude;
-
-    // 3. Pattern Frequency Mapping (For Entropy Calculation)
     // Quantize movement into 'buckets' to detect robotic loops
     String movementHash = "${rawMagnitude.toStringAsFixed(1)}:${dx.sign}:${dy.sign}";
+
+    // 3. Manage Circular Buffer & MATH INTEGRITY FIX
+    if (_motionHistory.length >= MAX_HISTORY_SIZE) {
+      final oldEvent = _motionHistory.removeAt(0);
+      
+      // FIX: Subtract old magnitude from accumulator
+      _accumulatedShake -= oldEvent.magnitude;
+      if (_accumulatedShake < 0) _accumulatedShake = 0; // Floating point safety
+
+      // FIX: Decrement old pattern frequency
+      String oldHash = "${oldEvent.magnitude.toStringAsFixed(1)}:${oldEvent.deltaX.sign}:${oldEvent.deltaY.sign}";
+      if (_patternFrequency.containsKey(oldHash)) {
+        _patternFrequency[oldHash] = (_patternFrequency[oldHash]! - 1);
+        if (_patternFrequency[oldHash]! <= 0) {
+          _patternFrequency.remove(oldHash);
+        }
+      }
+    }
+    
+    // Add New Data
+    _motionHistory.add(newEvent);
+    _accumulatedShake += rawMagnitude;
     _patternFrequency[movementHash] = (_patternFrequency[movementHash] ?? 0) + 1;
 
     // 4. Update Live Confidence Score (For UI)
@@ -140,8 +155,6 @@ class ClaController extends ChangeNotifier {
     );
 
     _liveConfidence = signature.humanConfidence;
-    // Don't notify listeners on every sensor update to save battery/performance
-    // The Widget uses Ticker for smooth animation anyway
   }
 
   // ═══════════════════════════════════════════════════════════
