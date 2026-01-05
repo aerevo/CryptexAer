@@ -10,7 +10,6 @@ class CryptexLock extends StatefulWidget {
   final VoidCallback onFail;
   final VoidCallback onJammed;
 
-  // NOTA: Tiada lagi parameter 'amount' di sini. Ia dalam Config.
   const CryptexLock({
     super.key,
     required this.controller,
@@ -35,9 +34,12 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _startSensors() {
+    // Telinga UI dibuka untuk dengar gegaran
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
       double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
+      
+      // Hantar data ke Otak (Controller)
       widget.controller.registerShake(delta);
     });
   }
@@ -54,7 +56,7 @@ class _CryptexLockState extends State<CryptexLock> {
     if (ok) {
       widget.onSuccess();
     } else if (widget.controller.state.jammed) {
-      widget.onJammed();
+      widget.onJammed(); // Ini akan trigger kalau Root Detected juga
     } else {
       widget.onFail();
     }
