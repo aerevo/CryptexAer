@@ -24,11 +24,11 @@ class CryptexLock extends StatefulWidget {
   State<CryptexLock> createState() => _CryptexLockState();
 }
 
-class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
-  StreamSubscription<UserAccelerometerEvent>? _accelSub; // TUKAR JENIS EVENT
+class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin, WidgetsBindingObserver {
+  // GUNA USERACCELEROMETER (GRAVITY FREE)
+  StreamSubscription<UserAccelerometerEvent>? _accelSub;
   
   // VARIABLE UNTUK SMOOTHING (PEMBERAT)
-  // Kita simpan nilai purata supaya graf tak melompat
   double _smoothMagnitude = 0.0;
   
   // UI State
@@ -50,15 +50,45 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Register Lifecycle Observer
     _initScrollControllers();
     _initAnimations();
     _startListening();
+    
+    // LISTEN TO CONTROLLER STATE (Fixes Build Phase Race Condition)
+    widget.controller.addListener(_handleControllerChange);
+  }
+  
+  void _handleControllerChange() {
+    if (widget.controller.state == SecurityState.UNLOCKED) {
+      widget.onSuccess();
+    } else if (widget.controller.state == SecurityState.HARD_LOCK) {
+      widget.onJammed();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 🔋 BATTERY SAVER PROTOCOL (LIFECYCLE)
+  // ═══════════════════════════════════════════════════════════
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      // Pause sensors immediately when backgrounded
+      _accelSub?.cancel();
+      _accelSub = null;
+    } else if (state == AppLifecycleState.resumed) {
+      // Resume sensors only if we are still active
+      if (_accelSub == null) {
+        _startListening();
+      }
+    }
   }
   
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 150), // Laju sikit supaya responsif
+      duration: const Duration(milliseconds: 150),
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
       CurvedAnimation(parent: _progressController, curve: Curves.linear),
@@ -73,28 +103,25 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _startListening() {
-    // 1. GUNA 'userAccelerometerEvents'
-    // Stream ini automatik BUANG GRAVITI. Bacaan meja statik akan jadi 0.0 (Sangat bersih)
+    // Prevent double subscription
+    _accelSub?.cancel();
+    
+    // GUNA 'userAccelerometerEvents' (Auto-Filter Gravity)
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
       
       // Kira kekuatan gegaran (Magnitude)
       double rawMagnitude = e.x.abs() + e.y.abs() + e.z.abs();
 
-      // 2. TEKNIK 'HEAVY SMOOTHING' (Exponential Moving Average)
-      // Rumus: (Data Lama * 0.9) + (Data Baru * 0.1)
-      // Maksudnya: Kita percayakan data lama 90%. Data baru cuma ubah sikit je.
-      // Ini akan matikan semua 'spike' gila (0 ke 19) tu.
+      // Exponential Moving Average (Absorber)
       _smoothMagnitude = lerpDouble(_smoothMagnitude, rawMagnitude, 0.1)!;
 
-      // Hantar data yang dah lembut ke Controller
+      // Hantar data ke Controller
       widget.controller.registerShake(_smoothMagnitude, e.x, e.y, e.z);
       
-      // 3. UI UPDATE LOGIC
-      // Kita update UI guna data 'Smooth' tadi.
+      // UI UPDATE LOGIC
       double currentUiValue = _progressAnimation.value;
       double targetValue = widget.controller.liveConfidence;
 
-      // Cuma update animasi kalau perbezaan ketara (jimat bateri & GPU)
       if ((currentUiValue - targetValue).abs() > 0.02) {
          _animateScoreBar(targetValue);
       }
@@ -102,6 +129,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
   
   void _animateScoreBar(double target) {
+    if (!mounted) return;
     _progressAnimation = Tween<double>(
       begin: _progressController.value,
       end: target,
@@ -112,6 +140,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // Unregister Observer
+    widget.controller.removeListener(_handleControllerChange); // Clean listener
     _accelSub?.cancel();
     _progressController.dispose();
     for (var c in _scrollControllers) c.dispose();
@@ -127,9 +157,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, child) {
-        if (widget.controller.state == SecurityState.UNLOCKED) {
-           Future.delayed(Duration.zero, widget.onSuccess);
-        }
+        // NOTE: Success logic moved to _handleControllerChange to prevent build errors
         return _buildStateUI(widget.controller.state);
       },
     );
@@ -142,7 +170,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       if (widget.controller.liveConfidence > 0.4) { // Rendahkan sikit threshold sebab data dah bersih
+       if (widget.controller.liveConfidence > 0.4) { 
          activeColor = _colLocked;
          statusText = "BIO-LOCK: ACTIVE";
          statusIcon = Icons.fingerprint;
@@ -232,13 +260,13 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               child: NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
                   if (notification is ScrollStartNotification || notification is ScrollUpdateNotification) {
-                     if (_activeWheelIndex == null) {
-                       setState(() => _activeWheelIndex = 1); 
-                     }
+                      if (_activeWheelIndex == null) {
+                        setState(() => _activeWheelIndex = 1); 
+                      }
                   } else if (notification is ScrollEndNotification) {
-                     Future.delayed(const Duration(milliseconds: 500), () {
-                       if (mounted) setState(() => _activeWheelIndex = null); 
-                     });
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        if (mounted) setState(() => _activeWheelIndex = null); 
+                      });
                   }
                   return false;
                 },
