@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-// IMPORT YANG BETUL (Kita buang cla_config.dart sebab dah delete)
 import 'cryptex_lock/src/cla_widget.dart';
 import 'cryptex_lock/src/cla_controller.dart';
-import 'cryptex_lock/src/cla_models.dart'; // Config duduk sini sekarang
+import 'cryptex_lock/src/cla_models.dart'; // Import betul untuk ClaConfig
 
 void main() {
   runApp(const MyApp());
@@ -135,10 +134,9 @@ class _LockScreenState extends State<LockScreen> {
               ),
               const SizedBox(height: 40),
               
-              // WIDGET UTAMA
+              // WIDGET UTAMA (DIBETULKAN: Tiada lagi parameter 'amount')
               CryptexLock(
                 controller: _controller,
-                amount: 5000, // Trigger amount
                 onSuccess: _onSuccess,
                 onFail: _onFail,
                 onJammed: _onJammed,
