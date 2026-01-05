@@ -1,6 +1,6 @@
-import 'dart:async'; // Perlu untuk StreamSubscription
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:sensors_plus/sensors_plus.dart'; // Perlu untuk Sensor Delta
+import 'package:sensors_plus/sensors_plus.dart';
 import 'cla_controller.dart';
 import 'cla_wheel.dart';
 
@@ -10,6 +10,7 @@ class CryptexLock extends StatefulWidget {
   final VoidCallback onFail;
   final VoidCallback onJammed;
 
+  // NOTA: Tiada lagi parameter 'amount' di sini. Ia dalam Config.
   const CryptexLock({
     super.key,
     required this.controller,
@@ -24,8 +25,6 @@ class CryptexLock extends StatefulWidget {
 
 class _CryptexLockState extends State<CryptexLock> {
   final List<int> _input = List.filled(5, 0);
-  
-  // --- SUNTIKAN ROH 2: SENSOR DELTA ---
   StreamSubscription<AccelerometerEvent>? _accelSub;
   double _lastX = 0, _lastY = 0, _lastZ = 0;
 
@@ -36,30 +35,27 @@ class _CryptexLockState extends State<CryptexLock> {
   }
 
   void _startSensors() {
-    // Kita dengar gegaran bumi/tangan
     _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
       double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
-
-      // Hantar data gegaran ke Controller (Otak)
       widget.controller.registerShake(delta);
     });
   }
 
   @override
   void dispose() {
-    _accelSub?.cancel(); // Tutup telinga bila keluar
+    _accelSub?.cancel();
     super.dispose();
   }
 
   void _tryUnlock() {
     final ok = widget.controller.attempt(_input);
-    if (ok) widget.onSuccess();
     
-    // UI Feedback Logic
-    if (widget.controller.state.jammed) {
+    if (ok) {
+      widget.onSuccess();
+    } else if (widget.controller.state.jammed) {
       widget.onJammed();
-    } else if (!ok) {
+    } else {
       widget.onFail();
     }
   }
@@ -67,9 +63,9 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.black, // Bank Grade Dark Mode
+        color: Colors.black,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade800),
       ),
@@ -85,17 +81,18 @@ class _CryptexLockState extends State<CryptexLock> {
               );
             }),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 25),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber, // Warna Emas Cryptex
+                backgroundColor: Colors.amber,
                 foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 15),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: _tryUnlock,
-              child: const Text("AUTHENTICATE", style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text("AUTHENTICATE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
             ),
           ),
         ],
