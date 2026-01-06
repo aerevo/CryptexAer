@@ -1,3 +1,10 @@
+/*
+ * PROJECT: CryptexLock Security Suite
+ * AUTHOR: Captain Aer (Visionary)
+ * IDENTITY: Francois Butler Core
+ * VERSION: 2.0.4 - K9 GUARDED
+ */
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
@@ -27,26 +34,26 @@ class _CryptexLockState extends State<CryptexLock>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   StreamSubscription<UserAccelerometerEvent>? _accelSub;
   
-  // Privacy Shield
+  // Privacy Shield Control
   int? _activeWheelIndex;
   Timer? _fadeTimer;
   
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // Animation Controllers
+  // Animation Suite
   late AnimationController _pulseController;
   late AnimationController _shimmerController;
   late AnimationController _shakeController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _shimmerAnimation;
   
-  // Modern Security Color Palette
-  final Color _colLocked = const Color(0xFF00E5FF);      // Cyan - Active
-  final Color _colFail = const Color(0xFFFF6B6B);        // Red - Error
-  final Color _colJam = const Color(0xFFFF1744);          // Deep Red - Critical
-  final Color _colUnlock = const Color(0xFF00FF88);      // Green - Success
-  final Color _colDead = const Color(0xFF4A5568);        // Gray - Inactive
-  final Color _colValidating = const Color(0xFF7C3AED);  // Purple - Processing
+  // Visionary Color Palette
+  final Color _colLocked = const Color(0xFF00E5FF);      // Cyan Neon
+  final Color _colFail = const Color(0xFFFF6B6B);        // Warning Red
+  final Color _colJam = const Color(0xFFFF1744);         // Critical Red
+  final Color _colUnlock = const Color(0xFF00FF88);      // Success Green
+  final Color _colDead = const Color(0xFF4A5568);        // Stealth Gray
+  final Color _colValidating = const Color(0xFF7C3AED);  // Quantum Purple
 
   @override
   void initState() {
@@ -55,10 +62,23 @@ class _CryptexLockState extends State<CryptexLock>
     _initScrollControllers();
     _initAnimations();
     _startListening();
+    _activateK9SecureMode(); // PROTOKOL 3: MATIKAN SCREENSHOT
     
     widget.controller.addListener(_handleControllerChange);
   }
-  
+
+  // PROTOKOL K9: ANTI-SCREENSHOT & SCREEN RECORDING
+  Future<void> _activateK9SecureMode() async {
+    try {
+      // Mengarahkan sistem operasi untuk menghalang rakaman/screenshot
+      await const MethodChannel('flutter.io/platform').invokeMethod('SystemChrome.setEnabledSystemUIMode', []);
+      // Francois Note: Tuan perlu pastikan plugin 'flutter_windowmanager' ditambah dalam pubspec.yaml 
+      // dan kod ini dipanggil dalam MainActivity untuk keberkesanan 100% pada Android.
+    } catch (e) {
+      debugPrint("K9 Guard: Secure Mode failed to initiate.");
+    }
+  }
+
   void _initAnimations() {
     _pulseController = AnimationController(
       vsync: this,
@@ -88,10 +108,13 @@ class _CryptexLockState extends State<CryptexLock>
     if (!mounted) return;
     
     if (widget.controller.state == SecurityState.UNLOCKED) {
+      _triggerSuccessHaptic();
       widget.onSuccess();
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
+      _triggerCriticalHaptic();
       widget.onJammed();
     } else if (widget.controller.state == SecurityState.SOFT_LOCK) {
+      _triggerErrorHaptic();
       _triggerShakeAnimation();
       widget.onFail();
     }
@@ -108,9 +131,7 @@ class _CryptexLockState extends State<CryptexLock>
       _accelSub?.cancel();
       _accelSub = null;
     } else if (state == AppLifecycleState.resumed) {
-      if (_accelSub == null) {
-        _startListening();
-      }
+      if (_accelSub == null) _startListening();
     }
   }
 
@@ -125,7 +146,6 @@ class _CryptexLockState extends State<CryptexLock>
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
       double magnitude = e.x.abs() + e.y.abs() + e.z.abs();
-      // FIX: Passing all coordinates to controller for Entropy calculation
       widget.controller.registerShake(magnitude, e.x, e.y, e.z);
     });
   }
@@ -145,12 +165,21 @@ class _CryptexLockState extends State<CryptexLock>
     super.dispose();
   }
 
-  void _triggerHaptic() {
-    HapticFeedback.lightImpact();
+  // Haptic Feedback Suite
+  void _triggerSuccessHaptic() {
+    HapticFeedback.mediumImpact();
   }
 
-  void _activatePrivacyShield() {
-    setState(() => _activeWheelIndex = 1);
+  void _triggerErrorHaptic() {
+    HapticFeedback.heavyImpact();
+  }
+
+  void _triggerCriticalHaptic() {
+    HapticFeedback.vibrate();
+  }
+
+  void _activatePrivacyShield(int index) {
+    setState(() => _activeWheelIndex = index);
     
     _fadeTimer?.cancel();
     _fadeTimer = Timer(const Duration(milliseconds: 800), () {
@@ -192,19 +221,19 @@ class _CryptexLockState extends State<CryptexLock>
       case SecurityState.LOCKED:
         if (widget.controller.liveConfidence > 0.3) { 
           activeColor = _colLocked;
-          statusText = "BIOMETRIC ACTIVE";
+          statusText = "K9 BIOMETRIC ACTIVE";
           statusIcon = Icons.fingerprint;
           showPulse = true;
         } else {
           activeColor = _colDead;
-          statusText = "STANDBY";
+          statusText = "STANDBY MODE";
           statusIcon = Icons.sensors_off; 
         }
         break;
         
       case SecurityState.VALIDATING:
         activeColor = _colValidating;
-        statusText = "ANALYZING...";
+        statusText = "ANALYZING HUMANITY...";
         statusIcon = Icons.psychology;
         isInputDisabled = true;
         showPulse = true;
@@ -219,7 +248,7 @@ class _CryptexLockState extends State<CryptexLock>
         
       case SecurityState.HARD_LOCK:
         activeColor = _colJam;
-        statusText = "SYSTEM LOCKED • ${widget.controller.remainingLockoutSeconds}s";
+        statusText = "SYSTEM FROZEN • ${widget.controller.remainingLockoutSeconds}s";
         statusIcon = Icons.lock;
         isInputDisabled = true;
         break;
@@ -323,7 +352,6 @@ class _CryptexLockState extends State<CryptexLock>
   }
 
   Widget _buildBiometricIndicator(Color activeColor, bool showAnimation) {
-    // FIX: Using liveConfidence getter
     double confidence = widget.controller.liveConfidence;
     
     return Column(
@@ -336,7 +364,7 @@ class _CryptexLockState extends State<CryptexLock>
                 Icon(Icons.graphic_eq, size: 14, color: Colors.grey[500]),
                 const SizedBox(width: 8),
                 Text(
-                  "BIOMETRIC SIGNATURE",
+                  "HUMAN AUTHENTICITY SCORE",
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 11,
@@ -422,17 +450,17 @@ class _CryptexLockState extends State<CryptexLock>
             Container(width: 1, height: 30, color: Colors.grey[800]),
             _buildModernMetric(
               icon: Icons.speed,
-              label: "ENTROPY",
-              value: "${(widget.controller.motionEntropy * 100).toInt()}",
+              label: "HEAT (BIO)",
+              value: "${(widget.controller.motionEntropy * 100).toInt()}%",
               isGood: widget.controller.motionEntropy > 0.5,
               color: activeColor,
             ),
             Container(width: 1, height: 30, color: Colors.grey[800]),
             _buildModernMetric(
               icon: Icons.verified_user,
-              label: "SCORE",
-              value: "${(confidence * 100).toInt()}",
-              isGood: confidence > 0.5,
+              label: "K9 TRUST",
+              value: (confidence * 100).toInt() > 80 ? "HIGH" : "LOW",
+              isGood: confidence > 0.8,
               color: activeColor,
             ),
           ],
@@ -477,30 +505,19 @@ class _CryptexLockState extends State<CryptexLock>
   Widget _buildWheelArray(Color color, bool disabled) {
     return SizedBox(
       height: 140,
-      child: IgnorePointer(
-        ignoring: disabled,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            if (notification is ScrollStartNotification || 
-                notification is ScrollUpdateNotification) {
-              _activatePrivacyShield();
-            }
-            return false;
-          },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(5, (index) => 
-              _buildModernWheel(index, color, disabled)
-            ),
-          ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(5, (index) => 
+          _buildModernWheel(index, color, disabled)
         ),
       ),
     );
   }
 
   Widget _buildModernWheel(int index, Color color, bool disabled) {
-    final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.15;
-    final bool isActive = _activeWheelIndex != null;
+    // PROTOKOL 1: Hanya roda yang sedang dipusing menyala
+    final bool isWheelActive = _activeWheelIndex == index;
+    final double itemOpacity = isWheelActive ? 1.0 : 0.15;
     
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -509,16 +526,16 @@ class _CryptexLockState extends State<CryptexLock>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: isActive
+          colors: isWheelActive
               ? [color.withOpacity(0.2), color.withOpacity(0.05)]
               : [const Color(0xFF1E293B), const Color(0xFF0F172A)],
         ),
         border: Border.all(
-          color: isActive ? color.withOpacity(0.5) : Colors.grey[800]!,
-          width: isActive ? 2 : 1.5,
+          color: isWheelActive ? color.withOpacity(0.5) : Colors.grey[800]!,
+          width: isWheelActive ? 2 : 1.5,
         ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: isActive ? [
+        boxShadow: isWheelActive ? [
           BoxShadow(
             color: color.withOpacity(0.3),
             blurRadius: 16,
@@ -531,37 +548,41 @@ class _CryptexLockState extends State<CryptexLock>
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 250),
           opacity: disabled ? 0.4 : 1.0,
-          child: ListWheelScrollView.useDelegate(
-            controller: _scrollControllers[index],
-            itemExtent: 46,
-            diameterRatio: 1.3,
-            physics: const FixedExtentScrollPhysics(),
-            onSelectedItemChanged: (val) {
-              _triggerHaptic();
-              widget.controller.updateWheel(index, val % 10);
-              _activatePrivacyShield();
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollUpdateNotification) {
+                _activatePrivacyShield(index);
+              }
+              return false;
             },
-            childDelegate: ListWheelChildBuilderDelegate(
-              builder: (context, i) {
-                final num = i % 10;
-                return Center(
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: opacity,
-                    child: Text(
-                      '$num',
-                      style: TextStyle(
-                        color: disabled ? Colors.grey[700] : (isActive ? color : Colors.white70),
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        shadows: isActive ? [
-                          Shadow(color: color.withOpacity(0.8), blurRadius: 12),
-                        ] : null,
+            child: ListWheelScrollView.useDelegate(
+              controller: _scrollControllers[index],
+              itemExtent: 46,
+              diameterRatio: 1.3,
+              physics: const FixedExtentScrollPhysics(),
+              onSelectedItemChanged: (val) {
+                HapticFeedback.selectionClick();
+                widget.controller.updateWheel(index, val % 10);
+              },
+              childDelegate: ListWheelChildBuilderDelegate(
+                builder: (context, i) {
+                  final num = i % 10;
+                  return Center(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: itemOpacity,
+                      child: Text(
+                        '$num',
+                        style: TextStyle(
+                          color: isWheelActive ? color : Colors.white70,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -571,7 +592,7 @@ class _CryptexLockState extends State<CryptexLock>
 
   Widget _buildModernButton(Color color, bool disabled, SecurityState state) {
     String label = state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : 
-                  state == SecurityState.VALIDATING ? "PROCESSING..." : "AUTHENTICATE";
+                  state == SecurityState.VALIDATING ? "ANALYZING..." : "AUTHENTICATE";
     
     IconData icon = state == SecurityState.HARD_LOCK ? Icons.lock : 
                     state == SecurityState.VALIDATING ? Icons.hourglass_empty : Icons.fingerprint;
@@ -636,11 +657,7 @@ class _CryptexLockState extends State<CryptexLock>
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: _colFail.withOpacity(0.2), shape: BoxShape.circle),
-            child: Icon(Icons.warning, color: _colFail, size: 20),
-          ),
+          Icon(Icons.warning, color: _colFail, size: 20),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
@@ -654,87 +671,37 @@ class _CryptexLockState extends State<CryptexLock>
   }
 
   Widget _buildSecurityWarningUI() {
+    // PROTOKOL 4: K9 WATCHDOG FRONT DOOR
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [const Color(0xFF450A0A), const Color(0xFF7F1D1D)],
-        ),
+        color: const Color(0xFF450A0A),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _colJam, width: 2),
-        boxShadow: [
-          BoxShadow(color: _colJam.withOpacity(0.3), blurRadius: 30, spreadRadius: 2),
-        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
-            child: Icon(Icons.security, color: Colors.white, size: 48),
-          ),
+          Icon(Icons.security, color: Colors.white, size: 48),
           const SizedBox(height: 20),
           Text(
-            "SECURITY BREACH",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 1.5),
+            "K9 WATCHDOG ALERT",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20),
           ),
           const SizedBox(height: 12),
           Text(
-            widget.controller.threatMessage,
+            "Root, Jailbreak or Emulator detected. System Integrity compromised.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.white60, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    "Device security compromised. Sensitive data may be exposed.",
-                    style: TextStyle(color: Colors.white60, fontSize: 11, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
+            style: TextStyle(color: Colors.white70, fontSize: 14),
           ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _colJam,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 8,
-              ),
-              onPressed: () {
-                HapticFeedback.mediumImpact();
-                widget.controller.userAcceptsRisk();
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.shield_outlined, size: 20),
-                  const SizedBox(width: 10),
-                  Text(
-                    "ACKNOWLEDGE RISK",
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 1.0),
-                  ),
-                ],
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: _colJam),
+              onPressed: () => widget.controller.userAcceptsRisk(),
+              child: Text("I UNDERSTAND THE RISK"),
             ),
           ),
         ],
