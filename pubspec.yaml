@@ -1,6 +1,6 @@
 name: cryptex_aer
 description: Secure Biometric Authentication System by Captain Aer.
-version: 0.0.0.1
+version: 0.0.1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -26,5 +26,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
 
 
