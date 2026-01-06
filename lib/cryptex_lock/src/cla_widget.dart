@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
@@ -24,57 +23,95 @@ class CryptexLock extends StatefulWidget {
   State<CryptexLock> createState() => _CryptexLockState();
 }
 
-class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
-  StreamSubscription<AccelerometerEvent>? _accelSub;
+class _CryptexLockState extends State<CryptexLock> 
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  StreamSubscription<UserAccelerometerEvent>? _accelSub;
   
-  double _lastX = 0, _lastY = 0, _lastZ = 0;
-  double _humanScore = 0.0;
-  bool _isHuman = false;
-  
-  // Privacy Shield - Track which wheel is being touched
+  // Privacy Shield
   int? _activeWheelIndex;
-  final Map<int, double> _wheelOpacity = {0: 0.1, 1: 0.1, 2: 0.1, 3: 0.1, 4: 0.1};
-  
-  // Advanced motion detection parameters
-  static const double MOVEMENT_THRESHOLD = 0.12; // Electronic noise floor
-  static const double DECAY_RATE = 0.5; // Natural score decay
-  static const double SENSITIVITY_BOOST = 3.2; // Human motion amplification
-  static const double HUMAN_ACTIVATION_THRESHOLD = 18.0; // Score needed for "human" status
-  static const double MAX_SCORE = 60.0; // Score ceiling
-  
-  // Frequency analysis for tremor detection
-  final List<double> _recentMagnitudes = [];
-  static const int FREQUENCY_WINDOW = 20;
+  Timer? _fadeTimer;
   
   late List<FixedExtentScrollController> _scrollControllers;
-  late AnimationController _glowController;
+  
+  // Animation Controllers
   late AnimationController _pulseController;
-
-  // Color scheme
-  final Color _colLocked = const Color(0xFFFFD700); 
-  final Color _colFail = const Color(0xFFFF9800);   
-  final Color _colJam = const Color(0xFFFF3333);    
-  final Color _colUnlock = const Color(0xFF00E676); 
-  final Color _colDead = const Color(0xFF424242);
-  final Color _colValidating = const Color(0xFF00BCD4);
+  late AnimationController _shimmerController;
+  late AnimationController _shakeController;
+  late Animation<double> _pulseAnimation;
+  late Animation<double> _shimmerAnimation;
+  
+  // Modern Security Color Palette
+  final Color _colLocked = const Color(0xFF00E5FF);      // Cyan - Active
+  final Color _colFail = const Color(0xFFFF6B6B);        // Red - Error
+  final Color _colJam = const Color(0xFFFF1744);          // Deep Red - Critical
+  final Color _colUnlock = const Color(0xFF00FF88);      // Green - Success
+  final Color _colDead = const Color(0xFF4A5568);        // Gray - Inactive
+  final Color _colValidating = const Color(0xFF7C3AED);  // Purple - Processing
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
+    _initAnimations();
     _startListening();
     
-    // Glow animation for active elements
-    _glowController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-    
-    // Pulse animation for biometric bar
+    widget.controller.addListener(_handleControllerChange);
+  }
+  
+  void _initAnimations() {
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+    
+    _shimmerAnimation = Tween<double>(begin: -1.0, end: 2.0).animate(
+      CurvedAnimation(parent: _shimmerController, curve: Curves.linear),
+    );
+    
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+  }
+  
+  void _handleControllerChange() {
+    if (!mounted) return;
+    
+    if (widget.controller.state == SecurityState.UNLOCKED) {
+      widget.onSuccess();
+    } else if (widget.controller.state == SecurityState.HARD_LOCK) {
+      widget.onJammed();
+    } else if (widget.controller.state == SecurityState.SOFT_LOCK) {
+      _triggerShakeAnimation();
+      widget.onFail();
+    }
+  }
+  
+  void _triggerShakeAnimation() {
+    _shakeController.reset();
+    _shakeController.forward();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _accelSub?.cancel();
+      _accelSub = null;
+    } else if (state == AppLifecycleState.resumed) {
+      if (_accelSub == null) {
+        _startListening();
+      }
+    }
   }
 
   void _initScrollControllers() {
@@ -85,100 +122,40 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _startListening() {
-    _accelSub = accelerometerEvents.listen((AccelerometerEvent e) {
-      double deltaX = (e.x - _lastX).abs();
-      double deltaY = (e.y - _lastY).abs();
-      double deltaZ = (e.z - _lastZ).abs();
-
-      _lastX = e.x; 
-      _lastY = e.y; 
-      _lastZ = e.z;
-      
-      double totalDelta = deltaX + deltaY + deltaZ;
-
-      // High-pass filter: Only process significant movements
-      if (totalDelta > MOVEMENT_THRESHOLD) {
-        // Natural human tremor amplification
-        _humanScore += (totalDelta * SENSITIVITY_BOOST);
-        
-        // Track for frequency analysis
-        _recentMagnitudes.add(totalDelta);
-        if (_recentMagnitudes.length > FREQUENCY_WINDOW) {
-          _recentMagnitudes.removeAt(0);
-        }
-        
-        // Register to controller with full delta information
-        widget.controller.registerShake(
-          totalDelta,
-          dx: deltaX,
-          dy: deltaY,
-          dz: deltaZ,
-        );
-      } else {
-        // Below noise threshold - apply natural decay
-        _humanScore -= DECAY_RATE;
-      }
-
-      // Apply score boundaries
-      _humanScore = _humanScore.clamp(0.0, MAX_SCORE);
-      
-      // Human detection with hysteresis (prevent flickering)
-      bool detectedHuman = _humanScore > HUMAN_ACTIVATION_THRESHOLD;
-
-      if (mounted && _isHuman != detectedHuman) {
-        setState(() => _isHuman = detectedHuman);
-      } else if (mounted) {
-        setState(() {}); // Update score display
-      }
+    _accelSub?.cancel();
+    _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
+      double magnitude = e.x.abs() + e.y.abs() + e.z.abs();
+      // FIX: Passing all coordinates to controller for Entropy calculation
+      widget.controller.registerShake(magnitude, e.x, e.y, e.z);
     });
-  }
-
-  /// Calculate tremor frequency variance (humans: 8-12 Hz, bots: 0 Hz or perfect sine)
-  double _calculateFrequencyVariance() {
-    if (_recentMagnitudes.length < 5) return 0.0;
-    
-    double mean = _recentMagnitudes.reduce((a, b) => a + b) / _recentMagnitudes.length;
-    double variance = 0.0;
-    
-    for (var val in _recentMagnitudes) {
-      variance += (val - mean) * (val - mean);
-    }
-    
-    return variance / _recentMagnitudes.length;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.controller.removeListener(_handleControllerChange);
     _accelSub?.cancel();
+    _fadeTimer?.cancel();
+    _pulseController.dispose();
+    _shimmerController.dispose();
+    _shakeController.dispose();
     for (var c in _scrollControllers) {
       c.dispose();
     }
-    _glowController.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
   void _triggerHaptic() {
-    HapticFeedback.selectionClick();
+    HapticFeedback.lightImpact();
   }
 
-  // Privacy Shield: Mark wheel as active on scroll
-  void _onWheelScrollStart(int index) {
-    setState(() {
-      _activeWheelIndex = index;
-      _wheelOpacity[index] = 1.0; // Full opacity
-    });
-  }
-
-  void _onWheelScrollEnd() {
-    Future.delayed(const Duration(milliseconds: 300), () {
+  void _activatePrivacyShield() {
+    setState(() => _activeWheelIndex = 1);
+    
+    _fadeTimer?.cancel();
+    _fadeTimer = Timer(const Duration(milliseconds: 800), () {
       if (mounted) {
-        setState(() {
-          _activeWheelIndex = null;
-          for (int i = 0; i < 5; i++) {
-            _wheelOpacity[i] = 0.1; // Blur all wheels
-          }
-        });
+        setState(() => _activeWheelIndex = null);
       }
     });
   }
@@ -186,14 +163,20 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: widget.controller,
+      animation: Listenable.merge([
+        widget.controller,
+        _shakeController,
+      ]),
       builder: (context, child) {
-        if (widget.controller.state == SecurityState.UNLOCKED) {
-          Future.delayed(Duration.zero, widget.onSuccess);
-        } else if (widget.controller.state == SecurityState.HARD_LOCK) {
-          Future.delayed(Duration.zero, widget.onJammed);
+        double shakeOffset = 0.0;
+        if (_shakeController.isAnimating) {
+          shakeOffset = 10 * (0.5 - (_shakeController.value - 0.5).abs()) * (widget.controller.state == SecurityState.SOFT_LOCK ? 1 : 0);
         }
-        return _buildStateUI(widget.controller.state);
+        
+        return Transform.translate(
+          offset: Offset(shakeOffset, 0),
+          child: _buildStateUI(widget.controller.state),
+        );
       },
     );
   }
@@ -203,50 +186,58 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     String statusText;
     IconData statusIcon;
     bool isInputDisabled = false;
+    bool showPulse = false;
 
     switch (state) {
       case SecurityState.LOCKED:
-        if (_isHuman) {
+        if (widget.controller.liveConfidence > 0.3) { 
           activeColor = _colLocked;
-          statusText = "BIO-LOCK ARMED";
+          statusText = "BIOMETRIC ACTIVE";
           statusIcon = Icons.fingerprint;
+          showPulse = true;
         } else {
           activeColor = _colDead;
-          statusText = "AWAITING BIOMETRIC"; 
+          statusText = "STANDBY";
           statusIcon = Icons.sensors_off; 
         }
         break;
+        
       case SecurityState.VALIDATING:
         activeColor = _colValidating;
-        statusText = "ANALYZING SIGNATURE...";
+        statusText = "ANALYZING...";
         statusIcon = Icons.psychology;
         isInputDisabled = true;
+        showPulse = true;
         break;
+        
       case SecurityState.SOFT_LOCK:
         activeColor = _colFail;
-        statusText = "ACCESS DENIED (${widget.controller.failedAttempts}/${widget.controller.config.maxAttempts})";
-        statusIcon = Icons.warning_amber_rounded;
+        statusText = "ACCESS DENIED • ${widget.controller.failedAttempts}/3";
+        statusIcon = Icons.error_outline;
         isInputDisabled = true;
         break;
+        
       case SecurityState.HARD_LOCK:
         activeColor = _colJam;
-        int remaining = widget.controller.remainingLockoutSeconds;
-        statusText = "LOCKOUT ACTIVE (${remaining}s)";
-        statusIcon = Icons.lock_clock;
+        statusText = "SYSTEM LOCKED • ${widget.controller.remainingLockoutSeconds}s";
+        statusIcon = Icons.lock;
         isInputDisabled = true;
         break;
+        
       case SecurityState.ROOT_WARNING:
-        return _buildLiabilityWaiverUI();
+        return _buildSecurityWarningUI();
+        
       case SecurityState.UNLOCKED:
         activeColor = _colUnlock;
         statusText = "ACCESS GRANTED";
-        statusIcon = Icons.verified_user;
+        statusIcon = Icons.check_circle_outline;
         isInputDisabled = true;
         break;
+        
       default:
         activeColor = _colLocked;
-        statusText = "SYSTEM INITIALIZED";
-        statusIcon = Icons.shield;
+        statusText = "READY";
+        statusIcon = Icons.shield_outlined;
     }
 
     return Container(
@@ -256,35 +247,40 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF0A0A0A),
-            const Color(0xFF1A1A1A),
+            const Color(0xFF0F172A),
+            const Color(0xFF1E293B),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: activeColor.withOpacity(0.5), 
+          color: activeColor.withOpacity(0.3),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: activeColor.withOpacity(0.3),
+            color: activeColor.withOpacity(0.15),
             blurRadius: 30,
             spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildHeader(statusIcon, statusText, activeColor),
-          const SizedBox(height: 20),
-          _buildBiometricDisplay(activeColor),
-          const SizedBox(height: 24),
+          _buildModernHeader(statusIcon, statusText, activeColor, showPulse),
+          const SizedBox(height: 28),
+          _buildBiometricIndicator(activeColor, showPulse),
+          const SizedBox(height: 32),
           _buildWheelArray(activeColor, isInputDisabled),
-          const SizedBox(height: 24),
-          _buildActionButton(activeColor, isInputDisabled, state),
+          const SizedBox(height: 28),
+          _buildModernButton(activeColor, isInputDisabled, state),
           if (widget.controller.threatMessage.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             _buildThreatAlert(),
           ],
         ],
@@ -292,149 +288,185 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildHeader(IconData icon, String text, Color color) {
+  Widget _buildModernHeader(IconData icon, String text, Color color, bool pulse) {
     return AnimatedBuilder(
-      animation: _glowController,
+      animation: _pulseAnimation,
       builder: (context, child) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon, 
-              color: color.withOpacity(0.7 + (_glowController.value * 0.3)),
-              size: 28,
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(pulse ? 0.1 * _pulseAnimation.value : 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(pulse ? 0.3 * _pulseAnimation.value : 0.2),
             ),
-            const SizedBox(width: 12),
-            Text(
-              text,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
-                fontSize: 16,
-                shadows: [
-                  Shadow(
-                    color: color.withOpacity(0.5),
-                    blurRadius: 10,
-                  ),
-                ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 12),
+              Text(
+                text,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  fontSize: 13,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildBiometricDisplay(Color activeColor) {
-    double variance = _calculateFrequencyVariance();
-    double confidence = widget.controller.biometricScore;
+  Widget _buildBiometricIndicator(Color activeColor, bool showAnimation) {
+    // FIX: Using liveConfidence getter
+    double confidence = widget.controller.liveConfidence;
     
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
-                Icon(Icons.radar, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 6),
+                Icon(Icons.graphic_eq, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 8),
                 Text(
-                  "BIO-SIGMA ANALYZER",
+                  "BIOMETRIC SIGNATURE",
                   style: TextStyle(
-                    color: Colors.grey[600],
+                    color: Colors.grey[500],
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: 1.0,
+                    letterSpacing: 0.8,
                   ),
                 ),
               ],
             ),
-            Row(
-              children: [
-                Text(
-                  _humanScore.toStringAsFixed(1),
-                  style: TextStyle(
-                    color: _isHuman ? _colUnlock : _colJam,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: activeColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                "${(confidence * 100).toInt()}%",
+                style: TextStyle(
+                  color: activeColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
                 ),
-                Text(
-                  " / ${MAX_SCORE.toInt()}",
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 11,
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        AnimatedBuilder(
-          animation: _pulseController,
-          builder: (context, child) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Stack(
-                children: [
-                  LinearProgressIndicator(
-                    value: _humanScore / MAX_SCORE,
-                    backgroundColor: Colors.grey[900],
-                    color: _isHuman ? _colUnlock : _colJam,
-                    minHeight: 6,
-                  ),
-                  Positioned.fill(
+        const SizedBox(height: 12),
+        Stack(
+          children: [
+            Container(
+              height: 6,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: Colors.grey[800]!, width: 1),
+              ),
+            ),
+            AnimatedBuilder(
+              animation: _shimmerAnimation,
+              builder: (context, child) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) {
+                      if (!showAnimation) {
+                        return LinearGradient(colors: [activeColor, activeColor]).createShader(bounds);
+                      }
+                      return LinearGradient(
+                        begin: Alignment(_shimmerAnimation.value - 1, 0),
+                        end: Alignment(_shimmerAnimation.value, 0),
+                        colors: [
+                          activeColor.withOpacity(0.6),
+                          activeColor,
+                          activeColor.withOpacity(0.6),
+                        ],
+                      ).createShader(bounds);
+                    },
                     child: Container(
+                      height: 6,
+                      width: MediaQuery.of(context).size.width * confidence * 0.85,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white.withOpacity(0.0),
-                            Colors.white.withOpacity(0.2 * _pulseController.value),
-                            Colors.white.withOpacity(0.0),
-                          ],
-                        ),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
                   ),
-                ],
-              ),
-            );
-          },
+                );
+              },
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildMetric("VARIANCE", variance.toStringAsFixed(2), variance > 0.1),
-            _buildMetric("PATTERNS", "${widget.controller.uniqueGestureCount}", widget.controller.uniqueGestureCount >= 3),
-            _buildMetric("CONFIDENCE", "${(confidence * 100).toStringAsFixed(0)}%", confidence > 0.7),
+            _buildModernMetric(
+              icon: Icons.timeline,
+              label: "PATTERNS",
+              value: "${widget.controller.uniqueGestureCount}",
+              isGood: widget.controller.uniqueGestureCount >= 3,
+              color: activeColor,
+            ),
+            Container(width: 1, height: 30, color: Colors.grey[800]),
+            _buildModernMetric(
+              icon: Icons.speed,
+              label: "ENTROPY",
+              value: "${(widget.controller.motionEntropy * 100).toInt()}",
+              isGood: widget.controller.motionEntropy > 0.5,
+              color: activeColor,
+            ),
+            Container(width: 1, height: 30, color: Colors.grey[800]),
+            _buildModernMetric(
+              icon: Icons.verified_user,
+              label: "SCORE",
+              value: "${(confidence * 100).toInt()}",
+              isGood: confidence > 0.5,
+              color: activeColor,
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildMetric(String label, String value, bool isGood) {
+  Widget _buildModernMetric({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isGood,
+    required Color color,
+  }) {
     return Column(
       children: [
+        Icon(icon, size: 16, color: isGood ? color : Colors.grey[600]),
+        const SizedBox(height: 6),
         Text(
           label,
           style: TextStyle(
-            color: Colors.grey[700],
-            fontSize: 8,
+            color: Colors.grey[600],
+            fontSize: 9,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
-            color: isGood ? _colUnlock : _colFail,
-            fontSize: 11,
+            color: isGood ? color : Colors.grey[500],
+            fontSize: 14,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -444,92 +476,92 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   Widget _buildWheelArray(Color color, bool disabled) {
     return SizedBox(
-      height: 130,
+      height: 140,
       child: IgnorePointer(
         ignoring: disabled,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(
-            5, 
-            (index) => _buildQuantumWheel(index, color, disabled),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification is ScrollStartNotification || 
+                notification is ScrollUpdateNotification) {
+              _activatePrivacyShield();
+            }
+            return false;
+          },
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: List.generate(5, (index) => 
+              _buildModernWheel(index, color, disabled)
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildQuantumWheel(int index, Color color, bool disabled) {
-    double opacity = _wheelOpacity[index] ?? 0.1;
-    bool isActive = _activeWheelIndex == index;
+  Widget _buildModernWheel(int index, Color color, bool disabled) {
+    final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.15;
+    final bool isActive = _activeWheelIndex != null;
     
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is ScrollStartNotification) {
-          _onWheelScrollStart(index);
-        } else if (notification is ScrollEndNotification) {
-          _onWheelScrollEnd();
-        }
-        return true;
-      },
-      child: Container(
-        width: 48,
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isActive 
-                ? color.withOpacity(0.8) 
-                : Colors.grey[800]!,
-            width: isActive ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isActive ? [
-            BoxShadow(
-              color: color.withOpacity(0.4),
-              blurRadius: 12,
-              spreadRadius: 2,
-            ),
-          ] : null,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: 52,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: isActive
+              ? [color.withOpacity(0.2), color.withOpacity(0.05)]
+              : [const Color(0xFF1E293B), const Color(0xFF0F172A)],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(
-              sigmaX: isActive ? 0 : 5,
-              sigmaY: isActive ? 0 : 5,
-            ),
-            child: ListWheelScrollView.useDelegate(
-              controller: _scrollControllers[index],
-              itemExtent: 44,
-              diameterRatio: 1.2,
-              physics: const FixedExtentScrollPhysics(),
-              onSelectedItemChanged: (val) {
-                _triggerHaptic();
-                widget.controller.updateWheel(index, val % 10);
-              },
-              childDelegate: ListWheelChildBuilderDelegate(
-                builder: (context, i) {
-                  final num = i % 10;
-                  return Center(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 150),
-                      opacity: opacity,
-                      child: Text(
-                        '$num',
-                        style: TextStyle(
-                          color: disabled ? Colors.grey[800] : Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          shadows: isActive ? [
-                            Shadow(
-                              color: color,
-                              blurRadius: 8,
-                            ),
-                          ] : null,
-                        ),
+        border: Border.all(
+          color: isActive ? color.withOpacity(0.5) : Colors.grey[800]!,
+          width: isActive ? 2 : 1.5,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: isActive ? [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+        ] : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 250),
+          opacity: disabled ? 0.4 : 1.0,
+          child: ListWheelScrollView.useDelegate(
+            controller: _scrollControllers[index],
+            itemExtent: 46,
+            diameterRatio: 1.3,
+            physics: const FixedExtentScrollPhysics(),
+            onSelectedItemChanged: (val) {
+              _triggerHaptic();
+              widget.controller.updateWheel(index, val % 10);
+              _activatePrivacyShield();
+            },
+            childDelegate: ListWheelChildBuilderDelegate(
+              builder: (context, i) {
+                final num = i % 10;
+                return Center(
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: opacity,
+                    child: Text(
+                      '$num',
+                      style: TextStyle(
+                        color: disabled ? Colors.grey[700] : (isActive ? color : Colors.white70),
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        shadows: isActive ? [
+                          Shadow(color: color.withOpacity(0.8), blurRadius: 12),
+                        ] : null,
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -537,83 +569,83 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildActionButton(Color color, bool disabled, SecurityState state) {
-    String label = state == SecurityState.HARD_LOCK 
-        ? "SYSTEM LOCKED" 
-        : "AUTHENTICATE";
+  Widget _buildModernButton(Color color, bool disabled, SecurityState state) {
+    String label = state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : 
+                  state == SecurityState.VALIDATING ? "PROCESSING..." : "AUTHENTICATE";
     
-    return AnimatedBuilder(
-      animation: _glowController,
-      builder: (context, child) {
-        return Container(
-          width: double.infinity,
-          height: 56,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: disabled 
-                ? LinearGradient(colors: [Colors.grey[900]!, Colors.grey[800]!])
-                : LinearGradient(
-                    colors: [
-                      color.withOpacity(0.8),
-                      color,
-                    ],
+    IconData icon = state == SecurityState.HARD_LOCK ? Icons.lock : 
+                    state == SecurityState.VALIDATING ? Icons.hourglass_empty : Icons.fingerprint;
+    
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: double.infinity,
+      height: 60,
+      decoration: BoxDecoration(
+        gradient: disabled ? null : LinearGradient(
+          colors: [color, color.withOpacity(0.7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        color: disabled ? const Color(0xFF1E293B) : null,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: disabled ? Colors.grey[800]! : color.withOpacity(0.5), width: 1.5),
+        boxShadow: disabled ? null : [
+          BoxShadow(color: color.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 8)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: disabled ? null : () {
+            HapticFeedback.mediumImpact();
+            widget.controller.validateAttempt(hasPhysicalMovement: true);
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: disabled ? Colors.grey[700] : Colors.black87, size: 22),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: disabled ? Colors.grey[700] : Colors.black87,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    letterSpacing: 1.2,
                   ),
-            boxShadow: disabled ? null : [
-              BoxShadow(
-                color: color.withOpacity(0.3 + (_glowController.value * 0.2)),
-                blurRadius: 20,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: disabled 
-                ? null 
-                : () => widget.controller.validateAttempt(
-                      hasPhysicalMovement: _isHuman,
-                    ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: disabled ? Colors.grey[700] : Colors.black,
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-                letterSpacing: 1.5,
-              ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
   Widget _buildThreatAlert() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _colJam.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _colJam.withOpacity(0.3)),
+        gradient: LinearGradient(
+          colors: [_colFail.withOpacity(0.15), _colFail.withOpacity(0.05)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _colFail.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: _colJam, size: 18),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: _colFail.withOpacity(0.2), shape: BoxShape.circle),
+            child: Icon(Icons.warning, color: _colFail, size: 20),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
               widget.controller.threatMessage,
-              style: TextStyle(
-                color: _colJam,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: _colFail, fontSize: 12, fontWeight: FontWeight.w600, height: 1.4),
             ),
           ),
         ],
@@ -621,73 +653,89 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildLiabilityWaiverUI() {
+  Widget _buildSecurityWarningUI() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            const Color(0xFF330000),
-            const Color(0xFF660000),
-          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [const Color(0xFF450A0A), const Color(0xFF7F1D1D)],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _colJam, width: 2),
+        boxShadow: [
+          BoxShadow(color: _colJam.withOpacity(0.3), blurRadius: 30, spreadRadius: 2),
+        ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.security, color: Colors.white, size: 60),
-          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+            child: Icon(Icons.security, color: Colors.white, size: 48),
+          ),
+          const SizedBox(height: 20),
           Text(
-            "SECURITY COMPROMISE DETECTED",
+            "SECURITY BREACH",
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              letterSpacing: 1.2,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 1.5),
           ),
           const SizedBox(height: 12),
           Text(
             widget.controller.threatMessage,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
-            child: Text(
-              "⚠️ This device's security integrity has been compromised. Proceeding may expose sensitive data to unauthorized access.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-              ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.white60, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    "Device security compromised. Sensitive data may be exposed.",
+                    style: TextStyle(color: Colors.white60, fontSize: 11, height: 1.4),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _colJam,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            ),
-            icon: const Icon(Icons.shield_outlined, color: Colors.white),
-            label: const Text(
-              "ACKNOWLEDGE RISK & PROCEED",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _colJam,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 8,
+              ),
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                widget.controller.userAcceptsRisk();
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.shield_outlined, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    "ACKNOWLEDGE RISK",
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 1.0),
+                  ),
+                ],
               ),
             ),
-            onPressed: () => widget.controller.userAcceptsRisk(),
           ),
         ],
       ),
