@@ -1,3 +1,10 @@
+/*
+ * PROJECT: CryptexLock Security Suite
+ * MODELS: Extended with Server Validation Support
+ */
+
+import '../security/config/security_config.dart';
+
 enum SecurityState {
   LOCKED,           // Ready for authentication
   VALIDATING,       // Processing biometric signature
@@ -20,10 +27,13 @@ class ClaConfig {
   final bool enableSensors;
   
   // Advanced biometric parameters
-  final double humanTremorFrequency; // Expected 8-12 Hz for human hand tremors
-  final double botDetectionSensitivity; // 0.0-1.0 scale
-  final int minimumGestureSequence; // Minimum unique movements required
-  final Duration biometricWindowDuration; // Time window for pattern analysis
+  final double humanTremorFrequency;
+  final double botDetectionSensitivity;
+  final int minimumGestureSequence;
+  final Duration biometricWindowDuration;
+  
+  // ✨ NEW: Server validation config
+  final SecurityConfig? securityConfig;
 
   const ClaConfig({
     required this.secret,
@@ -38,7 +48,15 @@ class ClaConfig {
     this.botDetectionSensitivity = 0.85,
     this.minimumGestureSequence = 5,
     this.biometricWindowDuration = const Duration(seconds: 2),
+    // Optional server config (default null = no server validation)
+    this.securityConfig,
   });
+  
+  /// Check if server validation is enabled
+  bool get hasServerValidation => 
+      securityConfig != null && 
+      securityConfig!.enableServerValidation &&
+      securityConfig!.isValid();
 }
 
 /// Biometric signature snapshot
@@ -62,16 +80,9 @@ class BiometricSignature {
   double get humanConfidence {
     double score = 0.0;
     
-    // Weight: Magnitude (natural human shake is 0.2-2.0)
     if (averageMagnitude > 0.15 && averageMagnitude < 3.0) score += 0.3;
-    
-    // Weight: Variance (humans are inconsistent)
     if (frequencyVariance > 0.1) score += 0.25;
-    
-    // Weight: Entropy (randomness indicator)
     if (patternEntropy > 0.5) score += 0.25;
-    
-    // Weight: Gesture diversity
     if (uniqueGestureCount >= 3) score += 0.2;
     
     return score.clamp(0.0, 1.0);
