@@ -1,4 +1,4 @@
-name: Francois Build (Final Fix)
+name: Francois Build (Upgrade v3)
 on:
   workflow_dispatch:
   push:
@@ -23,20 +23,21 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. JANA & GANTI TOTAL (THE NUCLEAR OPTION)
+      - name: 4. JANA & GANTI TOTAL (UPGRADED CORE)
         run: |
+          echo "=== FASA 0: BAIKI PUBSPEC (CRITICAL) ==="
+          sed -i 's/version: 0.0.0.1/version: 0.0.1+1/g' pubspec.yaml
+          
           echo "=== FASA 1: JANA STRUKTUR ASAL ==="
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
           echo "=== FASA 2: MUSNAHKAN FAIL BERMASALAH ==="
-          # Kita guna -f (force) dan padam kedua-dua versi (.gradle dan .gradle.kts)
-          # Ini menjamin skrip tidak akan gagal walau apa pun Flutter jana
           rm -f android/settings.gradle android/settings.gradle.kts
           rm -f android/build.gradle android/build.gradle.kts
           
-          echo "=== FASA 3: TULIS SEMULA settings.gradle (SAFE MODE) ==="
-          # Kita tulis fail baru (.gradle biasa) yang 100% menggunakan Google Mirror
+          echo "=== FASA 3: TULIS SEMULA settings.gradle (VERSION UPGRADE) ==="
+          # DISINI PUNCANYA. Saya telah naik taraf version AGP dan Kotlin.
           cat > android/settings.gradle <<EOF
           pluginManagement {
               def flutterSdkPath = {
@@ -58,8 +59,10 @@ jobs:
 
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.1.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.7.10" apply false
+              // UPGRADED: 8.1.0 -> 8.2.1 (Supaya Flutter puas hati)
+              id "com.android.application" version "8.2.1" apply false
+              // UPGRADED: 1.7.10 -> 1.9.20 (Wajib untuk support AGP 8.2)
+              id "org.jetbrains.kotlin.android" version "1.9.20" apply false
           }
 
           include ":app"
@@ -106,6 +109,7 @@ jobs:
           if [ ! -z "$JB_GRADLE" ]; then
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
             
+            # Kita paksa library lama guna Java 17 juga
             cat >> $JB_GRADLE <<EOF
             android {
                 compileOptions {
