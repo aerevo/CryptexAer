@@ -1,4 +1,4 @@
-name: Francois Build (Surgical Strike)
+name: Francois Build (Total Rewrite)
 on:
   workflow_dispatch:
   push:
@@ -23,44 +23,71 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. JANA & BEDAH (SURGICAL FIX)
+      - name: 4. JANA & GANTI TOTAL (THE NUCLEAR OPTION)
         run: |
-          echo "=== FASA 1: BERSIH & JANA ==="
+          echo "=== FASA 1: JANA STRUKTUR ASAL ==="
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
-          echo "=== FASA 2: SUNTIKAN PERISAI (PROJECT LEVEL) ==="
-          # Cari fail build.gradle (Groovy/Kotlin)
-          BUILD_FILE=$(find android -maxdepth 1 -name "build.gradle*")
-          if [ ! -z "$BUILD_FILE" ]; then
-             echo "Membedah $BUILD_FILE..."
-             # Paksa Google Mirror
-             sed -i 's|mavenCentral()|maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }; mavenCentral()|g' $BUILD_FILE
-             sed -i 's|google()|google(); maven { url "https://jitpack.io" }|g' $BUILD_FILE
-          fi
+          echo "=== FASA 2: MUSNAHKAN FAIL BERMASALAH ==="
+          rm android/settings.gradle.kts
+          rm android/build.gradle
+          
+          echo "=== FASA 3: TULIS SEMULA settings.gradle.kts (SAFE MODE) ==="
+          # Kita tulis fail baru yang 100% menggunakan Google Mirror
+          # Kita guna syntax Groovy (bukan Kotlin DSL) untuk elak isu version mismatch yang rumit
+          cat > android/settings.gradle <<EOF
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                  return flutterSdkPath
+              }()
 
-          echo "=== FASA 2B: SUNTIKAN SETTINGS (KOTLIN DSL FIX) ==="
-          # Ini adalah PUNCA RALAT TERBARU. Kita mesti ubah settings.gradle.kts
-          SETTINGS_FILE="android/settings.gradle.kts"
+              includeBuild("\$flutterSdkPath/packages/flutter_tools/gradle")
+
+              repositories {
+                  google()
+                  maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
+                  maven { url 'https://jitpack.io' }
+              }
+          }
+
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "8.1.0" apply false
+              id "org.jetbrains.kotlin.android" version "1.7.10" apply false
+          }
+
+          include ":app"
+          EOF
           
-          if [ -f "$SETTINGS_FILE" ]; then
-             echo "Sasaran Kotlin DSL Dikesan: $SETTINGS_FILE"
-             
-             # Ubah sintaks Kotlin DSL untuk memaksa Google Mirror
-             # Kita ganti gradlePluginPortal() dan mavenCentral() dengan URL Google
-             
-             # 1. Ganti gradlePluginPortal() dengan Google Mirror (Kotlin Syntax)
-             sed -i 's|gradlePluginPortal()|maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }|g' $SETTINGS_FILE
-             
-             # 2. Ganti mavenCentral() dengan Google Mirror (Kotlin Syntax)
-             sed -i 's|mavenCentral()|maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }|g' $SETTINGS_FILE
-             
-             echo "Pembedahan Settings Selesai."
-          else
-             echo "Fail settings.gradle.kts tidak dijumpai (Mungkin versi lama), meneruskan..."
-          fi
+          echo "=== FASA 4: TULIS SEMULA build.gradle (SAFE MODE) ==="
+          cat > android/build.gradle <<EOF
+          allprojects {
+              repositories {
+                  google()
+                  maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
+                  maven { url 'https://jitpack.io' }
+              }
+          }
+
+          rootProject.buildDir = '../build'
+          subprojects {
+              project.buildDir = "\${rootProject.buildDir}/\${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(':app')
+          }
+
+          task clean(type: Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
           
-          echo "=== FASA 3: PERMISSION VIBRATE ==="
+          echo "=== FASA 5: PERMISSION VIBRATE ==="
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
              sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' $MANIFEST_FILE
