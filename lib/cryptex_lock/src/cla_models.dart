@@ -1,18 +1,20 @@
 /*
  * PROJECT: CryptexLock Security Suite
  * MODELS: Extended with Server Validation Support
+ * STATUS: Fixed Import Path (Francois Optimized)
  */
 
-import '../security/config/security_config.dart';
+// ✨ FIXED: Jalur import diselaraskan ke dalam folder src/security
+import 'security/config/security_config.dart';
 
 enum SecurityState {
   LOCKED,           // Ready for authentication
-  VALIDATING,       // Processing biometric signature
-  UNLOCKED,         // Access granted
-  SOFT_LOCK,        // Failed attempt - warning state
-  HARD_LOCK,        // Cooldown period active
-  BOT_SIMULATION,   // Test mode for developers
-  ROOT_WARNING,     // Security compromise detected
+  VALIDATING,        // Processing biometric signature
+  UNLOCKED,          // Access granted
+  SOFT_LOCK,         // Failed attempt - warning state
+  HARD_LOCK,         // Cooldown period active
+  BOT_SIMULATION,    // Test mode for developers
+  ROOT_WARNING,      // Security compromise detected
   COMPROMISED       // Critical security breach
 }
 
