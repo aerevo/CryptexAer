@@ -13,7 +13,11 @@ dependencies:
   shared_preferences: ^2.2.0
   flutter_jailbreak_detection: ^1.1.0
   flutter_secure_storage: ^9.0.0
-  # flutter_vibrate DIBUANG. KITA GUNA NATIVE HAPTIC.
+  
+  # ✨ TAMBAH 3 DEPENDENCIES NI:
+  crypto: ^3.0.3
+  device_info_plus: ^9.1.1
+  http: ^1.1.0
 
 dev_dependencies:
   flutter_test:
