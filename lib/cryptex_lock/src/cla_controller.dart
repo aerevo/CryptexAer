@@ -3,11 +3,6 @@
  * AUTHOR: Captain Aer (Visionary)
  * LICENSE: Server-Side Public License (SSPL) Style
  * * COPYRIGHT (c) 2026 CAPTAIN AER. ALL RIGHTS RESERVED.
- * * Usage Warning:
- * This software's core biometric logic is the intellectual property of Captain Aer.
- * You may use this code for personal projects, but commercial redistribution, 
- * SaaS integration, or "white-labeling" without explicit permission is 
- * strictly prohibited and protected under international IP laws.
  */
 
 import 'dart:async';
@@ -29,7 +24,6 @@ class ClaController extends ChangeNotifier {
   
   late List<int> currentValues;
   
-  // Advanced biometric tracking
   final List<MotionEvent> _motionHistory = [];
   final List<double> _magnitudeBuffer = [];
   double _accumulatedShake = 0;
@@ -37,7 +31,6 @@ class ClaController extends ChangeNotifier {
   int _uniquePatternCount = 0;
   DateTime? _sessionStartTime;
   
-  // Pattern recognition state
   final Map<String, int> _patternFrequency = {};
   double _entropy = 0.0;
   
@@ -46,7 +39,6 @@ class ClaController extends ChangeNotifier {
   static const int MAX_HISTORY_SIZE = 100;
   static const double ELECTRONIC_NOISE_FLOOR = 0.12; 
 
-  Timer? _botTimer;
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
 
@@ -57,10 +49,6 @@ class ClaController extends ChangeNotifier {
     _initSecurityProtocol();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 🐕 SECURITY WATCHDOG
-  // ═══════════════════════════════════════════════════════════
-  
   Future<void> _initSecurityProtocol() async {
     bool isRooted = false;
     bool isUsbDebug = false;
@@ -96,10 +84,6 @@ class ClaController extends ChangeNotifier {
     _loadStateFromMemory();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 💾 PERSISTENT MEMORY
-  // ═══════════════════════════════════════════════════════════
-  
   Future<void> _loadStateFromMemory() async {
     if (_state == SecurityState.ROOT_WARNING) return;
 
@@ -148,10 +132,6 @@ class ClaController extends ChangeNotifier {
     _sessionStartTime = DateTime.now();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 🧬 BIOMETRIC PROCESSING (The "Secret Sauce")
-  // ═══════════════════════════════════════════════════════════
-  
   void updateWheel(int index, int value) {
     if (_state == SecurityState.HARD_LOCK || 
         _state == SecurityState.VALIDATING ||
@@ -162,6 +142,7 @@ class ClaController extends ChangeNotifier {
     }
   }
 
+  // FIX: Matching arguments with UI call
   void registerShake(double magnitude, double dx, double dy, double dz) {
     if (magnitude < ELECTRONIC_NOISE_FLOOR) return;
     
@@ -178,12 +159,8 @@ class ClaController extends ChangeNotifier {
     _motionHistory.add(event);
     _magnitudeBuffer.add(magnitude);
     
-    if (_motionHistory.length > MAX_HISTORY_SIZE) {
-      _motionHistory.removeAt(0);
-    }
-    if (_magnitudeBuffer.length > MAX_HISTORY_SIZE) {
-      _magnitudeBuffer.removeAt(0);
-    }
+    if (_motionHistory.length > MAX_HISTORY_SIZE) _motionHistory.removeAt(0);
+    if (_magnitudeBuffer.length > MAX_HISTORY_SIZE) _magnitudeBuffer.removeAt(0);
     
     String pattern = _quantizePattern(dx, dy, dz);
     _patternFrequency[pattern] = (_patternFrequency[pattern] ?? 0) + 1;
@@ -191,7 +168,7 @@ class ClaController extends ChangeNotifier {
     _accumulatedShake += magnitude;
     
     _calculateBiometricStats();
-    notifyListeners(); // Ensure UI reflects real-time metrics
+    notifyListeners(); 
   }
 
   String _quantizePattern(double dx, double dy, double dz) {
@@ -236,10 +213,6 @@ class ClaController extends ChangeNotifier {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 🤖 ANTI-BOT VALIDATION
-  // ═══════════════════════════════════════════════════════════
-  
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
     if (_state == SecurityState.ROOT_WARNING || _state == SecurityState.HARD_LOCK) return;
 
@@ -339,10 +312,6 @@ class ClaController extends ChangeNotifier {
     return true;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 📊 GETTERS (Aligned with Cryptex UI)
-  // ═══════════════════════════════════════════════════════════
-  
   int getInitialValue(int index) {
     if (index >= 0 && index < currentValues.length) return currentValues[index];
     return 0;
@@ -353,6 +322,7 @@ class ClaController extends ChangeNotifier {
     return _lockoutUntil!.difference(DateTime.now()).inSeconds.clamp(0, 999999);
   }
   
+  // FIX: Rename/Alignment with UI
   double get liveConfidence {
     final sig = _generateSignature();
     return sig.humanConfidence;
@@ -364,7 +334,6 @@ class ClaController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _botTimer?.cancel();
     super.dispose();
   }
 }
