@@ -1,4 +1,4 @@
-name: Francois Build (Anti-Ban 403)
+name: Francois Build (Smart Fix)
 on:
   workflow_dispatch:
   push:
@@ -23,24 +23,40 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI (Manifest & Android Reset)
+      - name: 4. SUNTIKAN PERISAI & BYPASS (Gabungan Pintar)
         run: |
-          echo "Membersihkan & Menjana Android..."
+          echo "=== FASA 1: BERSIH & JANA ==="
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
-          echo "Menyuntik Vibrate Permission..."
-          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
-
-      - name: 4b. BYPASS SEKATAN MAVEN (Ubat 403 Forbidden)
-        run: |
-           echo "Menambah Google Mirror untuk Maven Central..."
-           # Teknik François: Kita paksa guna Mirror Google sebelum Maven Central
-           # Ini mengelakkan ralat 403 kerana Google Mirror tidak menyekat GitHub Actions
-           sed -i 's|mavenCentral()|maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }; mavenCentral()|g' android/build.gradle
-           
-           # Kita juga pastikan repository Google sentiasa di atas
-           sed -i 's|google()|google(); maven { url "https://jitpack.io" }|g' android/build.gradle
+          echo "=== FASA 2: DIAGNOSIS STRUKTUR ==="
+          ls -R android
+          
+          echo "=== FASA 3: SUNTIKAN ANTI-BAN ==="
+          # Cari fail build.gradle (Sama ada .gradle atau .gradle.kts)
+          # Kita guna 'find' supaya tak tersalah nama fail
+          BUILD_FILE=$(find android -maxdepth 1 -name "build.gradle*")
+          
+          if [ -z "$BUILD_FILE" ]; then
+             echo "RALAT KRITIKAL: Fail build.gradle tidak dijumpai. Flutter gagal menjana Android."
+             exit 1
+          fi
+          
+          echo "Sasaran dikesan: $BUILD_FILE"
+          
+          # Suntik Google Mirror (Ubat 403)
+          sed -i 's|mavenCentral()|maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }; mavenCentral()|g' $BUILD_FILE
+          
+          # Suntik Priority Google
+          sed -i 's|google()|google(); maven { url "https://jitpack.io" }|g' $BUILD_FILE
+          
+          echo "=== FASA 4: PERMISSION VIBRATE ==="
+          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST_FILE" ]; then
+             sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' $MANIFEST_FILE
+          else
+             echo "Amaran: AndroidManifest tidak dijumpai di laluan standard."
+          fi
 
       - name: 5. Download Dependencies
         run: flutter pub get
