@@ -1,4 +1,4 @@
-name: Francois Build (Total Rewrite)
+name: Francois Build (Final Fix)
 on:
   workflow_dispatch:
   push:
@@ -30,12 +30,13 @@ jobs:
           flutter create . --platforms android --project-name cryptex_aer
           
           echo "=== FASA 2: MUSNAHKAN FAIL BERMASALAH ==="
-          rm android/settings.gradle.kts
-          rm android/build.gradle
+          # Kita guna -f (force) dan padam kedua-dua versi (.gradle dan .gradle.kts)
+          # Ini menjamin skrip tidak akan gagal walau apa pun Flutter jana
+          rm -f android/settings.gradle android/settings.gradle.kts
+          rm -f android/build.gradle android/build.gradle.kts
           
-          echo "=== FASA 3: TULIS SEMULA settings.gradle.kts (SAFE MODE) ==="
-          # Kita tulis fail baru yang 100% menggunakan Google Mirror
-          # Kita guna syntax Groovy (bukan Kotlin DSL) untuk elak isu version mismatch yang rumit
+          echo "=== FASA 3: TULIS SEMULA settings.gradle (SAFE MODE) ==="
+          # Kita tulis fail baru (.gradle biasa) yang 100% menggunakan Google Mirror
           cat > android/settings.gradle <<EOF
           pluginManagement {
               def flutterSdkPath = {
