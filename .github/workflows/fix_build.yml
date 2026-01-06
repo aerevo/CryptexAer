@@ -1,4 +1,4 @@
-name: Francois Build (Smart Fix)
+name: Francois Build (Ghost Protocol)
 on:
   workflow_dispatch:
   push:
@@ -23,45 +23,61 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI & BYPASS (Gabungan Pintar)
+      - name: 4. SUNTIKAN GLOBAL (INIT SCRIPT)
         run: |
-          echo "=== FASA 1: BERSIH & JANA ==="
+          echo "Mewujudkan 'Polis Trafik' Global untuk Gradle..."
+          mkdir -p ~/.gradle
+          
+          # Kita cipta fail init.gradle yang akan memintas semua trafik Maven
+          cat > ~/.gradle/init.gradle <<EOF
+          allprojects {
+              buildscript {
+                  repositories.all { ArtifactRepository repo ->
+                      if (repo instanceof MavenArtifactRepository) {
+                          if (repo.url.toString().contains("repo.maven.apache.org") || repo.url.toString().contains("mavenCentral")) {
+                              repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
+                          }
+                      }
+                  }
+              }
+              repositories.all { ArtifactRepository repo ->
+                  if (repo instanceof MavenArtifactRepository) {
+                      if (repo.url.toString().contains("repo.maven.apache.org") || repo.url.toString().contains("mavenCentral")) {
+                          repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
+                      }
+                  }
+              }
+          }
+          
+          // Memintas Plugin Management juga (Punca ralat classpath tadi)
+          settingsEvaluated { settings ->
+              settings.pluginManagement.repositories.all { ArtifactRepository repo ->
+                  if (repo instanceof MavenArtifactRepository) {
+                      if (repo.url.toString().contains("repo.maven.apache.org") || repo.url.toString().contains("mavenCentral")) {
+                          repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
+                      }
+                  }
+              }
+          }
+          EOF
+          
+          echo "Suntikan Global Selesai. Maven Central kini dipintas."
+
+      - name: 5. REGENERASI ANDROID (Clean Slate)
+        run: |
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
-          echo "=== FASA 2: DIAGNOSIS STRUKTUR ==="
-          ls -R android
-          
-          echo "=== FASA 3: SUNTIKAN ANTI-BAN ==="
-          # Cari fail build.gradle (Sama ada .gradle atau .gradle.kts)
-          # Kita guna 'find' supaya tak tersalah nama fail
-          BUILD_FILE=$(find android -maxdepth 1 -name "build.gradle*")
-          
-          if [ -z "$BUILD_FILE" ]; then
-             echo "RALAT KRITIKAL: Fail build.gradle tidak dijumpai. Flutter gagal menjana Android."
-             exit 1
-          fi
-          
-          echo "Sasaran dikesan: $BUILD_FILE"
-          
-          # Suntik Google Mirror (Ubat 403)
-          sed -i 's|mavenCentral()|maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }; mavenCentral()|g' $BUILD_FILE
-          
-          # Suntik Priority Google
-          sed -i 's|google()|google(); maven { url "https://jitpack.io" }|g' $BUILD_FILE
-          
-          echo "=== FASA 4: PERMISSION VIBRATE ==="
+          # Suntik Permission Vibrate (Satu-satunya modifikasi manual yang tinggal)
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
              sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' $MANIFEST_FILE
-          else
-             echo "Amaran: AndroidManifest tidak dijumpai di laluan standard."
           fi
 
-      - name: 5. Download Dependencies
+      - name: 6. Download Dependencies
         run: flutter pub get
 
-      - name: 5b. BEDAH LIBRARY JAILBREAK
+      - name: 7. BEDAH LIBRARY JAILBREAK
         run: |
           echo "Membedah flutter_jailbreak_detection..."
           
@@ -90,10 +106,10 @@ jobs:
           
           echo "Pembedahan Selesai."
 
-      - name: 6. Build APK Release
+      - name: 8. Build APK Release
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
 
-      - name: 7. Simpan APK
+      - name: 9. Simpan APK
         uses: actions/upload-artifact@v4
         with:
           name: cryptex-aer-bank-grade
