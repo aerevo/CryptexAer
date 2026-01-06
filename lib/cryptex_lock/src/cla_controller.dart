@@ -1,7 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * ENGINE UPGRADE: AAA / Enterprise Anti-Bot
- * AUTHOR: Captain Aer
+ * ENGINE: AAA + Server-Validated
+ * INTEGRATION: Zero-Knowledge Proof System
  */
 
 import 'dart:async';
@@ -10,6 +10,10 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 import 'cla_models.dart';
+// ✨ NEW IMPORTS
+import 'security/models/secure_payload.dart';
+import 'security/services/mirror_service.dart';
+import 'security/services/device_fingerprint.dart';
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
@@ -23,11 +27,10 @@ class ClaController extends ChangeNotifier {
   DateTime? _lockoutUntil;
   late List<int> currentValues;
 
-  // ===== Motion & Biometric Buffers =====
+  // Motion & Biometric Buffers
   final List<MotionEvent> _motionHistory = [];
   final List<double> _magnitudeBuffer = [];
   final List<DateTime> _motionTimestamps = [];
-
   final Map<String, int> _patternFrequency = {};
 
   double _accumulatedShake = 0;
@@ -35,18 +38,20 @@ class ClaController extends ChangeNotifier {
   double _entropy = 0.0;
   int _uniquePatternCount = 0;
 
-  // ===== Session Control =====
+  // Session Control
   DateTime? _sessionStartTime;
   DateTime? _lastInteractionTime;
   Duration _activeInteraction = Duration.zero;
 
-  // ===== AAA Enhancements =====
+  // AAA Enhancements
   BiometricSignature? _lastSignature;
   bool _quietSuspicion = false;
 
+  // ✨ NEW: Server validation
+  MirrorService? _mirrorService;
+
   static const int MAX_HISTORY_SIZE = 120;
   static const double ELECTRONIC_NOISE_FLOOR = 0.12;
-
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
@@ -57,6 +62,15 @@ class ClaController extends ChangeNotifier {
     final rand = Random();
     currentValues = List.generate(5, (_) => rand.nextInt(10));
     _sessionStartTime = DateTime.now();
+    
+    // Initialize server service if enabled
+    if (config.hasServerValidation) {
+      _mirrorService = MirrorService(
+        endpoint: config.securityConfig!.serverEndpoint,
+        timeout: config.securityConfig!.serverTimeout,
+      );
+    }
+    
     _initSecurityProtocol();
   }
 
@@ -141,7 +155,7 @@ class ClaController extends ChangeNotifier {
   }
 
   // =========================================================
-  // INTERACTION TRACKING (AAA)
+  // INTERACTION TRACKING
   // =========================================================
 
   void _registerInteraction() {
@@ -154,8 +168,17 @@ class ClaController extends ChangeNotifier {
 
   void updateWheel(int index, int value) {
     if (_state != SecurityState.LOCKED) return;
-    currentValues[index] = value;
+    if (index >= 0 && index < currentValues.length) {
+      currentValues[index] = value;
+    }
     _registerInteraction();
+  }
+  
+  int getInitialValue(int index) {
+    if (index >= 0 && index < currentValues.length) {
+      return currentValues[index];
+    }
+    return 0;
   }
 
   // =========================================================
@@ -201,6 +224,8 @@ class ClaController extends ChangeNotifier {
   }
 
   void _calculateStats() {
+    if (_magnitudeBuffer.isEmpty) return;
+    
     final mean =
         _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
 
@@ -216,12 +241,14 @@ class ClaController extends ChangeNotifier {
 
     for (final c in _patternFrequency.values) {
       final p = c / total;
-      _entropy -= p * (log(p) / log(2));
+      if (p > 0) {
+        _entropy -= p * (log(p) / log(2));
+      }
     }
   }
 
   // =========================================================
-  // AAA BIOMETRIC CORE
+  // BIOMETRIC CORE
   // =========================================================
 
   double _estimateTremorHz() {
@@ -237,8 +264,7 @@ class ClaController extends ChangeNotifier {
       );
     }
 
-    final avg =
-        intervals.reduce((a, b) => a + b) / intervals.length;
+    final avg = intervals.reduce((a, b) => a + b) / intervals.length;
     return avg <= 0 ? 0.0 : 1 / avg;
   }
 
@@ -252,8 +278,7 @@ class ClaController extends ChangeNotifier {
   BiometricSignature _generateSignature() {
     final avgMag = _magnitudeBuffer.isEmpty
         ? 0.0
-        : _magnitudeBuffer.reduce((a, b) => a + b) /
-            _magnitudeBuffer.length;
+        : _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
 
     final tremorHz = _estimateTremorHz();
     final tremorHuman = tremorHz > 7.5 && tremorHz < 13.5;
@@ -276,7 +301,71 @@ class ClaController extends ChangeNotifier {
   }
 
   // =========================================================
-  // VALIDATION (AAA)
+  // ✨ NEW: SERVER VALIDATION
+  // =========================================================
+
+  Future<ServerVerdict> _verifyWithServer() async {
+    if (_mirrorService == null) {
+      // Server validation not enabled
+      return ServerVerdict.offlineFallback();
+    }
+
+    try {
+      // Generate secure payload
+      final deviceId = await DeviceFingerprint.getDeviceId();
+      final appSignature = await DeviceFingerprint.getAppSignature();
+      final deviceSecret = await DeviceFingerprint.getDeviceSecret();
+      final nonce = DeviceFingerprint.generateNonce();
+      
+      // Generate ZK proof (Q3: Answer A - don't send code!)
+      final zkProof = ZeroKnowledgeProof.generate(
+        userCode: currentValues,
+        nonce: nonce,
+        deviceSecret: deviceSecret,
+      );
+      
+      // Generate motion signature hash
+      final motionSig = MotionSignature.generate(
+        entropy: _entropy,
+        variance: _frequencyVariance,
+        gestureCount: _uniquePatternCount,
+      );
+      
+      final payload = SecurePayload(
+        deviceId: deviceId,
+        appSignature: appSignature,
+        nonce: nonce,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        entropy: _entropy,
+        tremorHz: _estimateTremorHz(),
+        frequencyVariance: _frequencyVariance,
+        averageMagnitude: _magnitudeBuffer.isEmpty ? 0.0 :
+            _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length,
+        uniqueGestureCount: _uniquePatternCount,
+        interactionTimeMs: _activeInteraction.inMilliseconds,
+        zkProof: zkProof,
+        motionSignature: motionSig,
+      );
+      
+      // Send to server
+      return await _mirrorService!.verify(payload);
+      
+    } catch (e) {
+      if (kDebugMode) {
+        print('Server validation error: $e');
+      }
+      
+      // Q2: Answer A - Allow offline fallback
+      if (config.securityConfig!.allowOfflineFallback) {
+        return ServerVerdict.offlineFallback();
+      } else {
+        return ServerVerdict.denied('server_unavailable');
+      }
+    }
+  }
+
+  // =========================================================
+  // VALIDATION (AAA + SERVER)
   // =========================================================
 
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
@@ -286,6 +375,7 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 600));
 
+    // Local validation (your existing checks)
     if (_activeInteraction < config.minSolveTime) {
       await _fail(bot: true, msg: "INSUFFICIENT HUMAN INTERACTION");
       return;
@@ -297,9 +387,7 @@ class ClaController extends ChangeNotifier {
     if (_lastSignature != null) {
       final drift =
           (sig.patternEntropy - _lastSignature!.patternEntropy).abs() +
-              (sig.averageMagnitude -
-                      _lastSignature!.averageMagnitude)
-                  .abs();
+              (sig.averageMagnitude - _lastSignature!.averageMagnitude).abs();
 
       if (drift < 0.03) {
         await _fail(bot: true, msg: "BEHAVIOR TOO CONSISTENT");
@@ -310,8 +398,7 @@ class ClaController extends ChangeNotifier {
     _lastSignature = sig;
 
     if (confidence < config.botDetectionSensitivity) {
-      if (confidence >
-          config.botDetectionSensitivity - 0.05) {
+      if (confidence > config.botDetectionSensitivity - 0.05) {
         _quietSuspicion = true;
       } else {
         await _fail(bot: true, msg: "LOW BIOMETRIC CONFIDENCE");
@@ -319,13 +406,34 @@ class ClaController extends ChangeNotifier {
       }
     }
 
-    if (_quietSuspicion &&
-        confidence <
-            config.botDetectionSensitivity + 0.1) {
+    if (_quietSuspicion && confidence < config.botDetectionSensitivity + 0.1) {
       await _fail(bot: true, msg: "SILENT BOT FILTER");
       return;
     }
 
+    // ✨ NEW: Server validation (if enabled)
+    if (config.hasServerValidation) {
+      final verdict = await _verifyWithServer();
+      
+      if (!verdict.allowed) {
+        await _fail(
+          bot: true,
+          msg: verdict.reason?.toUpperCase() ?? "SERVER DENIED ACCESS",
+        );
+        return;
+      }
+      
+      // Verify token signature
+      if (!ZeroKnowledgeProof.verifyToken(
+        token: verdict.token,
+        serverPublicKey: '', // Add your server public key
+      )) {
+        await _fail(bot: true, msg: "INVALID SERVER TOKEN");
+        return;
+      }
+    }
+
+    // Final: Code validation
     if (_isCodeCorrect()) {
       await _clearMemory();
       _state = SecurityState.UNLOCKED;
@@ -342,8 +450,7 @@ class ClaController extends ChangeNotifier {
 
     if (bot || _failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
-      _lockoutUntil =
-          DateTime.now().add(config.jamCooldown);
+      _lockoutUntil = DateTime.now().add(config.jamCooldown);
     } else {
       _state = SecurityState.SOFT_LOCK;
       Future.delayed(config.softLockCooldown, () {
@@ -369,14 +476,9 @@ class ClaController extends ChangeNotifier {
   int get remainingLockoutSeconds =>
       _lockoutUntil == null
           ? 0
-          : _lockoutUntil!
-              .difference(DateTime.now())
-              .inSeconds
-              .clamp(0, 999999);
+          : _lockoutUntil!.difference(DateTime.now()).inSeconds.clamp(0, 999999);
 
-  double get liveConfidence =>
-      _decay(_generateSignature().humanConfidence);
-
+  double get liveConfidence => _decay(_generateSignature().humanConfidence);
   int get uniqueGestureCount => _uniquePatternCount;
   double get motionEntropy => _entropy;
 }
