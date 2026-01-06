@@ -1,8 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * AUTHOR: Captain Aer (Visionary)
- * LICENSE: Server-Side Public License (SSPL) Style
- * * COPYRIGHT (c) 2026 CAPTAIN AER. ALL RIGHTS RESERVED.
+ * ENGINE UPGRADE: AAA / Enterprise Anti-Bot
+ * AUTHOR: Captain Aer
  */
 
 import 'dart:async';
@@ -20,63 +19,67 @@ class ClaController extends ChangeNotifier {
 
   int _failedAttempts = 0;
   int get failedAttempts => _failedAttempts;
+
   DateTime? _lockoutUntil;
-  
   late List<int> currentValues;
-  
+
+  // ===== Motion & Biometric Buffers =====
   final List<MotionEvent> _motionHistory = [];
   final List<double> _magnitudeBuffer = [];
+  final List<DateTime> _motionTimestamps = [];
+
+  final Map<String, int> _patternFrequency = {};
+
   double _accumulatedShake = 0;
   double _frequencyVariance = 0;
-  int _uniquePatternCount = 0;
-  DateTime? _sessionStartTime;
-  
-  final Map<String, int> _patternFrequency = {};
   double _entropy = 0.0;
-  
+  int _uniquePatternCount = 0;
+
+  // ===== Session Control =====
+  DateTime? _sessionStartTime;
+  DateTime? _lastInteractionTime;
+  Duration _activeInteraction = Duration.zero;
+
+  // ===== AAA Enhancements =====
+  BiometricSignature? _lastSignature;
+  bool _quietSuspicion = false;
+
+  static const int MAX_HISTORY_SIZE = 120;
+  static const double ELECTRONIC_NOISE_FLOOR = 0.12;
+
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
-  static const int MAX_HISTORY_SIZE = 100;
-  static const double ELECTRONIC_NOISE_FLOOR = 0.12; 
 
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
 
   ClaController(this.config) {
     final rand = Random();
-    currentValues = List.generate(5, (index) => rand.nextInt(10));
+    currentValues = List.generate(5, (_) => rand.nextInt(10));
     _sessionStartTime = DateTime.now();
     _initSecurityProtocol();
   }
 
+  // =========================================================
+  // SECURITY BOOTSTRAP
+  // =========================================================
+
   Future<void> _initSecurityProtocol() async {
-    bool isRooted = false;
-    bool isUsbDebug = false;
-
     try {
-      isRooted = await FlutterJailbreakDetection.jailbroken;
-      isUsbDebug = await FlutterJailbreakDetection.developerMode;
-    } catch (e) {
-      if (kDebugMode) print("Security check failed: $e");
-    }
+      final rooted = await FlutterJailbreakDetection.jailbroken;
+      final usbDebug = await FlutterJailbreakDetection.developerMode;
 
-    if (isRooted) {
-      _threatMessage = "⚠️ ROOTED DEVICE DETECTED";
-      _state = SecurityState.ROOT_WARNING;
-      notifyListeners();
-      return; 
-    }
-    
-    if (isUsbDebug && !kDebugMode) {
-      _threatMessage = "⚠️ USB DEBUGGING ACTIVE";
-      _state = SecurityState.ROOT_WARNING;
-      notifyListeners();
-      return;
-    }
+      if (rooted || (usbDebug && !kDebugMode)) {
+        _state = SecurityState.ROOT_WARNING;
+        _threatMessage = "SYSTEM INTEGRITY COMPROMISED";
+        notifyListeners();
+        return;
+      }
+    } catch (_) {}
 
     await _loadStateFromMemory();
   }
-  
+
   void userAcceptsRisk() {
     _state = SecurityState.LOCKED;
     _threatMessage = "";
@@ -84,26 +87,27 @@ class ClaController extends ChangeNotifier {
     _loadStateFromMemory();
   }
 
-  Future<void> _loadStateFromMemory() async {
-    if (_state == SecurityState.ROOT_WARNING) return;
+  // =========================================================
+  // STATE PERSISTENCE
+  // =========================================================
 
+  Future<void> _loadStateFromMemory() async {
     final prefs = await SharedPreferences.getInstance();
     _failedAttempts = prefs.getInt(KEY_ATTEMPTS) ?? 0;
-    
-    final lockTimestamp = prefs.getInt(KEY_LOCKOUT);
-    if (lockTimestamp != null) {
-      _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTimestamp);
-      
+
+    final lockTs = prefs.getInt(KEY_LOCKOUT);
+    if (lockTs != null) {
+      _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTs);
       if (DateTime.now().isBefore(_lockoutUntil!)) {
         _state = SecurityState.HARD_LOCK;
         notifyListeners();
       } else {
-        await _clearMemory(); 
+        await _clearMemory();
       }
     }
   }
 
-  Future<void> _saveStateToMemory() async {
+  Future<void> _saveState() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(KEY_ATTEMPTS, _failedAttempts);
     if (_lockoutUntil != null) {
@@ -113,41 +117,57 @@ class ClaController extends ChangeNotifier {
 
   Future<void> _clearMemory() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(KEY_ATTEMPTS);
-    await prefs.remove(KEY_LOCKOUT);
+    await prefs.clear();
     _failedAttempts = 0;
-    _accumulatedShake = 0;
     _lockoutUntil = null;
-    _state = SecurityState.LOCKED;
     _resetBiometricState();
+    _state = SecurityState.LOCKED;
   }
 
   void _resetBiometricState() {
     _motionHistory.clear();
     _magnitudeBuffer.clear();
+    _motionTimestamps.clear();
     _patternFrequency.clear();
-    _uniquePatternCount = 0;
     _entropy = 0.0;
     _frequencyVariance = 0.0;
+    _uniquePatternCount = 0;
+    _accumulatedShake = 0;
+    _quietSuspicion = false;
+    _lastSignature = null;
+    _activeInteraction = Duration.zero;
     _sessionStartTime = DateTime.now();
+    _lastInteractionTime = null;
+  }
+
+  // =========================================================
+  // INTERACTION TRACKING (AAA)
+  // =========================================================
+
+  void _registerInteraction() {
+    final now = DateTime.now();
+    if (_lastInteractionTime != null) {
+      _activeInteraction += now.difference(_lastInteractionTime!);
+    }
+    _lastInteractionTime = now;
   }
 
   void updateWheel(int index, int value) {
-    if (_state == SecurityState.HARD_LOCK || 
-        _state == SecurityState.VALIDATING ||
-        _state == SecurityState.ROOT_WARNING) return;
-        
-    if (index >= 0 && index < currentValues.length) {
-      currentValues[index] = value;
-    }
+    if (_state != SecurityState.LOCKED) return;
+    currentValues[index] = value;
+    _registerInteraction();
   }
 
-  // FIX: Matching arguments with UI call
+  // =========================================================
+  // MOTION INPUT
+  // =========================================================
+
   void registerShake(double magnitude, double dx, double dy, double dz) {
     if (magnitude < ELECTRONIC_NOISE_FLOOR) return;
-    
+
     final now = DateTime.now();
-    
+    _registerInteraction();
+
     final event = MotionEvent(
       magnitude: magnitude,
       timestamp: now,
@@ -155,100 +175,155 @@ class ClaController extends ChangeNotifier {
       deltaY: dy,
       deltaZ: dz,
     );
-    
+
     _motionHistory.add(event);
     _magnitudeBuffer.add(magnitude);
-    
-    if (_motionHistory.length > MAX_HISTORY_SIZE) _motionHistory.removeAt(0);
-    if (_magnitudeBuffer.length > MAX_HISTORY_SIZE) _magnitudeBuffer.removeAt(0);
-    
-    String pattern = _quantizePattern(dx, dy, dz);
-    _patternFrequency[pattern] = (_patternFrequency[pattern] ?? 0) + 1;
-    _uniquePatternCount = _patternFrequency.keys.length;
+    _motionTimestamps.add(now);
+
+    if (_motionHistory.length > MAX_HISTORY_SIZE) {
+      _motionHistory.removeAt(0);
+      _magnitudeBuffer.removeAt(0);
+      _motionTimestamps.removeAt(0);
+    }
+
     _accumulatedShake += magnitude;
-    
-    _calculateBiometricStats();
-    notifyListeners(); 
+
+    final pattern = _quantizePattern(dx, dy, dz);
+    _patternFrequency[pattern] = (_patternFrequency[pattern] ?? 0) + 1;
+    _uniquePatternCount = _patternFrequency.length;
+
+    _calculateStats();
+    notifyListeners();
   }
 
   String _quantizePattern(double dx, double dy, double dz) {
-    int qx = (dx * 10).round();
-    int qy = (dy * 10).round();
-    int qz = (dz * 10).round();
-    return '$qx:$qy:$qz';
+    return "${(dx * 10).round()}:${(dy * 10).round()}:${(dz * 10).round()}";
   }
 
-  void _calculateBiometricStats() {
-    if (_magnitudeBuffer.length < 5) return;
-    
-    double mean = _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
-    double variance = _magnitudeBuffer
-        .map((x) => pow(x - mean, 2))
-        .reduce((a, b) => a + b) / _magnitudeBuffer.length;
-    _frequencyVariance = sqrt(variance);
-    
-    int totalPatterns = _patternFrequency.values.reduce((a, b) => a + b);
+  void _calculateStats() {
+    final mean =
+        _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
+
+    _frequencyVariance = sqrt(
+      _magnitudeBuffer
+              .map((x) => pow(x - mean, 2))
+              .reduce((a, b) => a + b) /
+          _magnitudeBuffer.length,
+    );
+
+    final total = _patternFrequency.values.fold(0, (a, b) => a + b);
     _entropy = 0.0;
-    
-    for (var count in _patternFrequency.values) {
-      double p = count / totalPatterns;
-      if (p > 0) {
-        _entropy -= p * (log(p) / log(2));
-      }
+
+    for (final c in _patternFrequency.values) {
+      final p = c / total;
+      _entropy -= p * (log(p) / log(2));
     }
   }
 
+  // =========================================================
+  // AAA BIOMETRIC CORE
+  // =========================================================
+
+  double _estimateTremorHz() {
+    if (_motionTimestamps.length < 6) return 0.0;
+    final intervals = <double>[];
+
+    for (int i = 1; i < _motionTimestamps.length; i++) {
+      intervals.add(
+        _motionTimestamps[i]
+                .difference(_motionTimestamps[i - 1])
+                .inMilliseconds /
+            1000.0,
+      );
+    }
+
+    final avg =
+        intervals.reduce((a, b) => a + b) / intervals.length;
+    return avg <= 0 ? 0.0 : 1 / avg;
+  }
+
+  double _decay(double raw) {
+    if (_sessionStartTime == null) return raw;
+    final elapsed =
+        DateTime.now().difference(_sessionStartTime!).inMilliseconds;
+    return (raw * exp(-elapsed / 4000)).clamp(0.0, 1.0);
+  }
+
   BiometricSignature _generateSignature() {
-    double avgMagnitude = _magnitudeBuffer.isEmpty 
-        ? 0.0 
-        : _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
-    
+    final avgMag = _magnitudeBuffer.isEmpty
+        ? 0.0
+        : _magnitudeBuffer.reduce((a, b) => a + b) /
+            _magnitudeBuffer.length;
+
+    final tremorHz = _estimateTremorHz();
+    final tremorHuman = tremorHz > 7.5 && tremorHz < 13.5;
+
+    double score = 0.0;
+    if (avgMag > 0.15 && avgMag < 3.0) score += 0.3;
+    if (_frequencyVariance > 0.1) score += 0.2;
+    if (_entropy > 0.5) score += 0.2;
+    if (_uniquePatternCount >= 3) score += 0.1;
+    if (tremorHuman) score += 0.2;
+
     return BiometricSignature(
-      averageMagnitude: avgMagnitude,
+      averageMagnitude: avgMag,
       frequencyVariance: _frequencyVariance,
       patternEntropy: _entropy,
       uniqueGestureCount: _uniquePatternCount,
       timestamp: DateTime.now(),
-      isPotentiallyHuman: avgMagnitude > 0.15 && _uniquePatternCount >= 3,
+      isPotentiallyHuman: score >= 0.6,
     );
   }
 
+  // =========================================================
+  // VALIDATION (AAA)
+  // =========================================================
+
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
-    if (_state == SecurityState.ROOT_WARNING || _state == SecurityState.HARD_LOCK) return;
+    if (_state != SecurityState.LOCKED) return;
 
     _state = SecurityState.VALIDATING;
     notifyListeners();
-
     await Future.delayed(const Duration(milliseconds: 600));
 
-    if (config.enableSensors) {
-      final signature = _generateSignature();
-      double humanConfidence = signature.humanConfidence;
-      
-      if (_accumulatedShake < 0.1 && !hasPhysicalMovement) {
-        _threatMessage = "🤖 STATIC DEVICE DETECTED";
-        await _handleFailure(isBotSuspected: true);
+    if (_activeInteraction < config.minSolveTime) {
+      await _fail(bot: true, msg: "INSUFFICIENT HUMAN INTERACTION");
+      return;
+    }
+
+    final sig = _generateSignature();
+    final confidence = _decay(sig.humanConfidence);
+
+    if (_lastSignature != null) {
+      final drift =
+          (sig.patternEntropy - _lastSignature!.patternEntropy).abs() +
+              (sig.averageMagnitude -
+                      _lastSignature!.averageMagnitude)
+                  .abs();
+
+      if (drift < 0.03) {
+        await _fail(bot: true, msg: "BEHAVIOR TOO CONSISTENT");
         return;
       }
-      
-      if (_isRepeatingPattern()) {
-        _threatMessage = "🔄 LOOP PATTERN DETECTED";
-        await _handleFailure(isBotSuspected: true);
+    }
+
+    _lastSignature = sig;
+
+    if (confidence < config.botDetectionSensitivity) {
+      if (confidence >
+          config.botDetectionSensitivity - 0.05) {
+        _quietSuspicion = true;
+      } else {
+        await _fail(bot: true, msg: "LOW BIOMETRIC CONFIDENCE");
         return;
       }
-      
-      if (humanConfidence < config.botDetectionSensitivity) {
-        _threatMessage = "⚠️ LOW BIOMETRIC CONFIDENCE (${(humanConfidence * 100).toStringAsFixed(0)}%)";
-        await _handleFailure(isBotSuspected: true);
-        return;
-      }
-      
-      final sessionDuration = DateTime.now().difference(_sessionStartTime!);
-      if (sessionDuration < config.minSolveTime) {
-        _threatMessage = "⏱️ IMPOSSIBLY FAST INPUT";
-        await _handleFailure(isBotSuspected: true);
-        return;
-      }
+    }
+
+    if (_quietSuspicion &&
+        confidence <
+            config.botDetectionSensitivity + 0.1) {
+      await _fail(bot: true, msg: "SILENT BOT FILTER");
+      return;
     }
 
     if (_isCodeCorrect()) {
@@ -257,43 +332,20 @@ class ClaController extends ChangeNotifier {
       _threatMessage = "";
       notifyListeners();
     } else {
-      _threatMessage = "❌ INVALID CODE";
-      await _handleFailure(isBotSuspected: false);
+      await _fail(bot: false, msg: "INVALID CODE");
     }
   }
 
-  bool _isRepeatingPattern() {
-    if (_motionHistory.length < 10) return false;
-    
-    int repeats = 0;
-    int checkSize = min(5, _motionHistory.length ~/ 2);
-    
-    for (int i = _motionHistory.length - 1; i >= checkSize; i--) {
-      if (_motionHistory[i].isSimilarTo(_motionHistory[i - checkSize], threshold: 0.03)) {
-        repeats++;
-      }
-    }
-    return repeats > (_motionHistory.length * 0.6);
-  }
-
-  Future<void> _handleFailure({bool isBotSuspected = false}) async {
+  Future<void> _fail({required bool bot, required String msg}) async {
     _failedAttempts++;
-    await _saveStateToMemory();
+    _threatMessage = msg;
 
-    if (isBotSuspected) {
+    if (bot || _failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
-      _lockoutUntil = DateTime.now().add(config.jamCooldown);
-      await _saveStateToMemory();
-      notifyListeners();
-    } else if (_failedAttempts >= config.maxAttempts) {
-      _state = SecurityState.HARD_LOCK;
-      _lockoutUntil = DateTime.now().add(config.jamCooldown);
-      await _saveStateToMemory();
-      notifyListeners();
+      _lockoutUntil =
+          DateTime.now().add(config.jamCooldown);
     } else {
       _state = SecurityState.SOFT_LOCK;
-      notifyListeners();
-      
       Future.delayed(config.softLockCooldown, () {
         if (_state == SecurityState.SOFT_LOCK) {
           _state = SecurityState.LOCKED;
@@ -302,38 +354,29 @@ class ClaController extends ChangeNotifier {
         }
       });
     }
+
+    await _saveState();
+    notifyListeners();
   }
 
   bool _isCodeCorrect() {
-    if (currentValues.length != config.secret.length) return false;
     for (int i = 0; i < config.secret.length; i++) {
       if (currentValues[i] != config.secret[i]) return false;
     }
     return true;
   }
 
-  int getInitialValue(int index) {
-    if (index >= 0 && index < currentValues.length) return currentValues[index];
-    return 0;
-  }
+  int get remainingLockoutSeconds =>
+      _lockoutUntil == null
+          ? 0
+          : _lockoutUntil!
+              .difference(DateTime.now())
+              .inSeconds
+              .clamp(0, 999999);
 
-  int get remainingLockoutSeconds {
-    if (_lockoutUntil == null) return 0;
-    return _lockoutUntil!.difference(DateTime.now()).inSeconds.clamp(0, 999999);
-  }
-  
-  // FIX: Rename/Alignment with UI
-  double get liveConfidence {
-    final sig = _generateSignature();
-    return sig.humanConfidence;
-  }
-  
+  double get liveConfidence =>
+      _decay(_generateSignature().humanConfidence);
+
   int get uniqueGestureCount => _uniquePatternCount;
-  
   double get motionEntropy => _entropy;
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
 }
