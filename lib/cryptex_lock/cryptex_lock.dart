@@ -90,11 +90,17 @@ class _CryptexLockState extends State<CryptexLock>
   void _handleControllerChange() {
     if (!mounted) return;
     
-    if (widget.controller.state == SecurityState.UNLOCKED) {
+    SecurityState newState = widget.controller.state;
+    
+    // Trigger quick haptic feedback based on state
+    if (newState == SecurityState.UNLOCKED) {
+      _triggerSuccessTik();
       widget.onSuccess();
-    } else if (widget.controller.state == SecurityState.HARD_LOCK) {
+    } else if (newState == SecurityState.HARD_LOCK) {
+      _triggerCriticalTik();
       widget.onJammed();
-    } else if (widget.controller.state == SecurityState.SOFT_LOCK) {
+    } else if (newState == SecurityState.SOFT_LOCK) {
+      _triggerErrorTik();
       _triggerShakeAnimation();
       widget.onFail();
     }
@@ -147,8 +153,33 @@ class _CryptexLockState extends State<CryptexLock>
     super.dispose();
   }
 
-  void _triggerHaptic() {
+  // Quick "tik" haptic feedback (< 50ms)
+  void _triggerLightTik() {
+    HapticFeedback.selectionClick();
+  }
+  
+  void _triggerMediumTik() {
     HapticFeedback.lightImpact();
+  }
+  
+  Future<void> _triggerSuccessTik() async {
+    HapticFeedback.mediumImpact();
+    await Future.delayed(const Duration(milliseconds: 50));
+    HapticFeedback.lightImpact();
+  }
+  
+  Future<void> _triggerErrorTik() async {
+    HapticFeedback.lightImpact();
+    await Future.delayed(const Duration(milliseconds: 40));
+    HapticFeedback.lightImpact();
+    await Future.delayed(const Duration(milliseconds: 40));
+    HapticFeedback.lightImpact();
+  }
+  
+  Future<void> _triggerCriticalTik() async {
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 60));
+    HapticFeedback.heavyImpact();
   }
 
   void _activatePrivacyShield() {
@@ -563,7 +594,7 @@ class _CryptexLockState extends State<CryptexLock>
             diameterRatio: 1.3,
             physics: const FixedExtentScrollPhysics(),
             onSelectedItemChanged: (val) {
-              _triggerHaptic();
+              _triggerLightTik();
               widget.controller.updateWheel(index, val % 10);
               _activatePrivacyShield();
             },
@@ -649,7 +680,7 @@ class _CryptexLockState extends State<CryptexLock>
           onTap: disabled
               ? null
               : () {
-                  HapticFeedback.mediumImpact();
+                  _triggerMediumTik();
                   widget.controller.validateAttempt(hasPhysicalMovement: true);
                 },
           borderRadius: BorderRadius.circular(14),
@@ -815,7 +846,7 @@ class _CryptexLockState extends State<CryptexLock>
                 elevation: 8,
               ),
               onPressed: () {
-                HapticFeedback.mediumImpact();
+                _triggerCriticalTik();
                 widget.controller.userAcceptsRisk();
               },
               child: Row(
