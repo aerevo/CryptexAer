@@ -1,4 +1,4 @@
-name: Francois Build (Ghost Protocol)
+name: Francois Build (Surgical Strike)
 on:
   workflow_dispatch:
   push:
@@ -23,61 +23,53 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN GLOBAL (INIT SCRIPT)
+      - name: 4. JANA & BEDAH (SURGICAL FIX)
         run: |
-          echo "Mewujudkan 'Polis Trafik' Global untuk Gradle..."
-          mkdir -p ~/.gradle
-          
-          # Kita cipta fail init.gradle yang akan memintas semua trafik Maven
-          cat > ~/.gradle/init.gradle <<EOF
-          allprojects {
-              buildscript {
-                  repositories.all { ArtifactRepository repo ->
-                      if (repo instanceof MavenArtifactRepository) {
-                          if (repo.url.toString().contains("repo.maven.apache.org") || repo.url.toString().contains("mavenCentral")) {
-                              repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
-                          }
-                      }
-                  }
-              }
-              repositories.all { ArtifactRepository repo ->
-                  if (repo instanceof MavenArtifactRepository) {
-                      if (repo.url.toString().contains("repo.maven.apache.org") || repo.url.toString().contains("mavenCentral")) {
-                          repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
-                      }
-                  }
-              }
-          }
-          
-          // Memintas Plugin Management juga (Punca ralat classpath tadi)
-          settingsEvaluated { settings ->
-              settings.pluginManagement.repositories.all { ArtifactRepository repo ->
-                  if (repo instanceof MavenArtifactRepository) {
-                      if (repo.url.toString().contains("repo.maven.apache.org") || repo.url.toString().contains("mavenCentral")) {
-                          repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
-                      }
-                  }
-              }
-          }
-          EOF
-          
-          echo "Suntikan Global Selesai. Maven Central kini dipintas."
-
-      - name: 5. REGENERASI ANDROID (Clean Slate)
-        run: |
+          echo "=== FASA 1: BERSIH & JANA ==="
           rm -rf android
           flutter create . --platforms android --project-name cryptex_aer
           
-          # Suntik Permission Vibrate (Satu-satunya modifikasi manual yang tinggal)
+          echo "=== FASA 2: SUNTIKAN PERISAI (PROJECT LEVEL) ==="
+          # Cari fail build.gradle (Groovy/Kotlin)
+          BUILD_FILE=$(find android -maxdepth 1 -name "build.gradle*")
+          if [ ! -z "$BUILD_FILE" ]; then
+             echo "Membedah $BUILD_FILE..."
+             # Paksa Google Mirror
+             sed -i 's|mavenCentral()|maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }; mavenCentral()|g' $BUILD_FILE
+             sed -i 's|google()|google(); maven { url "https://jitpack.io" }|g' $BUILD_FILE
+          fi
+
+          echo "=== FASA 2B: SUNTIKAN SETTINGS (KOTLIN DSL FIX) ==="
+          # Ini adalah PUNCA RALAT TERBARU. Kita mesti ubah settings.gradle.kts
+          SETTINGS_FILE="android/settings.gradle.kts"
+          
+          if [ -f "$SETTINGS_FILE" ]; then
+             echo "Sasaran Kotlin DSL Dikesan: $SETTINGS_FILE"
+             
+             # Ubah sintaks Kotlin DSL untuk memaksa Google Mirror
+             # Kita ganti gradlePluginPortal() dan mavenCentral() dengan URL Google
+             
+             # 1. Ganti gradlePluginPortal() dengan Google Mirror (Kotlin Syntax)
+             sed -i 's|gradlePluginPortal()|maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }|g' $SETTINGS_FILE
+             
+             # 2. Ganti mavenCentral() dengan Google Mirror (Kotlin Syntax)
+             sed -i 's|mavenCentral()|maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }|g' $SETTINGS_FILE
+             
+             echo "Pembedahan Settings Selesai."
+          else
+             echo "Fail settings.gradle.kts tidak dijumpai (Mungkin versi lama), meneruskan..."
+          fi
+          
+          echo "=== FASA 3: PERMISSION VIBRATE ==="
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
              sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' $MANIFEST_FILE
           fi
 
-      - name: 6. Download Dependencies
+      - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 7. BEDAH LIBRARY JAILBREAK
+      - name: 6. BEDAH LIBRARY JAILBREAK
         run: |
           echo "Membedah flutter_jailbreak_detection..."
           
@@ -106,10 +98,10 @@ jobs:
           
           echo "Pembedahan Selesai."
 
-      - name: 8. Build APK Release
+      - name: 7. Build APK Release
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
 
-      - name: 9. Simpan APK
+      - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
           name: cryptex-aer-bank-grade
