@@ -1,4 +1,4 @@
-name: Francois Build (Clean Native)
+name: Francois Build (Anti-Ban 403)
 on:
   workflow_dispatch:
   push:
@@ -23,7 +23,7 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI (Manifest)
+      - name: 4. SUNTIKAN PERISAI (Manifest & Android Reset)
         run: |
           echo "Membersihkan & Menjana Android..."
           rm -rf android
@@ -32,21 +32,28 @@ jobs:
           echo "Menyuntik Vibrate Permission..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
 
+      - name: 4b. BYPASS SEKATAN MAVEN (Ubat 403 Forbidden)
+        run: |
+           echo "Menambah Google Mirror untuk Maven Central..."
+           # Teknik François: Kita paksa guna Mirror Google sebelum Maven Central
+           # Ini mengelakkan ralat 403 kerana Google Mirror tidak menyekat GitHub Actions
+           sed -i 's|mavenCentral()|maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }; mavenCentral()|g' android/build.gradle
+           
+           # Kita juga pastikan repository Google sentiasa di atas
+           sed -i 's|google()|google(); maven { url "https://jitpack.io" }|g' android/build.gradle
+
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 5b. BEDAH LIBRARY JAILBREAK (Satu-satunya yang tinggal)
+      - name: 5b. BEDAH LIBRARY JAILBREAK
         run: |
           echo "Membedah flutter_jailbreak_detection..."
           
-          # 1. Cari fail Gradle library ini
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           
           if [ ! -z "$JB_GRADLE" ]; then
-            # Set Namespace (Ubat Ralat Namespace)
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
             
-            # Paksa JVM 17 (Ubat Ralat Inconsistent JVM)
             cat >> $JB_GRADLE <<EOF
             android {
                 compileOptions {
@@ -60,7 +67,6 @@ jobs:
           EOF
           fi
 
-          # 2. Buang 'package=' dari AndroidManifest (Ubat Ralat AGP 8.0)
           JB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
           if [ ! -z "$JB_MANIFEST" ]; then
              sed -i 's/package="[^"]*"//g' $JB_MANIFEST
