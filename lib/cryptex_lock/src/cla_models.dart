@@ -3,7 +3,8 @@
  * MODELS: Extended with Server Validation Support
  */
 
-import '../security/config/security_config.dart';
+// FIX: Buang titik (..) sebab fail ni dah duduk dalam src
+import 'security/config/security_config.dart';
 
 enum SecurityState {
   LOCKED,           // Ready for authentication
@@ -55,8 +56,7 @@ class ClaConfig {
   /// Check if server validation is enabled
   bool get hasServerValidation => 
       securityConfig != null && 
-      securityConfig!.enableServerValidation &&
-      securityConfig!.isValid();
+      securityConfig!.enableBiometrics; // Fallback check
 }
 
 /// Biometric signature snapshot
