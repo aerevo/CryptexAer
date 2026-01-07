@@ -1,11 +1,5 @@
-/*
- * PROJECT: CryptexLock Security Suite
- * UI: AAA GAME GRAPHICS (PBR Texture Mapping)
- * ASSET REQUIRED: assets/images/metal_plate.jpg
- */
-
 import 'dart:async';
-import 'dart:ui'; // Perlu untuk lerpDouble
+import 'dart:ui'; 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
@@ -41,7 +35,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   int? _activeWheelIndex;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // Warna Gred Tentera
+  // Colors
   final Color _colLocked = const Color(0xFF00FFFF); // Cyan Neon
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam = const Color(0xFFFF3333);    
@@ -55,8 +49,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _initScrollControllers();
     _initAnimations();
     _startListening();
-    
-    // Listen perubahan state dari Controller
     widget.controller.addListener(_handleControllerChange);
   }
   
@@ -67,7 +59,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       widget.onJammed();
     }
     
-    // Update Bar Motion secara LIVE
     if (mounted) {
        _animateScoreBar(widget.controller.motionConfidence);
     }
@@ -88,7 +79,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100), // Ultra-fast response (Turbo)
+      duration: const Duration(milliseconds: 150), // Lebih responsif
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
       CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic),
@@ -104,8 +95,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   void _startListening() {
     _accelSub?.cancel();
-    
-    // SENSOR MOTION (Raw Feed)
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
       double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
       widget.controller.registerShake(rawMag, e.x, e.y, e.z);
@@ -118,7 +107,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       begin: _progressController.value,
       end: target,
     ).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic));
-    
     _progressController.forward(from: 0);
   }
 
@@ -133,7 +121,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _triggerHaptic() {
-    HapticFeedback.heavyImpact(); // Bunyi berat besi
+    HapticFeedback.selectionClick();
   }
 
   @override
@@ -153,7 +141,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       // Logic Text
        if (widget.controller.motionConfidence > 0.8) { 
          activeColor = _colUnlock;
          statusText = "MOTION: ACTIVE";
@@ -164,7 +151,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
          statusIcon = Icons.sensors; 
        } else {
          activeColor = _colDead;
-         statusText = "SECURE VAULT";
+         statusText = "IDLE";
          statusIcon = Icons.lock_outline; 
        }
     } else if (state == SecurityState.VALIDATING) {
@@ -182,7 +169,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         statusIcon = Icons.block;
         isInputDisabled = true;
     } else if (state == SecurityState.ROOT_WARNING) {
-        return _buildSecurityWarningUI(); // K9 Watchdog UI
+        return _buildSecurityWarningUI(); 
     } else { 
         activeColor = _colUnlock;
         statusText = "ACCESS GRANTED";
@@ -201,7 +188,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // HEADER STATUS
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -212,10 +198,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ),
           const SizedBox(height: 25),
           
-          // METERS (BAR + BOX)
+          // ROW STATUS: BAR BESAR + KOTAK TOUCH KECIL
           Row(
             children: [
-              // 1. BAR MOTION (Expanded - Primary)
+              // 1. BAR MOTION (Expanded)
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,22 +226,23 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                   ],
                 ),
               ),
+              
               const SizedBox(width: 15),
-              // 2. KOTAK TOUCH (Compact - Secondary)
+              
+              // 2. KOTAK TOUCH (Compact)
               _buildTouchBox(widget.controller.touchConfidence),
             ],
           ),
           
           const SizedBox(height: 25),
           
-          // WHEELS (HYPER-REALISM TEXTURE)
+          // WHEELS
           SizedBox(
             height: 120,
             child: IgnorePointer(
               ignoring: isInputDisabled,
               child: NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
-                  // Logic Touch Detection
                   if (notification is ScrollUpdateNotification) {
                      widget.controller.registerTouch(); 
                      if (_activeWheelIndex == null) {
@@ -277,8 +264,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ),
           
           const SizedBox(height: 25),
-          
-          // UNLOCK BUTTON
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -300,7 +285,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
   
-  // WIDGET: KOTAK TOUCH CHECKBOX (Clean Look)
+  // WIDGET BARU: KOTAK TOUCH CHECKBOX
   Widget _buildTouchBox(double value) {
     bool isVerified = value > 0.5;
     Color boxColor = isVerified ? _colUnlock : Colors.grey[900]!;
@@ -328,87 +313,37 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
   
-  // 🔥 WIDGET UTAMA: RODA BESI (TEXTURE MAPPED)
   Widget _buildPrivacyWheel(int index, Color color, bool disabled) {
-    final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.6;
-    
-    return Container(
-      width: 60, 
-      decoration: BoxDecoration(
-        color: const Color(0xFF050505), // Latar belakang gelap
-        // Frame luar (Housing) supaya nampak tertanam
-        border: Border.symmetric(vertical: BorderSide(color: Colors.black, width: 2)),
-        boxShadow: [
-           BoxShadow(color: Colors.black, blurRadius: 10, spreadRadius: 2, offset: Offset(0, 0)),
-        ]
-      ),
+    final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.15;
+    return SizedBox(
+      width: 45,
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 200),
         opacity: disabled ? 0.3 : opacity,
         child: ListWheelScrollView.useDelegate(
           controller: _scrollControllers[index],
-          itemExtent: 70, // Jarak besar sikit untuk tekstur jelas
-          perspective: 0.006,
-          diameterRatio: 1.5, 
-          physics: const FixedExtentScrollPhysics(), // SNAP PHYSICS
-          useMagnifier: true,
-          magnification: 1.2,
+          itemExtent: 45,
+          perspective: 0.005,
+          diameterRatio: 1.2,
+          physics: const FixedExtentScrollPhysics(),
           onSelectedItemChanged: (val) {
-             HapticFeedback.heavyImpact(); // Bunyi berat besi
-             widget.controller.updateWheel(index, val % 10);
+            _triggerHaptic(); 
+            widget.controller.updateWheel(index, val % 10);
           },
           childDelegate: ListWheelChildBuilderDelegate(
             builder: (context, i) {
               final num = i % 10;
-              
-              return Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  // 1. TEXTURE LAYER (GAMBAR ASET KAPTEN)
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/metal_plate.jpg'), 
-                    fit: BoxFit.cover,
-                    // Gelapkan sikit texture supaya nombor jelas
-                    colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.3), BlendMode.darken),
-                  ),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Container(
-                  // 2. LIGHTING LAYER (Gradient Silinder)
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.9), // Bayang Atas
-                        Colors.transparent,            // Tengah
-                        Colors.white.withOpacity(0.15), // Highlight Kilat
-                        Colors.transparent,            // Tengah
-                        Colors.black.withOpacity(0.9), // Bayang Bawah
-                      ],
-                      stops: [0.0, 0.2, 0.5, 0.8, 1.0],
-                    ),
-                  ),
-                  child: Center(
-                    // 3. NOMBOR (ENGRAVED / PAHAT)
-                    child: Text(
-                      '$num',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: 'Roboto', 
-                        // Nombor 0 Merah Menyala (Danger), Lain Putih Kusam
-                        color: (num == 0) 
-                            ? const Color(0xFFFF3333).withOpacity(0.95) 
-                            : const Color(0xFFEEEEEE).withOpacity(0.9),
-                        shadows: [
-                          // Drop shadow tebal
-                          BoxShadow(color: Colors.black, blurRadius: 4, offset: Offset(2, 2)),
-                          // Glow merah jika nombor 0
-                          if (num == 0) BoxShadow(color: Colors.red.withOpacity(0.6), blurRadius: 15, spreadRadius: 2),
-                        ]
-                      ),
-                    ),
+              return Center(
+                child: Text(
+                  '$num',
+                  style: TextStyle(
+                    color: (num == 0 ? Colors.redAccent : Colors.white),
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      if (_activeWheelIndex != null) 
+                        BoxShadow(color: color.withOpacity(0.8), blurRadius: 10)
+                    ]
                   ),
                 ),
               );
@@ -419,7 +354,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
-  // K9 WATCHDOG UI
   Widget _buildSecurityWarningUI() {
     return Container(
       padding: const EdgeInsets.all(28),
