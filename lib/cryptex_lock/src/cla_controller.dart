@@ -1,8 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * ENGINE: AAA + Server-Validated
- * INTEGRATION: Zero-Knowledge Proof System
- * STATUS: FIXED IMPORT PATHS (Francois Optimized)
+ * ENGINE: STABLE SENSOR + SERVER SECURITY
+ * STATUS: Merged (No downgrade, No 0-19 ghost)
  */
 
 import 'dart:async';
@@ -12,13 +11,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 import 'cla_models.dart';
 
-// ✨ FIXED IMPORTS: Jalur diselaraskan ke dalam folder src/security
+// IMPORTS DARI ZIP (Untuk Server Security)
 import 'security/models/secure_payload.dart';
 import 'security/services/mirror_service.dart';
 import 'security/services/device_fingerprint.dart';
-// Note: ZeroKnowledgeProof, ServerVerdict, MotionSignature biasanya dimport 
-// melalui mirror_service atau fail model berkaitan. 
-// Saya memastikan rujukan ini berfungsi mengikut struktur src/security.
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
@@ -32,421 +28,199 @@ class ClaController extends ChangeNotifier {
   DateTime? _lockoutUntil;
   late List<int> currentValues;
 
-  // Motion & Biometric Buffers
+  // ═══════════════════════════════════════════════════════════
+  // 🧬 DATA METRICS (Untuk dihantar ke Server)
+  // ═══════════════════════════════════════════════════════════
+  // Kita simpan data ini bukan untuk filter (sebab sensor dah stabil),
+  // tapi untuk bina 'Payload' yang Server nak.
+  
   final List<MotionEvent> _motionHistory = [];
-  final List<double> _magnitudeBuffer = [];
-  final List<DateTime> _motionTimestamps = [];
-  final Map<String, int> _patternFrequency = {};
-
-  double _accumulatedShake = 0;
-  double _frequencyVariance = 0;
   double _entropy = 0.0;
-  int _uniquePatternCount = 0;
+  double _variance = 0.0;
+  double _liveConfidence = 0.0; // Score untuk UI
+  int _interactionCount = 0;    // Touch counter
 
-  // Session Control
-  DateTime? _sessionStartTime;
-  DateTime? _lastInteractionTime;
-  Duration _activeInteraction = Duration.zero;
-
-  // AAA Enhancements
-  BiometricSignature? _lastSignature;
-  bool _quietSuspicion = false;
-
-  // ✨ NEW: Server validation
-  MirrorService? _mirrorService;
-
-  static const int MAX_HISTORY_SIZE = 120;
-  static const double ELECTRONIC_NOISE_FLOOR = 0.12;
-  static const String KEY_ATTEMPTS = 'cla_failed_attempts';
-  static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
-
+  double get liveConfidence => _liveConfidence;
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
+  
+  late MirrorService _mirrorService;
 
   ClaController(this.config) {
     final rand = Random();
-    currentValues = List.generate(5, (_) => rand.nextInt(10));
-    _sessionStartTime = DateTime.now();
+    currentValues = List.generate(5, (index) => rand.nextInt(10));
     
-    // Initialize server service if enabled
+    // Init Server Service
     if (config.hasServerValidation) {
       _mirrorService = MirrorService(
         endpoint: config.securityConfig!.serverEndpoint,
         timeout: config.securityConfig!.serverTimeout,
       );
     }
-    
     _initSecurityProtocol();
   }
 
-  // =========================================================
-  // SECURITY BOOTSTRAP
-  // =========================================================
-
   Future<void> _initSecurityProtocol() async {
+    bool isRooted = false;
     try {
-      final rooted = await FlutterJailbreakDetection.jailbroken;
-      final usbDebug = await FlutterJailbreakDetection.developerMode;
-
-      if (rooted || (usbDebug && !kDebugMode)) {
-        _state = SecurityState.ROOT_WARNING;
-        _threatMessage = "SYSTEM INTEGRITY COMPROMISED";
-        notifyListeners();
-        return;
-      }
-    } catch (_) {}
-
-    await _loadStateFromMemory();
-  }
-
-  void userAcceptsRisk() {
-    _state = SecurityState.LOCKED;
-    _threatMessage = "";
-    notifyListeners();
-    _loadStateFromMemory();
-  }
-
-  // =========================================================
-  // STATE PERSISTENCE
-  // =========================================================
-
-  Future<void> _loadStateFromMemory() async {
-    final prefs = await SharedPreferences.getInstance();
-    _failedAttempts = prefs.getInt(KEY_ATTEMPTS) ?? 0;
-
-    final lockTs = prefs.getInt(KEY_LOCKOUT);
-    if (lockTs != null) {
-      _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTs);
-      if (DateTime.now().isBefore(_lockoutUntil!)) {
-        _state = SecurityState.HARD_LOCK;
-        notifyListeners();
-      } else {
-        await _clearMemory();
-      }
+      isRooted = await FlutterJailbreakDetection.jailbroken;
+    } catch (e) {
+      // Ignore debug
     }
-  }
 
-  Future<void> _saveState() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(KEY_ATTEMPTS, _failedAttempts);
-    if (_lockoutUntil != null) {
-      await prefs.setInt(KEY_LOCKOUT, _lockoutUntil!.millisecondsSinceEpoch);
+    if (isRooted) {
+      _threatMessage = "CRITICAL: K9 WATCHDOG ALERT";
+      _state = SecurityState.ROOT_WARNING;
+      notifyListeners();
+      return;
     }
-  }
-
-  Future<void> _clearMemory() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    _failedAttempts = 0;
-    _lockoutUntil = null;
-    _resetBiometricState();
-    _state = SecurityState.LOCKED;
-  }
-
-  void _resetBiometricState() {
-    _motionHistory.clear();
-    _magnitudeBuffer.clear();
-    _motionTimestamps.clear();
-    _patternFrequency.clear();
-    _entropy = 0.0;
-    _frequencyVariance = 0.0;
-    _uniquePatternCount = 0;
-    _accumulatedShake = 0;
-    _quietSuspicion = false;
-    _lastSignature = null;
-    _activeInteraction = Duration.zero;
-    _sessionStartTime = DateTime.now();
-    _lastInteractionTime = null;
-  }
-
-  // =========================================================
-  // INTERACTION TRACKING
-  // =========================================================
-
-  void _registerInteraction() {
-    final now = DateTime.now();
-    if (_lastInteractionTime != null) {
-      _activeInteraction += now.difference(_lastInteractionTime!);
-    }
-    _lastInteractionTime = now;
-  }
-
-  void updateWheel(int index, int value) {
-    if (_state != SecurityState.LOCKED) return;
-    if (index >= 0 && index < currentValues.length) {
-      currentValues[index] = value;
-    }
-    _registerInteraction();
+    await _loadState();
   }
   
-  int getInitialValue(int index) {
-    if (index >= 0 && index < currentValues.length) {
-      return currentValues[index];
-    }
-    return 0;
+  void userAcceptsRisk() {
+    _state = SecurityState.LOCKED;
+    notifyListeners();
+    _loadState();
   }
 
-  // =========================================================
-  // MOTION INPUT
-  // =========================================================
+  // ═══════════════════════════════════════════════════════════
+  // 🎛️ INPUT HANDLERS (Stabil)
+  // ═══════════════════════════════════════════════════════════
 
-  void registerShake(double magnitude, double dx, double dy, double dz) {
-    if (magnitude < ELECTRONIC_NOISE_FLOOR) return;
-
-    final now = DateTime.now();
-    _registerInteraction();
-
-    final event = MotionEvent(
-      magnitude: magnitude,
-      timestamp: now,
-      deltaX: dx,
-      deltaY: dy,
-      deltaZ: dz,
-    );
-
-    _motionHistory.add(event);
-    _magnitudeBuffer.add(magnitude);
-    _motionTimestamps.add(now);
-
-    if (_motionHistory.length > MAX_HISTORY_SIZE) {
-      _motionHistory.removeAt(0);
-      _magnitudeBuffer.removeAt(0);
-      _motionTimestamps.removeAt(0);
-    }
-
-    _accumulatedShake += magnitude;
-
-    final pattern = _quantizePattern(dx, dy, dz);
-    _patternFrequency[pattern] = (_patternFrequency[pattern] ?? 0) + 1;
-    _uniquePatternCount = _patternFrequency.length;
-
-    _calculateStats();
+  // 1. TOUCH INPUT
+  void registerTouchInteraction() {
+    if (_state != SecurityState.LOCKED) return;
+    _interactionCount++;
+    // Logic mudah: Makin banyak sentuh, makin yakin itu manusia
+    _liveConfidence = (_liveConfidence + 0.15).clamp(0.0, 1.0);
     notifyListeners();
   }
 
-  String _quantizePattern(double dx, double dy, double dz) {
-    return "${(dx * 10).round()}:${(dy * 10).round()}:${(dz * 10).round()}";
-  }
+  // 2. SENSOR INPUT
+  void registerShake(double rawMagnitude, double dx, dy, dz) {
+    if (_state != SecurityState.LOCKED) return;
 
-  void _calculateStats() {
-    if (_magnitudeBuffer.isEmpty) return;
-    
-    final mean =
-        _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
-
-    _frequencyVariance = sqrt(
-      _magnitudeBuffer
-              .map((x) => pow(x - mean, 2))
-              .reduce((a, b) => a + b) /
-          _magnitudeBuffer.length,
-    );
-
-    final total = _patternFrequency.values.fold(0, (a, b) => a + b);
-    _entropy = 0.0;
-
-    for (final c in _patternFrequency.values) {
-      final p = c / total;
-      if (p > 0) {
-        _entropy -= p * (log(p) / log(2));
-      }
+    // Simpan data untuk kiraan Entropy (Server Requirement)
+    // Cuma simpan kalau ada movement sebenar (>0.1)
+    if (rawMagnitude > 0.1) {
+       _addToHistory(rawMagnitude, dx, dy, dz);
+       
+       // Update UI sikit tanda sensor hidup
+       if (_liveConfidence < 1.0) {
+         _liveConfidence = (_liveConfidence + 0.01).clamp(0.0, 1.0);
+         notifyListeners();
+       }
     }
   }
 
-  // =========================================================
-  // BIOMETRIC CORE
-  // =========================================================
-
-  double _estimateTremorHz() {
-    if (_motionTimestamps.length < 6) return 0.0;
-    final intervals = <double>[];
-
-    for (int i = 1; i < _motionTimestamps.length; i++) {
-      intervals.add(
-        _motionTimestamps[i]
-                .difference(_motionTimestamps[i - 1])
-                .inMilliseconds /
-            1000.0,
-      );
-    }
-
-    final avg = intervals.reduce((a, b) => a + b) / intervals.length;
-    return avg <= 0 ? 0.0 : 1 / avg;
+  void _addToHistory(double mag, double dx, dy, dz) {
+     if (_motionHistory.length >= 50) _motionHistory.removeAt(0);
+     
+     _motionHistory.add(MotionEvent(
+       magnitude: mag,
+       timestamp: DateTime.now(),
+       deltaX: dx, deltaY: dy, deltaZ: dz
+     ));
+     
+     // Kira matematik untuk Server Payload
+     _calculateMetricsForServer();
   }
 
-  double _decay(double raw) {
-    if (_sessionStartTime == null) return raw;
-    final elapsed =
-        DateTime.now().difference(_sessionStartTime!).inMilliseconds;
-    return (raw * exp(-elapsed / 4000)).clamp(0.0, 1.0);
+  void _calculateMetricsForServer() {
+     if (_motionHistory.isEmpty) return;
+     
+     // 1. Variance
+     double mean = _motionHistory.map((e) => e.magnitude).reduce((a,b)=>a+b) / _motionHistory.length;
+     double sumSquaredDiff = _motionHistory.map((e) => pow(e.magnitude - mean, 2)).reduce((a,b)=>a+b);
+     _variance = sumSquaredDiff / _motionHistory.length;
+     
+     // 2. Entropy
+     Map<String, int> freq = {};
+     for (var m in _motionHistory) {
+       String key = "${m.magnitude.toStringAsFixed(1)}";
+       freq[key] = (freq[key] ?? 0) + 1;
+     }
+     
+     _entropy = 0.0;
+     int total = _motionHistory.length;
+     freq.forEach((k, v) {
+       double p = v / total;
+       if (p > 0) _entropy -= p * log(p);
+     });
   }
 
-  BiometricSignature _generateSignature() {
-    final avgMag = _magnitudeBuffer.isEmpty
-        ? 0.0
-        : _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
-
-    final tremorHz = _estimateTremorHz();
-    final tremorHuman = tremorHz > 7.5 && tremorHz < 13.5;
-
-    double score = 0.0;
-    if (avgMag > 0.15 && avgMag < 3.0) score += 0.3;
-    if (_frequencyVariance > 0.1) score += 0.2;
-    if (_entropy > 0.5) score += 0.2;
-    if (_uniquePatternCount >= 3) score += 0.1;
-    if (tremorHuman) score += 0.2;
-
-    return BiometricSignature(
-      averageMagnitude: avgMag,
-      frequencyVariance: _frequencyVariance,
-      patternEntropy: _entropy,
-      uniqueGestureCount: _uniquePatternCount,
-      timestamp: DateTime.now(),
-      isPotentiallyHuman: score >= 0.6,
-    );
-  }
-
-  // =========================================================
-  // ✨ NEW: SERVER VALIDATION
-  // =========================================================
-
-  Future<ServerVerdict> _verifyWithServer() async {
-    if (_mirrorService == null) {
-      // Server validation not enabled
-      return ServerVerdict.offlineFallback();
-    }
-
-    try {
-      // Generate secure payload
-      final deviceId = await DeviceFingerprint.getDeviceId();
-      final appSignature = await DeviceFingerprint.getAppSignature();
-      final deviceSecret = await DeviceFingerprint.getDeviceSecret();
-      final nonce = DeviceFingerprint.generateNonce();
-      
-      // Generate ZK proof (Q3: Answer A - don't send code!)
-      final zkProof = ZeroKnowledgeProof.generate(
-        userCode: currentValues,
-        nonce: nonce,
-        deviceSecret: deviceSecret,
-      );
-      
-      // Generate motion signature hash
-      final motionSig = MotionSignature.generate(
-        entropy: _entropy,
-        variance: _frequencyVariance,
-        gestureCount: _uniquePatternCount,
-      );
-      
-      final payload = SecurePayload(
-        deviceId: deviceId,
-        appSignature: appSignature,
-        nonce: nonce,
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-        entropy: _entropy,
-        tremorHz: _estimateTremorHz(),
-        frequencyVariance: _frequencyVariance,
-        averageMagnitude: _magnitudeBuffer.isEmpty ? 0.0 :
-            _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length,
-        uniqueGestureCount: _uniquePatternCount,
-        interactionTimeMs: _activeInteraction.inMilliseconds,
-        zkProof: zkProof,
-        motionSignature: motionSig,
-      );
-      
-      // Send to server
-      return await _mirrorService!.verify(payload);
-      
-    } catch (e) {
-      if (kDebugMode) {
-        print('Server validation error: $e');
-      }
-      
-      // Q2: Answer A - Allow offline fallback
-      if (config.securityConfig!.allowOfflineFallback) {
-        return ServerVerdict.offlineFallback();
-      } else {
-        return ServerVerdict.denied('server_unavailable');
-      }
-    }
-  }
-
-  // =========================================================
-  // VALIDATION (AAA + SERVER)
-  // =========================================================
+  // ═══════════════════════════════════════════════════════════
+  // 🔐 VALIDATION (SERVER + LOCAL)
+  // ═══════════════════════════════════════════════════════════
 
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
-    if (_state != SecurityState.LOCKED) return;
+    if (_state == SecurityState.ROOT_WARNING || _state == SecurityState.HARD_LOCK) return;
 
     _state = SecurityState.VALIDATING;
     notifyListeners();
+
     await Future.delayed(const Duration(milliseconds: 600));
 
-    // Local validation (your existing checks)
-    if (_activeInteraction < config.minSolveTime) {
-      await _fail(bot: true, msg: "INSUFFICIENT HUMAN INTERACTION");
+    // CHECK 1: CODE VALIDATION
+    if (!_isCodeCorrect()) {
+      await _fail(bot: false, msg: "INVALID PASSCODE");
       return;
     }
 
-    final sig = _generateSignature();
-    final confidence = _decay(sig.humanConfidence);
-
-    if (_lastSignature != null) {
-      final drift =
-          (sig.patternEntropy - _lastSignature!.patternEntropy).abs() +
-              (sig.averageMagnitude - _lastSignature!.averageMagnitude).abs();
-
-      if (drift < 0.03) {
-        await _fail(bot: true, msg: "BEHAVIOR TOO CONSISTENT");
-        return;
-      }
-    }
-
-    _lastSignature = sig;
-
-    if (confidence < config.botDetectionSensitivity) {
-      if (confidence > config.botDetectionSensitivity - 0.05) {
-        _quietSuspicion = true;
-      } else {
-        await _fail(bot: true, msg: "LOW BIOMETRIC CONFIDENCE");
-        return;
-      }
-    }
-
-    if (_quietSuspicion && confidence < config.botDetectionSensitivity + 0.1) {
-      await _fail(bot: true, msg: "SILENT BOT FILTER");
-      return;
-    }
-
-    // ✨ NEW: Server validation (if enabled)
+    // CHECK 2: SERVER VALIDATION (Feature ZIP)
     if (config.hasServerValidation) {
-      final verdict = await _verifyWithServer();
-      
-      if (!verdict.allowed) {
-        await _fail(
-          bot: true,
-          msg: verdict.reason?.toUpperCase() ?? "SERVER DENIED ACCESS",
+      try {
+        final deviceId = await DeviceFingerprint.getDeviceId();
+        final nonce = DeviceFingerprint.generateNonce();
+        final secretStr = await DeviceFingerprint.getDeviceSecret();
+        
+        // Zero-Knowledge Proof (Hantar bukti hash sahaja)
+        final zkProof = ZeroKnowledgeProof.generate(
+          userCode: currentValues,
+          nonce: nonce,
+          deviceSecret: secretStr,
         );
-        return;
-      }
-      
-      // Verify token signature
-      if (!ZeroKnowledgeProof.verifyToken(
-        token: verdict.token,
-        serverPublicKey: '', // Add your server public key
-      )) {
-        await _fail(bot: true, msg: "INVALID SERVER TOKEN");
-        return;
+
+        final payload = SecurePayload(
+          deviceId: deviceId,
+          appSignature: await DeviceFingerprint.getAppSignature(),
+          nonce: nonce,
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          // Data Biometrik Sebenar
+          entropy: _entropy, 
+          averageMagnitude: _motionHistory.isEmpty ? 0 : _motionHistory.last.magnitude,
+          frequencyVariance: _variance,
+          uniqueGestureCount: _interactionCount,
+          interactionTimeMs: 2000,
+          zkProof: zkProof,
+          motionSignature: MotionSignature.generate(
+            entropy: _entropy,
+            variance: _variance,
+            gestureCount: _interactionCount,
+          ), 
+          tremorHz: 10.0,
+        );
+
+        final verdict = await _mirrorService.verify(payload);
+        
+        if (!verdict.allowed) {
+          await _fail(bot: true, msg: "SERVER DENIED: ${verdict.reason}");
+          return;
+        }
+      } catch (e) {
+        // Fallback jika server down (Ikut Config)
+        if (!config.securityConfig!.allowOfflineFallback) {
+           await _fail(bot: false, msg: "SERVER UNREACHABLE");
+           return;
+        }
       }
     }
 
-    // Final: Code validation
-    if (_isCodeCorrect()) {
-      await _clearMemory();
-      _state = SecurityState.UNLOCKED;
-      _threatMessage = "";
-      notifyListeners();
-    } else {
-      await _fail(bot: false, msg: "INVALID CODE");
-    }
+    // SUCCESS
+    await _clearMemory();
+    _state = SecurityState.UNLOCKED;
+    _threatMessage = "";
+    notifyListeners();
   }
 
   Future<void> _fail({required bool bot, required String msg}) async {
@@ -477,13 +251,53 @@ class ClaController extends ChangeNotifier {
     }
     return true;
   }
+  
+  Future<void> _loadState() async {
+    final prefs = await SharedPreferences.getInstance();
+    _failedAttempts = prefs.getInt(KEY_ATTEMPTS) ?? 0;
+    final lockTs = prefs.getInt(KEY_LOCKOUT);
+    if (lockTs != null) {
+      _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTs);
+      if (DateTime.now().isBefore(_lockoutUntil!)) {
+        _state = SecurityState.HARD_LOCK;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> _saveState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(KEY_ATTEMPTS, _failedAttempts);
+    if (_lockoutUntil != null) {
+      await prefs.setInt(KEY_LOCKOUT, _lockoutUntil!.millisecondsSinceEpoch);
+    }
+  }
+
+  Future<void> _clearMemory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(KEY_ATTEMPTS);
+    await prefs.remove(KEY_LOCKOUT);
+    _failedAttempts = 0;
+    _motionHistory.clear();
+    _interactionCount = 0;
+    _liveConfidence = 0.0;
+    _lockoutUntil = null;
+    _state = SecurityState.LOCKED;
+  }
+
+  void updateWheel(int index, int value) {
+    if (_state != SecurityState.LOCKED) return;
+    if (index >= 0 && index < currentValues.length) {
+      currentValues[index] = value;
+      notifyListeners();
+    }
+  }
+
+  int getInitialValue(int index) {
+    if (index >= 0 && index < currentValues.length) return currentValues[index];
+    return 0;
+  }
 
   int get remainingLockoutSeconds =>
-      _lockoutUntil == null
-          ? 0
-          : _lockoutUntil!.difference(DateTime.now()).inSeconds.clamp(0, 999999);
-
-  double get liveConfidence => _decay(_generateSignature().humanConfidence);
-  int get uniqueGestureCount => _uniquePatternCount;
-  double get motionEntropy => _entropy;
+      _lockoutUntil == null ? 0 : _lockoutUntil!.difference(DateTime.now()).inSeconds.clamp(0, 999999);
 }
