@@ -1,7 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
  * ENGINE: PRO MAX (Original Math + DSP Stability)
- * STATUS: FIXED BUILD ERRORS (Variables restored & Math casted)
+ * STATUS: SENSOR STABILITY PATCH APPLIED ✅
  */
 
 import 'dart:async';
@@ -28,18 +28,19 @@ class ClaController extends ChangeNotifier {
   DateTime? _lockoutUntil;
   late List<int> currentValues;
 
-  // 🛠️ FIXED: MISSING KEYS RESTORED
+  // 🛠️ KEYS RESTORED
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
   // ═══════════════════════════════════════════════════════════
-  // 📡 DSP ENGINE (Penapis Isyarat Gred Tentera)
+  // 📡 DSP ENGINE (PATCHED - Sensor Stability Enhanced)
   // ═══════════════════════════════════════════════════════════
   
-  final List<double> _rawBuffer = []; // Rolling buffer untuk buang spike
-  static const int BUFFER_SIZE = 10;
-  static const double NOISE_GATE = 0.5; // Buang bunyi elektrik bawah 0.5
-  static const double SMOOTHING = 0.15; // Kelembutan animasi
+  final List<double> _rawBuffer = [];
+  static const int BUFFER_SIZE = 15;              // 🔧 FIXED: 10→15 (smoother)
+  static const double NOISE_GATE = 1.0;           // 🔧 FIXED: 0.5→1.0 (filter lebih garang)
+  static const double SMOOTHING = 0.15;
+  static const double MAX_REASONABLE_SHAKE = 8.0; // 🔧 NEW: Cap maximum spike
   
   double _internalSmoothedValue = 0.0;
 
@@ -50,11 +51,10 @@ class ClaController extends ChangeNotifier {
   final List<MotionEvent> _motionHistory = [];
   final Map<String, int> _patternFrequency = {};
   
-  double _entropy = 0.0;     // Kekal: Ukur kerawakan pergerakan
-  double _variance = 0.0;    // Kekal: Ukur robot vs manusia
+  double _entropy = 0.0;
+  double _variance = 0.0;
   double _liveConfidence = 0.0;
   
-  // Touch Metrics (Tambahan untuk kestabilan)
   int _interactionCount = 0;
 
   double get liveConfidence => _liveConfidence;
@@ -67,7 +67,6 @@ class ClaController extends ChangeNotifier {
     final rand = Random();
     currentValues = List.generate(5, (index) => rand.nextInt(10));
     
-    // Server Init (Dari ZIP)
     if (config.hasServerValidation) {
       _mirrorService = MirrorService(
         endpoint: config.securityConfig!.serverEndpoint,
@@ -101,48 +100,44 @@ class ClaController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎛️ PROCESSING PIPELINE (Jantung Utama)
+  // 🎛️ PROCESSING PIPELINE (PATCHED - Sensor Damping)
   // ═══════════════════════════════════════════════════════════
 
-  // Dipanggil dari Widget (Touch Event)
   void registerTouchInteraction() {
     if (_state != SecurityState.LOCKED) return;
     _interactionCount++;
-    // Sentuhan menyumbang kepada confidence (Human Factor)
     _liveConfidence = (_liveConfidence + 0.1).clamp(0.0, 1.0);
     notifyListeners();
   }
 
-  // Dipanggil dari Widget (Sensor Event)
   void registerShake(double rawMagnitude, double dx, dy, dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    // 1. FILTER: Noise Gate (Buang bacaan hantu < 0.5)
-    double cleanMag = rawMagnitude;
+    // 1. FILTER: Emergency Cap (🔧 NEW - Buang spike 19.0++)
+    double cleanMag = rawMagnitude.clamp(0.0, MAX_REASONABLE_SHAKE);
+    
+    // 2. FILTER: Noise Gate (Buang bacaan hantu < 1.0)
     if (cleanMag < NOISE_GATE) cleanMag = 0.0;
 
-    // 2. FILTER: Rolling Average (Buang spike 19.0)
+    // 3. FILTER: Rolling Average (Buffer lebih besar = smooth)
     _rawBuffer.add(cleanMag);
     if (_rawBuffer.length > BUFFER_SIZE) _rawBuffer.removeAt(0);
     double averageMag = _rawBuffer.reduce((a, b) => a + b) / _rawBuffer.length;
 
-    // 3. MATH: Exponential Smoothing (Absorber)
+    // 4. MATH: Exponential Smoothing
     _internalSmoothedValue = (_internalSmoothedValue * (1 - SMOOTHING)) + (averageMag * SMOOTHING);
 
-    // 4. LOGIC ASAL (ZIP): Simpan sejarah untuk Entropy
-    // Kita guna data yang SUDAH DITAPIS (_internalSmoothedValue), bukan raw.
-    if (_internalSmoothedValue > 0.1) {
+    // 5. LOGIC: Simpan sejarah (🔧 FIXED threshold: 0.1→0.3)
+    if (_internalSmoothedValue > 0.3) {
        _addToHistory(_internalSmoothedValue, dx, dy, dz);
     }
     
-    // 5. UPDATE UI SCORE (Normalized)
-    // Gabungan: Sensor Bersih (60%) + Touch (40%)
-    double sensorScore = (_internalSmoothedValue / 10.0).clamp(0.0, 1.0);
+    // 6. UPDATE UI SCORE (🔧 FIXED divisor: 10→15)
+    double sensorScore = (_internalSmoothedValue / 15.0).clamp(0.0, 1.0);
     double touchScore = (_interactionCount > 3) ? 1.0 : 0.0;
     
     _liveConfidence = (sensorScore * 0.6) + (touchScore * 0.4);
     
-    // Notify untuk UI update
     if (cleanMag > 0.1) notifyListeners(); 
   }
 
@@ -163,10 +158,7 @@ class ClaController extends ChangeNotifier {
      
      // 1. Calculate Variance (Robot vs Human)
      double mean = _motionHistory.map((e) => e.magnitude).reduce((a,b)=>a+b) / _motionHistory.length;
-     
-     // 🛠️ FIXED: CAST TO DOUBLE (dart:math pow returns num)
      double sumSquaredDiff = _motionHistory.map((e) => pow(e.magnitude - mean, 2).toDouble()).reduce((a,b)=>a+b);
-     
      _variance = sumSquaredDiff / _motionHistory.length;
      
      // 2. Calculate Entropy (Randomness)
@@ -210,14 +202,13 @@ class ClaController extends ChangeNotifier {
       return;
     }
 
-    // CHECK 3: SERVER VALIDATION (DARI ZIP)
+    // CHECK 3: SERVER VALIDATION
     if (config.hasServerValidation) {
       try {
         final deviceId = await DeviceFingerprint.getDeviceId();
         final nonce = DeviceFingerprint.generateNonce();
         final secretStr = await DeviceFingerprint.getDeviceSecret();
         
-        // Zero-Knowledge Proof
         final zkProof = ZeroKnowledgeProof.generate(
           userCode: currentValues,
           nonce: nonce,
