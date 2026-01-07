@@ -64,7 +64,7 @@ class ClaController extends ChangeNotifier {
     _sessionStartTime = DateTime.now();
     
     // Initialize server service if enabled
-    if (config.hasServerValidation) {
+    if (config.hasServerValidation && config.securityConfig != null) {
       _mirrorService = MirrorService(
         endpoint: config.securityConfig!.serverEndpoint,
         timeout: config.securityConfig!.serverTimeout,
@@ -72,6 +72,15 @@ class ClaController extends ChangeNotifier {
     }
     
     _initSecurityProtocol();
+  }
+
+  // =========================================================
+  // BRIDGE METHOD (FIX FOR LEGACY WIDGET SUPPORT)
+  // =========================================================
+  
+  /// UI lama perlukan method ini. Saya pasang jambatan.
+  void registerTouchInteraction() {
+    _registerInteraction();
   }
 
   // =========================================================
@@ -317,7 +326,7 @@ class ClaController extends ChangeNotifier {
       final deviceSecret = await DeviceFingerprint.getDeviceSecret();
       final nonce = DeviceFingerprint.generateNonce();
       
-      // Generate ZK proof (Q3: Answer A - don't send code!)
+      // Generate ZK proof
       final zkProof = ZeroKnowledgeProof.generate(
         userCode: currentValues,
         nonce: nonce,
@@ -355,8 +364,8 @@ class ClaController extends ChangeNotifier {
         print('Server validation error: $e');
       }
       
-      // Q2: Answer A - Allow offline fallback
-      if (config.securityConfig!.allowOfflineFallback) {
+      // Use null-aware operator to prevent crash if securityConfig is null
+      if (config.securityConfig?.allowOfflineFallback ?? true) {
         return ServerVerdict.offlineFallback();
       } else {
         return ServerVerdict.denied('server_unavailable');
@@ -375,7 +384,7 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 600));
 
-    // Local validation (your existing checks)
+    // Local validation
     if (_activeInteraction < config.minSolveTime) {
       await _fail(bot: true, msg: "INSUFFICIENT HUMAN INTERACTION");
       return;
