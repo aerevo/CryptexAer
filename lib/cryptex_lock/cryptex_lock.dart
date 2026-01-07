@@ -40,13 +40,13 @@ class _CryptexLockState extends State<CryptexLock>
   late Animation<double> _pulseAnimation;
   late Animation<double> _shimmerAnimation;
   
-  // 🔧 NEON CYAN COLOR SCHEME (Modified)
-  final Color _colLocked = const Color(0xFF00E5FF);      // Neon Cyan - Active ✨
+  // 🔧 ULTRA NEON CYAN COLOR SCHEME
+  final Color _colLocked = const Color(0xFF00FFFF);      // Pure Cyan - Sangat Terang! ✨✨✨
   final Color _colFail = const Color(0xFFFF6B6B);        // Red - Error
   final Color _colJam = const Color(0xFFFF1744);         // Deep Red - Critical
   final Color _colUnlock = const Color(0xFF00FF88);      // Green - Success
   final Color _colDead = const Color(0xFF4A5568);        // Gray - Inactive
-  final Color _colValidating = const Color(0xFF7C3AED);  // Purple - Processing
+  final Color _colValidating = const Color(0xFF00E5FF);  // Cyan variant - Processing
 
   @override
   void initState() {
@@ -132,9 +132,10 @@ class _CryptexLockState extends State<CryptexLock>
 
   void _startListening() {
     _accelSub?.cancel();
+    // 🔧 FIXED: Match controller parameter signature
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
-      double magnitude = e.x.abs() + e.y.abs() + e.z.abs();
-      widget.controller.registerShake(magnitude, e.x, e.y, e.z);
+      double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
+      widget.controller.registerShake(rawMag, e.x, e.y, e.z);
     });
   }
 
@@ -293,9 +294,9 @@ class _CryptexLockState extends State<CryptexLock>
         ),
         boxShadow: [
           BoxShadow(
-            color: activeColor.withOpacity(0.2), // 🔧 Increased glow
-            blurRadius: 35,
-            spreadRadius: 3,
+            color: activeColor.withOpacity(0.4), // 🔧 MEGA GLOW
+            blurRadius: 50,
+            spreadRadius: 5,
           ),
           BoxShadow(
             color: Colors.black.withOpacity(0.5),
@@ -577,9 +578,9 @@ class _CryptexLockState extends State<CryptexLock>
         boxShadow: isActive
             ? [
                 BoxShadow(
-                  color: color.withOpacity(0.4), // 🔧 Stronger glow
-                  blurRadius: 20,
-                  spreadRadius: 3,
+                  color: color.withOpacity(0.6), // 🔧 ULTRA glow untuk wheel
+                  blurRadius: 30,
+                  spreadRadius: 5,
                 ),
               ]
             : null,
@@ -617,8 +618,12 @@ class _CryptexLockState extends State<CryptexLock>
                         shadows: isActive
                             ? [
                                 Shadow(
-                                  color: color.withOpacity(0.9), // 🔧 Stronger text glow
-                                  blurRadius: 15,
+                                  color: color.withOpacity(1.0), // 🔧 MAXIMUM text glow
+                                  blurRadius: 20,
+                                ),
+                                Shadow(
+                                  color: color.withOpacity(0.5),
+                                  blurRadius: 40,
                                 ),
                               ]
                             : null,
