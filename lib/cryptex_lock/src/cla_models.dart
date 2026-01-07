@@ -1,20 +1,20 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * MODELS: Extended with Server Validation Support
+ * MODE: ACCELEROMETER FIRST (Classic)
+ * INTEGRATION: Server Validation Ready
  */
 
-// FIX: Buang titik (..) sebab fail ni dah duduk dalam src
 import 'security/config/security_config.dart';
 
 enum SecurityState {
-  LOCKED,           // Ready for authentication
-  VALIDATING,       // Processing biometric signature
-  UNLOCKED,         // Access granted
-  SOFT_LOCK,        // Failed attempt - warning state
-  HARD_LOCK,        // Cooldown period active
-  BOT_SIMULATION,   // Test mode for developers
-  ROOT_WARNING,     // Security compromise detected
-  COMPROMISED       // Critical security breach
+  LOCKED,           // Sedia
+  VALIDATING,       // Sedang semak
+  UNLOCKED,         // Berjaya
+  SOFT_LOCK,        // Salah Key in (Amaran)
+  HARD_LOCK,        // Jammed (Kena tunggu)
+  BOT_SIMULATION,   // Mode Test Robot
+  ROOT_WARNING,     // Anjing Penjaga Menggonggong
+  COMPROMISED       // Kena Block Terus
 }
 
 class ClaConfig {
@@ -28,12 +28,9 @@ class ClaConfig {
   final bool enableSensors;
   
   // Advanced biometric parameters
-  final double humanTremorFrequency;
   final double botDetectionSensitivity;
-  final int minimumGestureSequence;
-  final Duration biometricWindowDuration;
   
-  // ✨ NEW: Server validation config
+  // Server validation config
   final SecurityConfig? securityConfig;
 
   const ClaConfig({
@@ -45,51 +42,16 @@ class ClaConfig {
     this.maxAttempts = 3, 
     required this.thresholdAmount,
     this.enableSensors = true,
-    this.humanTremorFrequency = 10.0,
-    this.botDetectionSensitivity = 0.85,
-    this.minimumGestureSequence = 5,
-    this.biometricWindowDuration = const Duration(seconds: 2),
-    // Optional server config (default null = no server validation)
+    this.botDetectionSensitivity = 0.4,
     this.securityConfig,
   });
   
-  /// Check if server validation is enabled
   bool get hasServerValidation => 
       securityConfig != null && 
-      securityConfig!.enableBiometrics; // Fallback check
+      securityConfig!.enableServerValidation;
 }
 
-/// Biometric signature snapshot
-class BiometricSignature {
-  final double averageMagnitude;
-  final double frequencyVariance;
-  final double patternEntropy;
-  final int uniqueGestureCount;
-  final DateTime timestamp;
-  final bool isPotentiallyHuman;
-
-  BiometricSignature({
-    required this.averageMagnitude,
-    required this.frequencyVariance,
-    required this.patternEntropy,
-    required this.uniqueGestureCount,
-    required this.timestamp,
-    required this.isPotentiallyHuman,
-  });
-
-  double get humanConfidence {
-    double score = 0.0;
-    
-    if (averageMagnitude > 0.15 && averageMagnitude < 3.0) score += 0.3;
-    if (frequencyVariance > 0.1) score += 0.25;
-    if (patternEntropy > 0.5) score += 0.25;
-    if (uniqueGestureCount >= 3) score += 0.2;
-    
-    return score.clamp(0.0, 1.0);
-  }
-}
-
-/// Motion event for pattern analysis
+/// Structure for detailed motion analysis
 class MotionEvent {
   final double magnitude;
   final DateTime timestamp;
@@ -102,9 +64,4 @@ class MotionEvent {
     required this.deltaY,
     required this.deltaZ,
   });
-
-  bool isSimilarTo(MotionEvent other, {double threshold = 0.05}) {
-    double diff = (magnitude - other.magnitude).abs();
-    return diff < threshold;
-  }
 }
