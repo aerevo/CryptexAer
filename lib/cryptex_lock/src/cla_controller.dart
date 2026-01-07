@@ -1,7 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * ENGINE: STABLE SENSOR + SERVER SECURITY
- * STATUS: Merged (No downgrade, No 0-19 ghost)
+ * ENGINE: PRO MAX (Original Math + DSP Stability)
+ * STATUS: FIXED BUILD ERRORS (Variables restored & Math casted)
  */
 
 import 'dart:async';
@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 import 'cla_models.dart';
 
-// IMPORTS DARI ZIP (Untuk Server Security)
+// ✨ IMPORTS DARI ZIP (Kekal Canggih)
 import 'security/models/secure_payload.dart';
 import 'security/services/mirror_service.dart';
 import 'security/services/device_fingerprint.dart';
@@ -28,17 +28,34 @@ class ClaController extends ChangeNotifier {
   DateTime? _lockoutUntil;
   late List<int> currentValues;
 
+  // 🛠️ FIXED: MISSING KEYS RESTORED
+  static const String KEY_ATTEMPTS = 'cla_failed_attempts';
+  static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
+
   // ═══════════════════════════════════════════════════════════
-  // 🧬 DATA METRICS (Untuk dihantar ke Server)
+  // 📡 DSP ENGINE (Penapis Isyarat Gred Tentera)
   // ═══════════════════════════════════════════════════════════
-  // Kita simpan data ini bukan untuk filter (sebab sensor dah stabil),
-  // tapi untuk bina 'Payload' yang Server nak.
+  
+  final List<double> _rawBuffer = []; // Rolling buffer untuk buang spike
+  static const int BUFFER_SIZE = 10;
+  static const double NOISE_GATE = 0.5; // Buang bunyi elektrik bawah 0.5
+  static const double SMOOTHING = 0.15; // Kelembutan animasi
+  
+  double _internalSmoothedValue = 0.0;
+
+  // ═══════════════════════════════════════════════════════════
+  // 🧬 ADVANCED BIOMETRICS (Logik Asal ZIP Dikembalikan)
+  // ═══════════════════════════════════════════════════════════
   
   final List<MotionEvent> _motionHistory = [];
-  double _entropy = 0.0;
-  double _variance = 0.0;
-  double _liveConfidence = 0.0; // Score untuk UI
-  int _interactionCount = 0;    // Touch counter
+  final Map<String, int> _patternFrequency = {};
+  
+  double _entropy = 0.0;     // Kekal: Ukur kerawakan pergerakan
+  double _variance = 0.0;    // Kekal: Ukur robot vs manusia
+  double _liveConfidence = 0.0;
+  
+  // Touch Metrics (Tambahan untuk kestabilan)
+  int _interactionCount = 0;
 
   double get liveConfidence => _liveConfidence;
   String _threatMessage = "";
@@ -50,7 +67,7 @@ class ClaController extends ChangeNotifier {
     final rand = Random();
     currentValues = List.generate(5, (index) => rand.nextInt(10));
     
-    // Init Server Service
+    // Server Init (Dari ZIP)
     if (config.hasServerValidation) {
       _mirrorService = MirrorService(
         endpoint: config.securityConfig!.serverEndpoint,
@@ -65,7 +82,7 @@ class ClaController extends ChangeNotifier {
     try {
       isRooted = await FlutterJailbreakDetection.jailbroken;
     } catch (e) {
-      // Ignore debug
+      // Ignore in debug
     }
 
     if (isRooted) {
@@ -84,33 +101,49 @@ class ClaController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎛️ INPUT HANDLERS (Stabil)
+  // 🎛️ PROCESSING PIPELINE (Jantung Utama)
   // ═══════════════════════════════════════════════════════════
 
-  // 1. TOUCH INPUT
+  // Dipanggil dari Widget (Touch Event)
   void registerTouchInteraction() {
     if (_state != SecurityState.LOCKED) return;
     _interactionCount++;
-    // Logic mudah: Makin banyak sentuh, makin yakin itu manusia
-    _liveConfidence = (_liveConfidence + 0.15).clamp(0.0, 1.0);
+    // Sentuhan menyumbang kepada confidence (Human Factor)
+    _liveConfidence = (_liveConfidence + 0.1).clamp(0.0, 1.0);
     notifyListeners();
   }
 
-  // 2. SENSOR INPUT
+  // Dipanggil dari Widget (Sensor Event)
   void registerShake(double rawMagnitude, double dx, dy, dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    // Simpan data untuk kiraan Entropy (Server Requirement)
-    // Cuma simpan kalau ada movement sebenar (>0.1)
-    if (rawMagnitude > 0.1) {
-       _addToHistory(rawMagnitude, dx, dy, dz);
-       
-       // Update UI sikit tanda sensor hidup
-       if (_liveConfidence < 1.0) {
-         _liveConfidence = (_liveConfidence + 0.01).clamp(0.0, 1.0);
-         notifyListeners();
-       }
+    // 1. FILTER: Noise Gate (Buang bacaan hantu < 0.5)
+    double cleanMag = rawMagnitude;
+    if (cleanMag < NOISE_GATE) cleanMag = 0.0;
+
+    // 2. FILTER: Rolling Average (Buang spike 19.0)
+    _rawBuffer.add(cleanMag);
+    if (_rawBuffer.length > BUFFER_SIZE) _rawBuffer.removeAt(0);
+    double averageMag = _rawBuffer.reduce((a, b) => a + b) / _rawBuffer.length;
+
+    // 3. MATH: Exponential Smoothing (Absorber)
+    _internalSmoothedValue = (_internalSmoothedValue * (1 - SMOOTHING)) + (averageMag * SMOOTHING);
+
+    // 4. LOGIC ASAL (ZIP): Simpan sejarah untuk Entropy
+    // Kita guna data yang SUDAH DITAPIS (_internalSmoothedValue), bukan raw.
+    if (_internalSmoothedValue > 0.1) {
+       _addToHistory(_internalSmoothedValue, dx, dy, dz);
     }
+    
+    // 5. UPDATE UI SCORE (Normalized)
+    // Gabungan: Sensor Bersih (60%) + Touch (40%)
+    double sensorScore = (_internalSmoothedValue / 10.0).clamp(0.0, 1.0);
+    double touchScore = (_interactionCount > 3) ? 1.0 : 0.0;
+    
+    _liveConfidence = (sensorScore * 0.6) + (touchScore * 0.4);
+    
+    // Notify untuk UI update
+    if (cleanMag > 0.1) notifyListeners(); 
   }
 
   void _addToHistory(double mag, double dx, dy, dz) {
@@ -122,28 +155,30 @@ class ClaController extends ChangeNotifier {
        deltaX: dx, deltaY: dy, deltaZ: dz
      ));
      
-     // Kira matematik untuk Server Payload
-     _calculateMetricsForServer();
+     _calculateAdvancedBiometrics();
   }
 
-  void _calculateMetricsForServer() {
+  void _calculateAdvancedBiometrics() {
      if (_motionHistory.isEmpty) return;
      
-     // 1. Variance
+     // 1. Calculate Variance (Robot vs Human)
      double mean = _motionHistory.map((e) => e.magnitude).reduce((a,b)=>a+b) / _motionHistory.length;
-     double sumSquaredDiff = _motionHistory.map((e) => pow(e.magnitude - mean, 2)).reduce((a,b)=>a+b);
+     
+     // 🛠️ FIXED: CAST TO DOUBLE (dart:math pow returns num)
+     double sumSquaredDiff = _motionHistory.map((e) => pow(e.magnitude - mean, 2).toDouble()).reduce((a,b)=>a+b);
+     
      _variance = sumSquaredDiff / _motionHistory.length;
      
-     // 2. Entropy
-     Map<String, int> freq = {};
+     // 2. Calculate Entropy (Randomness)
+     _patternFrequency.clear();
      for (var m in _motionHistory) {
        String key = "${m.magnitude.toStringAsFixed(1)}";
-       freq[key] = (freq[key] ?? 0) + 1;
+       _patternFrequency[key] = (_patternFrequency[key] ?? 0) + 1;
      }
      
      _entropy = 0.0;
      int total = _motionHistory.length;
-     freq.forEach((k, v) {
+     _patternFrequency.forEach((k, v) {
        double p = v / total;
        if (p > 0) _entropy -= p * log(p);
      });
@@ -161,20 +196,28 @@ class ClaController extends ChangeNotifier {
 
     await Future.delayed(const Duration(milliseconds: 600));
 
-    // CHECK 1: CODE VALIDATION
+    // CHECK 1: BIOMETRIC QUALITY
+    if (config.enableSensors) {
+       if (_variance < 0.001 && _interactionCount < 2) {
+         await _fail(bot: true, msg: "BOT DETECTED: UNNATURAL MOVEMENT");
+         return;
+       }
+    }
+
+    // CHECK 2: CODE VALIDATION
     if (!_isCodeCorrect()) {
       await _fail(bot: false, msg: "INVALID PASSCODE");
       return;
     }
 
-    // CHECK 2: SERVER VALIDATION (Feature ZIP)
+    // CHECK 3: SERVER VALIDATION (DARI ZIP)
     if (config.hasServerValidation) {
       try {
         final deviceId = await DeviceFingerprint.getDeviceId();
         final nonce = DeviceFingerprint.generateNonce();
         final secretStr = await DeviceFingerprint.getDeviceSecret();
         
-        // Zero-Knowledge Proof (Hantar bukti hash sahaja)
+        // Zero-Knowledge Proof
         final zkProof = ZeroKnowledgeProof.generate(
           userCode: currentValues,
           nonce: nonce,
@@ -186,9 +229,8 @@ class ClaController extends ChangeNotifier {
           appSignature: await DeviceFingerprint.getAppSignature(),
           nonce: nonce,
           timestamp: DateTime.now().millisecondsSinceEpoch,
-          // Data Biometrik Sebenar
           entropy: _entropy, 
-          averageMagnitude: _motionHistory.isEmpty ? 0 : _motionHistory.last.magnitude,
+          averageMagnitude: _internalSmoothedValue,
           frequencyVariance: _variance,
           uniqueGestureCount: _interactionCount,
           interactionTimeMs: 2000,
@@ -208,7 +250,6 @@ class ClaController extends ChangeNotifier {
           return;
         }
       } catch (e) {
-        // Fallback jika server down (Ikut Config)
         if (!config.securityConfig!.allowOfflineFallback) {
            await _fail(bot: false, msg: "SERVER UNREACHABLE");
            return;
@@ -216,7 +257,7 @@ class ClaController extends ChangeNotifier {
       }
     }
 
-    // SUCCESS
+    // UNLOCK SUCCESS
     await _clearMemory();
     _state = SecurityState.UNLOCKED;
     _threatMessage = "";
@@ -278,6 +319,7 @@ class ClaController extends ChangeNotifier {
     await prefs.remove(KEY_ATTEMPTS);
     await prefs.remove(KEY_LOCKOUT);
     _failedAttempts = 0;
+    _internalSmoothedValue = 0;
     _motionHistory.clear();
     _interactionCount = 0;
     _liveConfidence = 0.0;
