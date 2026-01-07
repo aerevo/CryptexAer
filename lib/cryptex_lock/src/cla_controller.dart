@@ -1,7 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * ENGINE: CLASSIC MOTION (Accelerometer Driven)
- * FILTER: DSP ENABLED (No Jitter)
+ * ENGINE: SENSITIVE MOTION (Tuned for Human Hand)
+ * STATUS: FIXED (No more aggressive shaking needed)
  */
 
 import 'dart:async';
@@ -28,22 +28,27 @@ class ClaController extends ChangeNotifier {
   DateTime? _lockoutUntil;
   late List<int> currentValues;
   
-  // FIXED: MISSING KEYS RESTORED
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
   // ═══════════════════════════════════════════════════════════
-  // 📡 DSP ENGINE (PENAPIS GEGARAN)
+  // 📡 DSP ENGINE (SENSITIVITY TUNED)
   // ═══════════════════════════════════════════════════════════
-  // Ini rahsia supaya sensor tak gila (0-19).
   
   final List<double> _rawBuffer = []; 
-  static const int BUFFER_SIZE = 10;     // Purata 10 frame (Smooth)
-  static const double NOISE_GATE = 0.3;  // Abaikan getaran meja (<0.3)
-  static const double SMOOTHING = 0.1;   // Gerakan bar macam air (Liquid)
-  static const double MAX_SHAKE = 8.0;   // Nilai gegaran maksimum untuk 100%
+  static const int BUFFER_SIZE = 10;     
   
-  double _internalSmoothedValue = 0.0;   // Nilai yang dah bersih
+  // 🔥 FIX 1: NOISE GATE (Turunkan sikit supaya detect gerakan halus)
+  static const double NOISE_GATE = 0.15; // Was 0.3
+  
+  // 🔥 FIX 2: SMOOTHING (Naikkan sikit supaya tak terlalu lambat)
+  static const double SMOOTHING = 0.15;  // Was 0.1
+  
+  // 🔥 FIX 3: MAX SHAKE (PENTING! Turunkan supaya senang penuh)
+  // 8.0 = Gempa Bumi. 2.5 = Tangan Manusia.
+  static const double MAX_SHAKE = 2.5;   // Was 8.0
+  
+  double _internalSmoothedValue = 0.0;
 
   // ═══════════════════════════════════════════════════════════
   // 🧬 METRICS
@@ -53,9 +58,8 @@ class ClaController extends ChangeNotifier {
   double _entropy = 0.0;
   double _variance = 0.0;
   
-  // UI SCORES
-  double _motionConfidence = 0.0; // Bar Besar (Utama)
-  double _touchConfidence = 0.0;  // Meter Kecil (Secondary)
+  double _motionConfidence = 0.0; 
+  double _touchConfidence = 0.0;  
   int _touchCount = 0;
 
   double get motionConfidence => _motionConfidence;
@@ -101,30 +105,29 @@ class ClaController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎛️ INPUT LOGIC (ACCELEROMETER IS KING)
+  // 🎛️ INPUT LOGIC
   // ═══════════════════════════════════════════════════════════
 
-  // 1. SENSOR INPUT (UTAMA - MENGGERAKKAN BAR BESAR)
   void registerShake(double rawMagnitude, double dx, dy, dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    // A. NOISE GATE (Buang sampah)
+    // A. NOISE GATE
     double cleanMag = rawMagnitude;
     if (cleanMag < NOISE_GATE) cleanMag = 0.0;
 
-    // B. ROLLING AVERAGE (Buang spike)
+    // B. ROLLING AVERAGE
     _rawBuffer.add(cleanMag);
     if (_rawBuffer.length > BUFFER_SIZE) _rawBuffer.removeAt(0);
     double averageMag = _rawBuffer.reduce((a, b) => a + b) / _rawBuffer.length;
 
-    // C. SMOOTHING (Absorber)
+    // C. SMOOTHING
     _internalSmoothedValue = (_internalSmoothedValue * (1 - SMOOTHING)) + (averageMag * SMOOTHING);
 
-    // D. UPDATE UI (Normalize 0.0 - 1.0)
-    // Kalau gegaran cecah 8.0, bar penuh.
+    // D. NORMALIZE (0.0 - 1.0)
+    // Dengan MAX_SHAKE = 2.5, gegaran sikit pun dah boleh dapat 0.5 - 0.8.
     _motionConfidence = (_internalSmoothedValue / MAX_SHAKE).clamp(0.0, 1.0);
 
-    // E. REKOD SEJARAH (Untuk Server)
+    // E. RECORD HISTORY
     if (_internalSmoothedValue > 0.1) {
        _addToHistory(_internalSmoothedValue, dx, dy, dz);
     }
@@ -132,12 +135,11 @@ class ClaController extends ChangeNotifier {
     notifyListeners(); 
   }
 
-  // 2. TOUCH INPUT (SECONDARY - METER KECIL)
   void registerTouch() {
     if (_state != SecurityState.LOCKED) return;
     _touchCount++;
-    // Meter kecil naik cepat sikit
-    _touchConfidence = (_touchCount / 5.0).clamp(0.0, 1.0);
+    // Logic Touch mudah: Cukup 3 kali sentuh, dia jadi 1.0 (Verified)
+    _touchConfidence = (_touchCount / 3.0).clamp(0.0, 1.0);
     notifyListeners();
   }
 
@@ -150,20 +152,16 @@ class ClaController extends ChangeNotifier {
        deltaX: dx, deltaY: dy, deltaZ: dz
      ));
      
-     // Kira matematik server (Variance/Entropy)
      _calculateMetrics();
   }
 
   void _calculateMetrics() {
      if (_motionHistory.isEmpty) return;
      
-     // Variance Logic
      double mean = _motionHistory.map((e) => e.magnitude).reduce((a,b)=>a+b) / _motionHistory.length;
-     // Fixed: Cast pow result to double
      double sumSquaredDiff = _motionHistory.map((e) => pow(e.magnitude - mean, 2).toDouble()).reduce((a,b)=>a+b);
      _variance = sumSquaredDiff / _motionHistory.length;
      
-     // Entropy Logic
      Map<String, int> freq = {};
      for (var m in _motionHistory) {
        String key = "${m.magnitude.toStringAsFixed(1)}";
@@ -190,8 +188,8 @@ class ClaController extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 600));
 
     // CHECK 1: DEAD CHECK
-    // Mesti ada pergerakan ATAU sentuhan. Kalau kaku 100%, reject.
-    if (_motionConfidence < 0.05 && _touchConfidence < 0.1) {
+    // Mesti ada aktiviti minima
+    if (_motionConfidence < 0.1 && _touchConfidence < 0.1) {
        await _fail(bot: true, msg: "NO ACTIVITY DETECTED");
        return;
     }
@@ -202,14 +200,13 @@ class ClaController extends ChangeNotifier {
       return;
     }
 
-    // CHECK 3: SERVER VALIDATION (INTEGRATED)
+    // CHECK 3: SERVER
     if (config.hasServerValidation) {
       try {
         final deviceId = await DeviceFingerprint.getDeviceId();
         final nonce = DeviceFingerprint.generateNonce();
         final secretStr = await DeviceFingerprint.getDeviceSecret();
         
-        // Zero-Knowledge Proof
         final zkProof = ZeroKnowledgeProof.generate(
           userCode: currentValues,
           nonce: nonce,
@@ -248,7 +245,6 @@ class ClaController extends ChangeNotifier {
       }
     }
 
-    // UNLOCK SUCCESS
     await _clearMemory();
     _state = SecurityState.UNLOCKED;
     _threatMessage = "";
