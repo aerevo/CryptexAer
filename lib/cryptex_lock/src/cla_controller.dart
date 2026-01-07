@@ -339,6 +339,14 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 600));
 
+    // 🔧 DEBUG: Print all metrics
+    if (kDebugMode) {
+      print('🔍 VALIDATION START');
+      print('   Interaction time: ${_activeInteraction.inSeconds}s (min: ${config.minSolveTime.inSeconds}s)');
+      print('   Wheel touches: $_wheelTouchCount');
+      print('   Motion events: ${_motionHistory.length}');
+    }
+
     // CHECK 1: Minimum interaction time
     if (_activeInteraction < config.minSolveTime) {
       await _fail(bot: true, msg: "INSUFFICIENT HUMAN INTERACTION");
@@ -348,6 +356,11 @@ class ClaController extends ChangeNotifier {
     // CHECK 2: Biometric quality
     final sig = _generateSignature();
     final confidence = _decay(sig.humanConfidence);
+
+    if (kDebugMode) {
+      print('   Biometric confidence: ${confidence.toStringAsFixed(3)}');
+      print('   Required: ${config.botDetectionSensitivity}');
+    }
 
     if (_lastSignature != null) {
       final drift = (sig.patternEntropy - _lastSignature!.patternEntropy).abs() +
@@ -392,6 +405,7 @@ class ClaController extends ChangeNotifier {
     }
 
     // SUCCESS
+    if (kDebugMode) print('✅ VALIDATION SUCCESS');
     await _clearMemory();
     _state = SecurityState.UNLOCKED;
     _threatMessage = "";
@@ -401,6 +415,19 @@ class ClaController extends ChangeNotifier {
   Future<void> _fail({required bool bot, required String msg}) async {
     _failedAttempts++;
     _threatMessage = msg;
+
+    // 🔧 DEBUG MODE: 5 second grace period before locking
+    if (kDebugMode) {
+      print('🔴 FAIL DETECTED: $msg');
+      print('   Bot: $bot | Attempts: $_failedAttempts/${config.maxAttempts}');
+      print('   Motion entropy: ${_entropy.toStringAsFixed(3)}');
+      print('   Variance: ${_frequencyVariance.toStringAsFixed(3)}');
+      print('   Wheel touches: $_wheelTouchCount');
+      print('   Confidence: ${liveConfidence.toStringAsFixed(3)}');
+      print('⏱️  5 second grace period - debug now!');
+      
+      await Future.delayed(const Duration(seconds: 5));
+    }
 
     if (bot || _failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
@@ -496,14 +523,14 @@ class ClaController extends ChangeNotifier {
 
   /// Main confidence score (time-decayed, stable)
   double get liveConfidence {
-    // Wheel touch contribution (immediate feedback)
-    double wheelScore = (_wheelTouchCount / 10.0).clamp(0.0, 0.7);
-    
-    // Motion contribution
+    // Motion contribution (primary)
     double motionScore = _decay(_generateSignature().humanConfidence);
     
-    // Combine: 60% wheel, 40% motion
-    return (wheelScore * 0.6 + motionScore * 0.4).clamp(0.0, 1.0);
+    // Wheel touch contribution (secondary feedback)
+    double wheelScore = (_wheelTouchCount / 10.0).clamp(0.0, 0.7);
+    
+    // Combine: 70% motion, 30% wheel
+    return (motionScore * 0.7 + wheelScore * 0.3).clamp(0.0, 1.0);
   }
   
   int get uniqueGestureCount => _uniquePatternCount;
