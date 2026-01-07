@@ -1,7 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * MODELS: Hybrid Logic + Server Validation
- * STATUS: MERGED (Francois Edition)
+ * MODELS: Server Config Ready
+ * STATUS: FINAL (No bloatware)
  */
 
 import 'security/config/security_config.dart';
@@ -30,7 +30,7 @@ class ClaConfig {
   // Advanced biometric parameters
   final double botDetectionSensitivity;
   
-  // Server validation config (KEKALKAN DARI ZIP)
+  // Server validation config (Dari ZIP)
   final SecurityConfig? securityConfig;
 
   const ClaConfig({
@@ -46,32 +46,11 @@ class ClaConfig {
     this.securityConfig,
   });
   
-  /// Check if server validation is enabled
+  /// Helper: Check if server validation is active
   bool get hasServerValidation => 
       securityConfig != null && 
       securityConfig!.enableServerValidation &&
       securityConfig!.isValid();
-}
-
-/// Hybrid Signature (Gabungan Touch + Motion)
-class BiometricSignature {
-  final double touchScore;    // 80% Weight
-  final double motionScore;   // 20% Weight
-  final double finalConfidence;
-  final DateTime timestamp;
-  final bool isHumanLikely;
-
-  BiometricSignature({
-    required this.touchScore,
-    required this.motionScore,
-    required this.finalConfidence,
-    required this.timestamp,
-    required this.isHumanLikely,
-  });
-
-  // Untuk serasi dengan kod server lama (Payload), kita map nilai hybrid ke sini
-  double get averageMagnitude => motionScore; // Mapping
-  double get patternEntropy => touchScore;    // Mapping
 }
 
 class MotionEvent {
