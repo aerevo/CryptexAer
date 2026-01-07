@@ -27,14 +27,12 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
   StreamSubscription<UserAccelerometerEvent>? _accelSub;
   
-  // Privacy Shield
   int? _activeWheelIndex;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // 🔥 COLOR PALETTE (MONO-CYAN)
-  // Kita tak guna Hijau atau Kuning. Kita main dengan Brightness Cyan.
-  final Color _colNeon = const Color(0xFF00FFFF); // Cyan Terang (Active/Unlock)
-  final Color _colDim  = const Color(0xFF008B8B); // Cyan Gelap (Idle)
+  // COLOR PALETTE (Mono-Cyan)
+  final Color _colNeon = const Color(0xFF00FFFF); 
+  final Color _colDim  = const Color(0xFF008B8B); 
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam  = const Color(0xFFFF3333);    
   final Color _colDead = const Color(0xFF424242);
@@ -54,7 +52,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
       widget.onJammed();
     }
-    // Update UI setiap kali data sensor masuk (Direct Feed)
     if (mounted) setState(() {});
   }
 
@@ -100,38 +97,32 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Kita tak pakai AnimatedBuilder untuk root sebab kita guna setState direct
     return _buildStateUI(widget.controller.state);
   }
 
   Widget _buildStateUI(SecurityState state) {
     Color activeColor;
-    Color boxColor; // Warna khas untuk kotak sensor
+    Color boxColor;
     String statusText;
     IconData statusIcon;
     bool isInputDisabled = false;
 
-    // LOGIK WARNA MONO-CYAN
     if (state == SecurityState.LOCKED) {
-       // Kalau Motion > 0.8 (Detection), UI jadi TERANG
+       // Logic Warna
        if (widget.controller.motionConfidence > 0.8) { 
          activeColor = _colNeon;
          statusText = "MOTION DETECTED";
          statusIcon = Icons.graphic_eq;
-       } 
-       // Kalau Sensing (0.1 - 0.8), UI jadi sederhana
-       else if (widget.controller.motionConfidence > 0.1) {
+       } else if (widget.controller.motionConfidence > 0.05) { // 0.05 sebab deadzone
          activeColor = _colNeon.withOpacity(0.8);
          statusText = "SENSING...";
          statusIcon = Icons.sensors; 
-       } 
-       // Kalau Idle, UI jadi malap (Cyan Gelap)
-       else {
+       } else {
          activeColor = _colDim;
          statusText = "IDLE";
          statusIcon = Icons.lock_outline; 
        }
-       boxColor = _colNeon; // Kotak sentiasa Neon
+       boxColor = _colNeon;
     } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
         boxColor = Colors.white;
@@ -152,7 +143,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     } else if (state == SecurityState.ROOT_WARNING) {
         return _buildSecurityWarningUI(); 
     } else { 
-        activeColor = _colNeon; // Unlock kekal Cyan (Tak tukar hijau)
+        activeColor = _colNeon;
         boxColor = _colNeon;
         statusText = "ACCESS GRANTED";
         statusIcon = Icons.lock_open;
@@ -170,26 +161,50 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // HEADER
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(statusIcon, color: activeColor, size: 18),
-              const SizedBox(width: 10),
-              Text(statusText, style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 25),
           
-          // 🔥 DUA KOTAK SENSOR (KIRI & KANAN)
+          // 🔥 NEW LAYOUT: LEFT (Status) vs RIGHT (Sensors)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 1. MOTION SENSOR (3 Fasa)
-              _buildMotionBox(widget.controller.motionConfidence, boxColor),
+              // 1. KIRI: STATUS BESAR
+              Expanded(
+                flex: 7,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(statusIcon, color: activeColor, size: 20),
+                        const SizedBox(width: 8),
+                        Text("SYSTEM STATUS", style: TextStyle(color: Colors.grey[600], fontSize: 10, letterSpacing: 2)),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      statusText, 
+                      style: TextStyle(
+                        color: activeColor, 
+                        fontWeight: FontWeight.bold, 
+                        fontSize: 16, // Besar sikit
+                        letterSpacing: 1.0
+                      )
+                    ),
+                    const SizedBox(height: 5),
+                    Divider(color: activeColor.withOpacity(0.3)),
+                  ],
+                ),
+              ),
               
-              // 2. BIO-THERMAL (Touch)
-              _buildBioThermalBox(widget.controller.touchConfidence, boxColor),
+              const SizedBox(width: 15),
+
+              // 2. KANAN: STACK SENSORS (HUD STYLE)
+              Column(
+                children: [
+                   _buildMotionBox(widget.controller.motionConfidence, boxColor),
+                   const SizedBox(height: 8),
+                   _buildBioThermalBox(widget.controller.touchConfidence, boxColor),
+                ],
+              )
             ],
           ),
           
@@ -224,6 +239,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
           
           const SizedBox(height: 25),
           
+          // UNLOCK BUTTON
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -245,81 +261,50 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     );
   }
   
-  // 🔥 WIDGET 1: MOTION SENSOR (SISTEM 3 FASA)
+  // WIDGET 1: MOTION BOX (Small & Compact)
   Widget _buildMotionBox(double value, Color color) {
+    bool isActive = value > 0.8;
+    bool isSensing = value > 0.05; // Lebih dari Deadzone
+
     IconData iconToShow;
-    String label;
-    bool isActive = false;
+    if (isActive) iconToShow = Icons.check; // Tick
+    else if (isSensing) iconToShow = Icons.circle; // Dot
+    else iconToShow = Icons.crop_square; // Kosong
 
-    if (value > 0.8) {
-      // FASA 3: DETECTED (Tick)
-      iconToShow = Icons.check_box;
-      label = "DETECTED";
-      isActive = true;
-    } else if (value > 0.1) {
-      // FASA 2: SENSING (Dot)
-      // Kita guna icon bulat kecil dalam kotak
-      iconToShow = Icons.radio_button_checked; 
-      label = "SENSING";
-      isActive = true;
-    } else {
-      // FASA 1: IDLE (Kosong)
-      iconToShow = Icons.check_box_outline_blank;
-      label = "MOTION";
-      isActive = false;
-    }
-
-    return Column(
-      children: [
-        Text(label, style: TextStyle(color: isActive ? color : Colors.grey[600], fontSize: 9, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 100), // Laju
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isActive ? color.withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: isActive ? color : Colors.grey[800]!),
-            boxShadow: isActive ? [BoxShadow(color: color.withOpacity(0.3), blurRadius: 10)] : [],
-          ),
-          child: Center(
-            child: Icon(iconToShow, size: 24, color: isActive ? color : Colors.grey[700]),
-          ),
-        ),
-      ],
+    return Container(
+      width: 45,
+      height: 35,
+      decoration: BoxDecoration(
+        color: isActive ? color.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: isSensing ? color : Colors.grey[800]!),
+      ),
+      child: Center(
+        child: Icon(iconToShow, size: 16, color: isSensing ? color : Colors.grey[700]),
+      ),
     );
   }
 
-  // 🔥 WIDGET 2: BIO-THERMAL (SISTEM TOUCH)
+  // WIDGET 2: BIO-THERMAL BOX
   Widget _buildBioThermalBox(double value, Color color) {
     bool isVerified = value > 0.5;
     
-    return Column(
-      children: [
-        // TUKAR NAMA JADI "BIO-THERMAL" (Finger Heat)
-        Text("BIO-THERMAL", style: TextStyle(color: isVerified ? color : Colors.grey[600], fontSize: 9, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isVerified ? color.withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: isVerified ? color : Colors.grey[800]!),
-            boxShadow: isVerified ? [BoxShadow(color: color.withOpacity(0.3), blurRadius: 10)] : [],
-          ),
-          child: Center(
-            // Icon Cap Jari Api
-            child: Icon(
-              isVerified ? Icons.local_fire_department : Icons.fingerprint, 
-              size: 24, 
-              color: isVerified ? color : Colors.grey[700]
-            ),
-          ),
+    return Container(
+      width: 45,
+      height: 35,
+      decoration: BoxDecoration(
+        color: isVerified ? color.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: isVerified ? color : Colors.grey[800]!),
+      ),
+      child: Center(
+        // IKON CHECKMARK (√) seperti diminta
+        child: Icon(
+          isVerified ? Icons.check : Icons.fingerprint, // Check bila verified, cap jari bila tak
+          size: 16, 
+          color: isVerified ? color : Colors.grey[700]
         ),
-      ],
+      ),
     );
   }
   
