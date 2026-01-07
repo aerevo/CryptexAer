@@ -31,13 +31,13 @@ class ClaController extends ChangeNotifier {
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
   // ═══════════════════════════════════════════════════════════
-  // 📡 DSP ENGINE (Sensor Signal Processing)
+  // 📡 DSP ENGINE (DISABLED - 100% RAW SENSITIVITY)
   // ═══════════════════════════════════════════════════════════
   
   final List<double> _rawSensorBuffer = [];
-  static const int BUFFER_SIZE = 12;
-  static const double NOISE_GATE = 0.8;
-  static const double MAX_REASONABLE_SHAKE = 7.0;
+  static const int BUFFER_SIZE = 3;                // 🔥 12→3 (minimal smoothing)
+  static const double NOISE_GATE = 0.1;            // 🔥 0.8→0.1 (catch everything!)
+  static const double MAX_REASONABLE_SHAKE = 25.0; // 🔥 7.0→25.0 (no cap!)
 
   // ═══════════════════════════════════════════════════════════
   // 🧬 BIOMETRIC STATE (AAA Architecture)
@@ -62,7 +62,7 @@ class ClaController extends ChangeNotifier {
   bool _quietSuspicion = false;
 
   static const int MAX_HISTORY_SIZE = 100;
-  static const double ELECTRONIC_NOISE_FLOOR = 0.15;
+  static const double ELECTRONIC_NOISE_FLOOR = 0.05; // 🔥 0.15→0.05 (ultra sensitive!)
 
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
@@ -147,21 +147,23 @@ class ClaController extends ChangeNotifier {
   void registerShake(double rawMagnitude, double dx, double dy, double dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    // STAGE 1: DSP Filtering (Hardware noise removal)
+    // 🔥 100% SENSITIVE MODE - MINIMAL FILTERING
     double cleanMag = rawMagnitude.clamp(0.0, MAX_REASONABLE_SHAKE);
-    if (cleanMag < NOISE_GATE) cleanMag = 0.0;
+    
+    // Skip noise gate completely if magnitude > 0.1
+    if (cleanMag < NOISE_GATE) return; // Only filter extreme noise
 
-    // STAGE 2: Rolling average (spike suppression)
+    // MINIMAL rolling average (3 samples only)
     _rawSensorBuffer.add(cleanMag);
     if (_rawSensorBuffer.length > BUFFER_SIZE) _rawSensorBuffer.removeAt(0);
     
-    double filteredMag = _rawSensorBuffer.isEmpty ? 0.0 :
+    double filteredMag = _rawSensorBuffer.isEmpty ? cleanMag :
         _rawSensorBuffer.reduce((a, b) => a + b) / _rawSensorBuffer.length;
 
-    // STAGE 3: Only process significant motion
+    // ACCEPT ALL significant motion (no floor check)
     if (filteredMag < ELECTRONIC_NOISE_FLOOR) return;
 
-    // STAGE 4: Biometric recording
+    // Record everything
     final now = DateTime.now();
     _registerInteraction();
 
@@ -185,17 +187,14 @@ class ClaController extends ChangeNotifier {
 
     _accumulatedShake += filteredMag;
 
-    // Pattern fingerprinting
     final pattern = _quantizePattern(dx, dy, dz);
     _patternFrequency[pattern] = (_patternFrequency[pattern] ?? 0) + 1;
     _uniquePatternCount = _patternFrequency.length;
 
     _calculateBiometricStats();
     
-    // Only notify UI on significant changes (throttle updates)
-    if (_motionHistory.length % 3 == 0) {
-      notifyListeners();
-    }
+    // 🔥 UPDATE EVERY FRAME (no throttle!)
+    notifyListeners();
   }
 
   String _quantizePattern(double dx, double dy, double dz) {
@@ -239,11 +238,10 @@ class ClaController extends ChangeNotifier {
     return avg <= 0 ? 0.0 : 1 / avg;
   }
 
-  /// Time-decay function (natural confidence drop over time)
+  /// Time-decay function (DISABLED for 100% sensitivity)
   double _decay(double raw) {
-    if (_sessionStartTime == null) return raw;
-    final elapsed = DateTime.now().difference(_sessionStartTime!).inMilliseconds;
-    return (raw * exp(-elapsed / 5000)).clamp(0.0, 1.0);
+    // 🔥 NO DECAY - Return raw score immediately
+    return raw.clamp(0.0, 1.0);
   }
 
   BiometricSignature _generateSignature() {
@@ -253,18 +251,19 @@ class ClaController extends ChangeNotifier {
     final tremorHz = _estimateTremorHz();
     final tremorHuman = tremorHz > 7.5 && tremorHz < 13.5;
 
+    // 🔥 ULTRA SENSITIVE SCORING - Give credit easily
     double score = 0.0;
     
-    // Motion scoring (40% weight)
-    if (avgMag > 0.2 && avgMag < 3.5) score += 0.15;
-    if (_frequencyVariance > 0.12) score += 0.1;
-    if (_entropy > 0.5) score += 0.1;
-    if (tremorHuman) score += 0.05;
+    // Motion scoring (generous thresholds)
+    if (avgMag > 0.1) score += 0.2;        // 🔥 0.2→0.1 (easier to trigger)
+    if (_frequencyVariance > 0.05) score += 0.15; // 🔥 0.12→0.05 (easier)
+    if (_entropy > 0.3) score += 0.15;     // 🔥 0.5→0.3 (easier)
+    if (tremorHuman) score += 0.1;
     
-    // 🔥 WHEEL INTERACTION SCORING (60% weight)
-    if (_wheelTouchCount > 0) score += 0.2;
-    if (_wheelTouchCount > 3) score += 0.2;
-    if (_wheelTouchCount > 6) score += 0.2;
+    // Wheel interaction scoring
+    if (_wheelTouchCount > 0) score += 0.15;
+    if (_wheelTouchCount > 2) score += 0.15; // 🔥 3→2 (easier)
+    if (_wheelTouchCount > 4) score += 0.1;  // 🔥 6→4 (easier)
 
     return BiometricSignature(
       averageMagnitude: avgMag,
@@ -272,7 +271,7 @@ class ClaController extends ChangeNotifier {
       patternEntropy: _entropy,
       uniqueGestureCount: _wheelTouchCount,
       timestamp: DateTime.now(),
-      isPotentiallyHuman: score >= 0.6,
+      isPotentiallyHuman: score >= 0.5, // 🔥 0.6→0.5 (easier to pass)
     );
   }
 
@@ -521,13 +520,13 @@ class ClaController extends ChangeNotifier {
   // 📊 PUBLIC GETTERS (UI Access)
   // ═══════════════════════════════════════════════════════════
 
-  /// Main confidence score (time-decayed, stable)
+  /// Main confidence score (100% SENSITIVE - No decay, direct response)
   double get liveConfidence {
-    // Motion contribution (primary)
-    double motionScore = _decay(_generateSignature().humanConfidence);
+    // Motion contribution (primary) - NO DECAY
+    double motionScore = _generateSignature().humanConfidence;
     
     // Wheel touch contribution (secondary feedback)
-    double wheelScore = (_wheelTouchCount / 10.0).clamp(0.0, 0.7);
+    double wheelScore = (_wheelTouchCount / 8.0).clamp(0.0, 0.8); // 🔥 10→8 (faster max)
     
     // Combine: 70% motion, 30% wheel
     return (motionScore * 0.7 + wheelScore * 0.3).clamp(0.0, 1.0);
