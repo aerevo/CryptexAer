@@ -1,7 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * ENGINE: SENSITIVE MOTION (Tuned for Human Hand)
- * STATUS: FIXED (No more aggressive shaking needed)
+ * ENGINE: RAW INSTANT RESPONSE
+ * TUNING: Zero Latency, Maximum Gain
  */
 
 import 'dart:async';
@@ -32,21 +32,25 @@ class ClaController extends ChangeNotifier {
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
   // ═══════════════════════════════════════════════════════════
-  // 📡 DSP ENGINE (SENSITIVITY TUNED)
+  // 📡 DSP ENGINE (RAW UNLEASHED)
   // ═══════════════════════════════════════════════════════════
   
   final List<double> _rawBuffer = []; 
-  static const int BUFFER_SIZE = 10;     
+  // Buffer pendek untuk respon kilat
+  static const int BUFFER_SIZE = 3;      
   
-  // 🔥 FIX 1: NOISE GATE (Turunkan sikit supaya detect gerakan halus)
-  static const double NOISE_GATE = 0.15; // Was 0.3
+  // 🔥 SETTING "GILA" BARU:
+  // 1. Terima SEMUA getaran, walau sekecil kuman.
+  static const double NOISE_GATE = 0.0; 
   
-  // 🔥 FIX 2: SMOOTHING (Naikkan sikit supaya tak terlalu lambat)
-  static const double SMOOTHING = 0.15;  // Was 0.1
+  // 2. Percaya data baru 80%. Jangan simpan data lama. (Bar jadi sangat liar & laju)
+  static const double SMOOTHING = 0.8;  
   
-  // 🔥 FIX 3: MAX SHAKE (PENTING! Turunkan supaya senang penuh)
-  // 8.0 = Gempa Bumi. 2.5 = Tangan Manusia.
-  static const double MAX_SHAKE = 2.5;   // Was 8.0
+  // 3. Ganda 5 kali. Goyang sikit = Bar Penuh.
+  static const double SENSITIVITY_BOOST = 5.0; 
+  
+  // 4. Had maksimum rendah. 1.5 shj dah cukup untuk 100%.
+  static const double MAX_SHAKE = 1.5;   
   
   double _internalSmoothedValue = 0.0;
 
@@ -111,34 +115,35 @@ class ClaController extends ChangeNotifier {
   void registerShake(double rawMagnitude, double dx, dy, dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    // A. NOISE GATE
+    // A. NOISE GATE (OFF)
     double cleanMag = rawMagnitude;
-    if (cleanMag < NOISE_GATE) cleanMag = 0.0;
+    // Kita terima semua data > 0.0
 
-    // B. ROLLING AVERAGE
+    // B. ROLLING AVERAGE (Pendek)
     _rawBuffer.add(cleanMag);
     if (_rawBuffer.length > BUFFER_SIZE) _rawBuffer.removeAt(0);
     double averageMag = _rawBuffer.reduce((a, b) => a + b) / _rawBuffer.length;
 
-    // C. SMOOTHING
+    // C. SMOOTHING (Sangat Kurang - Hampir Raw)
+    // Formula: (Nilai Lama * 0.2) + (Nilai Baru * 0.8)
+    // Maksudnya: Nilai baru terus ambil alih bar.
     _internalSmoothedValue = (_internalSmoothedValue * (1 - SMOOTHING)) + (averageMag * SMOOTHING);
 
-    // D. NORMALIZE (0.0 - 1.0)
-    // Dengan MAX_SHAKE = 2.5, gegaran sikit pun dah boleh dapat 0.5 - 0.8.
-    _motionConfidence = (_internalSmoothedValue / MAX_SHAKE).clamp(0.0, 1.0);
+    // D. BOOST
+    _motionConfidence = (_internalSmoothedValue * SENSITIVITY_BOOST / MAX_SHAKE).clamp(0.0, 1.0);
 
     // E. RECORD HISTORY
-    if (_internalSmoothedValue > 0.1) {
-       _addToHistory(_internalSmoothedValue, dx, dy, dz);
+    if (rawMagnitude > 0.01) {
+       _addToHistory(rawMagnitude, dx, dy, dz);
     }
     
+    // PENTING: Paksa UI update setiap kali sensor hantar data
     notifyListeners(); 
   }
 
   void registerTouch() {
     if (_state != SecurityState.LOCKED) return;
     _touchCount++;
-    // Logic Touch mudah: Cukup 3 kali sentuh, dia jadi 1.0 (Verified)
     _touchConfidence = (_touchCount / 3.0).clamp(0.0, 1.0);
     notifyListeners();
   }
@@ -188,8 +193,9 @@ class ClaController extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 600));
 
     // CHECK 1: DEAD CHECK
-    // Mesti ada aktiviti minima
-    if (_motionConfidence < 0.1 && _touchConfidence < 0.1) {
+    // Disebabkan sensor dah sensitif gila, threshold ni pun kita rendahkan.
+    // Asalkan bar gerak sikit je (>0.01), kita luluskan sensor.
+    if (_motionConfidence < 0.01 && _touchConfidence < 0.1) {
        await _fail(bot: true, msg: "NO ACTIVITY DETECTED");
        return;
     }
