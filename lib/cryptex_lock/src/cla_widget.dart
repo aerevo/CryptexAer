@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui'; // Perlu untuk lerpDouble
+import 'dart:ui'; 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
@@ -35,12 +35,12 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   int? _activeWheelIndex;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // Colors (Warna Gred Tentera ZIP)
-  final Color _colLocked = const Color(0xFFFFD700); 
+  // Warna Gred Tentera
+  final Color _colLocked = const Color(0xFF00FFFF); // Cyan Neon
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam = const Color(0xFFFF3333);    
   final Color _colUnlock = const Color(0xFF00E676); 
-  final Color _colDead = const Color(0xFF616161); // Warna ZIP
+  final Color _colDead = const Color(0xFF616161);
 
   @override
   void initState() {
@@ -49,7 +49,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _initScrollControllers();
     _initAnimations();
     _startListening();
-    
     widget.controller.addListener(_handleControllerChange);
   }
   
@@ -60,9 +59,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       widget.onJammed();
     }
     
-    // Update Bar
+    // UPDATE BAR UTAMA (Motion)
     if (mounted) {
-       _animateScoreBar(widget.controller.liveConfidence);
+       _animateScoreBar(widget.controller.motionConfidence);
     }
   }
 
@@ -81,7 +80,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300), 
+      duration: const Duration(milliseconds: 200), // Laju sikit sebab sensor
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
       CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic),
@@ -98,10 +97,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _startListening() {
     _accelSub?.cancel();
     
-    // SENSOR STABIL (UserAccelerometer)
+    // SENSOR UTAMA: Mengawal Bar Besar
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
       double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
-      // Hantar terus ke Controller. Controller akan urus payload server.
       widget.controller.registerShake(rawMag, e.x, e.y, e.z);
     });
   }
@@ -147,22 +145,23 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       if (widget.controller.liveConfidence > 0.8) { 
+       // Logic Text
+       if (widget.controller.motionConfidence > 0.8) { 
          activeColor = _colUnlock;
-         statusText = "BIOMETRIC MATCH (SECURE)";
-         statusIcon = Icons.fingerprint;
-       } else if (widget.controller.liveConfidence > 0.3) {
+         statusText = "BIO-RESONANCE: PEAK";
+         statusIcon = Icons.graphic_eq;
+       } else if (widget.controller.motionConfidence > 0.3) {
          activeColor = _colLocked;
-         statusText = "ANALYZING...";
-         statusIcon = Icons.touch_app; 
+         statusText = "SENSING MOTION...";
+         statusIcon = Icons.sensors; 
        } else {
          activeColor = _colDead;
-         statusText = "SECURE VAULT";
+         statusText = "AWAITING BIO-SIGNATURE";
          statusIcon = Icons.lock_outline; 
        }
     } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
-        statusText = "SERVER VERIFICATION..."; // Tanda integration server berjaya
+        statusText = "SERVER VERIFICATION...";
         statusIcon = Icons.cloud_sync;
         isInputDisabled = true;
     } else if (state == SecurityState.SOFT_LOCK) {
@@ -175,7 +174,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         statusIcon = Icons.block;
         isInputDisabled = true;
     } else if (state == SecurityState.ROOT_WARNING) {
-        return _buildSecurityWarningUI(); // K9 Watchdog UI
+        return _buildSecurityWarningUI(); 
     } else { 
         activeColor = _colUnlock;
         statusText = "ACCESS GRANTED";
@@ -204,32 +203,34 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ),
           const SizedBox(height: 25),
           
-          // BIO-SIGMA BAR
-          AnimatedBuilder(
-            animation: _progressController,
-            builder: (context, child) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                 Row(
-                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                   children: [
-                     Text("BIO-SIGMA CONFIDENCE", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
-                     Text("${(_progressAnimation.value * 100).toInt()}%", style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, fontSize: 10)),
-                   ],
+          // BAR BESAR (ACCELEROMETER)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+               Row(
+                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                 children: [
+                   Text("MOTION RESONANCE (PRIMARY)", style: TextStyle(color: Colors.grey[600], fontSize: 9)),
+                   Text("${(_progressAnimation.value * 100).toInt()}%", style: TextStyle(color: activeColor, fontWeight: FontWeight.bold, fontSize: 10)),
+                 ],
+               ),
+               const SizedBox(height: 6),
+               ClipRRect(
+                 borderRadius: BorderRadius.circular(2),
+                 child: LinearProgressIndicator(
+                   value: _progressAnimation.value,
+                   backgroundColor: Colors.grey[900],
+                   color: activeColor,
+                   minHeight: 6, // Tebal sikit
                  ),
-                 const SizedBox(height: 6),
-                 ClipRRect(
-                   borderRadius: BorderRadius.circular(2),
-                   child: LinearProgressIndicator(
-                     value: _progressAnimation.value,
-                     backgroundColor: Colors.grey[900],
-                     color: activeColor,
-                     minHeight: 3,
-                   ),
-                 ),
-              ],
-            ),
+               ),
+            ],
           ),
+          
+          const SizedBox(height: 15),
+          
+          // METER KECIL (TOUCH SECONDARY)
+          _buildTouchMeter(widget.controller.touchConfidence),
           
           const SizedBox(height: 25),
           
@@ -241,9 +242,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               child: NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
                   if (notification is ScrollUpdateNotification) {
-                     // Hantar signal sentuhan
-                     widget.controller.registerTouchInteraction(); 
-                     
+                     widget.controller.registerTouch(); // Lapor sentuhan
                      if (_activeWheelIndex == null) {
                        setState(() => _activeWheelIndex = 1); 
                      }
@@ -284,9 +283,32 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
   
+  // WIDGET BARU: Meter Sentuhan Kecil
+  Widget _buildTouchMeter(double value) {
+    Color touchColor = value > 0.5 ? Colors.greenAccent : Colors.grey[800]!;
+    return Row(
+      children: [
+        Icon(Icons.touch_app, size: 12, color: touchColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: value,
+              backgroundColor: Colors.grey[900],
+              color: touchColor,
+              minHeight: 2,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text("TOUCH VERIFIED", style: TextStyle(fontSize: 9, color: touchColor)),
+      ],
+    );
+  }
+  
   Widget _buildPrivacyWheel(int index, Color color, bool disabled) {
     final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.15;
-    
     return SizedBox(
       width: 45,
       child: AnimatedOpacity(
