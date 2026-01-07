@@ -1,7 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * ENGINE: HYBRID DSP + AAA Biometrics
- * STATUS: PRODUCTION GRADE - Sensor Stable + Time Decay Confidence
+ * ENGINE: CLASSIC MOTION (Accelerometer Driven)
+ * FILTER: DSP ENABLED (No Jitter)
  */
 
 import 'dart:async';
@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 import 'cla_models.dart';
 
+// SERVER SECURITY IMPORTS
 import 'security/models/secure_payload.dart';
 import 'security/services/mirror_service.dart';
 import 'security/services/device_fingerprint.dart';
@@ -26,53 +27,48 @@ class ClaController extends ChangeNotifier {
 
   DateTime? _lockoutUntil;
   late List<int> currentValues;
-
+  
+  // FIXED: MISSING KEYS RESTORED
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
   // ═══════════════════════════════════════════════════════════
-  // 📡 DSP ENGINE (DISABLED - 100% RAW SENSITIVITY)
+  // 📡 DSP ENGINE (PENAPIS GEGARAN)
   // ═══════════════════════════════════════════════════════════
+  // Ini rahsia supaya sensor tak gila (0-19).
   
-  final List<double> _rawSensorBuffer = [];
-  static const int BUFFER_SIZE = 3;                // 🔥 12→3 (minimal smoothing)
-  static const double NOISE_GATE = 0.1;            // 🔥 0.8→0.1 (catch everything!)
-  static const double MAX_REASONABLE_SHAKE = 25.0; // 🔥 7.0→25.0 (no cap!)
+  final List<double> _rawBuffer = []; 
+  static const int BUFFER_SIZE = 10;     // Purata 10 frame (Smooth)
+  static const double NOISE_GATE = 0.3;  // Abaikan getaran meja (<0.3)
+  static const double SMOOTHING = 0.1;   // Gerakan bar macam air (Liquid)
+  static const double MAX_SHAKE = 8.0;   // Nilai gegaran maksimum untuk 100%
+  
+  double _internalSmoothedValue = 0.0;   // Nilai yang dah bersih
 
   // ═══════════════════════════════════════════════════════════
-  // 🧬 BIOMETRIC STATE (AAA Architecture)
+  // 🧬 METRICS
   // ═══════════════════════════════════════════════════════════
   
   final List<MotionEvent> _motionHistory = [];
-  final List<double> _magnitudeBuffer = [];
-  final List<DateTime> _motionTimestamps = [];
-  final Map<String, int> _patternFrequency = {};
-
-  double _accumulatedShake = 0;
-  double _frequencyVariance = 0;
   double _entropy = 0.0;
-  int _uniquePatternCount = 0;
+  double _variance = 0.0;
+  
+  // UI SCORES
+  double _motionConfidence = 0.0; // Bar Besar (Utama)
+  double _touchConfidence = 0.0;  // Meter Kecil (Secondary)
+  int _touchCount = 0;
 
-  // Session Control
-  DateTime? _sessionStartTime;
-  DateTime? _lastInteractionTime;
-  Duration _activeInteraction = Duration.zero;
-
-  BiometricSignature? _lastSignature;
-  bool _quietSuspicion = false;
-
-  static const int MAX_HISTORY_SIZE = 100;
-  static const double ELECTRONIC_NOISE_FLOOR = 0.05; // 🔥 0.15→0.05 (ultra sensitive!)
-
+  double get motionConfidence => _motionConfidence;
+  double get touchConfidence => _touchConfidence;
+  
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
-
+  
   late MirrorService _mirrorService;
 
   ClaController(this.config) {
     final rand = Random();
-    currentValues = List.generate(5, (_) => rand.nextInt(10));
-    _sessionStartTime = DateTime.now();
+    currentValues = List.generate(5, (index) => rand.nextInt(10));
     
     if (config.hasServerValidation) {
       _mirrorService = MirrorService(
@@ -80,21 +76,14 @@ class ClaController extends ChangeNotifier {
         timeout: config.securityConfig!.serverTimeout,
       );
     }
-    
     _initSecurityProtocol();
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // 🔐 SECURITY BOOTSTRAP
-  // ═══════════════════════════════════════════════════════════
 
   Future<void> _initSecurityProtocol() async {
     bool isRooted = false;
     try {
       isRooted = await FlutterJailbreakDetection.jailbroken;
-    } catch (e) {
-      // Ignore in debug
-    }
+    } catch (e) { /* Ignore */ }
 
     if (isRooted) {
       _threatMessage = "CRITICAL: K9 WATCHDOG ALERT";
@@ -107,228 +96,90 @@ class ClaController extends ChangeNotifier {
   
   void userAcceptsRisk() {
     _state = SecurityState.LOCKED;
-    _threatMessage = "";
     notifyListeners();
     _loadState();
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎯 PUBLIC API (Widget Interface)
+  // 🎛️ INPUT LOGIC (ACCELEROMETER IS KING)
   // ═══════════════════════════════════════════════════════════
 
-  int _wheelTouchCount = 0;
+  // 1. SENSOR INPUT (UTAMA - MENGGERAKKAN BAR BESAR)
+  void registerShake(double rawMagnitude, double dx, dy, dz) {
+    if (_state != SecurityState.LOCKED) return;
 
-  /// Bridge method for legacy widget support
-  void registerTouchInteraction() {
-    _registerInteraction();
-    _wheelTouchCount++;
+    // A. NOISE GATE (Buang sampah)
+    double cleanMag = rawMagnitude;
+    if (cleanMag < NOISE_GATE) cleanMag = 0.0;
+
+    // B. ROLLING AVERAGE (Buang spike)
+    _rawBuffer.add(cleanMag);
+    if (_rawBuffer.length > BUFFER_SIZE) _rawBuffer.removeAt(0);
+    double averageMag = _rawBuffer.reduce((a, b) => a + b) / _rawBuffer.length;
+
+    // C. SMOOTHING (Absorber)
+    _internalSmoothedValue = (_internalSmoothedValue * (1 - SMOOTHING)) + (averageMag * SMOOTHING);
+
+    // D. UPDATE UI (Normalize 0.0 - 1.0)
+    // Kalau gegaran cecah 8.0, bar penuh.
+    _motionConfidence = (_internalSmoothedValue / MAX_SHAKE).clamp(0.0, 1.0);
+
+    // E. REKOD SEJARAH (Untuk Server)
+    if (_internalSmoothedValue > 0.1) {
+       _addToHistory(_internalSmoothedValue, dx, dy, dz);
+    }
+    
+    notifyListeners(); 
+  }
+
+  // 2. TOUCH INPUT (SECONDARY - METER KECIL)
+  void registerTouch() {
+    if (_state != SecurityState.LOCKED) return;
+    _touchCount++;
+    // Meter kecil naik cepat sikit
+    _touchConfidence = (_touchCount / 5.0).clamp(0.0, 1.0);
     notifyListeners();
   }
 
-  void updateWheel(int index, int value) {
-    if (_state != SecurityState.LOCKED) return;
-    if (index >= 0 && index < currentValues.length) {
-      currentValues[index] = value;
-      _registerInteraction();
-      _wheelTouchCount++;
-      notifyListeners();
-    }
-  }
-  
-  int getInitialValue(int index) {
-    if (index >= 0 && index < currentValues.length) return currentValues[index];
-    return 0;
+  void _addToHistory(double mag, double dx, dy, dz) {
+     if (_motionHistory.length >= 50) _motionHistory.removeAt(0);
+     
+     _motionHistory.add(MotionEvent(
+       magnitude: mag,
+       timestamp: DateTime.now(),
+       deltaX: dx, deltaY: dy, deltaZ: dz
+     ));
+     
+     // Kira matematik server (Variance/Entropy)
+     _calculateMetrics();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 📊 MOTION INPUT PROCESSING (DSP + Biometric Fusion)
-  // ═══════════════════════════════════════════════════════════
-
-  void registerShake(double rawMagnitude, double dx, double dy, double dz) {
-    if (_state != SecurityState.LOCKED) return;
-
-    // 🔥 100% SENSITIVE MODE - MINIMAL FILTERING
-    double cleanMag = rawMagnitude.clamp(0.0, MAX_REASONABLE_SHAKE);
-    
-    // Skip noise gate completely if magnitude > 0.1
-    if (cleanMag < NOISE_GATE) return; // Only filter extreme noise
-
-    // MINIMAL rolling average (3 samples only)
-    _rawSensorBuffer.add(cleanMag);
-    if (_rawSensorBuffer.length > BUFFER_SIZE) _rawSensorBuffer.removeAt(0);
-    
-    double filteredMag = _rawSensorBuffer.isEmpty ? cleanMag :
-        _rawSensorBuffer.reduce((a, b) => a + b) / _rawSensorBuffer.length;
-
-    // ACCEPT ALL significant motion (no floor check)
-    if (filteredMag < ELECTRONIC_NOISE_FLOOR) return;
-
-    // Record everything
-    final now = DateTime.now();
-    _registerInteraction();
-
-    final event = MotionEvent(
-      magnitude: filteredMag,
-      timestamp: now,
-      deltaX: dx,
-      deltaY: dy,
-      deltaZ: dz,
-    );
-
-    _motionHistory.add(event);
-    _magnitudeBuffer.add(filteredMag);
-    _motionTimestamps.add(now);
-
-    if (_motionHistory.length > MAX_HISTORY_SIZE) {
-      _motionHistory.removeAt(0);
-      _magnitudeBuffer.removeAt(0);
-      _motionTimestamps.removeAt(0);
-    }
-
-    _accumulatedShake += filteredMag;
-
-    final pattern = _quantizePattern(dx, dy, dz);
-    _patternFrequency[pattern] = (_patternFrequency[pattern] ?? 0) + 1;
-    _uniquePatternCount = _patternFrequency.length;
-
-    _calculateBiometricStats();
-    
-    // 🔥 UPDATE EVERY FRAME (no throttle!)
-    notifyListeners();
-  }
-
-  String _quantizePattern(double dx, double dy, double dz) {
-    return "${(dx * 10).round()}:${(dy * 10).round()}:${(dz * 10).round()}";
-  }
-
-  void _calculateBiometricStats() {
-    if (_magnitudeBuffer.isEmpty) return;
-    
-    final mean = _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
-
-    _frequencyVariance = sqrt(
-      _magnitudeBuffer.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) / 
-      _magnitudeBuffer.length,
-    );
-
-    final total = _patternFrequency.values.fold(0, (a, b) => a + b);
-    _entropy = 0.0;
-
-    for (final count in _patternFrequency.values) {
-      final p = count / total;
-      if (p > 0) _entropy -= p * (log(p) / log(2));
-    }
+  void _calculateMetrics() {
+     if (_motionHistory.isEmpty) return;
+     
+     // Variance Logic
+     double mean = _motionHistory.map((e) => e.magnitude).reduce((a,b)=>a+b) / _motionHistory.length;
+     // Fixed: Cast pow result to double
+     double sumSquaredDiff = _motionHistory.map((e) => pow(e.magnitude - mean, 2).toDouble()).reduce((a,b)=>a+b);
+     _variance = sumSquaredDiff / _motionHistory.length;
+     
+     // Entropy Logic
+     Map<String, int> freq = {};
+     for (var m in _motionHistory) {
+       String key = "${m.magnitude.toStringAsFixed(1)}";
+       freq[key] = (freq[key] ?? 0) + 1;
+     }
+     
+     _entropy = 0.0;
+     int total = _motionHistory.length;
+     freq.forEach((k, v) {
+       double p = v / total;
+       if (p > 0) _entropy -= p * log(p);
+     });
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🧬 BIOMETRIC SIGNATURE GENERATION
-  // ═══════════════════════════════════════════════════════════
-
-  double _estimateTremorHz() {
-    if (_motionTimestamps.length < 6) return 0.0;
-    final intervals = <double>[];
-
-    for (int i = 1; i < _motionTimestamps.length; i++) {
-      intervals.add(
-        _motionTimestamps[i].difference(_motionTimestamps[i - 1]).inMilliseconds / 1000.0,
-      );
-    }
-
-    final avg = intervals.reduce((a, b) => a + b) / intervals.length;
-    return avg <= 0 ? 0.0 : 1 / avg;
-  }
-
-  /// Time-decay function (DISABLED for 100% sensitivity)
-  double _decay(double raw) {
-    // 🔥 NO DECAY - Return raw score immediately
-    return raw.clamp(0.0, 1.0);
-  }
-
-  BiometricSignature _generateSignature() {
-    final avgMag = _magnitudeBuffer.isEmpty ? 0.0 :
-        _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length;
-
-    final tremorHz = _estimateTremorHz();
-    final tremorHuman = tremorHz > 7.5 && tremorHz < 13.5;
-
-    // 🔥 ULTRA SENSITIVE SCORING - Give credit easily
-    double score = 0.0;
-    
-    // Motion scoring (generous thresholds)
-    if (avgMag > 0.1) score += 0.2;        // 🔥 0.2→0.1 (easier to trigger)
-    if (_frequencyVariance > 0.05) score += 0.15; // 🔥 0.12→0.05 (easier)
-    if (_entropy > 0.3) score += 0.15;     // 🔥 0.5→0.3 (easier)
-    if (tremorHuman) score += 0.1;
-    
-    // Wheel interaction scoring
-    if (_wheelTouchCount > 0) score += 0.15;
-    if (_wheelTouchCount > 2) score += 0.15; // 🔥 3→2 (easier)
-    if (_wheelTouchCount > 4) score += 0.1;  // 🔥 6→4 (easier)
-
-    return BiometricSignature(
-      averageMagnitude: avgMag,
-      frequencyVariance: _frequencyVariance,
-      patternEntropy: _entropy,
-      uniqueGestureCount: _wheelTouchCount,
-      timestamp: DateTime.now(),
-      isPotentiallyHuman: score >= 0.5, // 🔥 0.6→0.5 (easier to pass)
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // 📡 SERVER VALIDATION
-  // ═══════════════════════════════════════════════════════════
-
-  Future<ServerVerdict> _verifyWithServer() async {
-    try {
-      final deviceId = await DeviceFingerprint.getDeviceId();
-      final appSignature = await DeviceFingerprint.getAppSignature();
-      final deviceSecret = await DeviceFingerprint.getDeviceSecret();
-      final nonce = DeviceFingerprint.generateNonce();
-      
-      final zkProof = ZeroKnowledgeProof.generate(
-        userCode: currentValues,
-        nonce: nonce,
-        deviceSecret: deviceSecret,
-      );
-      
-      final motionSig = MotionSignature.generate(
-        entropy: _entropy,
-        variance: _frequencyVariance,
-        gestureCount: _uniquePatternCount,
-      );
-      
-      final payload = SecurePayload(
-        deviceId: deviceId,
-        appSignature: appSignature,
-        nonce: nonce,
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-        entropy: _entropy,
-        tremorHz: _estimateTremorHz(),
-        frequencyVariance: _frequencyVariance,
-        averageMagnitude: _magnitudeBuffer.isEmpty ? 0.0 :
-            _magnitudeBuffer.reduce((a, b) => a + b) / _magnitudeBuffer.length,
-        uniqueGestureCount: _uniquePatternCount,
-        interactionTimeMs: _activeInteraction.inMilliseconds,
-        zkProof: zkProof,
-        motionSignature: motionSig,
-      );
-      
-      return await _mirrorService.verify(payload);
-      
-    } catch (e) {
-      if (kDebugMode) print('Server validation error: $e');
-      
-      if (config.securityConfig?.allowOfflineFallback ?? true) {
-        return ServerVerdict.offlineFallback();
-      } else {
-        return ServerVerdict.denied('server_unavailable');
-      }
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // 🔐 VALIDATION PIPELINE (AAA + Server)
+  // 🔐 VALIDATION
   // ═══════════════════════════════════════════════════════════
 
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
@@ -338,73 +189,66 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 600));
 
-    // 🔧 DEBUG: Print all metrics
-    if (kDebugMode) {
-      print('🔍 VALIDATION START');
-      print('   Interaction time: ${_activeInteraction.inSeconds}s (min: ${config.minSolveTime.inSeconds}s)');
-      print('   Wheel touches: $_wheelTouchCount');
-      print('   Motion events: ${_motionHistory.length}');
+    // CHECK 1: DEAD CHECK
+    // Mesti ada pergerakan ATAU sentuhan. Kalau kaku 100%, reject.
+    if (_motionConfidence < 0.05 && _touchConfidence < 0.1) {
+       await _fail(bot: true, msg: "NO ACTIVITY DETECTED");
+       return;
     }
 
-    // CHECK 1: Minimum interaction time
-    if (_activeInteraction < config.minSolveTime) {
-      await _fail(bot: true, msg: "INSUFFICIENT HUMAN INTERACTION");
-      return;
-    }
-
-    // CHECK 2: Biometric quality
-    final sig = _generateSignature();
-    final confidence = _decay(sig.humanConfidence);
-
-    if (kDebugMode) {
-      print('   Biometric confidence: ${confidence.toStringAsFixed(3)}');
-      print('   Required: ${config.botDetectionSensitivity}');
-    }
-
-    if (_lastSignature != null) {
-      final drift = (sig.patternEntropy - _lastSignature!.patternEntropy).abs() +
-                    (sig.averageMagnitude - _lastSignature!.averageMagnitude).abs();
-
-      if (drift < 0.03) {
-        await _fail(bot: true, msg: "BEHAVIOR TOO CONSISTENT");
-        return;
-      }
-    }
-
-    _lastSignature = sig;
-
-    if (confidence < config.botDetectionSensitivity) {
-      if (confidence > config.botDetectionSensitivity - 0.05) {
-        _quietSuspicion = true;
-      } else {
-        await _fail(bot: true, msg: "LOW BIOMETRIC CONFIDENCE");
-        return;
-      }
-    }
-
-    if (_quietSuspicion && confidence < config.botDetectionSensitivity + 0.1) {
-      await _fail(bot: true, msg: "SILENT BOT FILTER");
-      return;
-    }
-
-    // CHECK 3: Server validation
-    if (config.hasServerValidation) {
-      final verdict = await _verifyWithServer();
-      
-      if (!verdict.allowed) {
-        await _fail(bot: true, msg: verdict.reason?.toUpperCase() ?? "SERVER DENIED ACCESS");
-        return;
-      }
-    }
-
-    // CHECK 4: Code validation
+    // CHECK 2: CODE VALIDATION
     if (!_isCodeCorrect()) {
       await _fail(bot: false, msg: "INVALID PASSCODE");
       return;
     }
 
-    // SUCCESS
-    if (kDebugMode) print('✅ VALIDATION SUCCESS');
+    // CHECK 3: SERVER VALIDATION (INTEGRATED)
+    if (config.hasServerValidation) {
+      try {
+        final deviceId = await DeviceFingerprint.getDeviceId();
+        final nonce = DeviceFingerprint.generateNonce();
+        final secretStr = await DeviceFingerprint.getDeviceSecret();
+        
+        // Zero-Knowledge Proof
+        final zkProof = ZeroKnowledgeProof.generate(
+          userCode: currentValues,
+          nonce: nonce,
+          deviceSecret: secretStr,
+        );
+
+        final payload = SecurePayload(
+          deviceId: deviceId,
+          appSignature: await DeviceFingerprint.getAppSignature(),
+          nonce: nonce,
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          entropy: _entropy, 
+          averageMagnitude: _internalSmoothedValue,
+          frequencyVariance: _variance,
+          uniqueGestureCount: _touchCount,
+          interactionTimeMs: 2000,
+          zkProof: zkProof,
+          motionSignature: MotionSignature.generate(
+            entropy: _entropy,
+            variance: _variance,
+            gestureCount: _touchCount,
+          ), 
+          tremorHz: 10.0,
+        );
+
+        final verdict = await _mirrorService.verify(payload);
+        if (!verdict.allowed) {
+          await _fail(bot: true, msg: "SERVER DENIED: ${verdict.reason}");
+          return;
+        }
+      } catch (e) {
+        if (!config.securityConfig!.allowOfflineFallback) {
+           await _fail(bot: false, msg: "SERVER UNREACHABLE");
+           return;
+        }
+      }
+    }
+
+    // UNLOCK SUCCESS
     await _clearMemory();
     _state = SecurityState.UNLOCKED;
     _threatMessage = "";
@@ -414,20 +258,6 @@ class ClaController extends ChangeNotifier {
   Future<void> _fail({required bool bot, required String msg}) async {
     _failedAttempts++;
     _threatMessage = msg;
-
-    // 🔧 DEBUG MODE: 5 second grace period before locking
-    if (kDebugMode) {
-      print('🔴 FAIL DETECTED: $msg');
-      print('   Bot: $bot | Attempts: $_failedAttempts/${config.maxAttempts}');
-      print('   Motion entropy: ${_entropy.toStringAsFixed(3)}');
-      print('   Variance: ${_frequencyVariance.toStringAsFixed(3)}');
-      print('   Wheel touches: $_wheelTouchCount');
-      print('   Confidence: ${liveConfidence.toStringAsFixed(3)}');
-      print('⏱️  5 second grace period - debug now!');
-      
-      await Future.delayed(const Duration(seconds: 5));
-    }
-
     if (bot || _failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
       _lockoutUntil = DateTime.now().add(config.jamCooldown);
@@ -441,7 +271,6 @@ class ClaController extends ChangeNotifier {
         }
       });
     }
-
     await _saveState();
     notifyListeners();
   }
@@ -452,23 +281,16 @@ class ClaController extends ChangeNotifier {
     }
     return true;
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // 💾 STATE PERSISTENCE
-  // ═══════════════════════════════════════════════════════════
   
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
     _failedAttempts = prefs.getInt(KEY_ATTEMPTS) ?? 0;
-    
     final lockTs = prefs.getInt(KEY_LOCKOUT);
     if (lockTs != null) {
       _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(lockTs);
       if (DateTime.now().isBefore(_lockoutUntil!)) {
         _state = SecurityState.HARD_LOCK;
         notifyListeners();
-      } else {
-        await _clearMemory();
       }
     }
   }
@@ -483,59 +305,31 @@ class ClaController extends ChangeNotifier {
 
   Future<void> _clearMemory() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.remove(KEY_ATTEMPTS);
+    await prefs.remove(KEY_LOCKOUT);
     _failedAttempts = 0;
+    _internalSmoothedValue = 0;
+    _motionHistory.clear();
+    _touchCount = 0;
+    _motionConfidence = 0.0;
+    _touchConfidence = 0.0;
     _lockoutUntil = null;
-    _resetBiometricState();
     _state = SecurityState.LOCKED;
   }
 
-  void _resetBiometricState() {
-    _motionHistory.clear();
-    _magnitudeBuffer.clear();
-    _motionTimestamps.clear();
-    _patternFrequency.clear();
-    _rawSensorBuffer.clear();
-    _entropy = 0.0;
-    _frequencyVariance = 0.0;
-    _uniquePatternCount = 0;
-    _accumulatedShake = 0;
-    _quietSuspicion = false;
-    _lastSignature = null;
-    _activeInteraction = Duration.zero;
-    _sessionStartTime = DateTime.now();
-    _lastInteractionTime = null;
-    _wheelTouchCount = 0;
-  }
-
-  void _registerInteraction() {
-    final now = DateTime.now();
-    if (_lastInteractionTime != null) {
-      _activeInteraction += now.difference(_lastInteractionTime!);
+  void updateWheel(int index, int value) {
+    if (_state != SecurityState.LOCKED) return;
+    if (index >= 0 && index < currentValues.length) {
+      currentValues[index] = value;
+      notifyListeners();
     }
-    _lastInteractionTime = now;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 📊 PUBLIC GETTERS (UI Access)
-  // ═══════════════════════════════════════════════════════════
-
-  /// Main confidence score (100% SENSITIVE - No decay, direct response)
-  double get liveConfidence {
-    // Motion contribution (primary) - NO DECAY
-    double motionScore = _generateSignature().humanConfidence;
-    
-    // Wheel touch contribution (secondary feedback)
-    double wheelScore = (_wheelTouchCount / 8.0).clamp(0.0, 0.8); // 🔥 10→8 (faster max)
-    
-    // Combine: 70% motion, 30% wheel
-    return (motionScore * 0.7 + wheelScore * 0.3).clamp(0.0, 1.0);
+  int getInitialValue(int index) {
+    if (index >= 0 && index < currentValues.length) return currentValues[index];
+    return 0;
   }
-  
-  int get uniqueGestureCount => _uniquePatternCount;
-  double get motionEntropy => _entropy;
-  
+
   int get remainingLockoutSeconds =>
-      _lockoutUntil == null ? 0 : 
-      _lockoutUntil!.difference(DateTime.now()).inSeconds.clamp(0, 999999);
+      _lockoutUntil == null ? 0 : _lockoutUntil!.difference(DateTime.now()).inSeconds.clamp(0, 999999);
 }
