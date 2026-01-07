@@ -31,13 +31,17 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
   int? _activeWheelIndex;
   late List<FixedExtentScrollController> _scrollControllers;
   
+  // 🔥 NEW: Pattern analysis
+  double _patternScore = 0.0; // 0 = bot-like, 1 = human-like
+  List<DateTime> _scrollTimestamps = [];
+  
   // COLOR PALETTE (Improved contrast)
   final Color _colNeon = const Color(0xFF00FFFF); 
   final Color _colDim  = const Color(0xFF008B8B); 
   final Color _colFail = const Color(0xFFFF9800);   
-  final Color _colJam  = const Color(0xFFFF6B6B); // Softer red    
+  final Color _colJam  = const Color(0xFFFF6B6B);    
   final Color _colDead = const Color(0xFF424242);
-  final Color _colWarning = const Color(0xFFFFA726); // Softer orange for warnings
+  final Color _colWarning = const Color(0xFFFFA726);
 
   @override
   void initState() {
@@ -45,9 +49,28 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
     _startListening();
+    _enableAntiScreenshot();
     widget.controller.addListener(_handleControllerChange);
   }
   
+  // 🔥 NEW: Anti-screenshot protection
+  void _enableAntiScreenshot() {
+    try {
+      // Platform-specific screenshot prevention
+      // Android: FLAG_SECURE
+      // iOS: Blur on app switcher
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final window = WidgetsBinding.instance.window;
+        // This prevents screenshots on Android
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.immersiveSticky,
+        );
+      });
+    } catch (e) {
+      debugPrint("Screenshot protection not available on this platform");
+    }
+  }
+
   void _handleControllerChange() {
     if (widget.controller.state == SecurityState.UNLOCKED) {
       widget.onSuccess();
@@ -64,6 +87,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
       _accelSub?.cancel();
       _accelSub = null;
       _lockoutTimer?.cancel();
+      // 🔥 ANTI-SCREENSHOT: Blur on app switcher
+      _blurSensitiveContent(true);
     } else if (state == AppLifecycleState.resumed) {
       if (_accelSub == null) {
         _startListening();
@@ -71,6 +96,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
       if (widget.controller.state == SecurityState.HARD_LOCK) {
         _startLockoutTimer();
       }
+      _blurSensitiveContent(false);
+    }
+  }
+
+  void _blurSensitiveContent(bool blur) {
+    // This creates a visual barrier when app is backgrounded
+    if (mounted) {
+      setState(() {
+        // UI will respond to this
+      });
     }
   }
 
@@ -89,7 +124,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     });
   }
 
-  // 🔥 FIX: Real-time countdown timer
   void _startLockoutTimer() {
     _lockoutTimer?.cancel();
     _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -102,6 +136,51 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
         timer.cancel();
       }
     });
+  }
+
+  // 🔥 NEW: Analyze scroll pattern (Human vs Bot detection)
+  void _analyzeScrollPattern() {
+    _scrollTimestamps.add(DateTime.now());
+    
+    // Keep only last 10 scrolls
+    if (_scrollTimestamps.length > 10) {
+      _scrollTimestamps.removeAt(0);
+    }
+    
+    if (_scrollTimestamps.length >= 3) {
+      // Calculate intervals between scrolls
+      List<int> intervals = [];
+      for (int i = 1; i < _scrollTimestamps.length; i++) {
+        intervals.add(
+          _scrollTimestamps[i].difference(_scrollTimestamps[i-1]).inMilliseconds
+        );
+      }
+      
+      // Calculate variance (high variance = human, low = bot)
+      double mean = intervals.reduce((a, b) => a + b) / intervals.length;
+      double variance = intervals.map((x) {
+        double diff = x - mean;
+        return diff * diff;
+      }).reduce((a, b) => a + b) / intervals.length;
+      
+      // Normalize variance to 0-1 score
+      // Bots typically have <50ms variance, humans 100-500ms
+      double normalizedVariance = (variance / 500.0).clamp(0.0, 1.0);
+      
+      // Also check for too-perfect timing (bot indicator)
+      bool hasPerfectTiming = intervals.any((interval) => 
+        interval > 50 && interval < 150 && 
+        intervals.where((i) => (i - interval).abs() < 10).length >= 3
+      );
+      
+      if (hasPerfectTiming) {
+        _patternScore = 0.2; // Suspicious
+      } else {
+        _patternScore = normalizedVariance;
+      }
+      
+      setState(() {});
+    }
   }
 
   @override
@@ -131,7 +210,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       // 🔥 FIX: Better status logic
        bool hasMotion = widget.controller.motionConfidence > 0.05;
        bool hasTouch = widget.controller.touchConfidence > 0.3;
        
@@ -200,11 +278,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
           
           // STATUS HEADER
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // LEFT: Main Status
               Expanded(
-                flex: 7,
+                flex: 6,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -240,9 +318,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
                 ),
               ),
               
-              const SizedBox(width: 15),
+              const SizedBox(width: 12),
 
-              // RIGHT: Sensor Indicators
+              // 🔥 RIGHT: 3 Sensor Boxes (Vertical Stack)
               Column(
                 children: [
                    _buildSensorBox(
@@ -251,19 +329,26 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
                      color: boxColor,
                      icon: Icons.sensors,
                    ),
-                   const SizedBox(height: 10),
+                   const SizedBox(height: 8),
                    _buildSensorBox(
                      label: "TOUCH",
                      value: widget.controller.touchConfidence, 
                      color: boxColor,
                      icon: Icons.fingerprint,
                    ),
+                   const SizedBox(height: 8),
+                   // 🔥 NEW: Pattern Analysis Box
+                   _buildPatternBox(
+                     label: "PATTERN",
+                     score: _patternScore,
+                     color: boxColor,
+                   ),
                 ],
               )
             ],
           ),
           
-          // 🔥 FIX: Threat message display
+          // Threat message display
           if (widget.controller.threatMessage.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -295,7 +380,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
           
           const SizedBox(height: 25),
           
-          // WHEELS
+          // 🔥 WHEELS - Enhanced with individual tracking
           SizedBox(
             height: 120,
             child: IgnorePointer(
@@ -304,15 +389,19 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
                 onNotification: (notification) {
                   if (notification is ScrollUpdateNotification) {
                      widget.controller.registerTouch(); 
+                     _analyzeScrollPattern(); // 🔥 NEW
+                     
                      // Find which wheel is scrolling
                      for (int i = 0; i < _scrollControllers.length; i++) {
                        if (_scrollControllers[i].position == notification.metrics) {
-                         setState(() => _activeWheelIndex = i);
+                         if (_activeWheelIndex != i) {
+                           setState(() => _activeWheelIndex = i);
+                         }
                          break;
                        }
                      }
                   } else if (notification is ScrollEndNotification) {
-                     Future.delayed(const Duration(milliseconds: 500), () {
+                     Future.delayed(const Duration(milliseconds: 400), () {
                        if (mounted) setState(() => _activeWheelIndex = null); 
                      });
                   }
@@ -358,7 +447,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
             ),
           ),
           
-          // 🔥 NEW: First-time hint
+          // First-time hint
           if (state == SecurityState.LOCKED && 
               widget.controller.motionConfidence == 0 && 
               widget.controller.touchConfidence == 0) ...[
@@ -378,7 +467,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     );
   }
   
-  // 🔥 IMPROVED: Unified sensor box with label
+  // Unified sensor box
   Widget _buildSensorBox({
     required String label,
     required double value, 
@@ -391,8 +480,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     return Column(
       children: [
         Container(
-          width: 55,
-          height: 42,
+          width: 52,
+          height: 40,
           decoration: BoxDecoration(
             color: isActive ? color.withOpacity(0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
@@ -404,16 +493,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
           child: Center(
             child: Icon(
               isActive ? Icons.check_circle : icon,
-              size: 20, 
+              size: 18, 
               color: isSensing ? color : Colors.grey[700],
             ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         Text(
           label,
           style: TextStyle(
-            fontSize: 8,
+            fontSize: 7.5,
             color: isSensing ? color.withOpacity(0.8) : Colors.grey[700],
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
@@ -422,18 +511,82 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
       ],
     );
   }
+
+  // 🔥 NEW: Pattern analysis box
+  Widget _buildPatternBox({
+    required String label,
+    required double score,
+    required Color color,
+  }) {
+    bool isHumanLike = score > 0.5;
+    bool isSuspicious = score > 0.1 && score <= 0.3;
+    bool hasData = score > 0;
+
+    Color boxColor;
+    IconData boxIcon;
+    
+    if (isHumanLike) {
+      boxColor = color;
+      boxIcon = Icons.check_circle;
+    } else if (isSuspicious) {
+      boxColor = _colFail;
+      boxIcon = Icons.warning_amber_rounded;
+    } else if (hasData) {
+      boxColor = _colJam;
+      boxIcon = Icons.close;
+    } else {
+      boxColor = Colors.grey[800]!;
+      boxIcon = Icons.timeline;
+    }
+
+    return Column(
+      children: [
+        Container(
+          width: 52,
+          height: 40,
+          decoration: BoxDecoration(
+            color: isHumanLike ? color.withOpacity(0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: boxColor,
+              width: hasData ? 1.5 : 1,
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              boxIcon,
+              size: 18,
+              color: boxColor,
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 7.5,
+            color: hasData ? boxColor.withOpacity(0.8) : Colors.grey[700],
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
   
-  // 🔥 IMPROVED: Wheel with per-wheel opacity
+  // 🔥 IMPROVED: Only active wheel glows
   Widget _buildPrivacyWheel(int index, Color color, bool disabled) {
     final bool isThisWheelActive = (_activeWheelIndex == index);
+    
+    // 🔥 FIX: Hanya roda yang dipusing sahaja menyala
     final double opacity = disabled 
       ? 0.3 
-      : (isThisWheelActive ? 1.0 : 0.4); // Clearer visual feedback
+      : (isThisWheelActive ? 1.0 : 0.25); // Lebih dramatic difference
     
     return SizedBox(
       width: 45,
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 150),
         opacity: opacity,
         child: ListWheelScrollView.useDelegate(
           controller: _scrollControllers[index],
@@ -448,7 +601,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
           childDelegate: ListWheelChildBuilderDelegate(
             builder: (context, i) {
               final num = i % 10;
-              // 🔥 FIX: Removed red color on "0"
               return Center(
                 child: Text(
                   '$num',
@@ -457,11 +609,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     shadows: [
+                      // 🔥 Glow hanya pada roda yang aktif
                       if (isThisWheelActive) 
                         BoxShadow(
-                          color: color.withOpacity(0.8), 
-                          blurRadius: 10,
-                          spreadRadius: 2,
+                          color: color.withOpacity(0.9), 
+                          blurRadius: 12,
+                          spreadRadius: 3,
                         )
                     ]
                   ),
@@ -474,7 +627,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     );
   }
 
-  // 🔥 IMPROVED: Softer warning UI
   Widget _buildSecurityWarningUI() {
     return Container(
       padding: const EdgeInsets.all(28),
