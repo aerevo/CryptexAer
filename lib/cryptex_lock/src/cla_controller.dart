@@ -1,7 +1,6 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * ENGINE: DIRECT FEED (No Filtering)
- * STATUS: METER FIXED (Movement Guaranteed)
+ * LOGIC: DIRECT FEED (No Delay)
  */
 
 import 'dart:async';
@@ -30,13 +29,7 @@ class ClaController extends ChangeNotifier {
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
-  // ═══════════════════════════════════════════════════════════
-  // 📡 RAW ENGINE (DIRECT TO UI)
-  // ═══════════════════════════════════════════════════════════
-  
-  // 🔥 BUANG SEMUA BUFFER/SMOOTHING. 
-  // Kita ambil data mentah terus ke UI supaya responsif.
-  
+  // SENSOR VALUES
   double _motionConfidence = 0.0; 
   double _touchConfidence = 0.0;  
   int _touchCount = 0;
@@ -88,26 +81,25 @@ class ClaController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎛️ INPUT LOGIC (DIRECT)
+  // 🎛️ INPUT LOGIC (DIRECT FEED)
   // ═══════════════════════════════════════════════════════════
 
   void registerShake(double rawMagnitude, double dx, dy, dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    // 🔥 FIX UTAMA: DIRECT CALCULATION
-    // Goncang sikit (0.1) -> Darab 5.0 -> Jadi 0.5 (Setengah Bar)
-    // Tiada tapis, tiada delay.
-    double boostedVal = rawMagnitude * 5.0;
+    // SENSITIVITI TINGGI (DIRECT)
+    // 0.0 - 0.1 = Kosong
+    // 0.1 - 0.8 = Dot (Sensing)
+    // > 0.8     = Tick (Detected)
     
-    // Clamp supaya tak lebih 1.0
+    // Darab 3.0 dah cukup untuk bagi dia sensitif tapi tak liar sangat
+    double boostedVal = rawMagnitude * 3.0;
+    
     _motionConfidence = boostedVal.clamp(0.0, 1.0);
 
-    // Simpan history untuk server (kalau perlu)
     if (rawMagnitude > 0.05) {
        _addToHistory(rawMagnitude, dx, dy, dz);
     }
-    
-    // WAJIB: Beritahu UI untuk lukis semula
     notifyListeners(); 
   }
 
@@ -117,10 +109,6 @@ class ClaController extends ChangeNotifier {
     _touchConfidence = (_touchCount / 3.0).clamp(0.0, 1.0);
     notifyListeners();
   }
-  
-  // ... (Kod Server & Calculation lain kekal sama) ...
-  // Saya ringkaskan bahagian bawah untuk menjimatkan token Kapten, 
-  // tapi pastikan copy-paste bahagian history/validation di bawah ini:
 
   void _addToHistory(double mag, double dx, dy, dz) {
      if (_motionHistory.length >= 50) _motionHistory.removeAt(0);
@@ -152,7 +140,7 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 600));
 
-    // Check Activity (Low threshold sebab direct feed)
+    // VALIDATION: Mesti ada motion sikit (>0.05) atau touch
     if (_motionConfidence < 0.05 && _touchConfidence < 0.1) {
        await _fail(bot: true, msg: "NO ACTIVITY DETECTED");
        return;
@@ -162,7 +150,6 @@ class ClaController extends ChangeNotifier {
       return;
     }
     
-    // Server Validation Logic (Copy dari kod sebelum ini)
     if (config.hasServerValidation) {
       try {
         final deviceId = await DeviceFingerprint.getDeviceId();
@@ -199,7 +186,7 @@ class ClaController extends ChangeNotifier {
     _threatMessage = msg;
     if (bot || _failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
-      _lockoutUntil = DateTime.now().add(config.jamCooldown); // Guna cooldown 5 saat
+      _lockoutUntil = DateTime.now().add(config.jamCooldown);
     } else {
       _state = SecurityState.SOFT_LOCK;
       Future.delayed(config.softLockCooldown, () {
