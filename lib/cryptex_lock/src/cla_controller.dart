@@ -1,7 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * ENGINE: RAW INSTANT RESPONSE
- * TUNING: Zero Latency, Maximum Gain
+ * ENGINE: DIRECT FEED (No Filtering)
+ * STATUS: METER FIXED (Movement Guaranteed)
  */
 
 import 'dart:async';
@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 import 'cla_models.dart';
 
-// SERVER SECURITY IMPORTS
 import 'security/models/secure_payload.dart';
 import 'security/services/mirror_service.dart';
 import 'security/services/device_fingerprint.dart';
@@ -32,35 +31,11 @@ class ClaController extends ChangeNotifier {
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
   // ═══════════════════════════════════════════════════════════
-  // 📡 DSP ENGINE (RAW UNLEASHED)
+  // 📡 RAW ENGINE (DIRECT TO UI)
   // ═══════════════════════════════════════════════════════════
   
-  final List<double> _rawBuffer = []; 
-  // Buffer pendek untuk respon kilat
-  static const int BUFFER_SIZE = 3;      
-  
-  // 🔥 SETTING "GILA" BARU:
-  // 1. Terima SEMUA getaran, walau sekecil kuman.
-  static const double NOISE_GATE = 0.0; 
-  
-  // 2. Percaya data baru 80%. Jangan simpan data lama. (Bar jadi sangat liar & laju)
-  static const double SMOOTHING = 0.8;  
-  
-  // 3. Ganda 5 kali. Goyang sikit = Bar Penuh.
-  static const double SENSITIVITY_BOOST = 5.0; 
-  
-  // 4. Had maksimum rendah. 1.5 shj dah cukup untuk 100%.
-  static const double MAX_SHAKE = 1.5;   
-  
-  double _internalSmoothedValue = 0.0;
-
-  // ═══════════════════════════════════════════════════════════
-  // 🧬 METRICS
-  // ═══════════════════════════════════════════════════════════
-  
-  final List<MotionEvent> _motionHistory = [];
-  double _entropy = 0.0;
-  double _variance = 0.0;
+  // 🔥 BUANG SEMUA BUFFER/SMOOTHING. 
+  // Kita ambil data mentah terus ke UI supaya responsif.
   
   double _motionConfidence = 0.0; 
   double _touchConfidence = 0.0;  
@@ -68,6 +43,10 @@ class ClaController extends ChangeNotifier {
 
   double get motionConfidence => _motionConfidence;
   double get touchConfidence => _touchConfidence;
+  
+  final List<MotionEvent> _motionHistory = [];
+  double _entropy = 0.0;
+  double _variance = 0.0;
   
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
@@ -109,35 +88,26 @@ class ClaController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎛️ INPUT LOGIC
+  // 🎛️ INPUT LOGIC (DIRECT)
   // ═══════════════════════════════════════════════════════════
 
   void registerShake(double rawMagnitude, double dx, dy, dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    // A. NOISE GATE (OFF)
-    double cleanMag = rawMagnitude;
-    // Kita terima semua data > 0.0
+    // 🔥 FIX UTAMA: DIRECT CALCULATION
+    // Goncang sikit (0.1) -> Darab 5.0 -> Jadi 0.5 (Setengah Bar)
+    // Tiada tapis, tiada delay.
+    double boostedVal = rawMagnitude * 5.0;
+    
+    // Clamp supaya tak lebih 1.0
+    _motionConfidence = boostedVal.clamp(0.0, 1.0);
 
-    // B. ROLLING AVERAGE (Pendek)
-    _rawBuffer.add(cleanMag);
-    if (_rawBuffer.length > BUFFER_SIZE) _rawBuffer.removeAt(0);
-    double averageMag = _rawBuffer.reduce((a, b) => a + b) / _rawBuffer.length;
-
-    // C. SMOOTHING (Sangat Kurang - Hampir Raw)
-    // Formula: (Nilai Lama * 0.2) + (Nilai Baru * 0.8)
-    // Maksudnya: Nilai baru terus ambil alih bar.
-    _internalSmoothedValue = (_internalSmoothedValue * (1 - SMOOTHING)) + (averageMag * SMOOTHING);
-
-    // D. BOOST
-    _motionConfidence = (_internalSmoothedValue * SENSITIVITY_BOOST / MAX_SHAKE).clamp(0.0, 1.0);
-
-    // E. RECORD HISTORY
-    if (rawMagnitude > 0.01) {
+    // Simpan history untuk server (kalau perlu)
+    if (rawMagnitude > 0.05) {
        _addToHistory(rawMagnitude, dx, dy, dz);
     }
     
-    // PENTING: Paksa UI update setiap kali sensor hantar data
+    // WAJIB: Beritahu UI untuk lukis semula
     notifyListeners(); 
   }
 
@@ -147,32 +117,27 @@ class ClaController extends ChangeNotifier {
     _touchConfidence = (_touchCount / 3.0).clamp(0.0, 1.0);
     notifyListeners();
   }
+  
+  // ... (Kod Server & Calculation lain kekal sama) ...
+  // Saya ringkaskan bahagian bawah untuk menjimatkan token Kapten, 
+  // tapi pastikan copy-paste bahagian history/validation di bawah ini:
 
   void _addToHistory(double mag, double dx, dy, dz) {
      if (_motionHistory.length >= 50) _motionHistory.removeAt(0);
-     
-     _motionHistory.add(MotionEvent(
-       magnitude: mag,
-       timestamp: DateTime.now(),
-       deltaX: dx, deltaY: dy, deltaZ: dz
-     ));
-     
+     _motionHistory.add(MotionEvent(magnitude: mag, timestamp: DateTime.now(), deltaX: dx, deltaY: dy, deltaZ: dz));
      _calculateMetrics();
   }
 
   void _calculateMetrics() {
      if (_motionHistory.isEmpty) return;
-     
      double mean = _motionHistory.map((e) => e.magnitude).reduce((a,b)=>a+b) / _motionHistory.length;
      double sumSquaredDiff = _motionHistory.map((e) => pow(e.magnitude - mean, 2).toDouble()).reduce((a,b)=>a+b);
      _variance = sumSquaredDiff / _motionHistory.length;
-     
      Map<String, int> freq = {};
      for (var m in _motionHistory) {
        String key = "${m.magnitude.toStringAsFixed(1)}";
        freq[key] = (freq[key] ?? 0) + 1;
      }
-     
      _entropy = 0.0;
      int total = _motionHistory.length;
      freq.forEach((k, v) {
@@ -181,63 +146,35 @@ class ClaController extends ChangeNotifier {
      });
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 🔐 VALIDATION
-  // ═══════════════════════════════════════════════════════════
-
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
     if (_state == SecurityState.ROOT_WARNING || _state == SecurityState.HARD_LOCK) return;
-
     _state = SecurityState.VALIDATING;
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 600));
 
-    // CHECK 1: DEAD CHECK
-    // Disebabkan sensor dah sensitif gila, threshold ni pun kita rendahkan.
-    // Asalkan bar gerak sikit je (>0.01), kita luluskan sensor.
-    if (_motionConfidence < 0.01 && _touchConfidence < 0.1) {
+    // Check Activity (Low threshold sebab direct feed)
+    if (_motionConfidence < 0.05 && _touchConfidence < 0.1) {
        await _fail(bot: true, msg: "NO ACTIVITY DETECTED");
        return;
     }
-
-    // CHECK 2: CODE VALIDATION
     if (!_isCodeCorrect()) {
       await _fail(bot: false, msg: "INVALID PASSCODE");
       return;
     }
-
-    // CHECK 3: SERVER
+    
+    // Server Validation Logic (Copy dari kod sebelum ini)
     if (config.hasServerValidation) {
       try {
         final deviceId = await DeviceFingerprint.getDeviceId();
         final nonce = DeviceFingerprint.generateNonce();
         final secretStr = await DeviceFingerprint.getDeviceSecret();
-        
-        final zkProof = ZeroKnowledgeProof.generate(
-          userCode: currentValues,
-          nonce: nonce,
-          deviceSecret: secretStr,
-        );
-
+        final zkProof = ZeroKnowledgeProof.generate(userCode: currentValues, nonce: nonce, deviceSecret: secretStr);
         final payload = SecurePayload(
-          deviceId: deviceId,
-          appSignature: await DeviceFingerprint.getAppSignature(),
-          nonce: nonce,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-          entropy: _entropy, 
-          averageMagnitude: _internalSmoothedValue,
-          frequencyVariance: _variance,
-          uniqueGestureCount: _touchCount,
-          interactionTimeMs: 2000,
-          zkProof: zkProof,
-          motionSignature: MotionSignature.generate(
-            entropy: _entropy,
-            variance: _variance,
-            gestureCount: _touchCount,
-          ), 
-          tremorHz: 10.0,
+          deviceId: deviceId, appSignature: await DeviceFingerprint.getAppSignature(), nonce: nonce,
+          timestamp: DateTime.now().millisecondsSinceEpoch, entropy: _entropy, averageMagnitude: _motionHistory.isEmpty ? 0 : _motionHistory.last.magnitude,
+          frequencyVariance: _variance, uniqueGestureCount: _touchCount, interactionTimeMs: 2000, zkProof: zkProof,
+          motionSignature: MotionSignature.generate(entropy: _entropy, variance: _variance, gestureCount: _touchCount), tremorHz: 10.0,
         );
-
         final verdict = await _mirrorService.verify(payload);
         if (!verdict.allowed) {
           await _fail(bot: true, msg: "SERVER DENIED: ${verdict.reason}");
@@ -262,7 +199,7 @@ class ClaController extends ChangeNotifier {
     _threatMessage = msg;
     if (bot || _failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
-      _lockoutUntil = DateTime.now().add(config.jamCooldown);
+      _lockoutUntil = DateTime.now().add(config.jamCooldown); // Guna cooldown 5 saat
     } else {
       _state = SecurityState.SOFT_LOCK;
       Future.delayed(config.softLockCooldown, () {
@@ -310,7 +247,6 @@ class ClaController extends ChangeNotifier {
     await prefs.remove(KEY_ATTEMPTS);
     await prefs.remove(KEY_LOCKOUT);
     _failedAttempts = 0;
-    _internalSmoothedValue = 0;
     _motionHistory.clear();
     _touchCount = 0;
     _motionConfidence = 0.0;
