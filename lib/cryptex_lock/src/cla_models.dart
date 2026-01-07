@@ -1,20 +1,19 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * MODE: ACCELEROMETER FIRST (Classic)
- * INTEGRATION: Server Validation Ready
+ * CONFIG: QUICK COOLDOWN (5 Seconds)
  */
 
 import 'security/config/security_config.dart';
 
 enum SecurityState {
-  LOCKED,           // Sedia
-  VALIDATING,       // Sedang semak
-  UNLOCKED,         // Berjaya
-  SOFT_LOCK,        // Salah Key in (Amaran)
-  HARD_LOCK,        // Jammed (Kena tunggu)
-  BOT_SIMULATION,   // Mode Test Robot
-  ROOT_WARNING,     // Anjing Penjaga Menggonggong
-  COMPROMISED       // Kena Block Terus
+  LOCKED,           
+  VALIDATING,       
+  UNLOCKED,         
+  SOFT_LOCK,        
+  HARD_LOCK,        
+  BOT_SIMULATION,   
+  ROOT_WARNING,     
+  COMPROMISED       
 }
 
 class ClaConfig {
@@ -27,18 +26,16 @@ class ClaConfig {
   final double thresholdAmount;
   final bool enableSensors;
   
-  // Advanced biometric parameters
   final double botDetectionSensitivity;
-  
-  // Server validation config
   final SecurityConfig? securityConfig;
 
   const ClaConfig({
     required this.secret,
     required this.minSolveTime,
     required this.minShake,
-    required this.jamCooldown,
-    this.softLockCooldown = const Duration(seconds: 3),
+    // 🔥 FIX 1: Default Cooldown dipendekkan ke 5 saat (Dulu lama)
+    this.jamCooldown = const Duration(seconds: 5), 
+    this.softLockCooldown = const Duration(seconds: 2), // Soft lock pun laju
     this.maxAttempts = 3, 
     required this.thresholdAmount,
     this.enableSensors = true,
@@ -51,7 +48,6 @@ class ClaConfig {
       securityConfig!.enableServerValidation;
 }
 
-/// Structure for detailed motion analysis
 class MotionEvent {
   final double magnitude;
   final DateTime timestamp;
