@@ -116,9 +116,12 @@ class ClaController extends ChangeNotifier {
   // 🎯 PUBLIC API (Widget Interface)
   // ═══════════════════════════════════════════════════════════
 
+  int _wheelTouchCount = 0;
+
   /// Bridge method for legacy widget support
   void registerTouchInteraction() {
     _registerInteraction();
+    _wheelTouchCount++;
     notifyListeners();
   }
 
@@ -127,6 +130,7 @@ class ClaController extends ChangeNotifier {
     if (index >= 0 && index < currentValues.length) {
       currentValues[index] = value;
       _registerInteraction();
+      _wheelTouchCount++;
       notifyListeners();
     }
   }
@@ -250,17 +254,23 @@ class ClaController extends ChangeNotifier {
     final tremorHuman = tremorHz > 7.5 && tremorHz < 13.5;
 
     double score = 0.0;
-    if (avgMag > 0.2 && avgMag < 3.5) score += 0.3;
-    if (_frequencyVariance > 0.12) score += 0.2;
-    if (_entropy > 0.5) score += 0.2;
-    if (_uniquePatternCount >= 3) score += 0.1;
-    if (tremorHuman) score += 0.2;
+    
+    // Motion scoring (40% weight)
+    if (avgMag > 0.2 && avgMag < 3.5) score += 0.15;
+    if (_frequencyVariance > 0.12) score += 0.1;
+    if (_entropy > 0.5) score += 0.1;
+    if (tremorHuman) score += 0.05;
+    
+    // 🔥 WHEEL INTERACTION SCORING (60% weight)
+    if (_wheelTouchCount > 0) score += 0.2;
+    if (_wheelTouchCount > 3) score += 0.2;
+    if (_wheelTouchCount > 6) score += 0.2;
 
     return BiometricSignature(
       averageMagnitude: avgMag,
       frequencyVariance: _frequencyVariance,
       patternEntropy: _entropy,
-      uniqueGestureCount: _uniquePatternCount,
+      uniqueGestureCount: _wheelTouchCount,
       timestamp: DateTime.now(),
       isPotentiallyHuman: score >= 0.6,
     );
@@ -469,6 +479,7 @@ class ClaController extends ChangeNotifier {
     _activeInteraction = Duration.zero;
     _sessionStartTime = DateTime.now();
     _lastInteractionTime = null;
+    _wheelTouchCount = 0;
   }
 
   void _registerInteraction() {
@@ -484,7 +495,16 @@ class ClaController extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════
 
   /// Main confidence score (time-decayed, stable)
-  double get liveConfidence => _decay(_generateSignature().humanConfidence);
+  double get liveConfidence {
+    // Wheel touch contribution (immediate feedback)
+    double wheelScore = (_wheelTouchCount / 10.0).clamp(0.0, 0.7);
+    
+    // Motion contribution
+    double motionScore = _decay(_generateSignature().humanConfidence);
+    
+    // Combine: 60% wheel, 40% motion
+    return (wheelScore * 0.6 + motionScore * 0.4).clamp(0.0, 1.0);
+  }
   
   int get uniqueGestureCount => _uniquePatternCount;
   double get motionEntropy => _entropy;
