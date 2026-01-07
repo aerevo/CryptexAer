@@ -26,16 +26,18 @@ class CryptexLock extends StatefulWidget {
 
 class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
   StreamSubscription<UserAccelerometerEvent>? _accelSub;
+  Timer? _lockoutTimer;
   
   int? _activeWheelIndex;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // COLOR PALETTE (Mono-Cyan)
+  // COLOR PALETTE (Improved contrast)
   final Color _colNeon = const Color(0xFF00FFFF); 
   final Color _colDim  = const Color(0xFF008B8B); 
   final Color _colFail = const Color(0xFFFF9800);   
-  final Color _colJam  = const Color(0xFFFF3333);    
+  final Color _colJam  = const Color(0xFFFF6B6B); // Softer red    
   final Color _colDead = const Color(0xFF424242);
+  final Color _colWarning = const Color(0xFFFFA726); // Softer orange for warnings
 
   @override
   void initState() {
@@ -51,6 +53,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
       widget.onSuccess();
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
       widget.onJammed();
+      _startLockoutTimer();
     }
     if (mounted) setState(() {});
   }
@@ -60,9 +63,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _accelSub?.cancel();
       _accelSub = null;
+      _lockoutTimer?.cancel();
     } else if (state == AppLifecycleState.resumed) {
       if (_accelSub == null) {
         _startListening();
+      }
+      if (widget.controller.state == SecurityState.HARD_LOCK) {
+        _startLockoutTimer();
       }
     }
   }
@@ -82,11 +89,27 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     });
   }
 
+  // 🔥 FIX: Real-time countdown timer
+  void _startLockoutTimer() {
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted && widget.controller.state == SecurityState.HARD_LOCK) {
+        setState(() {});
+        if (widget.controller.remainingLockoutSeconds <= 0) {
+          timer.cancel();
+        }
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
     _accelSub?.cancel();
+    _lockoutTimer?.cancel();
     for (var c in _scrollControllers) c.dispose();
     super.dispose();
   }
@@ -108,36 +131,49 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
-       // Logic Warna
+       // 🔥 FIX: Better status logic
+       bool hasMotion = widget.controller.motionConfidence > 0.05;
+       bool hasTouch = widget.controller.touchConfidence > 0.3;
+       
        if (widget.controller.motionConfidence > 0.8) { 
          activeColor = _colNeon;
          statusText = "MOTION DETECTED";
          statusIcon = Icons.graphic_eq;
-       } else if (widget.controller.motionConfidence > 0.05) { // 0.05 sebab deadzone
+       } else if (hasMotion && hasTouch) {
+         activeColor = _colNeon.withOpacity(0.9);
+         statusText = "MOTION + TOUCH ACTIVE";
+         statusIcon = Icons.sensors;
+       } else if (hasTouch) {
          activeColor = _colNeon.withOpacity(0.8);
-         statusText = "SENSING...";
-         statusIcon = Icons.sensors; 
+         statusText = "TOUCH DETECTED";
+         statusIcon = Icons.touch_app;
+       } else if (hasMotion) {
+         activeColor = _colNeon.withOpacity(0.7);
+         statusText = "MOTION SENSING...";
+         statusIcon = Icons.radar;
        } else {
          activeColor = _colDim;
-         statusText = "IDLE";
+         statusText = "READY TO AUTHENTICATE";
          statusIcon = Icons.lock_outline; 
        }
        boxColor = _colNeon;
     } else if (state == SecurityState.VALIDATING) {
         activeColor = Colors.white;
         boxColor = Colors.white;
-        statusText = "VERIFYING...";
+        statusText = "VERIFYING CREDENTIALS...";
         statusIcon = Icons.cloud_sync;
         isInputDisabled = true;
     } else if (state == SecurityState.SOFT_LOCK) {
         activeColor = _colFail;
         boxColor = _colFail;
-        statusText = "MISMATCH (${widget.controller.failedAttempts}/3)";
+        statusText = "AUTHENTICATION FAILED (${widget.controller.failedAttempts}/3)";
         statusIcon = Icons.warning_amber_rounded;
+        isInputDisabled = true;
     } else if (state == SecurityState.HARD_LOCK) {
         activeColor = _colJam;
         boxColor = _colJam;
-        statusText = "LOCKED (${widget.controller.remainingLockoutSeconds}s)";
+        int remaining = widget.controller.remainingLockoutSeconds;
+        statusText = "SYSTEM LOCKED ($remaining s)";
         statusIcon = Icons.block;
         isInputDisabled = true;
     } else if (state == SecurityState.ROOT_WARNING) {
@@ -162,11 +198,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
         mainAxisSize: MainAxisSize.min,
         children: [
           
-          // 🔥 NEW LAYOUT: LEFT (Status) vs RIGHT (Sensors)
+          // STATUS HEADER
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 1. KIRI: STATUS BESAR
+              // LEFT: Main Status
               Expanded(
                 flex: 7,
                 child: Column(
@@ -176,37 +212,86 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
                       children: [
                         Icon(statusIcon, color: activeColor, size: 20),
                         const SizedBox(width: 8),
-                        Text("SYSTEM STATUS", style: TextStyle(color: Colors.grey[600], fontSize: 10, letterSpacing: 2)),
+                        Text(
+                          "SYSTEM STATUS", 
+                          style: TextStyle(
+                            color: Colors.grey[600], 
+                            fontSize: 10, 
+                            letterSpacing: 2,
+                            fontWeight: FontWeight.w600
+                          )
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 6),
                     Text(
                       statusText, 
                       style: TextStyle(
                         color: activeColor, 
                         fontWeight: FontWeight.bold, 
-                        fontSize: 16, // Besar sikit
-                        letterSpacing: 1.0
+                        fontSize: 15,
+                        letterSpacing: 0.5,
+                        height: 1.2
                       )
                     ),
-                    const SizedBox(height: 5),
-                    Divider(color: activeColor.withOpacity(0.3)),
+                    const SizedBox(height: 8),
+                    Divider(color: activeColor.withOpacity(0.3), height: 1),
                   ],
                 ),
               ),
               
               const SizedBox(width: 15),
 
-              // 2. KANAN: STACK SENSORS (HUD STYLE)
+              // RIGHT: Sensor Indicators
               Column(
                 children: [
-                   _buildMotionBox(widget.controller.motionConfidence, boxColor),
-                   const SizedBox(height: 8),
-                   _buildBioThermalBox(widget.controller.touchConfidence, boxColor),
+                   _buildSensorBox(
+                     label: "MOTION",
+                     value: widget.controller.motionConfidence, 
+                     color: boxColor,
+                     icon: Icons.sensors,
+                   ),
+                   const SizedBox(height: 10),
+                   _buildSensorBox(
+                     label: "TOUCH",
+                     value: widget.controller.touchConfidence, 
+                     color: boxColor,
+                     icon: Icons.fingerprint,
+                   ),
                 ],
               )
             ],
           ),
+          
+          // 🔥 FIX: Threat message display
+          if (widget.controller.threatMessage.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _colFail.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _colFail.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: _colFail, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.controller.threatMessage,
+                      style: TextStyle(
+                        color: _colFail, 
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           
           const SizedBox(height: 25),
           
@@ -219,8 +304,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
                 onNotification: (notification) {
                   if (notification is ScrollUpdateNotification) {
                      widget.controller.registerTouch(); 
-                     if (_activeWheelIndex == null) {
-                       setState(() => _activeWheelIndex = 1); 
+                     // Find which wheel is scrolling
+                     for (int i = 0; i < _scrollControllers.length; i++) {
+                       if (_scrollControllers[i].position == notification.metrics) {
+                         setState(() => _activeWheelIndex = i);
+                         break;
+                       }
                      }
                   } else if (notification is ScrollEndNotification) {
                      Future.delayed(const Duration(milliseconds: 500), () {
@@ -231,7 +320,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
                 },
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(5, (index) => _buildPrivacyWheel(index, activeColor, isInputDisabled)),
+                  children: List.generate(
+                    5, 
+                    (index) => _buildPrivacyWheel(index, activeColor, isInputDisabled)
+                  ),
                 ),
               ),
             ),
@@ -248,73 +340,101 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: isInputDisabled ? 0 : 4,
               ),
-              onPressed: isInputDisabled ? null : () => widget.controller.validateAttempt(hasPhysicalMovement: true),
+              onPressed: isInputDisabled 
+                ? null 
+                : () => widget.controller.validateAttempt(hasPhysicalMovement: true),
               child: Text(
-                state == SecurityState.HARD_LOCK ? "LOCKED" : "AUTHENTICATE", 
-                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)
+                state == SecurityState.HARD_LOCK 
+                  ? "SYSTEM LOCKED" 
+                  : "AUTHENTICATE", 
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold, 
+                  letterSpacing: 1.5,
+                  fontSize: 14
+                ),
               ),
             ),
           ),
+          
+          // 🔥 NEW: First-time hint
+          if (state == SecurityState.LOCKED && 
+              widget.controller.motionConfidence == 0 && 
+              widget.controller.touchConfidence == 0) ...[
+            const SizedBox(height: 12),
+            Text(
+              "💡 Move device & scroll wheels to unlock",
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ],
       ),
     );
   }
   
-  // WIDGET 1: MOTION BOX (Small & Compact)
-  Widget _buildMotionBox(double value, Color color) {
-    bool isActive = value > 0.8;
-    bool isSensing = value > 0.05; // Lebih dari Deadzone
+  // 🔥 IMPROVED: Unified sensor box with label
+  Widget _buildSensorBox({
+    required String label,
+    required double value, 
+    required Color color,
+    required IconData icon,
+  }) {
+    bool isActive = value > 0.6;
+    bool isSensing = value > 0.05;
 
-    IconData iconToShow;
-    if (isActive) iconToShow = Icons.check; // Tick
-    else if (isSensing) iconToShow = Icons.circle; // Dot
-    else iconToShow = Icons.crop_square; // Kosong
-
-    return Container(
-      width: 45,
-      height: 35,
-      decoration: BoxDecoration(
-        color: isActive ? color.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: isSensing ? color : Colors.grey[800]!),
-      ),
-      child: Center(
-        child: Icon(iconToShow, size: 16, color: isSensing ? color : Colors.grey[700]),
-      ),
-    );
-  }
-
-  // WIDGET 2: BIO-THERMAL BOX
-  Widget _buildBioThermalBox(double value, Color color) {
-    bool isVerified = value > 0.5;
-    
-    return Container(
-      width: 45,
-      height: 35,
-      decoration: BoxDecoration(
-        color: isVerified ? color.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: isVerified ? color : Colors.grey[800]!),
-      ),
-      child: Center(
-        // IKON CHECKMARK (√) seperti diminta
-        child: Icon(
-          isVerified ? Icons.check : Icons.fingerprint, // Check bila verified, cap jari bila tak
-          size: 16, 
-          color: isVerified ? color : Colors.grey[700]
+    return Column(
+      children: [
+        Container(
+          width: 55,
+          height: 42,
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSensing ? color : Colors.grey[800]!,
+              width: isSensing ? 1.5 : 1,
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              isActive ? Icons.check_circle : icon,
+              size: 20, 
+              color: isSensing ? color : Colors.grey[700],
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 8,
+            color: isSensing ? color.withOpacity(0.8) : Colors.grey[700],
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
     );
   }
   
+  // 🔥 IMPROVED: Wheel with per-wheel opacity
   Widget _buildPrivacyWheel(int index, Color color, bool disabled) {
-    final double opacity = (_activeWheelIndex != null) ? 1.0 : 0.15;
+    final bool isThisWheelActive = (_activeWheelIndex == index);
+    final double opacity = disabled 
+      ? 0.3 
+      : (isThisWheelActive ? 1.0 : 0.4); // Clearer visual feedback
+    
     return SizedBox(
       width: 45,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 200),
-        opacity: disabled ? 0.3 : opacity,
+        opacity: opacity,
         child: ListWheelScrollView.useDelegate(
           controller: _scrollControllers[index],
           itemExtent: 45,
@@ -328,16 +448,21 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
           childDelegate: ListWheelChildBuilderDelegate(
             builder: (context, i) {
               final num = i % 10;
+              // 🔥 FIX: Removed red color on "0"
               return Center(
                 child: Text(
                   '$num',
                   style: TextStyle(
-                    color: (num == 0 ? Colors.redAccent : Colors.white),
+                    color: Colors.white,
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     shadows: [
-                      if (_activeWheelIndex != null) 
-                        BoxShadow(color: color.withOpacity(0.8), blurRadius: 10)
+                      if (isThisWheelActive) 
+                        BoxShadow(
+                          color: color.withOpacity(0.8), 
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        )
                     ]
                   ),
                 ),
@@ -349,30 +474,74 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     );
   }
 
+  // 🔥 IMPROVED: Softer warning UI
   Widget _buildSecurityWarningUI() {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: const Color(0xFF450A0A),
+        color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _colJam, width: 2),
+        border: Border.all(color: _colWarning, width: 2),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.security, color: Colors.white, size: 48),
+          Icon(Icons.shield_outlined, color: _colWarning, size: 48),
           const SizedBox(height: 20),
-          const Text("K9 WATCHDOG ALERT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
+          Text(
+            "Security Notice",
+            style: TextStyle(
+              color: _colWarning,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 12),
-          const Text("Critical Security Breach Detected.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 14)),
+          const Text(
+            "Rooted or jailbroken devices may reduce security protections. This could expose sensitive data to unauthorized access.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: _colJam),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _colWarning,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
               onPressed: () => widget.controller.userAcceptsRisk(),
-              child: const Text("ACKNOWLEDGE RISK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text(
+                "I UNDERSTAND THE RISKS",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              // Could add more info or exit
+            },
+            child: Text(
+              "Learn more about device security",
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 12,
+                decoration: TextDecoration.underline,
+              ),
             ),
           ),
         ],
