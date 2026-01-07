@@ -27,19 +27,20 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin, WidgetsBindingObserver {
   StreamSubscription<UserAccelerometerEvent>? _accelSub;
   
-  // UI Animation State
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
   
-  // Privacy Shield
   int? _activeWheelIndex;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // Colors
-  final Color _colLocked = const Color(0xFF00FFFF); // Cyan Neon
+  // 🔥 FIX 2: TUKAR WARNA SEPERTI ARAHAN
+  // DULU: Locked=Cyan, Unlock=Green
+  // SEKARANG: Locked=Kuning(Gold), Unlock=Cyan
+  
+  final Color _colLocked = const Color(0xFFFFD700); // KUNING/GOLD (Idle/Scanning)
   final Color _colFail = const Color(0xFFFF9800);   
   final Color _colJam = const Color(0xFFFF3333);    
-  final Color _colUnlock = const Color(0xFF00E676); 
+  final Color _colUnlock = const Color(0xFF00FFFF); // CYAN (Success!)
   final Color _colDead = const Color(0xFF616161);
 
   @override
@@ -79,7 +80,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _initAnimations() {
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 150), // Lebih responsif
+      duration: const Duration(milliseconds: 100), 
     );
     _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
       CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic),
@@ -96,6 +97,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _startListening() {
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
+      // Input Raw untuk pastikan meter gerak
       double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
       widget.controller.registerShake(rawMag, e.x, e.y, e.z);
     });
@@ -121,7 +123,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   void _triggerHaptic() {
-    HapticFeedback.selectionClick();
+    HapticFeedback.selectionClick(); 
   }
 
   @override
@@ -141,12 +143,13 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
+       // Logic Text
        if (widget.controller.motionConfidence > 0.8) { 
-         activeColor = _colUnlock;
-         statusText = "MOTION: ACTIVE";
+         activeColor = _colUnlock; // JADI CYAN BILA AKTIF
+         statusText = "MOTION DETECTED";
          statusIcon = Icons.graphic_eq;
        } else if (widget.controller.motionConfidence > 0.1) {
-         activeColor = _colLocked;
+         activeColor = _colLocked; // KUNING BILA SENSING
          statusText = "SENSING...";
          statusIcon = Icons.sensors; 
        } else {
@@ -171,7 +174,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     } else if (state == SecurityState.ROOT_WARNING) {
         return _buildSecurityWarningUI(); 
     } else { 
-        activeColor = _colUnlock;
+        activeColor = _colUnlock; // JADI CYAN BILA BERJAYA
         statusText = "ACCESS GRANTED";
         statusIcon = Icons.lock_open;
         isInputDisabled = true;
@@ -198,10 +201,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ),
           const SizedBox(height: 25),
           
-          // ROW STATUS: BAR BESAR + KOTAK TOUCH KECIL
           Row(
             children: [
-              // 1. BAR MOTION (Expanded)
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,17 +227,13 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                   ],
                 ),
               ),
-              
               const SizedBox(width: 15),
-              
-              // 2. KOTAK TOUCH (Compact)
               _buildTouchBox(widget.controller.touchConfidence),
             ],
           ),
           
           const SizedBox(height: 25),
           
-          // WHEELS
           SizedBox(
             height: 120,
             child: IgnorePointer(
@@ -264,6 +261,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ),
           
           const SizedBox(height: 25),
+          
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -285,9 +283,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
   
-  // WIDGET BARU: KOTAK TOUCH CHECKBOX
   Widget _buildTouchBox(double value) {
     bool isVerified = value > 0.5;
+    // Kotak Touch pun ikut warna tema
     Color boxColor = isVerified ? _colUnlock : Colors.grey[900]!;
     Color iconColor = isVerified ? Colors.black : Colors.grey[700]!;
     
