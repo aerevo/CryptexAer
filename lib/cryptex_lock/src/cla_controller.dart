@@ -1,6 +1,6 @@
 /*
  * PROJECT: CryptexLock Security Suite
- * LOGIC: DIRECT FEED (No Delay)
+ * LOGIC: Z-KINETIC (Anti-Bot) + FLOOR DEADZONE
  */
 
 import 'dart:async';
@@ -29,7 +29,6 @@ class ClaController extends ChangeNotifier {
   static const String KEY_ATTEMPTS = 'cla_failed_attempts';
   static const String KEY_LOCKOUT = 'cla_lockout_timestamp';
 
-  // SENSOR VALUES
   double _motionConfidence = 0.0; 
   double _touchConfidence = 0.0;  
   int _touchCount = 0;
@@ -81,24 +80,28 @@ class ClaController extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎛️ INPUT LOGIC (DIRECT FEED)
+  // 🎛️ INPUT LOGIC (WITH DEADZONE)
   // ═══════════════════════════════════════════════════════════
 
   void registerShake(double rawMagnitude, double dx, dy, dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    // SENSITIVITI TINGGI (DIRECT)
-    // 0.0 - 0.1 = Kosong
-    // 0.1 - 0.8 = Dot (Sensing)
-    // > 0.8     = Tick (Detected)
-    
-    // Darab 3.0 dah cukup untuk bagi dia sensitif tapi tak liar sangat
-    double boostedVal = rawMagnitude * 3.0;
+    // 🔥 FIX 1: DEADZONE / NOISE GATE
+    // Kalau getaran kurang dari 0.05 (biasanya lantai/meja), kita anggap 0.
+    // Ini elak status "Sensing" bila phone duduk diam.
+    double cleanMag = rawMagnitude;
+    if (cleanMag < 0.05) {
+      cleanMag = 0.0;
+    }
+
+    // Boost signal yang lepas gate
+    double boostedVal = cleanMag * 4.0; 
     
     _motionConfidence = boostedVal.clamp(0.0, 1.0);
 
-    if (rawMagnitude > 0.05) {
-       _addToHistory(rawMagnitude, dx, dy, dz);
+    // Rekod history cuma kalau ada gerakan sebenar
+    if (cleanMag > 0.0) {
+       _addToHistory(cleanMag, dx, dy, dz);
     }
     notifyListeners(); 
   }
@@ -140,16 +143,25 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 600));
 
-    // VALIDATION: Mesti ada motion sikit (>0.05) atau touch
-    if (_motionConfidence < 0.05 && _touchConfidence < 0.1) {
-       await _fail(bot: true, msg: "NO ACTIVITY DETECTED");
+    // 🔥 FIX 2: STRICT MOTION CHECK
+    // Kalau letak atas lantai, _motionConfidence ialah 0.0.
+    // Kalau touch tak cukup, _touchConfidence rendah.
+    // KITA REJECT TERUS. Ini teras Z-KINETIC.
+    
+    bool hasHumanPresence = (_motionConfidence > 0.1) || (_touchConfidence > 0.5);
+    
+    if (!hasHumanPresence) {
+       // Gagal sebab tak ada "Nyawa"
+       await _fail(bot: true, msg: "NO BIO-KINETIC DETECTED");
        return;
     }
+
     if (!_isCodeCorrect()) {
       await _fail(bot: false, msg: "INVALID PASSCODE");
       return;
     }
     
+    // Server Validation Logic
     if (config.hasServerValidation) {
       try {
         final deviceId = await DeviceFingerprint.getDeviceId();
