@@ -135,6 +135,12 @@ class _CryptexLockState extends State<CryptexLock>
     // 🔧 FIXED: Match controller parameter signature
     _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent e) {
       double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
+      
+      // 🔧 DEBUG: Print sensor data
+      if (rawMag > 1.0) {
+        print('📊 SENSOR: ${rawMag.toStringAsFixed(2)} | x:${e.x.toStringAsFixed(1)} y:${e.y.toStringAsFixed(1)} z:${e.z.toStringAsFixed(1)}');
+      }
+      
       widget.controller.registerShake(rawMag, e.x, e.y, e.z);
     });
   }
@@ -319,6 +325,31 @@ class _CryptexLockState extends State<CryptexLock>
             const SizedBox(height: 16),
             _buildThreatAlert(),
           ],
+          // 🔧 DEBUG: Show sensor status
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[800]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.sensors, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 8),
+                Text(
+                  "Sensor Active - Shake to test",
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
