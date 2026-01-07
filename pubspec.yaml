@@ -27,9 +27,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Tambah bahagian ini:
-  assets:
-    - assets/images/metal_plate.jpg
 
 
 
