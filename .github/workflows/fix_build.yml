@@ -1,4 +1,4 @@
-name: Francois Build (Upgrade v3)
+name: Francois Build (Advanced Native Injection)
 on:
   workflow_dispatch:
   push:
@@ -23,112 +23,71 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. JANA & GANTI TOTAL (UPGRADED CORE)
+      - name: 4. PENJANAAN & SUNTIKAN NATIVE
         run: |
-          echo "=== FASA 0: BAIKI PUBSPEC (CRITICAL) ==="
-          sed -i 's/version: 0.0.0.1/version: 0.0.1+1/g' pubspec.yaml
-          
-          echo "=== FASA 1: JANA STRUKTUR ASAL ==="
+          echo "Membersihkan & Menjana Android dengan Package com.cryptex..."
           rm -rf android
-          flutter create . --platforms android --project-name cryptex_aer
+          # Paksa create dengan package name yang betul
+          flutter create . --platforms android --org com --project-name cryptex
           
-          echo "=== FASA 2: MUSNAHKAN FAIL BERMASALAH ==="
-          rm -f android/settings.gradle android/settings.gradle.kts
-          rm -f android/build.gradle android/build.gradle.kts
+          echo "Mencipta Folder Package..."
+          mkdir -p android/app/src/main/kotlin/com/cryptex
           
-          echo "=== FASA 3: TULIS SEMULA settings.gradle (VERSION UPGRADE) ==="
-          # DISINI PUNCANYA. Saya telah naik taraf version AGP dan Kotlin.
-          cat > android/settings.gradle <<EOF
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }()
+          echo "Menyuntik MainActivity.kt (Z-KINETIC Bridge)..."
+          cat > android/app/src/main/kotlin/com/cryptex/MainActivity.kt <<EOF
+          package com.cryptex
+          import android.view.WindowManager
+          import android.os.Bundle
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+          import java.io.File
+          import android.content.Context
+          import android.content.pm.PackageManager
 
-              includeBuild("\$flutterSdkPath/packages/flutter_tools/gradle")
-
-              repositories {
-                  google()
-                  maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
-                  maven { url 'https://jitpack.io' }
+          class MainActivity: FlutterActivity() {
+              private val CHANNEL = "com.cryptex/security"
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+                      when (call.method) {
+                          "enableScreenshotProtection" -> {
+                              window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                              result.success(true)
+                          }
+                          "checkScreenshot" -> { result.success(false) }
+                          "detectRootBypass" -> {
+                              val packages = call.argument<List<String>>("packages")
+                              val paths = call.argument<List<String>>("paths")
+                              result.success(checkRootBypass(packages, paths))
+                          }
+                          else -> { result.notImplemented() }
+                      }
+                  }
+              }
+              private fun checkRootBypass(packages: List<String>?, paths: List<String>?): Boolean {
+                  paths?.forEach { if (File(it).exists()) return true }
+                  packages?.forEach { if (isPackageInstalled(it, packageManager)) return true }
+                  return false
+              }
+              private fun isPackageInstalled(pName: String, pm: PackageManager): Boolean {
+                  return try { pm.getPackageInfo(pName, 0); true } catch (e: Exception) { false }
               }
           }
-
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              // UPGRADED: 8.1.0 -> 8.2.1 (Supaya Flutter puas hati)
-              id "com.android.application" version "8.2.1" apply false
-              // UPGRADED: 1.7.10 -> 1.9.20 (Wajib untuk support AGP 8.2)
-              id "org.jetbrains.kotlin.android" version "1.9.20" apply false
-          }
-
-          include ":app"
           EOF
-          
-          echo "=== FASA 4: TULIS SEMULA build.gradle (SAFE MODE) ==="
-          cat > android/build.gradle <<EOF
-          allprojects {
-              repositories {
-                  google()
-                  maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
-                  maven { url 'https://jitpack.io' }
-              }
-          }
 
-          rootProject.buildDir = '../build'
-          subprojects {
-              project.buildDir = "\${rootProject.buildDir}/\${project.name}"
-          }
-          subprojects {
-              project.evaluationDependsOn(':app')
-          }
-
-          task clean(type: Delete) {
-              delete rootProject.buildDir
-          }
-          EOF
-          
-          echo "=== FASA 5: PERMISSION VIBRATE ==="
-          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-          if [ -f "$MANIFEST_FILE" ]; then
-             sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' $MANIFEST_FILE
-          fi
+          echo "Menyuntik Vibrate Permission..."
+          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 6. BEDAH LIBRARY JAILBREAK
+      - name: 6. BEDAH LIBRARY JAILBREAK (Namespace Fix)
         run: |
-          echo "Membedah flutter_jailbreak_detection..."
-          
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
-          
           if [ ! -z "$JB_GRADLE" ]; then
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
-            
-            # Kita paksa library lama guna Java 17 juga
-            cat >> $JB_GRADLE <<EOF
-            android {
-                compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
-                }
-                kotlinOptions {
-                    jvmTarget = '17'
-                }
-            }
-          EOF
           fi
-
-          JB_MANIFEST=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android/src/main -name "AndroidManifest.xml")
-          if [ ! -z "$JB_MANIFEST" ]; then
-             sed -i 's/package="[^"]*"//g' $JB_MANIFEST
-          fi
-          
-          echo "Pembedahan Selesai."
 
       - name: 7. Build APK Release
         run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
@@ -136,5 +95,5 @@ jobs:
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-bank-grade
+          name: cryptex-aer-advanced-security
           path: build/app/outputs/flutter-apk/app-release.apk
