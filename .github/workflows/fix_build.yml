@@ -1,4 +1,4 @@
-name: Francois Build (Isolated Workspace)
+name: Francois Build (Final Fortress)
 on:
   workflow_dispatch:
   push:
@@ -23,28 +23,27 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. PEMBINAAN DALAM KAWASAN TERPENCIL (Isolated Build)
+      - name: 4. PEMBINAAN TOTAL DI LUAR KAWASAN (The Master Template)
         run: |
-          echo "Langkah 4.1: Mencipta 'Clean Workspace' di folder sebelah..."
+          echo "Langkah 4.1: Bina projek baru di folder asing..."
           cd ..
-          flutter create --platforms android --org com.cryptex --project-name cryptex_aer build_zone
+          # Kita bina di luar terus, bukan dalam folder projek Kapten
+          flutter create --platforms android --org com.cryptex --project-name cryptex_aer clean_project
           
-          echo "Langkah 4.2: Memindahkan aset & kod Kapten ke Build Zone..."
-          # Padam folder lib asal build_zone dan ganti dengan milik Kapten
-          rm -rf build_zone/lib
-          cp -r $GITHUB_WORKSPACE/lib build_zone/
+          echo "Langkah 4.2: Pindahkan Nadi Kod Kapten ke Clean Project..."
+          # Ambil fail lib dan pubspec Kapten sahaja
+          rm -rf clean_project/lib
+          cp -r $GITHUB_WORKSPACE/lib clean_project/
+          cp $GITHUB_WORKSPACE/pubspec.yaml clean_project/
           
-          # Salin pubspec.yaml (Ini nadi library Kapten)
-          cp $GITHUB_WORKSPACE/pubspec.yaml build_zone/
-          
-          # Salin assets jika ada
+          # Salin assets jika wujud
           if [ -d "$GITHUB_WORKSPACE/assets" ]; then
-            cp -r $GITHUB_WORKSPACE/assets build_zone/
+            cp -r $GITHUB_WORKSPACE/assets clean_project/
           fi
 
-          echo "Langkah 4.3: Suntikan Nadi Native ke Build Zone..."
-          mkdir -p build_zone/android/app/src/main/kotlin/com/cryptex/cryptex_aer
-          cat > build_zone/android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt <<EOF
+          echo "Langkah 4.3: Suntikan Native Bridge (MainActivity.kt)..."
+          mkdir -p clean_project/android/app/src/main/kotlin/com/cryptex/cryptex_aer
+          cat > clean_project/android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt <<EOF
           package com.cryptex.cryptex_aer
           import android.view.WindowManager
           import android.os.Bundle
@@ -85,17 +84,18 @@ jobs:
           }
           EOF
 
-          echo "Langkah 4.4: Konfigurasi Android & JVM Target 17..."
-          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' build_zone/android/app/src/main/AndroidManifest.xml
-          echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> build_zone/android/app/build.gradle
+          echo "Langkah 4.4: Hard-Coding Permissions..."
+          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' clean_project/android/app/src/main/AndroidManifest.xml
+          echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> clean_project/android/app/build.gradle
 
-      - name: 5. Download Dependencies (Dalam Build Zone)
+      - name: 5. Download Dependencies (In Clean Project)
         run: |
-          cd ../build_zone
+          cd ../clean_project
           flutter pub get
 
-      - name: 6. BEDAH LIBRARY JAILBREAK (Deep Surgery)
+      - name: 6. BEDAH LIBRARY JAILBREAK (Critical Fix)
         run: |
+          # Cari build.gradle dalam library tersebut
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           if [ ! -z "$JB_GRADLE" ]; then
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
@@ -110,13 +110,14 @@ jobs:
           EOF
           fi
 
-      - name: 7. Build APK Gred Bank (Z-KINETIC)
+      - name: 7. Build APK Release (The Moment of Truth)
         run: |
-          cd ../build_zone
+          cd ../clean_project
+          # Kita tambah --android-skip-build-dependency-validation untuk keselamatan extra
           flutter build apk --obfuscate --split-debug-info=./debug_info --release --android-skip-build-dependency-validation
 
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: Z-KINETIC-ULTRA-READY
-          path: ../build_zone/build/app/outputs/flutter-apk/app-release.apk
+          name: Z-KINETIC-ULTRA-SUCCESS
+          path: ../clean_project/build/app/outputs/flutter-apk/app-release.apk
