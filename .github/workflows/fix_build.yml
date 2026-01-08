@@ -1,4 +1,4 @@
-name: Francois Build (Final Structure Fix)
+name: Francois Build (Stable Structure Fix)
 on:
   workflow_dispatch:
   push:
@@ -23,24 +23,22 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. PENJANAAN SEMULA STRUCTURE (Fix Unsupported Gradle)
+      - name: 4. PENJANAAN SEMULA STRUCTURE (Safe Mode)
         run: |
-          echo "Menyelamatkan fail penting..."
-          mkdir -p backup_fix
-          cp pubspec.yaml backup_fix/
-          
           echo "Menghancurkan folder android lama..."
           rm -rf android
           
-          echo "Menjana semula projek dengan struktur terbaru..."
-          # Kita guna -t app dan --force untuk pastikan struktur Gradle adalah versi terbaru
-          flutter create . --platforms android --org com.cryptex --project-name cryptex_aer --force
+          echo "Menjana semula projek (Tanpa --force)..."
+          # Sembunyikan pubspec sebentar supaya flutter create anggap ini projek baru
+          mv pubspec.yaml pubspec.yaml.bak
+          flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
           
-          echo "Memulihkan pubspec.yaml..."
-          cp backup_fix/pubspec.yaml .
+          echo "Memulihkan pubspec.yaml asli Kapten..."
+          rm pubspec.yaml
+          mv pubspec.yaml.bak pubspec.yaml
           
           echo "Mencipta Folder Package Native..."
-          # Pastikan folder ikut package name com.cryptex.cryptex_aer
+          # Struktur folder: com/cryptex/cryptex_aer
           mkdir -p android/app/src/main/kotlin/com/cryptex/cryptex_aer
           
           echo "Suntikan MainActivity.kt (The Z-KINETIC Bridge)..."
@@ -87,12 +85,14 @@ jobs:
 
           echo "Suntikan Permission & JVM Settings..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+          
+          # Pastikan Gradle guna Java 17
           echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> android/app/build.gradle
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 6. BEDAH LIBRARY JAILBREAK (Deep Surgery)
+      - name: 6. BEDAH LIBRARY JAILBREAK
         run: |
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           if [ ! -z "$JB_GRADLE" ]; then
@@ -110,11 +110,10 @@ jobs:
 
       - name: 7. Build APK Release
         run: |
-          # Menggunakan flag --no-tree-shake-icons untuk elak ralat font jika perlu
           flutter build apk --obfuscate --split-debug-info=./debug_info --release --android-skip-build-dependency-validation
 
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: Z-KINETIC-ULTRA-READY
+          name: Z-KINETIC-ULTRA-STABLE
           path: build/app/outputs/flutter-apk/app-release.apk
