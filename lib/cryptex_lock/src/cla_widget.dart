@@ -7,26 +7,21 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'cla_controller.dart';
 import 'cla_models.dart';
 
-// 🔥 1. ML LOGIC (Kekal Pintar - Sumbangan Francois)
+// 🔥 ML PATTERN ANALYZER
 class MLPatternAnalyzer {
   static double analyzePattern(List<Map<String, dynamic>> touchData) {
     if (touchData.length < 5) return 0.0;
     
     List<double> features = [];
-    
-    // Timing variance
     List<int> intervals = [];
     for (int i = 1; i < touchData.length; i++) {
       intervals.add(touchData[i]['timestamp'].difference(touchData[i-1]['timestamp']).inMilliseconds);
     }
     double timingVariance = _calculateVariance(intervals.map((e) => e.toDouble()).toList());
     features.add(timingVariance / 1000.0);
-    
-    // Tremor calculation
     double tremorScore = _detectTremor(touchData);
     features.add(tremorScore);
     
-    // Weighted Score
     double humanScore = (features[0] * 0.4) + (features[1] * 0.6);
     return humanScore.clamp(0.0, 1.0);
   }
@@ -75,21 +70,18 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // Z-KINETIC Data
   double _patternScore = 0.0;
   List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
   bool _suspiciousRootBypass = false;
   
-  // 🎨 ANIMATION CONTROLLERS (Sumbangan Claude)
   late AnimationController _pulseController;
   late AnimationController _scanController;
   
-  // 🎨 HYBRID PALETTE (Francois Professionalism + Claude Sci-Fi)
-  final Color _colNeon = const Color(0xFF00FFFF); // Cyan Utama
-  final Color _colPass = const Color(0xFF00FF88); // Hijau Matrix
-  final Color _colFail = const Color(0xFFFF3333); // Merah Alert
-  final Color _colDark = const Color(0xFF050A10); // Hitam Angkasa
+  final Color _colNeon = const Color(0xFF00FFFF); 
+  final Color _colPass = const Color(0xFF00FF88); 
+  final Color _colFail = const Color(0xFFFF3333); 
+  final Color _colDark = const Color(0xFF050A10); 
 
   @override
   void initState() {
@@ -102,7 +94,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _checkRootBypass();
     widget.controller.addListener(_handleControllerChange);
     
-    // Init Animasi
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -153,7 +144,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     if (widget.controller.state == SecurityState.UNLOCKED) {
       widget.onSuccess();
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
-      widget.onJammed(); // Instant Eject (Francois Logic)
+      widget.onJammed(); 
     }
     if (mounted) setState(() {});
   }
@@ -226,7 +217,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   Widget _buildStateUI(SecurityState state) {
-    // Logic Status UI
     Color activeColor = _colNeon;
     String statusText = "SYSTEM IDLE";
     IconData statusIcon = Icons.lock_outline;
@@ -276,7 +266,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
     return Stack(
       children: [
-        // 🌌 LAYER 1: Animated Grid Background (Claude Idea)
+        // LAYER 1: Grid
         Positioned.fill(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
@@ -294,11 +284,11 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ),
         ),
 
-        // 🛡️ LAYER 2: Main Container (Francois Structure)
+        // LAYER 2: Container
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: _colDark.withOpacity(0.9), // Sedikit transparent untuk nampak grid
+            color: _colDark.withOpacity(0.9), 
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: activeColor.withOpacity(0.6), 
@@ -332,7 +322,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                           ],
                         ),
                         const SizedBox(height: 8),
-                        // Pulsing Text Effect
                         AnimatedBuilder(
                           animation: _pulseController,
                           builder: (context, child) {
@@ -358,7 +347,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                   ),
                   const SizedBox(width: 12),
                   
-                  // SENSORS (Red/Green Logic inside Holographic Box)
+                  // SENSORS
                   Column(
                     children: [
                        _buildHoloSensorBox("MOTION", widget.controller.motionConfidence, Icons.sensors),
@@ -393,7 +382,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               
               const SizedBox(height: 25),
               
-              // 💿 WHEELS: HOLOGRAPHIC TUNER
+              // 💿 WHEELS
               SizedBox(
                 height: 130,
                 child: IgnorePointer(
@@ -432,7 +421,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               
               const SizedBox(height: 25),
               
-              // BUTTON: LAUNCH BAR STYLE
+              // BUTTON
               SizedBox(
                 width: double.infinity,
                 child: InkWell(
@@ -487,14 +476,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
   
-  // 🟥🟩 FIX: RED/GREEN Logic dalam Hologram Box
   Widget _buildHoloSensorBox(String label, double value, IconData icon) {
     bool isPass = value > 0.6;
     bool hasData = value > 0.05;
-    
-    Color statusColor = !hasData 
-      ? Colors.grey.withOpacity(0.3) 
-      : (isPass ? _colPass : _colFail);
+    Color statusColor = !hasData ? Colors.grey.withOpacity(0.3) : (isPass ? _colPass : _colFail);
 
     return Container(
       width: 60,
@@ -519,10 +504,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   Widget _buildHoloPatternBox(String label, double score) {
     bool isPass = score >= 0.5;
     bool hasData = score > 0;
-    
-    Color statusColor = !hasData 
-      ? Colors.grey.withOpacity(0.3) 
-      : (isPass ? _colPass : _colFail);
+    Color statusColor = !hasData ? Colors.grey.withOpacity(0.3) : (isPass ? _colPass : _colFail);
 
     return Container(
       width: 60,
@@ -544,70 +526,70 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
-  // 💿 HOLOGRAM WHEEL (Target Lock Active)
+  // 💿 HOLOGRAM WHEEL (FIXED LAYOUT)
   Widget _buildHolographicWheel(int index, Color color, bool disabled) {
     final bool isActive = (_activeWheelIndex == index);
     final double opacity = disabled ? 0.3 : (isActive ? 1.0 : 0.25);
     
     return Column(
       children: [
-        // Top Scan Line
         AnimatedContainer(duration: const Duration(milliseconds: 200), height: 1, width: isActive ? 40 : 0, color: color),
         
-        SizedBox(
-          width: 45,
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 200),
-            opacity: opacity,
-            child: Stack(
-              children: [
-                ListWheelScrollView.useDelegate(
-                  controller: _scrollControllers[index],
-                  itemExtent: 45,
-                  perspective: 0.005,
-                  diameterRatio: 1.4,
-                  physics: const FixedExtentScrollPhysics(),
-                  onSelectedItemChanged: (val) {
-                    _triggerHaptic(); 
-                    widget.controller.updateWheel(index, val % 10);
-                  },
-                  childDelegate: ListWheelChildBuilderDelegate(
-                    builder: (context, i) {
-                      final num = i % 10;
-                      return Center(
-                        child: AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 150),
-                          style: TextStyle(
-                            color: isActive ? color : Colors.grey[800],
-                            fontSize: isActive ? 30 : 26,
-                            fontFamily: 'Courier',
-                            fontWeight: FontWeight.bold,
-                            shadows: isActive ? [BoxShadow(color: color.withOpacity(0.8), blurRadius: 15)] : [],
-                          ),
-                          child: Text('$num'),
-                        ),
-                      );
+        // 🔥 FIX UTAMA: Gunakan Expanded supaya roda tidak 'hilang'
+        Expanded(
+          child: SizedBox(
+            width: 45,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: opacity,
+              child: Stack(
+                children: [
+                  ListWheelScrollView.useDelegate(
+                    controller: _scrollControllers[index],
+                    itemExtent: 45,
+                    perspective: 0.005,
+                    diameterRatio: 1.4,
+                    physics: const FixedExtentScrollPhysics(),
+                    onSelectedItemChanged: (val) {
+                      _triggerHaptic(); 
+                      widget.controller.updateWheel(index, val % 10);
                     },
-                  ),
-                ),
-                // Overlay Scan Line Effect (Claude's Visual)
-                if (isActive)
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: _scanController,
-                      builder: (context, child) {
-                        return CustomPaint(
-                          painter: ScanLinePainter(color: color, progress: _scanController.value),
+                    childDelegate: ListWheelChildBuilderDelegate(
+                      builder: (context, i) {
+                        final num = i % 10;
+                        return Center(
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 150),
+                            style: TextStyle(
+                              color: isActive ? color : Colors.grey[800],
+                              fontSize: isActive ? 30 : 26,
+                              fontFamily: 'Courier',
+                              fontWeight: FontWeight.bold,
+                              shadows: isActive ? [BoxShadow(color: color.withOpacity(0.8), blurRadius: 15)] : [],
+                            ),
+                            child: Text('$num'),
+                          ),
                         );
                       },
                     ),
                   ),
-              ],
+                  if (isActive)
+                    Positioned.fill(
+                      child: AnimatedBuilder(
+                        animation: _scanController,
+                        builder: (context, child) {
+                          return CustomPaint(
+                            painter: ScanLinePainter(color: color, progress: _scanController.value),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
         
-        // Bottom Scan Line
         AnimatedContainer(duration: const Duration(milliseconds: 200), height: 1, width: isActive ? 40 : 0, color: color),
       ],
     );
@@ -640,7 +622,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 }
 
-// 🎨 FIX: KELAS YANG CLAUDE TINGGALKAN (Francois Tulis Semula)
+// 🎨 GRID PAINTER
 class GridPainter extends CustomPainter {
   final Color color;
   final double scanValue;
@@ -651,7 +633,6 @@ class GridPainter extends CustomPainter {
     final paint = Paint()..color = color..strokeWidth = 1;
     double step = 20.0;
     
-    // Lukis Grid
     for (double x = 0; x < size.width; x += step) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
@@ -659,7 +640,6 @@ class GridPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
     
-    // Lukis Radar Scan Line (Melintang)
     final scanPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
@@ -674,6 +654,7 @@ class GridPainter extends CustomPainter {
   bool shouldRepaint(covariant GridPainter oldDelegate) => oldDelegate.scanValue != scanValue;
 }
 
+// 🎨 SCAN LINE PAINTER
 class ScanLinePainter extends CustomPainter {
   final Color color;
   final double progress;
