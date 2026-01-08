@@ -187,7 +187,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     if (widget.controller.state == SecurityState.UNLOCKED) {
       widget.onSuccess();
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
-      // 🔥 FIX 3: INSTANT EJECT (No Freeze)
+      // INSTANT EJECT (No Freeze)
       widget.onJammed(); 
     }
     if (mounted) setState(() {});
@@ -537,7 +537,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     );
   }
   
-  // 🔥 FIX 1: INSTRUMENT CLUSTER (Kotak Merah/Hijau dalam bingkai Cyan)
+  // FIX 1: INSTRUMENT CLUSTER (Kotak Merah/Hijau dalam bingkai Cyan)
   Widget _buildSensorBox({
     required String label,
     required double value, 
@@ -545,7 +545,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
   }) {
     bool isPass = value > 0.6; // Threshold lulus
     
-    // Warna kotak ikut status LULUS/GAGAL (bukan ikut tema luar)
+    // Warna kotak ikut status LULUS/GAGAL
     Color instrColor = isPass ? _colPass : _colFail;
     IconData instrIcon = isPass ? Icons.check_circle : Icons.circle_outlined;
 
@@ -587,7 +587,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     );
   }
 
-  // 🔥 FIX 1: PATTERN BOX (Merah/Hijau/Kelabu)
+  // FIX 1 (CORRECTED): PATTERN BOX (Merah/Hijau/Kelabu)
   Widget _buildPatternBox({
     required String label,
     required double score,
@@ -606,7 +606,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
       instrIcon = Icons.check_circle;
     } else {
       instrColor = _colFail;
-      statusIcon = Icons.warning_amber_rounded;
+      instrIcon = Icons.warning_amber_rounded; // 🔥 FIXED: instrIcon digunakan
     }
 
     return Column(
@@ -644,7 +644,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver {
     );
   }
   
-  // 🔥 FIX 2: TARGET LOCK SYSTEM (Roda Aktif Shj Menyala)
+  // FIX 2: TARGET LOCK SYSTEM (Roda Aktif Shj Menyala)
   Widget _buildPrivacyWheel(int index, Color themeColor, bool disabled) {
     final bool isThisWheelActive = (_activeWheelIndex == index);
     
