@@ -130,8 +130,8 @@ jobs:
           
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.1.4" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.20" apply false
+              id "com.android.application" version "8.6.0" apply false
+              id "org.jetbrains.kotlin.android" version "2.1.0" apply false
           }
           
           include ":app"
@@ -241,14 +241,20 @@ jobs:
       - name: 🔍 Patch Jailbreak Library
         run: |
           echo "==> Patching flutter_jailbreak_detection..."
-          JB_GRADLE=$(find ~/.pub-cache/hosted/pub.dev -path "*/flutter_jailbreak_detection-*/android/build.gradle" 2>/dev/null | head -n 1)
-          if [ -n "$JB_GRADLE" ]; then
-            echo "Found: $JB_GRADLE"
-            if ! grep -q "namespace" "$JB_GRADLE"; then
-              sed -i '/android {/a \    namespace "flutter.jailbreak_detection"' "$JB_GRADLE"
-            fi
-            if ! grep -q "jvmTarget" "$JB_GRADLE"; then
-              cat >> "$JB_GRADLE" << 'JBPATCH'
+          JB_DIR=$(find ~/.pub-cache/hosted/pub.dev -type d -name "flutter_jailbreak_detection-*" 2>/dev/null | head -n 1)
+          
+          if [ -n "$JB_DIR" ]; then
+            echo "Found library at: $JB_DIR"
+            
+            # Patch build.gradle
+            JB_GRADLE="$JB_DIR/android/build.gradle"
+            if [ -f "$JB_GRADLE" ]; then
+              echo "Patching build.gradle..."
+              if ! grep -q "namespace" "$JB_GRADLE"; then
+                sed -i '/android {/a \    namespace "flutter.jailbreak_detection"' "$JB_GRADLE"
+              fi
+              if ! grep -q "jvmTarget" "$JB_GRADLE"; then
+                cat >> "$JB_GRADLE" << 'JBPATCH'
           
           android {
               compileOptions {
@@ -260,8 +266,19 @@ jobs:
               kotlinOptions { jvmTarget = "17" }
           }
           JBPATCH
+              fi
             fi
-            echo "✅ Library patched"
+            
+            # CRITICAL FIX: Remove package attribute from AndroidManifest.xml
+            JB_MANIFEST="$JB_DIR/android/src/main/AndroidManifest.xml"
+            if [ -f "$JB_MANIFEST" ]; then
+              echo "Patching AndroidManifest.xml..."
+              sed -i 's/package="[^"]*"//g' "$JB_MANIFEST"
+              sed -i 's/<manifest[^>]*>/<manifest xmlns:android="http:\/\/schemas.android.com\/apk\/res\/android">/g' "$JB_MANIFEST"
+              echo "✅ Removed legacy package attribute"
+            fi
+            
+            echo "✅ Library fully patched"
           else
             echo "⚠️ Library not found"
           fi
