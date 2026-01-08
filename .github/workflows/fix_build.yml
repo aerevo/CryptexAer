@@ -33,7 +33,6 @@ jobs:
           echo "==> Creating fresh Android platform..."
           flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
           
-          # Verify android folder exists
           if [ ! -d "android" ]; then
             echo "ERROR: Android folder not created!"
             exit 1
@@ -41,138 +40,131 @@ jobs:
           
           echo "✅ Android structure initialized successfully"
 
-      - name: 🔐 Inject Native Security Code (MainActivity.kt)
+      - name: 🔐 Inject Native Security Code
         run: |
           echo "==> Creating MainActivity.kt with security features..."
           
           MAIN_ACTIVITY_DIR="android/app/src/main/kotlin/com/cryptex/cryptex_aer"
           mkdir -p "$MAIN_ACTIVITY_DIR"
           
-          cat > "$MAIN_ACTIVITY_DIR/MainActivity.kt" <<'KOTLIN_EOF'
-package com.cryptex.cryptex_aer
-
-import android.os.Bundle
-import android.view.WindowManager
-import io.flutter.embedding.android.FlutterActivity
-import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodChannel
-import java.io.File
-import android.content.pm.PackageManager
-
-class MainActivity: FlutterActivity() {
-    private val SECURITY_CHANNEL = "com.cryptex/security"
-    
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // Enable screenshot protection by default
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
-    }
-    
-    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        super.configureFlutterEngine(flutterEngine)
-        
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SECURITY_CHANNEL)
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "enableScreenshotProtection" -> {
-                        try {
-                            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                            result.success(true)
-                        } catch (e: Exception) {
-                            result.error("PROTECTION_ERROR", e.message, null)
-                        }
-                    }
-                    
-                    "checkScreenshot" -> {
-                        result.success(false) // Always return false in production
-                    }
-                    
-                    "detectRootBypass" -> {
-                        try {
-                            val packages = call.argument<List<String>>("packages") ?: emptyList()
-                            val paths = call.argument<List<String>>("paths") ?: emptyList()
-                            val isRooted = checkRootBypass(packages, paths)
-                            result.success(isRooted)
-                        } catch (e: Exception) {
-                            result.error("ROOT_CHECK_ERROR", e.message, null)
-                        }
-                    }
-                    
-                    else -> {
-                        result.notImplemented()
-                    }
-                }
-            }
-    }
-    
-    private fun checkRootBypass(packages: List<String>, paths: List<String>): Boolean {
-        // Check for root-related files
-        paths.forEach { path ->
-            if (File(path).exists()) {
-                return true
-            }
-        }
-        
-        // Check for root-related packages
-        packages.forEach { packageName ->
-            if (isPackageInstalled(packageName, packageManager)) {
-                return true
-            }
-        }
-        
-        return false
-    }
-    
-    private fun isPackageInstalled(packageName: String, pm: PackageManager): Boolean {
-        return try {
-            pm.getPackageInfo(packageName, 0)
-            true
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
-        }
-    }
-}
-KOTLIN_EOF
+          cat > "$MAIN_ACTIVITY_DIR/MainActivity.kt" << 'EOF'
+          package com.cryptex.cryptex_aer
+          
+          import android.os.Bundle
+          import android.view.WindowManager
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+          import java.io.File
+          import android.content.pm.PackageManager
+          
+          class MainActivity: FlutterActivity() {
+              private val SECURITY_CHANNEL = "com.cryptex/security"
+              
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  window.setFlags(
+                      WindowManager.LayoutParams.FLAG_SECURE,
+                      WindowManager.LayoutParams.FLAG_SECURE
+                  )
+              }
+              
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SECURITY_CHANNEL)
+                      .setMethodCallHandler { call, result ->
+                          when (call.method) {
+                              "enableScreenshotProtection" -> {
+                                  try {
+                                      window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                                      result.success(true)
+                                  } catch (e: Exception) {
+                                      result.error("PROTECTION_ERROR", e.message, null)
+                                  }
+                              }
+                              
+                              "checkScreenshot" -> {
+                                  result.success(false)
+                              }
+                              
+                              "detectRootBypass" -> {
+                                  try {
+                                      val packages = call.argument<List<String>>("packages") ?: emptyList()
+                                      val paths = call.argument<List<String>>("paths") ?: emptyList()
+                                      val isRooted = checkRootBypass(packages, paths)
+                                      result.success(isRooted)
+                                  } catch (e: Exception) {
+                                      result.error("ROOT_CHECK_ERROR", e.message, null)
+                                  }
+                              }
+                              
+                              else -> {
+                                  result.notImplemented()
+                              }
+                          }
+                      }
+              }
+              
+              private fun checkRootBypass(packages: List<String>, paths: List<String>): Boolean {
+                  paths.forEach { path ->
+                      if (File(path).exists()) {
+                          return true
+                      }
+                  }
+                  
+                  packages.forEach { packageName ->
+                      if (isPackageInstalled(packageName, packageManager)) {
+                          return true
+                      }
+                  }
+                  
+                  return false
+              }
+              
+              private fun isPackageInstalled(packageName: String, pm: PackageManager): Boolean {
+                  return try {
+                      pm.getPackageInfo(packageName, 0)
+                      true
+                  } catch (e: PackageManager.NameNotFoundException) {
+                      false
+                  }
+              }
+          }
+          EOF
           
           echo "✅ MainActivity.kt injected successfully"
 
-      - name: ⚙️ Configure Android Manifest Permissions
+      - name: ⚙️ Configure Android Manifest
         run: |
           echo "==> Adding required permissions..."
           
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-          
-          # Add VIBRATE permission before <application> tag
           sed -i '/<application/i \    <uses-permission android:name="android.permission.VIBRATE"/>' "$MANIFEST_FILE"
           
           echo "✅ Permissions configured"
 
-      - name: 🔧 Configure Gradle Build Settings
+      - name: 🔧 Configure Gradle Settings
         run: |
           echo "==> Configuring app/build.gradle..."
           
           APP_GRADLE="android/app/build.gradle"
           
-          # Add Kotlin compile options
-          cat >> "$APP_GRADLE" <<'GRADLE_EOF'
-
-// Security & Kotlin Configuration
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-}
-
-android {
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-}
-GRADLE_EOF
+          cat >> "$APP_GRADLE" << 'EOF'
+          
+          tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+          }
+          
+          android {
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
           
           echo "✅ Gradle configured for Java 17"
 
@@ -188,37 +180,34 @@ GRADLE_EOF
         run: |
           echo "==> Patching flutter_jailbreak_detection library..."
           
-          # Find the library's build.gradle
           JB_GRADLE=$(find ~/.pub-cache/hosted/pub.dev -path "*/flutter_jailbreak_detection-*/android/build.gradle" | head -n 1)
           
           if [ -n "$JB_GRADLE" ]; then
             echo "Found: $JB_GRADLE"
             
-            # Add namespace if missing
             if ! grep -q "namespace" "$JB_GRADLE"; then
               sed -i '/android {/a \    namespace "flutter.jailbreak_detection"' "$JB_GRADLE"
             fi
             
-            # Add Java 17 compatibility
-            cat >> "$JB_GRADLE" <<'GRADLE_FIX'
-
-android {
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-}
-
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-}
-GRADLE_FIX
+            cat >> "$JB_GRADLE" << 'EOF'
+          
+          android {
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          
+          tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+          }
+          EOF
             
             echo "✅ Jailbreak detection library patched"
           else
-            echo "⚠️ Jailbreak detection library not found (might be cached)"
+            echo "⚠️ Jailbreak detection library not found"
           fi
 
       - name: 🛡️ Protect Server Folder
@@ -236,39 +225,31 @@ GRADLE_FIX
         run: |
           echo "==> Running pre-build checks..."
           
-          # Verify Android structure
           if [ ! -f "android/app/build.gradle" ]; then
             echo "ERROR: android/app/build.gradle missing!"
             exit 1
           fi
           
-          # Verify MainActivity.kt exists
           if [ ! -f "android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt" ]; then
             echo "ERROR: MainActivity.kt not found!"
             exit 1
           fi
           
-          # Check Flutter doctor
           flutter doctor -v
           
           echo "✅ All pre-build checks passed"
 
-      - name: 🚀 Build Release APK (Obfuscated)
+      - name: 🚀 Build Release APK
         run: |
           echo "==> Building release APK with code obfuscation..."
           
-          flutter build apk \
-            --release \
-            --obfuscate \
-            --split-debug-info=./debug_symbols
+          flutter build apk --release --obfuscate --split-debug-info=./debug_symbols
           
-          # Verify APK was created
           if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
             echo "ERROR: APK build failed!"
             exit 1
           fi
           
-          # Show APK details
           APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)
           echo "✅ APK built successfully (Size: $APK_SIZE)"
 
@@ -279,7 +260,7 @@ GRADLE_FIX
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
           
-      - name: 📤 Upload Debug Symbols (Optional)
+      - name: 📤 Upload Debug Symbols
         uses: actions/upload-artifact@v4
         with:
           name: debug-symbols
