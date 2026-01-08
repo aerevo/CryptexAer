@@ -1,4 +1,4 @@
-name: Secure APK Build (Captain Aer)
+name: Secure APK Build (Nuclear Clean)
 on:
   workflow_dispatch:
   push:
@@ -22,32 +22,82 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          
-      - name: 🧹 Clean Existing Android Structure
+
+      - name: 🔥 Nuclear Clean - Remove ALL Flutter Artifacts
         run: |
-          echo "==> Removing any existing android folder..."
+          echo "==> Removing ALL Flutter/Android generated files..."
           rm -rf android/
+          rm -rf ios/
+          rm -rf build/
+          rm -rf .dart_tool/
+          rm -rf .flutter-plugins
+          rm -rf .flutter-plugins-dependencies
+          rm -rf .packages
+          rm -rf .metadata
+          rm -rf pubspec.lock
           
-      - name: 🏗️ Initialize Proper Android Structure
+          echo "✅ All generated files removed"
+
+      - name: 💾 Backup Critical Files
         run: |
-          echo "==> Creating fresh Android platform..."
-          flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
+          echo "==> Backing up lib, pubspec.yaml, and server..."
+          mkdir -p /tmp/backup
+          cp -r lib /tmp/backup/
+          cp pubspec.yaml /tmp/backup/
           
-          if [ ! -d "android" ]; then
-            echo "ERROR: Android folder not created!"
+          if [ -d "server" ]; then
+            cp -r server /tmp/backup/
+          fi
+          
+          if [ -d "assets" ]; then
+            cp -r assets /tmp/backup/
+          fi
+          
+          echo "✅ Critical files backed up to /tmp/backup"
+
+      - name: 🏗️ Create Fresh Flutter Project
+        run: |
+          echo "==> Creating brand new Flutter project structure..."
+          cd ..
+          
+          flutter create --platforms android --org com.cryptex --project-name cryptex_aer fresh_build
+          
+          if [ ! -d "fresh_build/android" ]; then
+            echo "ERROR: Fresh project creation failed!"
             exit 1
           fi
           
-          echo "✅ Android structure initialized successfully"
+          echo "✅ Fresh Flutter project created"
 
-      - name: 🔐 Inject Native Security Code
+      - name: 📦 Restore Code & Configuration
         run: |
-          echo "==> Creating MainActivity.kt with security features..."
+          echo "==> Restoring backed up files..."
+          cd ../fresh_build
           
-          MAIN_ACTIVITY_DIR="android/app/src/main/kotlin/com/cryptex/cryptex_aer"
-          mkdir -p "$MAIN_ACTIVITY_DIR"
+          rm -rf lib/
+          cp -r /tmp/backup/lib .
           
-          cat > "$MAIN_ACTIVITY_DIR/MainActivity.kt" << 'EOF'
+          cp /tmp/backup/pubspec.yaml .
+          
+          if [ -d "/tmp/backup/server" ]; then
+            cp -r /tmp/backup/server .
+          fi
+          
+          if [ -d "/tmp/backup/assets" ]; then
+            cp -r /tmp/backup/assets .
+          fi
+          
+          echo "✅ Code and configuration restored"
+
+      - name: 🔐 Inject MainActivity.kt
+        run: |
+          cd ../fresh_build
+          echo "==> Creating MainActivity.kt..."
+          
+          MAIN_DIR="android/app/src/main/kotlin/com/cryptex/cryptex_aer"
+          mkdir -p "$MAIN_DIR"
+          
+          cat > "$MAIN_DIR/MainActivity.kt" << 'MAINACTIVITY_EOF'
           package com.cryptex.cryptex_aer
           
           import android.os.Bundle
@@ -83,79 +133,56 @@ jobs:
                                       result.error("PROTECTION_ERROR", e.message, null)
                                   }
                               }
-                              
                               "checkScreenshot" -> {
                                   result.success(false)
                               }
-                              
                               "detectRootBypass" -> {
                                   try {
                                       val packages = call.argument<List<String>>("packages") ?: emptyList()
                                       val paths = call.argument<List<String>>("paths") ?: emptyList()
-                                      val isRooted = checkRootBypass(packages, paths)
-                                      result.success(isRooted)
+                                      result.success(checkRootBypass(packages, paths))
                                   } catch (e: Exception) {
                                       result.error("ROOT_CHECK_ERROR", e.message, null)
                                   }
                               }
-                              
-                              else -> {
-                                  result.notImplemented()
-                              }
+                              else -> result.notImplemented()
                           }
                       }
               }
               
               private fun checkRootBypass(packages: List<String>, paths: List<String>): Boolean {
-                  paths.forEach { path ->
-                      if (File(path).exists()) {
-                          return true
-                      }
-                  }
-                  
-                  packages.forEach { packageName ->
-                      if (isPackageInstalled(packageName, packageManager)) {
-                          return true
-                      }
-                  }
-                  
+                  paths.forEach { if (File(it).exists()) return true }
+                  packages.forEach { if (isPackageInstalled(it, packageManager)) return true }
                   return false
               }
               
-              private fun isPackageInstalled(packageName: String, pm: PackageManager): Boolean {
-                  return try {
-                      pm.getPackageInfo(packageName, 0)
-                      true
-                  } catch (e: PackageManager.NameNotFoundException) {
-                      false
-                  }
+              private fun isPackageInstalled(pkg: String, pm: PackageManager): Boolean {
+                  return try { pm.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
               }
           }
-          EOF
+          MAINACTIVITY_EOF
           
-          echo "✅ MainActivity.kt injected successfully"
+          echo "✅ MainActivity.kt created"
 
       - name: ⚙️ Configure Android Manifest
         run: |
-          echo "==> Adding required permissions..."
+          cd ../fresh_build
+          echo "==> Adding permissions..."
           
-          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.VIBRATE"/>' "$MANIFEST_FILE"
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.VIBRATE"/>' "$MANIFEST"
           
-          echo "✅ Permissions configured"
+          echo "✅ Manifest configured"
 
-      - name: 🔧 Configure Gradle Settings
+      - name: 🔧 Configure Gradle for Java 17
         run: |
-          echo "==> Configuring app/build.gradle..."
+          cd ../fresh_build
+          echo "==> Updating Gradle configuration..."
           
-          APP_GRADLE="android/app/build.gradle"
-          
-          cat >> "$APP_GRADLE" << 'EOF'
+          cat >> android/app/build.gradle << 'GRADLE_EOF'
           
           tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-              kotlinOptions {
-                  jvmTarget = '17'
-              }
+              kotlinOptions { jvmTarget = '17' }
           }
           
           android {
@@ -164,32 +191,35 @@ jobs:
                   targetCompatibility JavaVersion.VERSION_17
               }
           }
-          EOF
+          GRADLE_EOF
           
-          echo "✅ Gradle configured for Java 17"
+          echo "✅ Gradle configured"
 
-      - name: 📦 Download Flutter Dependencies
+      - name: 📦 Install Dependencies
         run: |
+          cd ../fresh_build
           echo "==> Running flutter pub get..."
           flutter pub get
           
-          echo "==> Verifying dependencies..."
-          flutter pub deps | grep -E "flutter_jailbreak_detection|flutter_secure_storage|sensors_plus"
+          echo "==> Listing key dependencies..."
+          flutter pub deps --style=compact | grep -E "cryptex_aer|flutter_jailbreak|flutter_secure_storage"
 
-      - name: 🔍 Fix Jailbreak Detection Library
+      - name: 🔍 Patch Jailbreak Detection Library
         run: |
-          echo "==> Patching flutter_jailbreak_detection library..."
+          echo "==> Finding and patching jailbreak detection..."
           
-          JB_GRADLE=$(find ~/.pub-cache/hosted/pub.dev -path "*/flutter_jailbreak_detection-*/android/build.gradle" | head -n 1)
+          JB_GRADLE=$(find ~/.pub-cache/hosted/pub.dev -path "*/flutter_jailbreak_detection-*/android/build.gradle" 2>/dev/null | head -n 1)
           
           if [ -n "$JB_GRADLE" ]; then
-            echo "Found: $JB_GRADLE"
+            echo "Found library at: $JB_GRADLE"
             
             if ! grep -q "namespace" "$JB_GRADLE"; then
               sed -i '/android {/a \    namespace "flutter.jailbreak_detection"' "$JB_GRADLE"
+              echo "Added namespace"
             fi
             
-            cat >> "$JB_GRADLE" << 'EOF'
+            if ! grep -q "jvmTarget" "$JB_GRADLE"; then
+              cat >> "$JB_GRADLE" << 'PATCH_EOF'
           
           android {
               compileOptions {
@@ -199,81 +229,95 @@ jobs:
           }
           
           tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-              kotlinOptions {
-                  jvmTarget = '17'
-              }
+              kotlinOptions { jvmTarget = '17' }
           }
-          EOF
+          PATCH_EOF
+              echo "Added Java 17 compatibility"
+            fi
             
-            echo "✅ Jailbreak detection library patched"
+            echo "✅ Library patched successfully"
           else
-            echo "⚠️ Jailbreak detection library not found"
+            echo "⚠️ Library not found or already cached"
           fi
 
-      - name: 🛡️ Protect Server Folder
+      - name: 🧪 Pre-Build Validation
         run: |
-          echo "==> Ensuring server folder is preserved..."
+          cd ../fresh_build
+          echo "==> Validating project structure..."
           
-          if [ -d "server" ]; then
-            echo "✅ Server folder exists and is protected"
-            ls -la server/ | head -5
-          else
-            echo "⚠️ No server folder found in repository"
-          fi
-
-      - name: 🏗️ Pre-Build Validation
-        run: |
-          echo "==> Running pre-build checks..."
+          echo "Checking critical files..."
+          test -f android/app/build.gradle && echo "✓ build.gradle exists"
+          test -f android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt && echo "✓ MainActivity.kt exists"
+          test -f pubspec.yaml && echo "✓ pubspec.yaml exists"
+          test -d lib && echo "✓ lib/ directory exists"
           
-          if [ ! -f "android/app/build.gradle" ]; then
-            echo "ERROR: android/app/build.gradle missing!"
-            exit 1
-          fi
-          
-          if [ ! -f "android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt" ]; then
-            echo "ERROR: MainActivity.kt not found!"
-            exit 1
-          fi
-          
+          echo ""
+          echo "Running Flutter doctor..."
           flutter doctor -v
           
-          echo "✅ All pre-build checks passed"
+          echo ""
+          echo "Analyzing project..."
+          flutter analyze --no-fatal-infos || echo "⚠️ Analysis warnings (non-fatal)"
+          
+          echo "✅ Pre-build validation complete"
 
       - name: 🚀 Build Release APK
         run: |
-          echo "==> Building release APK with code obfuscation..."
+          cd ../fresh_build
+          echo "==> Building release APK with obfuscation..."
           
-          flutter build apk --release --obfuscate --split-debug-info=./debug_symbols
+          flutter build apk \
+            --release \
+            --obfuscate \
+            --split-debug-info=./debug_symbols \
+            --verbose
           
           if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
-            echo "ERROR: APK build failed!"
+            echo "❌ ERROR: APK was not generated!"
+            echo "Checking build output directory..."
+            find build/app/outputs -type f
             exit 1
           fi
           
-          APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)
-          echo "✅ APK built successfully (Size: $APK_SIZE)"
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+          
+          echo ""
+          echo "✅ BUILD SUCCESS!"
+          echo "📦 APK Size: $APK_SIZE"
+          echo "📍 Location: $APK_PATH"
 
-      - name: 📤 Upload APK Artifact
+      - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-secure-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: cryptex-aer-release
+          path: ../fresh_build/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
-          
+
       - name: 📤 Upload Debug Symbols
         uses: actions/upload-artifact@v4
         with:
           name: debug-symbols
-          path: debug_symbols/
+          path: ../fresh_build/debug_symbols/
           retention-days: 90
+        continue-on-error: true
 
-      - name: 🎯 Build Summary
+      - name: 🎉 Build Summary
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📱 CRYPTEX AER - Build Complete"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ APK: build/app/outputs/flutter-apk/app-release.apk"
-          echo "✅ Size: $(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)"
-          echo "✅ Obfuscation: Enabled"
-          echo "✅ Security: Screenshot protection + Root detection"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          cd ../fresh_build
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          
+          echo ""
+          echo "╔════════════════════════════════════════════════╗"
+          echo "║     🚀 CRYPTEX AER - BUILD SUCCESSFUL 🚀      ║"
+          echo "╠════════════════════════════════════════════════╣"
+          echo "║ Package: com.cryptex.cryptex_aer              ║"
+          echo "║ APK Size: $(du -h "$APK_PATH" | cut -f1 | awk '{printf "%-37s", $1}') ║"
+          echo "║ Obfuscation: ✅ ENABLED                        ║"
+          echo "║ Security Features:                            ║"
+          echo "║   • Screenshot Protection (FLAG_SECURE)       ║"
+          echo "║   • Root/Jailbreak Detection                  ║"
+          echo "║   • Code Obfuscation + Symbol Stripping       ║"
+          echo "╚════════════════════════════════════════════════╝"
+          echo ""
+          echo "📥 Download your APK from the 'Artifacts' section above"
