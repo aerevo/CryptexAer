@@ -1,4 +1,4 @@
-name: Francois Build (Trojan Migration Fix)
+name: Francois Build (Pure Migration)
 on:
   workflow_dispatch:
   push:
@@ -23,18 +23,27 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. OPERASI TROJAN (Bina Struktur Baru)
+      - name: 4. PROSES PEMBERSIHAN TOTAL & MIGRASI
         run: |
-          echo "Menghancurkan folder android lama yang bermasalah..."
-          rm -rf android
+          echo "Menyimpan kod Dart dan aset Kapten..."
+          mkdir -p ../temp_source
+          cp -r lib ../temp_source/
+          cp -r assets ../temp_source/ 2>/dev/null || true
+          cp pubspec.yaml ../temp_source/
           
-          echo "Membina 'Trojan Project' di folder sementara..."
-          cd ..
-          flutter create --platforms android --org com.cryptex --project-name cryptex_aer trojan_project
+          echo "Menghancurkan folder lama untuk pembersihan total..."
+          # Padam semua fail termasuk fail halimunan .metadata dsb
+          find . -maxdepth 1 -not -path '*/.*' -not -name '.' -delete
+          rm -rf .metadata .packages .flutter-plugins .flutter-plugins-dependencies
           
-          echo "Memindahkan folder Android suci ke dalam projek Kapten..."
-          cp -r trojan_project/android $GITHUB_WORKSPACE/
-          cd $GITHUB_WORKSPACE
+          echo "Membina Projek Baru yang Suci..."
+          flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
+          
+          echo "Mengembalikan kod Dart dan aset Kapten ke dalam struktur baru..."
+          rm -rf lib
+          cp -r ../temp_source/lib .
+          cp -r ../temp_source/assets . 2>/dev/null || true
+          cp ../temp_source/pubspec.yaml .
           
           echo "Mencipta Folder Package Native..."
           mkdir -p android/app/src/main/kotlin/com/cryptex/cryptex_aer
@@ -81,10 +90,8 @@ jobs:
           }
           EOF
 
-          echo "Suntikan Vibrate Permission..."
+          echo "Suntikan Permission & JVM Target 17..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
-          
-          echo "Fixing JVM Target in Gradle..."
           echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> android/app/build.gradle
 
       - name: 5. Download Dependencies
@@ -113,5 +120,5 @@ jobs:
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: Z-KINETIC-ULTRA-READY
+          name: Z-KINETIC-ULTRA-FINAL
           path: build/app/outputs/flutter-apk/app-release.apk
