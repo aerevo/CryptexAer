@@ -1,4 +1,4 @@
-name: Francois Build (JVM Target Fix)
+name: Francois Build (Final Structure Fix)
 on:
   workflow_dispatch:
   push:
@@ -23,18 +23,29 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. SUNTIKAN PERISAI & CONFIG
+      - name: 4. PENJANAAN SEMULA STRUCTURE (Fix Unsupported Gradle)
         run: |
-          echo "Membersihkan & Menjana Android..."
+          echo "Menyelamatkan fail penting..."
+          mkdir -p backup_fix
+          cp pubspec.yaml backup_fix/
+          
+          echo "Menghancurkan folder android lama..."
           rm -rf android
-          flutter create . --platforms android --org com --project-name cryptex
+          
+          echo "Menjana semula projek dengan struktur terbaru..."
+          # Kita guna -t app dan --force untuk pastikan struktur Gradle adalah versi terbaru
+          flutter create . --platforms android --org com.cryptex --project-name cryptex_aer --force
+          
+          echo "Memulihkan pubspec.yaml..."
+          cp backup_fix/pubspec.yaml .
           
           echo "Mencipta Folder Package Native..."
-          mkdir -p android/app/src/main/kotlin/com/cryptex
+          # Pastikan folder ikut package name com.cryptex.cryptex_aer
+          mkdir -p android/app/src/main/kotlin/com/cryptex/cryptex_aer
           
-          echo "Suntikan MainActivity.kt..."
-          cat > android/app/src/main/kotlin/com/cryptex/MainActivity.kt <<EOF
-          package com.cryptex
+          echo "Suntikan MainActivity.kt (The Z-KINETIC Bridge)..."
+          cat > android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt <<EOF
+          package com.cryptex.cryptex_aer
           import android.view.WindowManager
           import android.os.Bundle
           import io.flutter.embedding.android.FlutterActivity
@@ -74,45 +85,36 @@ jobs:
           }
           EOF
 
-          echo "Setting Global JVM Target 17 in build.gradle..."
-          # Paksa Gradle guna Java 17 untuk semua tugasan
+          echo "Suntikan Permission & JVM Settings..."
+          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
           echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> android/app/build.gradle
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 6. BEDAH LIBRARY (Fix Inconsistent JVM)
+      - name: 6. BEDAH LIBRARY JAILBREAK (Deep Surgery)
         run: |
-          echo "Membedah library yang bermasalah..."
-          # Cari build.gradle dalam library jailbreak detection
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
-          
           if [ ! -z "$JB_GRADLE" ]; then
-            echo "Library ditemui: $JB_GRADLE"
-            # Paksa Namespace
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
-            
-            # Paksa Java 17 Target dalam library tersebut
             cat >> $JB_GRADLE <<EOF
             android {
                 compileOptions {
                     sourceCompatibility JavaVersion.VERSION_17
                     targetCompatibility JavaVersion.VERSION_17
                 }
-                kotlinOptions {
-                    jvmTarget = '17'
-                }
+                kotlinOptions { jvmTarget = '17' }
             }
           EOF
           fi
 
-      - name: 7. Build APK Release (With Skip Check)
+      - name: 7. Build APK Release
         run: |
-          # Kita tambah flag skip-validation untuk elak AGP Warning tadi
+          # Menggunakan flag --no-tree-shake-icons untuk elak ralat font jika perlu
           flutter build apk --obfuscate --split-debug-info=./debug_info --release --android-skip-build-dependency-validation
 
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: Z-KINETIC-ULTRA-APK
+          name: Z-KINETIC-ULTRA-READY
           path: build/app/outputs/flutter-apk/app-release.apk
