@@ -32,6 +32,7 @@ jobs:
       - name: 🏗️ 5. Membina Semula Struktur Android
         run: |
           echo "==> Menjana platform Android yang suci..."
+          # Membina struktur native baru dalam folder yang sama
           flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
           
           if [ ! -d "android" ]; then
@@ -44,10 +45,11 @@ jobs:
         run: |
           echo "==> Menyuntik kod perisai ke MainActivity.kt..."
           
+          # Tentukan folder destinasi berdasarkan project name
           MAIN_ACTIVITY_DIR="android/app/src/main/kotlin/com/cryptex/cryptex_aer"
           mkdir -p "$MAIN_ACTIVITY_DIR"
           
-          # Menggunakan 'KOTLIN_EOF' untuk mengelakkan ralat interpretasi pembolehubah GitHub
+          # PENTING: Menggunakan 'KOTLIN_EOF' (dengan quote) untuk mengelakkan ralat YAML $ interpretation
           cat > "$MAIN_ACTIVITY_DIR/MainActivity.kt" <<'KOTLIN_EOF'
 package com.cryptex.cryptex_aer
 
@@ -64,6 +66,7 @@ class MainActivity: FlutterActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Perisai automatik: FLAG_SECURE sekat rakaman skrin & screenshot
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE
@@ -114,14 +117,14 @@ KOTLIN_EOF
       - name: ⚙️ 7. Konfigurasi Manifest & Permissions
         run: |
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-          # Tambah VIBRATE permission sebelum tag <application>
+          # Tambah VIBRATE permission tepat sebelum tag <application>
           sed -i '/<application/i \    <uses-permission android:name="android.permission.VIBRATE"/>' "$MANIFEST_FILE"
           echo "✅ Permissions dikonfigurasi."
 
       - name: 🔧 8. Penyelarasan JVM & Gradle (Java 17)
         run: |
           APP_GRADLE="android/app/build.gradle"
-          # Gunakan 'GRADLE_EOF' untuk mengelakkan ralat YAML
+          # PENTING: Menggunakan 'GRADLE_EOF' (dengan quote)
           cat >> "$APP_GRADLE" <<'GRADLE_EOF'
 
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
@@ -144,8 +147,10 @@ GRADLE_EOF
 
       - name: 🔍 10. Pembedahan Library (Jailbreak Detection Patch)
         run: |
+          # Cari build.gradle library jailbreak yang bermasalah dengan Java 17
           JB_GRADLE=$(find ~/.pub-cache/hosted/pub.dev -path "*/flutter_jailbreak_detection-*/android/build.gradle" | head -n 1)
           if [ -n "$JB_GRADLE" ]; then
+            # Paksa Namespace & Java Compatibility
             sed -i '/android {/a \    namespace "flutter.jailbreak_detection"' "$JB_GRADLE"
             cat >> "$JB_GRADLE" <<'GRADLE_FIX'
 android {
@@ -163,6 +168,7 @@ GRADLE_FIX
 
       - name: 🚀 11. Build Release APK (Z-KINETIC ULTRA)
         run: |
+          # Obfuscate untuk menyulitkan kod supaya tidak mudah di-reverse engineering
           flutter build apk \
             --release \
             --obfuscate \
