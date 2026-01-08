@@ -59,12 +59,11 @@ jobs:
           [ -d "/tmp/cryptex_backup/assets" ] && cp -r /tmp/cryptex_backup/assets .
           echo "✅ Code restored"
 
-      - name: 🔧 FORCE FIX: Override build.gradle (Critical)
+      - name: 🔧 Override build.gradle
         run: |
           cd ../fresh_build
-          echo "==> Overriding android/app/build.gradle with modern template..."
-          
-          cat > android/app/build.gradle << 'BUILD_GRADLE_EOF'
+          echo "==> Creating modern build.gradle..."
+          cat > android/app/build.gradle << 'BUILDGRADLE'
           plugins {
               id "com.android.application"
               id "kotlin-android"
@@ -72,13 +71,13 @@ jobs:
           }
           
           android {
-              namespace = "com.cryptex.cryptex_aer"
-              compileSdk = flutter.compileSdkVersion
-              ndkVersion = flutter.ndkVersion
+              namespace "com.cryptex.cryptex_aer"
+              compileSdk flutter.compileSdkVersion
+              ndkVersion flutter.ndkVersion
           
               compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
               }
           
               kotlinOptions {
@@ -86,33 +85,31 @@ jobs:
               }
           
               defaultConfig {
-                  applicationId = "com.cryptex.cryptex_aer"
-                  minSdk = flutter.minSdkVersion
-                  targetSdk = flutter.targetSdkVersion
-                  versionCode = flutter.versionCode
-                  versionName = flutter.versionName
+                  applicationId "com.cryptex.cryptex_aer"
+                  minSdk flutter.minSdkVersion
+                  targetSdk flutter.targetSdkVersion
+                  versionCode flutter.versionCode
+                  versionName flutter.versionName
               }
           
               buildTypes {
                   release {
-                      signingConfig = signingConfigs.debug
+                      signingConfig signingConfigs.debug
                   }
               }
           }
           
           flutter {
-              source = "../.."
+              source "../.."
           }
-          BUILD_GRADLE_EOF
-          
-          echo "✅ build.gradle overridden with modern template"
+          BUILDGRADLE
+          echo "✅ build.gradle created"
 
       - name: 🔧 Fix settings.gradle
         run: |
           cd ../fresh_build
-          echo "==> Ensuring settings.gradle is correct..."
-          
-          cat > android/settings.gradle << 'SETTINGS_GRADLE_EOF'
+          echo "==> Configuring settings.gradle..."
+          cat > android/settings.gradle << 'SETTINGSGRADLE'
           pluginManagement {
               def flutterSdkPath = {
                   def properties = new Properties()
@@ -138,35 +135,30 @@ jobs:
           }
           
           include ":app"
-          SETTINGS_GRADLE_EOF
-          
+          SETTINGSGRADLE
           echo "✅ settings.gradle configured"
 
-      - name: 🔧 Fix gradle.properties
+      - name: 🔧 Configure gradle.properties
         run: |
           cd ../fresh_build
-          echo "==> Configuring gradle.properties..."
-          
-          cat > android/gradle.properties << 'GRADLE_PROPS_EOF'
+          echo "==> Setting gradle.properties..."
+          cat > android/gradle.properties << 'GRADLEPROPS'
           org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:+HeapDumpOnOutOfMemoryError
           android.useAndroidX=true
           android.enableJetifier=true
           android.defaults.buildfeatures.buildconfig=true
           android.nonTransitiveRClass=false
           android.nonFinalResIds=false
-          GRADLE_PROPS_EOF
-          
+          GRADLEPROPS
           echo "✅ gradle.properties configured"
 
       - name: 🔐 Inject MainActivity.kt
         run: |
           cd ../fresh_build
           echo "==> Creating MainActivity.kt..."
-          
           MAIN_DIR="android/app/src/main/kotlin/com/cryptex/cryptex_aer"
           mkdir -p "$MAIN_DIR"
-          
-          cat > "$MAIN_DIR/MainActivity.kt" << 'KOTLIN_EOF'
+          cat > "$MAIN_DIR/MainActivity.kt" << 'MAINACTIVITY'
           package com.cryptex.cryptex_aer
           
           import android.os.Bundle
@@ -227,104 +219,77 @@ jobs:
                   return try { pm.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
               }
           }
-          KOTLIN_EOF
-          
+          MAINACTIVITY
           echo "✅ MainActivity.kt created"
 
-      - name: ⚙️ Configure AndroidManifest.xml
+      - name: ⚙️ Configure AndroidManifest
         run: |
           cd ../fresh_build
-          echo "==> Adding permissions to AndroidManifest.xml..."
-          
+          echo "==> Adding permissions..."
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i '/<application/i \    <uses-permission android:name="android.permission.VIBRATE"/>' "$MANIFEST"
-          
-          echo "✅ AndroidManifest.xml configured"
+          echo "✅ Manifest configured"
 
       - name: 📦 Install Dependencies
         run: |
           cd ../fresh_build
           echo "==> Running flutter pub get..."
           flutter pub get
-          
           echo "==> Verifying dependencies..."
           flutter pub deps --style=compact | grep -E "flutter_jailbreak|flutter_secure_storage|sensors_plus" || true
 
-      - name: 🔍 Patch Jailbreak Detection Library
+      - name: 🔍 Patch Jailbreak Library
         run: |
           echo "==> Patching flutter_jailbreak_detection..."
-          
           JB_GRADLE=$(find ~/.pub-cache/hosted/pub.dev -path "*/flutter_jailbreak_detection-*/android/build.gradle" 2>/dev/null | head -n 1)
-          
           if [ -n "$JB_GRADLE" ]; then
             echo "Found: $JB_GRADLE"
-            
             if ! grep -q "namespace" "$JB_GRADLE"; then
-              sed -i '/android {/a \    namespace = "flutter.jailbreak_detection"' "$JB_GRADLE"
+              sed -i '/android {/a \    namespace "flutter.jailbreak_detection"' "$JB_GRADLE"
             fi
-            
             if ! grep -q "jvmTarget" "$JB_GRADLE"; then
-              cat >> "$JB_GRADLE" << 'PATCH_EOF'
+              cat >> "$JB_GRADLE" << 'JBPATCH'
           
           android {
               compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
               }
           }
-          
           tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
+              kotlinOptions { jvmTarget = "17" }
           }
-          PATCH_EOF
+          JBPATCH
             fi
-            
             echo "✅ Library patched"
           else
-            echo "⚠️ Library not found (may be cached)"
+            echo "⚠️ Library not found"
           fi
 
       - name: 🧪 Verify Gradle Files
         run: |
           cd ../fresh_build
-          echo "==> Verifying critical Gradle files..."
-          
-          echo "Checking build.gradle..."
-          grep -q "namespace = \"com.cryptex.cryptex_aer\"" android/app/build.gradle && echo "✓ Namespace found"
+          echo "==> Verifying Gradle configuration..."
+          grep -q "namespace" android/app/build.gradle && echo "✓ Namespace found"
           grep -q "dev.flutter.flutter-gradle-plugin" android/app/build.gradle && echo "✓ Flutter plugin found"
-          
-          echo "Checking settings.gradle..."
           grep -q "dev.flutter.flutter-plugin-loader" android/settings.gradle && echo "✓ Plugin loader found"
-          
-          echo "Checking MainActivity.kt..."
-          test -f android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt && echo "✓ MainActivity.kt exists"
-          
+          test -f android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt && echo "✓ MainActivity exists"
           echo ""
-          echo "Running Flutter doctor..."
           flutter doctor -v
-          
-          echo "✅ All validations passed"
+          echo "✅ Validation complete"
 
       - name: 🚀 Build Release APK
         run: |
           cd ../fresh_build
-          echo "==> Building release APK with obfuscation..."
-          
+          echo "==> Building release APK..."
           flutter build apk --release --obfuscate --split-debug-info=./debug_symbols
-          
           if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
-            echo "❌ APK build failed!"
-            echo "Checking build directory..."
-            find build/app/outputs -type f 2>/dev/null || echo "No outputs found"
+            echo "❌ Build failed!"
+            find build/app/outputs -type f 2>/dev/null || echo "No outputs"
             exit 1
           fi
-          
           APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)
-          echo ""
-          echo "✅ BUILD SUCCESSFUL!"
-          echo "📦 APK Size: $APK_SIZE"
+          echo "✅ BUILD SUCCESS - Size: $APK_SIZE"
 
       - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
@@ -345,11 +310,12 @@ jobs:
         run: |
           cd ../fresh_build
           echo ""
-          echo "╔════════════════════════════════════════════════╗"
-          echo "║     ✅ CRYPTEX AER BUILD SUCCESSFUL ✅         ║"
-          echo "╠════════════════════════════════════════════════╣"
-          echo "║ Package: com.cryptex.cryptex_aer              ║"
-          echo "║ APK: $(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1 | awk '{printf "%-38s", $1}')║"
-          echo "║ Obfuscation: ENABLED                          ║"
-          echo "║ Security: Screenshot + Root Detection         ║"
-          echo "╚════════════════════════════════════════════════╝"
+          echo "╔════════════════════════════════════════╗"
+          echo "║  ✅ CRYPTEX AER BUILD SUCCESSFUL ✅   ║"
+          echo "╠════════════════════════════════════════╣"
+          echo "║ Package: com.cryptex.cryptex_aer      ║"
+          APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)
+          printf "║ Size: %-32s ║\n" "$APK_SIZE"
+          echo "║ Obfuscation: ENABLED                  ║"
+          echo "║ Security: Screenshot + Root Detection ║"
+          echo "╚════════════════════════════════════════╝"
