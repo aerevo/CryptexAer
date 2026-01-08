@@ -312,14 +312,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cryptex-aer-release
-          path: ../fresh_build/build/app/outputs/flutter-apk/app-release.apk
+          path: ${{ github.workspace }}/../fresh_build/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
       - name: 📤 Upload Debug Symbols
         uses: actions/upload-artifact@v4
         with:
           name: debug-symbols
-          path: ../fresh_build/debug_symbols/
+          path: ${{ github.workspace }}/../fresh_build/debug_symbols/
           retention-days: 90
         continue-on-error: true
 
