@@ -1,4 +1,4 @@
-name: Secure APK Build (Captain Aer)
+name: Secure APK Build (Captain Aer - Francois Final)
 on:
   workflow_dispatch:
   push:
@@ -9,45 +9,45 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: 📥 Checkout Repository
+      - name: 📥 1. Checkout Repository
         uses: actions/checkout@v3
 
-      - name: ☕ Setup Java 17
+      - name: ☕ 2. Setup Java 17
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 🦅 Setup Flutter (Stable)
+      - name: 🦅 3. Setup Flutter (Stable)
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           
-      - name: 🧹 Clean Existing Android Structure
+      - name: 🧹 4. Membersihkan Struktur Lama
         run: |
-          echo "==> Removing any existing android folder..."
+          echo "==> Menghancurkan folder android lama..."
           rm -rf android/
+          rm -f pubspec.lock
           
-      - name: 🏗️ Initialize Proper Android Structure
+      - name: 🏗️ 5. Membina Semula Struktur Android
         run: |
-          echo "==> Creating fresh Android platform..."
+          echo "==> Menjana platform Android yang suci..."
           flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
           
-          # Verify android folder exists
           if [ ! -d "android" ]; then
-            echo "ERROR: Android folder not created!"
+            echo "ERROR: Kegagalan kritikal pembinaan folder android!"
             exit 1
           fi
-          
-          echo "✅ Android structure initialized successfully"
+          echo "✅ Struktur Android berjaya dijana."
 
-      - name: 🔐 Inject Native Security Code (MainActivity.kt)
+      - name: 🔐 6. Suntikan Nadi Security (MainActivity.kt)
         run: |
-          echo "==> Creating MainActivity.kt with security features..."
+          echo "==> Menyuntik kod perisai ke MainActivity.kt..."
           
           MAIN_ACTIVITY_DIR="android/app/src/main/kotlin/com/cryptex/cryptex_aer"
           mkdir -p "$MAIN_ACTIVITY_DIR"
           
+          # Menggunakan 'KOTLIN_EOF' untuk mengelakkan ralat interpretasi pembolehubah GitHub
           cat > "$MAIN_ACTIVITY_DIR/MainActivity.kt" <<'KOTLIN_EOF'
 package com.cryptex.cryptex_aer
 
@@ -64,7 +64,6 @@ class MainActivity: FlutterActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Enable screenshot protection by default
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE
@@ -78,51 +77,25 @@ class MainActivity: FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "enableScreenshotProtection" -> {
-                        try {
-                            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                            result.success(true)
-                        } catch (e: Exception) {
-                            result.error("PROTECTION_ERROR", e.message, null)
-                        }
+                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                        result.success(true)
                     }
-                    
                     "checkScreenshot" -> {
-                        result.success(false) // Always return false in production
+                        result.success(false) 
                     }
-                    
                     "detectRootBypass" -> {
-                        try {
-                            val packages = call.argument<List<String>>("packages") ?: emptyList()
-                            val paths = call.argument<List<String>>("paths") ?: emptyList()
-                            val isRooted = checkRootBypass(packages, paths)
-                            result.success(isRooted)
-                        } catch (e: Exception) {
-                            result.error("ROOT_CHECK_ERROR", e.message, null)
-                        }
+                        val packages = call.argument<List<String>>("packages") ?: emptyList()
+                        val paths = call.argument<List<String>>("paths") ?: emptyList()
+                        result.success(checkRootBypass(packages, paths))
                     }
-                    
-                    else -> {
-                        result.notImplemented()
-                    }
+                    else -> result.notImplemented()
                 }
             }
     }
     
     private fun checkRootBypass(packages: List<String>, paths: List<String>): Boolean {
-        // Check for root-related files
-        paths.forEach { path ->
-            if (File(path).exists()) {
-                return true
-            }
-        }
-        
-        // Check for root-related packages
-        packages.forEach { packageName ->
-            if (isPackageInstalled(packageName, packageManager)) {
-                return true
-            }
-        }
-        
+        paths.forEach { if (File(it).exists()) return true }
+        packages.forEach { if (isPackageInstalled(it, packageManager)) return true }
         return false
     }
     
@@ -136,30 +109,21 @@ class MainActivity: FlutterActivity() {
     }
 }
 KOTLIN_EOF
-          
-          echo "✅ MainActivity.kt injected successfully"
+          echo "✅ Nadi Security berjaya disuntik."
 
-      - name: ⚙️ Configure Android Manifest Permissions
+      - name: ⚙️ 7. Konfigurasi Manifest & Permissions
         run: |
-          echo "==> Adding required permissions..."
-          
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-          
-          # Add VIBRATE permission before <application> tag
+          # Tambah VIBRATE permission sebelum tag <application>
           sed -i '/<application/i \    <uses-permission android:name="android.permission.VIBRATE"/>' "$MANIFEST_FILE"
-          
-          echo "✅ Permissions configured"
+          echo "✅ Permissions dikonfigurasi."
 
-      - name: 🔧 Configure Gradle Build Settings
+      - name: 🔧 8. Penyelarasan JVM & Gradle (Java 17)
         run: |
-          echo "==> Configuring app/build.gradle..."
-          
           APP_GRADLE="android/app/build.gradle"
-          
-          # Add Kotlin compile options
+          # Gunakan 'GRADLE_EOF' untuk mengelakkan ralat YAML
           cat >> "$APP_GRADLE" <<'GRADLE_EOF'
 
-// Security & Kotlin Configuration
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
     kotlinOptions {
         jvmTarget = '17'
@@ -173,126 +137,40 @@ android {
     }
 }
 GRADLE_EOF
-          
-          echo "✅ Gradle configured for Java 17"
+          echo "✅ Gradle diselaraskan ke Java 17."
 
-      - name: 📦 Download Flutter Dependencies
-        run: |
-          echo "==> Running flutter pub get..."
-          flutter pub get
-          
-          echo "==> Verifying dependencies..."
-          flutter pub deps | grep -E "flutter_jailbreak_detection|flutter_secure_storage|sensors_plus"
+      - name: 📦 9. Download Dependencies
+        run: flutter pub get
 
-      - name: 🔍 Fix Jailbreak Detection Library
+      - name: 🔍 10. Pembedahan Library (Jailbreak Detection Patch)
         run: |
-          echo "==> Patching flutter_jailbreak_detection library..."
-          
-          # Find the library's build.gradle
           JB_GRADLE=$(find ~/.pub-cache/hosted/pub.dev -path "*/flutter_jailbreak_detection-*/android/build.gradle" | head -n 1)
-          
           if [ -n "$JB_GRADLE" ]; then
-            echo "Found: $JB_GRADLE"
-            
-            # Add namespace if missing
-            if ! grep -q "namespace" "$JB_GRADLE"; then
-              sed -i '/android {/a \    namespace "flutter.jailbreak_detection"' "$JB_GRADLE"
-            fi
-            
-            # Add Java 17 compatibility
+            sed -i '/android {/a \    namespace "flutter.jailbreak_detection"' "$JB_GRADLE"
             cat >> "$JB_GRADLE" <<'GRADLE_FIX'
-
 android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
 }
-
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-    kotlinOptions {
-        jvmTarget = '17'
-    }
+    kotlinOptions { jvmTarget = '17' }
 }
 GRADLE_FIX
-            
-            echo "✅ Jailbreak detection library patched"
-          else
-            echo "⚠️ Jailbreak detection library not found (might be cached)"
+            echo "✅ Library patched."
           fi
 
-      - name: 🛡️ Protect Server Folder
+      - name: 🚀 11. Build Release APK (Z-KINETIC ULTRA)
         run: |
-          echo "==> Ensuring server folder is preserved..."
-          
-          if [ -d "server" ]; then
-            echo "✅ Server folder exists and is protected"
-            ls -la server/ | head -5
-          else
-            echo "⚠️ No server folder found in repository"
-          fi
-
-      - name: 🏗️ Pre-Build Validation
-        run: |
-          echo "==> Running pre-build checks..."
-          
-          # Verify Android structure
-          if [ ! -f "android/app/build.gradle" ]; then
-            echo "ERROR: android/app/build.gradle missing!"
-            exit 1
-          fi
-          
-          # Verify MainActivity.kt exists
-          if [ ! -f "android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt" ]; then
-            echo "ERROR: MainActivity.kt not found!"
-            exit 1
-          fi
-          
-          # Check Flutter doctor
-          flutter doctor -v
-          
-          echo "✅ All pre-build checks passed"
-
-      - name: 🚀 Build Release APK (Obfuscated)
-        run: |
-          echo "==> Building release APK with code obfuscation..."
-          
           flutter build apk \
             --release \
             --obfuscate \
             --split-debug-info=./debug_symbols
-          
-          # Verify APK was created
-          if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
-            echo "ERROR: APK build failed!"
-            exit 1
-          fi
-          
-          # Show APK details
-          APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)
-          echo "✅ APK built successfully (Size: $APK_SIZE)"
 
-      - name: 📤 Upload APK Artifact
+      - name: 📤 12. Simpan Hasil APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-secure-apk
+          name: Z-KINETIC-ULTRA-READY
           path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
-          
-      - name: 📤 Upload Debug Symbols (Optional)
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-symbols
-          path: debug_symbols/
-          retention-days: 90
-
-      - name: 🎯 Build Summary
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📱 CRYPTEX AER - Build Complete"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ APK: build/app/outputs/flutter-apk/app-release.apk"
-          echo "✅ Size: $(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)"
-          echo "✅ Obfuscation: Enabled"
-          echo "✅ Security: Screenshot protection + Root detection"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          retention-days: 7
