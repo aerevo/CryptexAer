@@ -1,4 +1,4 @@
-name: Francois Build (Stable Structure Fix)
+name: Francois Build (Trojan Migration Fix)
 on:
   workflow_dispatch:
   push:
@@ -23,25 +23,23 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. PENJANAAN SEMULA STRUCTURE (Safe Mode)
+      - name: 4. OPERASI TROJAN (Bina Struktur Baru)
         run: |
-          echo "Menghancurkan folder android lama..."
+          echo "Menghancurkan folder android lama yang bermasalah..."
           rm -rf android
           
-          echo "Menjana semula projek (Tanpa --force)..."
-          # Sembunyikan pubspec sebentar supaya flutter create anggap ini projek baru
-          mv pubspec.yaml pubspec.yaml.bak
-          flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
+          echo "Membina 'Trojan Project' di folder sementara..."
+          cd ..
+          flutter create --platforms android --org com.cryptex --project-name cryptex_aer trojan_project
           
-          echo "Memulihkan pubspec.yaml asli Kapten..."
-          rm pubspec.yaml
-          mv pubspec.yaml.bak pubspec.yaml
+          echo "Memindahkan folder Android suci ke dalam projek Kapten..."
+          cp -r trojan_project/android $GITHUB_WORKSPACE/
+          cd $GITHUB_WORKSPACE
           
           echo "Mencipta Folder Package Native..."
-          # Struktur folder: com/cryptex/cryptex_aer
           mkdir -p android/app/src/main/kotlin/com/cryptex/cryptex_aer
           
-          echo "Suntikan MainActivity.kt (The Z-KINETIC Bridge)..."
+          echo "Suntikan MainActivity.kt (Z-KINETIC Bridge)..."
           cat > android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt <<EOF
           package com.cryptex.cryptex_aer
           import android.view.WindowManager
@@ -83,10 +81,10 @@ jobs:
           }
           EOF
 
-          echo "Suntikan Permission & JVM Settings..."
+          echo "Suntikan Vibrate Permission..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
           
-          # Pastikan Gradle guna Java 17
+          echo "Fixing JVM Target in Gradle..."
           echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> android/app/build.gradle
 
       - name: 5. Download Dependencies
@@ -115,5 +113,5 @@ jobs:
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: Z-KINETIC-ULTRA-STABLE
+          name: Z-KINETIC-ULTRA-READY
           path: build/app/outputs/flutter-apk/app-release.apk
