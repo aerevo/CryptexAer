@@ -67,7 +67,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   Timer? _screenshotWatchdog;
   
   int? _activeWheelIndex;
-  Timer? _wheelActiveTimer;
+  Timer? _wheelResetTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
   double _patternScore = 0.0;
@@ -155,7 +155,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       _accelSub?.cancel();
       _accelSub = null;
       _screenshotWatchdog?.cancel();
-      _wheelActiveTimer?.cancel();
+      _wheelResetTimer?.cancel();
     } else if (state == AppLifecycleState.resumed) {
       if (_accelSub == null) _startListening();
       _startScreenshotWatchdog();
@@ -176,7 +176,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     });
   }
 
-  void _analyzeScrollPattern() {
+  void _analyzeScrollPattern(int index) {
     final now = DateTime.now();
     double speed = 0.0;
     if (_lastScrollTime != null) {
@@ -184,7 +184,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     }
     _lastScrollTime = now;
     
-    _touchData.add({'timestamp': now, 'speed': speed, 'pressure': 0.5, 'wheelIndex': _activeWheelIndex ?? 0});
+    _touchData.add({'timestamp': now, 'speed': speed, 'pressure': 0.5, 'wheelIndex': index});
     if (_touchData.length > 20) _touchData.removeAt(0);
     
     if (_touchData.length >= 5) {
@@ -193,13 +193,33 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     }
   }
 
+  // 🔥 LOGIC TOUCH BARU: Panggil ini bila jari sentuh skrin
+  void _setActiveWheel(int index) {
+    _wheelResetTimer?.cancel();
+    setState(() {
+      _activeWheelIndex = index;
+    });
+  }
+
+  // 🔥 LOGIC TOUCH BARU: Panggil ini bila jari lepas
+  void _resetActiveWheel() {
+    _wheelResetTimer?.cancel();
+    _wheelResetTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _activeWheelIndex = null;
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
     _accelSub?.cancel();
     _screenshotWatchdog?.cancel();
-    _wheelActiveTimer?.cancel();
+    _wheelResetTimer?.cancel();
     _pulseController.dispose();
     _scanController.dispose();
     for (var c in _scrollControllers) c.dispose();
@@ -266,7 +286,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
     return Stack(
       children: [
-        // LAYER 1: Grid
+        // LAYER 1: Grid Background
         Positioned.fill(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
@@ -284,7 +304,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ),
         ),
 
-        // LAYER 2: Container
+        // LAYER 2: Main Interface
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -382,38 +402,16 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               
               const SizedBox(height: 25),
               
-              // 💿 WHEELS
+              // 💿 WHEELS (HOLOGRAPHIC & REACTIVE)
               SizedBox(
                 height: 130,
                 child: IgnorePointer(
                   ignoring: isInputDisabled,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      if (notification is ScrollStartNotification) {
-                        for (int i = 0; i < _scrollControllers.length; i++) {
-                          if (_scrollControllers[i].position == notification.metrics) {
-                            setState(() { _activeWheelIndex = i; });
-                            _wheelActiveTimer?.cancel();
-                            break;
-                          }
-                        }
-                      } else if (notification is ScrollUpdateNotification) {
-                        widget.controller.registerTouch(); 
-                        _analyzeScrollPattern();
-                      } else if (notification is ScrollEndNotification) {
-                        _wheelActiveTimer?.cancel();
-                        _wheelActiveTimer = Timer(const Duration(milliseconds: 300), () {
-                          if (mounted) setState(() => _activeWheelIndex = null);
-                        });
-                      }
-                      return false;
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: List.generate(
-                        5, 
-                        (index) => _buildHolographicWheel(index, activeColor, isInputDisabled)
-                      ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: List.generate(
+                      5, 
+                      (index) => _buildHolographicWheel(index, activeColor, isInputDisabled)
                     ),
                   ),
                 ),
@@ -526,72 +524,91 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
-  // 💿 HOLOGRAM WHEEL (FIXED LAYOUT)
+  // 💿 INSTANT GLOW HOLOGRAM WHEEL
   Widget _buildHolographicWheel(int index, Color color, bool disabled) {
     final bool isActive = (_activeWheelIndex == index);
     final double opacity = disabled ? 0.3 : (isActive ? 1.0 : 0.25);
     
-    return Column(
-      children: [
-        AnimatedContainer(duration: const Duration(milliseconds: 200), height: 1, width: isActive ? 40 : 0, color: color),
-        
-        // 🔥 FIX UTAMA: Gunakan Expanded supaya roda tidak 'hilang'
-        Expanded(
-          child: SizedBox(
-            width: 45,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity: opacity,
-              child: Stack(
-                children: [
-                  ListWheelScrollView.useDelegate(
-                    controller: _scrollControllers[index],
-                    itemExtent: 45,
-                    perspective: 0.005,
-                    diameterRatio: 1.4,
-                    physics: const FixedExtentScrollPhysics(),
-                    onSelectedItemChanged: (val) {
-                      _triggerHaptic(); 
-                      widget.controller.updateWheel(index, val % 10);
-                    },
-                    childDelegate: ListWheelChildBuilderDelegate(
-                      builder: (context, i) {
-                        final num = i % 10;
-                        return Center(
-                          child: AnimatedDefaultTextStyle(
-                            duration: const Duration(milliseconds: 150),
-                            style: TextStyle(
-                              color: isActive ? color : Colors.grey[800],
-                              fontSize: isActive ? 30 : 26,
-                              fontFamily: 'Courier',
-                              fontWeight: FontWeight.bold,
-                              shadows: isActive ? [BoxShadow(color: color.withOpacity(0.8), blurRadius: 15)] : [],
-                            ),
-                            child: Text('$num'),
-                          ),
-                        );
+    // 🔥 PENTING: Bungkus dengan Listener untuk kesan sentuhan serta-merta
+    return Listener(
+      onPointerDown: (_) => _setActiveWheel(index), // Sentuh je terus menyala!
+      onPointerUp: (_) => _resetActiveWheel(),      // Lepas baru padam
+      child: Column(
+        children: [
+          AnimatedContainer(duration: const Duration(milliseconds: 100), height: 1, width: isActive ? 40 : 0, color: color),
+          
+          Expanded(
+            child: SizedBox(
+              width: 45,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 150),
+                opacity: opacity,
+                child: Stack(
+                  children: [
+                    // Setiap roda ada NotificationListener sendiri untuk tracking scroll
+                    NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification is ScrollUpdateNotification) {
+                          widget.controller.registerTouch(); 
+                          _analyzeScrollPattern(index);
+                          _setActiveWheel(index); // Keep active while scrolling
+                        }
+                        return false;
                       },
-                    ),
-                  ),
-                  if (isActive)
-                    Positioned.fill(
-                      child: AnimatedBuilder(
-                        animation: _scanController,
-                        builder: (context, child) {
-                          return CustomPaint(
-                            painter: ScanLinePainter(color: color, progress: _scanController.value),
-                          );
+                      child: ListWheelScrollView.useDelegate(
+                        controller: _scrollControllers[index],
+                        itemExtent: 45,
+                        perspective: 0.005,
+                        diameterRatio: 1.4,
+                        physics: const FixedExtentScrollPhysics(),
+                        onSelectedItemChanged: (val) {
+                          _triggerHaptic(); 
+                          widget.controller.updateWheel(index, val % 10);
                         },
+                        childDelegate: ListWheelChildBuilderDelegate(
+                          builder: (context, i) {
+                            final num = i % 10;
+                            return Center(
+                              child: AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 100),
+                                style: TextStyle(
+                                  color: isActive ? color : Colors.grey[800],
+                                  fontSize: isActive ? 30 : 26,
+                                  fontFamily: 'Courier',
+                                  fontWeight: FontWeight.bold,
+                                  shadows: isActive ? [
+                                    BoxShadow(color: color.withOpacity(0.9), blurRadius: 20),
+                                    BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 5)
+                                  ] : [],
+                                ),
+                                child: Text('$num'),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                ],
+                    
+                    if (isActive)
+                      Positioned.fill(
+                        child: AnimatedBuilder(
+                          animation: _scanController,
+                          builder: (context, child) {
+                            return CustomPaint(
+                              painter: ScanLinePainter(color: color, progress: _scanController.value),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        
-        AnimatedContainer(duration: const Duration(milliseconds: 200), height: 1, width: isActive ? 40 : 0, color: color),
-      ],
+          
+          AnimatedContainer(duration: const Duration(milliseconds: 100), height: 1, width: isActive ? 40 : 0, color: color),
+        ],
+      ),
     );
   }
 
@@ -622,7 +639,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 }
 
-// 🎨 GRID PAINTER
 class GridPainter extends CustomPainter {
   final Color color;
   final double scanValue;
@@ -654,7 +670,6 @@ class GridPainter extends CustomPainter {
   bool shouldRepaint(covariant GridPainter oldDelegate) => oldDelegate.scanValue != scanValue;
 }
 
-// 🎨 SCAN LINE PAINTER
 class ScanLinePainter extends CustomPainter {
   final Color color;
   final double progress;
