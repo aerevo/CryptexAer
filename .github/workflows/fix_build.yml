@@ -1,4 +1,4 @@
-name: Francois Build (Protected Pure Migration)
+name: Francois Build (Isolated Workspace)
 on:
   workflow_dispatch:
   push:
@@ -23,40 +23,28 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. PROSES PEMBERSIHAN PILIHAN (Server & Git Safe)
+      - name: 4. PEMBINAAN DALAM KAWASAN TERPENCIL (Isolated Build)
         run: |
-          echo "Langkah 4.1: Menyelamatkan kod Dart..."
-          mkdir -p ../temp_source
-          cp -r lib ../temp_source/
-          cp pubspec.yaml ../temp_source/
-          [ -d assets ] && cp -r assets ../temp_source/ || echo "Tiada folder assets."
-
-          echo "Langkah 4.2: Pembersihan Bersasaran (Targeted Wipe)..."
-          # Kita PADAM folder android lama & fail sampah Flutter sahaja
-          # Kita TIDAK sentuh folder 'server' atau '.gitignore'
-          rm -rf android
-          rm -rf ios
-          rm -rf build
-          rm -rf .dart_tool
-          rm -rf .metadata
-          rm -f .packages
-          rm -f .flutter-plugins
-          rm -f .flutter-plugins-dependencies
-          rm -f pubspec.lock
-
-          echo "Langkah 4.3: Menjana semula struktur Android..."
-          # Gunakan nama projek yang konsisten dengan kod Claude
-          flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
+          echo "Langkah 4.1: Mencipta 'Clean Workspace' di folder sebelah..."
+          cd ..
+          flutter create --platforms android --org com.cryptex --project-name cryptex_aer build_zone
           
-          echo "Langkah 4.4: Memulihkan kod Dart Kapten..."
-          rm -rf lib
-          cp -r ../temp_source/lib .
-          cp ../temp_source/pubspec.yaml .
-          [ -d ../temp_source/assets ] && cp -r ../temp_source/assets . || echo "Tiada assets untuk dipulihkan."
+          echo "Langkah 4.2: Memindahkan aset & kod Kapten ke Build Zone..."
+          # Padam folder lib asal build_zone dan ganti dengan milik Kapten
+          rm -rf build_zone/lib
+          cp -r $GITHUB_WORKSPACE/lib build_zone/
+          
+          # Salin pubspec.yaml (Ini nadi library Kapten)
+          cp $GITHUB_WORKSPACE/pubspec.yaml build_zone/
+          
+          # Salin assets jika ada
+          if [ -d "$GITHUB_WORKSPACE/assets" ]; then
+            cp -r $GITHUB_WORKSPACE/assets build_zone/
+          fi
 
-          echo "Langkah 4.5: Suntikan Nadi Native (MainActivity.kt)..."
-          mkdir -p android/app/src/main/kotlin/com/cryptex/cryptex_aer
-          cat > android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt <<EOF
+          echo "Langkah 4.3: Suntikan Nadi Native ke Build Zone..."
+          mkdir -p build_zone/android/app/src/main/kotlin/com/cryptex/cryptex_aer
+          cat > build_zone/android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt <<EOF
           package com.cryptex.cryptex_aer
           import android.view.WindowManager
           import android.os.Bundle
@@ -97,12 +85,14 @@ jobs:
           }
           EOF
 
-          echo "Langkah 4.6: Suntikan Konfigurasi Global..."
-          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
-          echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> android/app/build.gradle
+          echo "Langkah 4.4: Konfigurasi Android & JVM Target 17..."
+          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' build_zone/android/app/src/main/AndroidManifest.xml
+          echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> build_zone/android/app/build.gradle
 
-      - name: 5. Ambil Library Baru
-        run: flutter pub get
+      - name: 5. Download Dependencies (Dalam Build Zone)
+        run: |
+          cd ../build_zone
+          flutter pub get
 
       - name: 6. BEDAH LIBRARY JAILBREAK (Deep Surgery)
         run: |
@@ -120,12 +110,13 @@ jobs:
           EOF
           fi
 
-      - name: 7. Build APK Gred Bank
+      - name: 7. Build APK Gred Bank (Z-KINETIC)
         run: |
+          cd ../build_zone
           flutter build apk --obfuscate --split-debug-info=./debug_info --release --android-skip-build-dependency-validation
 
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
           name: Z-KINETIC-ULTRA-READY
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: ../build_zone/build/app/outputs/flutter-apk/app-release.apk
