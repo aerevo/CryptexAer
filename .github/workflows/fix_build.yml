@@ -308,18 +308,28 @@ jobs:
           APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)
           echo "✅ BUILD SUCCESS - Size: $APK_SIZE"
 
+      - name: 📦 Copy APK to Workspace
+        run: |
+          echo "==> Copying APK to workspace for artifact upload..."
+          mkdir -p ${{ github.workspace }}/release_output
+          cp ../fresh_build/build/app/outputs/flutter-apk/app-release.apk ${{ github.workspace }}/release_output/
+          if [ -d "../fresh_build/debug_symbols" ]; then
+            cp -r ../fresh_build/debug_symbols ${{ github.workspace }}/release_output/
+          fi
+          echo "✅ Files copied to workspace"
+
       - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: cryptex-aer-release
-          path: ${{ github.workspace }}/../fresh_build/build/app/outputs/flutter-apk/app-release.apk
+          path: release_output/app-release.apk
           retention-days: 30
 
       - name: 📤 Upload Debug Symbols
         uses: actions/upload-artifact@v4
         with:
           name: debug-symbols
-          path: ${{ github.workspace }}/../fresh_build/debug_symbols/
+          path: release_output/debug_symbols/
           retention-days: 90
         continue-on-error: true
 
