@@ -1,4 +1,4 @@
-name: Francois Build (Pure Migration)
+name: Francois Build (Protected Pure Migration)
 on:
   workflow_dispatch:
   push:
@@ -23,32 +23,39 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. PROSES PEMBERSIHAN TOTAL & MIGRASI
+      - name: 4. PROSES PEMBERSIHAN PILIHAN (Server & Git Safe)
         run: |
-          echo "Menyimpan kod Dart dan aset Kapten..."
+          echo "Langkah 4.1: Menyelamatkan kod Dart..."
           mkdir -p ../temp_source
           cp -r lib ../temp_source/
-          cp -r assets ../temp_source/ 2>/dev/null || true
           cp pubspec.yaml ../temp_source/
-          
-          echo "Menghancurkan folder lama untuk pembersihan total..."
-          # Padam semua fail termasuk fail halimunan .metadata dsb
-          find . -maxdepth 1 -not -path '*/.*' -not -name '.' -delete
-          rm -rf .metadata .packages .flutter-plugins .flutter-plugins-dependencies
-          
-          echo "Membina Projek Baru yang Suci..."
+          [ -d assets ] && cp -r assets ../temp_source/ || echo "Tiada folder assets."
+
+          echo "Langkah 4.2: Pembersihan Bersasaran (Targeted Wipe)..."
+          # Kita PADAM folder android lama & fail sampah Flutter sahaja
+          # Kita TIDAK sentuh folder 'server' atau '.gitignore'
+          rm -rf android
+          rm -rf ios
+          rm -rf build
+          rm -rf .dart_tool
+          rm -rf .metadata
+          rm -f .packages
+          rm -f .flutter-plugins
+          rm -f .flutter-plugins-dependencies
+          rm -f pubspec.lock
+
+          echo "Langkah 4.3: Menjana semula struktur Android..."
+          # Gunakan nama projek yang konsisten dengan kod Claude
           flutter create . --platforms android --org com.cryptex --project-name cryptex_aer
           
-          echo "Mengembalikan kod Dart dan aset Kapten ke dalam struktur baru..."
+          echo "Langkah 4.4: Memulihkan kod Dart Kapten..."
           rm -rf lib
           cp -r ../temp_source/lib .
-          cp -r ../temp_source/assets . 2>/dev/null || true
           cp ../temp_source/pubspec.yaml .
-          
-          echo "Mencipta Folder Package Native..."
+          [ -d ../temp_source/assets ] && cp -r ../temp_source/assets . || echo "Tiada assets untuk dipulihkan."
+
+          echo "Langkah 4.5: Suntikan Nadi Native (MainActivity.kt)..."
           mkdir -p android/app/src/main/kotlin/com/cryptex/cryptex_aer
-          
-          echo "Suntikan MainActivity.kt (Z-KINETIC Bridge)..."
           cat > android/app/src/main/kotlin/com/cryptex/cryptex_aer/MainActivity.kt <<EOF
           package com.cryptex.cryptex_aer
           import android.view.WindowManager
@@ -90,14 +97,14 @@ jobs:
           }
           EOF
 
-          echo "Suntikan Permission & JVM Target 17..."
+          echo "Langkah 4.6: Suntikan Konfigurasi Global..."
           sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
           echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> android/app/build.gradle
 
-      - name: 5. Download Dependencies
+      - name: 5. Ambil Library Baru
         run: flutter pub get
 
-      - name: 6. BEDAH LIBRARY JAILBREAK
+      - name: 6. BEDAH LIBRARY JAILBREAK (Deep Surgery)
         run: |
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
           if [ ! -z "$JB_GRADLE" ]; then
@@ -113,12 +120,12 @@ jobs:
           EOF
           fi
 
-      - name: 7. Build APK Release
+      - name: 7. Build APK Gred Bank
         run: |
           flutter build apk --obfuscate --split-debug-info=./debug_info --release --android-skip-build-dependency-validation
 
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: Z-KINETIC-ULTRA-FINAL
+          name: Z-KINETIC-ULTRA-READY
           path: build/app/outputs/flutter-apk/app-release.apk
