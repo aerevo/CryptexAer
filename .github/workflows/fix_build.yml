@@ -1,4 +1,4 @@
-name: Francois Build (Advanced Native Injection)
+name: Francois Build (JVM Target Fix)
 on:
   workflow_dispatch:
   push:
@@ -12,7 +12,7 @@ jobs:
       - name: 1. Ambil Kod Kapten
         uses: actions/checkout@v3
 
-      - name: 2. Setup Java
+      - name: 2. Setup Java 17
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
@@ -23,17 +23,16 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: 4. PENJANAAN & SUNTIKAN NATIVE
+      - name: 4. SUNTIKAN PERISAI & CONFIG
         run: |
-          echo "Membersihkan & Menjana Android dengan Package com.cryptex..."
+          echo "Membersihkan & Menjana Android..."
           rm -rf android
-          # Paksa create dengan package name yang betul
           flutter create . --platforms android --org com --project-name cryptex
           
-          echo "Mencipta Folder Package..."
+          echo "Mencipta Folder Package Native..."
           mkdir -p android/app/src/main/kotlin/com/cryptex
           
-          echo "Menyuntik MainActivity.kt (Z-KINETIC Bridge)..."
+          echo "Suntikan MainActivity.kt..."
           cat > android/app/src/main/kotlin/com/cryptex/MainActivity.kt <<EOF
           package com.cryptex
           import android.view.WindowManager
@@ -42,7 +41,6 @@ jobs:
           import io.flutter.embedding.engine.FlutterEngine
           import io.flutter.plugin.common.MethodChannel
           import java.io.File
-          import android.content.Context
           import android.content.pm.PackageManager
 
           class MainActivity: FlutterActivity() {
@@ -76,24 +74,45 @@ jobs:
           }
           EOF
 
-          echo "Menyuntik Vibrate Permission..."
-          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+          echo "Setting Global JVM Target 17 in build.gradle..."
+          # Paksa Gradle guna Java 17 untuk semua tugasan
+          echo "tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { kotlinOptions { jvmTarget = '17' } }" >> android/app/build.gradle
 
       - name: 5. Download Dependencies
         run: flutter pub get
 
-      - name: 6. BEDAH LIBRARY JAILBREAK (Namespace Fix)
+      - name: 6. BEDAH LIBRARY (Fix Inconsistent JVM)
         run: |
+          echo "Membedah library yang bermasalah..."
+          # Cari build.gradle dalam library jailbreak detection
           JB_GRADLE=$(find $HOME/.pub-cache/hosted/pub.dev/flutter_jailbreak_detection-*/android -name "build.gradle")
+          
           if [ ! -z "$JB_GRADLE" ]; then
+            echo "Library ditemui: $JB_GRADLE"
+            # Paksa Namespace
             sed -i 's/android {/android { namespace "flutter.jailbreak_detection"/g' $JB_GRADLE
+            
+            # Paksa Java 17 Target dalam library tersebut
+            cat >> $JB_GRADLE <<EOF
+            android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                kotlinOptions {
+                    jvmTarget = '17'
+                }
+            }
+          EOF
           fi
 
-      - name: 7. Build APK Release
-        run: flutter build apk --obfuscate --split-debug-info=./debug_info --release
+      - name: 7. Build APK Release (With Skip Check)
+        run: |
+          # Kita tambah flag skip-validation untuk elak AGP Warning tadi
+          flutter build apk --obfuscate --split-debug-info=./debug_info --release --android-skip-build-dependency-validation
 
       - name: 8. Simpan APK
         uses: actions/upload-artifact@v4
         with:
-          name: cryptex-aer-advanced-security
+          name: Z-KINETIC-ULTRA-APK
           path: build/app/outputs/flutter-apk/app-release.apk
