@@ -39,9 +39,7 @@ class ClaController extends ChangeNotifier {
   static const _K_LOCKOUT = 'cla_lockout';
 
   ClaController(this.config) {
-    _engine = SecurityEngine(
-      config.engineConfig ?? const SecurityEngineConfig(),
-    );
+    _engine = SecurityEngine(const SecurityEngineConfig());
 
     _storage = const FlutterSecureStorage(
       aOptions: AndroidOptions(encryptedSharedPreferences: true),
