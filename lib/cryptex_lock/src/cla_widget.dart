@@ -1,7 +1,6 @@
-// 🎯 PROJECT JARVIS - HOLOGRAPHIC HUD INTERFACE
-// Design Inspiration: JARVIS (Iron Man) - Holographic Targeting System
-// Integrated & Fixed by: Francois (Loyal Butler)
-// Total Integrity Check: 100% COMPLETE ✅
+// 🎯 PROJECT JARVIS - THE MASTERFILE (AUDIT CORRECTED)
+// 100% Full Code | No Truncation | No Missing Sensors
+// Integrated by: Francois (Loyal Butler)
 
 import 'dart:async';
 import 'dart:math';
@@ -14,7 +13,7 @@ import 'cla_controller.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 1. ML PATTERN ANALYZER (LOGIK ASAL FRANCOIS)
+// 1. ML PATTERN ANALYZER
 // ============================================
 class MLPatternAnalyzer {
   static double analyzePattern(List<Map<String, dynamic>> touchData) {
@@ -98,7 +97,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   late AnimationController _reticleController;
   
   final Color _jarvisCyan = const Color(0xFF00FFFF);
-  final Color _jarvisDim = const Color(0xFF004D4D);
   final Color _jarvisGreen = const Color(0xFF00FF88);
   final Color _jarvisRed = const Color(0xFFFF3366);
   final Color _jarvisWarning = const Color(0xFFFFA726);
@@ -152,7 +150,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   void _handleControllerChange() {
     if (widget.controller.state == SecurityState.UNLOCKED) widget.onSuccess();
-    else if (widget.controller.state == SecurityState.HARD_LOCK) widget.onJammed();
+    else if (widget.controller.state == SecurityState.HARD_LOCK) {
+      _startLockoutTimer();
+      widget.onJammed();
+    }
     if (mounted) setState(() {});
   }
 
@@ -169,6 +170,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _startListening() {
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((e) => widget.controller.registerShake(e.x.abs() + e.y.abs() + e.z.abs(), e.x, e.y, e.z));
+  }
+
+  void _startLockoutTimer() {
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted && widget.controller.state == SecurityState.HARD_LOCK) {
+        setState(() {});
+        if (widget.controller.remainingLockoutSeconds <= 0) timer.cancel();
+      } else { timer.cancel(); }
+    });
   }
 
   void _analyzeScrollPattern() {
@@ -196,7 +207,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     if (state == SecurityState.ROOT_WARNING) return _buildSecurityWarningUI();
 
     Color activeColor = (state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK) ? _jarvisRed : (state == SecurityState.UNLOCKED ? _jarvisGreen : _jarvisCyan);
-    String status = _getStatusLabel(state);
+    String statusLabel = _getStatusLabel(state);
     
     return Stack(
       children: [
@@ -215,7 +226,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildHUDHeader(activeColor, status),
+              _buildHUDHeader(activeColor, statusLabel),
               if (widget.controller.threatMessage.isNotEmpty || _suspiciousRootBypass) _buildWarningBanner(),
               const SizedBox(height: 32),
               _buildJarvisTumblerArea(activeColor),
@@ -232,13 +243,14 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     switch (state) {
       case SecurityState.LOCKED: return "AWAITING BIOMETRIC SCAN";
       case SecurityState.VALIDATING: return "ENCRYPTION SYNC ACTIVE";
-      case SecurityState.SOFT_LOCK: return "AUTH ERROR - RETRYING";
-      case SecurityState.HARD_LOCK: return "TERMINAL LOCKDOWN";
-      case SecurityState.UNLOCKED: return "DECRYPTION COMPLETE";
+      case SecurityState.SOFT_LOCK: return "AUTH ERROR [ATTEMPT ${widget.controller.failedAttempts}/3]";
+      case SecurityState.HARD_LOCK: return "TERMINAL LOCKDOWN [${widget.controller.remainingLockoutSeconds}s]";
+      case SecurityState.UNLOCKED: return "ACCESS AUTHORIZED";
       default: return "SYSTEM STANDBY";
     }
   }
 
+  // 🎯 Issue #1 FIXED: Restoration of 3 Sensor Boxes
   Widget _buildHUDHeader(Color color, String status) {
     return Stack(
       children: [
@@ -264,9 +276,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             const SizedBox(width: 16),
             Column(
               children: [
-                _buildSensorBox("MOT", widget.controller.motionConfidence, color, Icons.sensors),
+                _buildSensorBox("MOTION", widget.controller.motionConfidence, color, Icons.sensors),
                 const SizedBox(height: 10),
-                _buildPatternBox("PAT", _patternScore, color),
+                _buildSensorBox("TOUCH", widget.controller.touchConfidence, color, Icons.fingerprint), // 🎯 RESTORED
+                const SizedBox(height: 10),
+                _buildPatternBox("PATTERN", _patternScore, color),
               ],
             )
           ],
@@ -275,6 +289,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
+  // 🎯 Issue #2 FIXED: Proper ScrollNotification Logic
   Widget _buildJarvisTumblerArea(Color color) {
     return SizedBox(
       height: 140,
@@ -284,9 +299,28 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           Positioned(right: 0, top: 0, bottom: 0, child: CustomPaint(size: const Size(40, 140), painter: JarvisPeripheralPainter(color: color, side: 'right'))),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 50),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(5, (index) => _buildHolographicWheel(index, color)),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is ScrollStartNotification) {
+                  for (int i = 0; i < _scrollControllers.length; i++) {
+                    if (_scrollControllers[i].position == notification.metrics) {
+                      setState(() { _activeWheelIndex = i; });
+                      _wheelActiveTimer?.cancel();
+                      break;
+                    }
+                  }
+                } else if (notification is ScrollUpdateNotification) {
+                  widget.controller.registerTouch(); // 🎯 RESTORED CRITICAL LOGIC
+                  _analyzeScrollPattern();
+                } else if (notification is ScrollEndNotification) {
+                  _resetActiveWheelTimer();
+                }
+                return false;
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(5, (index) => _buildHolographicWheel(index, color)),
+              ),
             ),
           )
         ],
@@ -294,12 +328,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
+  // 🎯 Issue #3 FIXED: Improved Wheel Timer & Instant Glow
   Widget _buildHolographicWheel(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
     return Expanded(
       child: Listener(
-        onPointerDown: (_) => setState(() => _activeWheelIndex = index),
-        onPointerUp: (_) => Timer(const Duration(milliseconds: 300), () => setState(() => _activeWheelIndex = null)),
+        onPointerDown: (_) {
+          setState(() => _activeWheelIndex = index);
+          _wheelActiveTimer?.cancel();
+        },
+        onPointerUp: (_) => _resetActiveWheelTimer(),
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
           opacity: isActive ? 1.0 : 0.4,
@@ -312,7 +350,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 controller: _scrollControllers[index],
                 itemExtent: 50, perspective: 0.003, diameterRatio: 1.1,
                 physics: const FixedExtentScrollPhysics(),
-                onSelectedItemChanged: (v) { widget.controller.updateWheel(index, v % 10); HapticFeedback.selectionClick(); _analyzeScrollPattern(); },
+                onSelectedItemChanged: (v) { 
+                  widget.controller.updateWheel(index, v % 10); 
+                  HapticFeedback.selectionClick(); 
+                },
                 childDelegate: ListWheelChildBuilderDelegate(builder: (context, i) => Center(child: Text('${i % 10}', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, shadows: isActive ? [Shadow(color: color, blurRadius: 25)] : [])))),
               ),
             ],
@@ -320,6 +361,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         ),
       ),
     );
+  }
+
+  void _resetActiveWheelTimer() {
+    _wheelActiveTimer?.cancel();
+    _wheelActiveTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _activeWheelIndex = null);
+    });
   }
 
   Widget _buildAuthButton(Color activeColor, SecurityState state) {
@@ -391,7 +439,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 }
 
 // ============================================
-// 4. CUSTOM PAINTERS (RECONSTRUCTED)
+// 4. CUSTOM PAINTERS (AUDIT CORRECTED)
 // ============================================
 
 class JarvisGridPainter extends CustomPainter {
@@ -415,7 +463,6 @@ class JarvisPeripheralPainter extends CustomPainter {
     final tp = TextPainter(textDirection: TextDirection.ltr);
     final random = Random(side == 'left' ? 42 : 123);
 
-    // 🎯 Issue #1 FIXED: Full Coordinate & Barcode Display
     if (side == 'left') {
       canvas.drawRect(const Rect.fromLTWH(0, 10, 38, 14), Paint()..color = color.withOpacity(0.2));
       _drawText(canvas, tp, "COORD", 4, 13, 7, color, true);
@@ -458,7 +505,6 @@ class JarvisReticlePainter extends CustomPainter {
       canvas.drawLine(Offset(c.dx + 18 * cos(a), c.dy + 18 * sin(a)), Offset(c.dx + 26 * cos(a), c.dy + 26 * sin(a)), p);
     }
     canvas.restore();
-    canvas.drawCircle(c, 30, Paint()..color = color.withOpacity(0.1)..style = PaintingStyle.stroke);
   }
   @override bool shouldRepaint(JarvisReticlePainter old) => old.progress != progress;
 }
