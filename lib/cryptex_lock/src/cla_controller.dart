@@ -1,7 +1,3 @@
-// 🔐 PROJECT Z-KINETIC V4.0 — CONTROLLER
-// Bank-Grade Lock Orchestrator
-// Shadow Rewrite — François
-
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -14,41 +10,42 @@ import 'security_engine.dart';
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
   late final SecurityEngine _engine;
-  late final FlutterSecureStorage _vault;
+  late final FlutterSecureStorage _storage;
 
   SecurityState _state = SecurityState.LOCKED;
   SecurityState get state => _state;
 
-  int _failures = 0;
-  DateTime? _lockoutUntil;
+  int _failedAttempts = 0;
+  int get failedAttempts => _failedAttempts;
 
+  DateTime? _lockoutUntil;
   late List<int> currentValues;
 
-  double _motionConfidence = 0;
-  double _touchConfidence = 0;
+  double _motionConfidence = 0.0;
+  double _touchConfidence = 0.0;
   int _touchCount = 0;
 
-  final List<MotionEvent> _motionHistory = [];
+  double get motionConfidence => _motionConfidence;
+  double get touchConfidence => _touchConfidence;
 
-  String _threat = '';
-  String get threatMessage => _threat;
+  final List<MotionEvent> _motionHistory = [];
+  String _threatMessage = "";
+  String get threatMessage => _threatMessage;
 
   Timer? _debounce;
-  static const _tick = Duration(milliseconds: 40);
+  static const _throttle = Duration(milliseconds: 50);
 
-  static const _K_FAIL = 'cla_fail';
-  static const _K_LOCK = 'cla_lock';
+  static const _K_ATTEMPTS = 'cla_attempts';
+  static const _K_LOCKOUT = 'cla_lockout';
 
   ClaController(this.config) {
     _engine = SecurityEngine(
       config.engineConfig ?? const SecurityEngineConfig(),
     );
 
-    _vault = const FlutterSecureStorage(
+    _storage = const FlutterSecureStorage(
       aOptions: AndroidOptions(encryptedSharedPreferences: true),
-      iOptions: IOSOptions(
-        accessibility: KeychainAccessibility.first_unlock,
-      ),
+      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
 
     currentValues = List.generate(5, (_) => Random().nextInt(10));
@@ -56,30 +53,30 @@ class ClaController extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    final compromised =
-        await FlutterJailbreakDetection.jailbroken.catchError((_) => false);
+    bool compromised = false;
+    try {
+      compromised = await FlutterJailbreakDetection.jailbroken;
+    } catch (_) {}
 
     if (compromised) {
       _state = SecurityState.ROOT_WARNING;
-      _threat = 'SYSTEM_INTEGRITY_COMPROMISED';
+      _threatMessage = "DEVICE COMPROMISED";
       _notify();
       return;
     }
 
-    await _restore();
+    await _loadSecure();
   }
 
-  // ─────────────────────────────────────────────
-  // SENSOR INPUT
-  // ─────────────────────────────────────────────
-  void registerShake(double mag, double dx, double dy, double dz) {
+  // ================= SENSOR INPUT =================
+
+  void registerShake(double mag, double dx, dy, dz) {
     if (_state != SecurityState.LOCKED) return;
 
-    _motionConfidence =
-        (_motionConfidence * 0.7 + mag * 0.6).clamp(0.0, 1.0);
+    _motionConfidence = (mag * 4).clamp(0.0, 1.0);
 
-    if (mag > 0.04) {
-      if (_motionHistory.length > 60) _motionHistory.removeAt(0);
+    if (mag > 0.05) {
+      if (_motionHistory.length > 50) _motionHistory.removeAt(0);
       _motionHistory.add(MotionEvent(
         magnitude: mag,
         timestamp: DateTime.now(),
@@ -88,28 +85,19 @@ class ClaController extends ChangeNotifier {
         deltaZ: dz,
       ));
     }
-
     _notify();
   }
 
   void registerTouch() {
     if (_state != SecurityState.LOCKED) return;
     _touchCount++;
-    _touchConfidence =
-        (_touchConfidence * 0.6 + (_touchCount / 3)).clamp(0.0, 1.0);
+    _touchConfidence = (_touchCount / 3).clamp(0.0, 1.0);
     _notify();
   }
 
-  // ─────────────────────────────────────────────
-  // VALIDATION
-  // ─────────────────────────────────────────────
-  Future<void> validateAttempt() async {
-    if (_state == SecurityState.HARD_LOCK &&
-        _lockoutUntil != null &&
-        DateTime.now().isBefore(_lockoutUntil!)) {
-      return;
-    }
+  // ================= VALIDATION =================
 
+  Future<void> validateAttempt({bool hasPhysicalMovement = false}) async {
     if (_state != SecurityState.LOCKED &&
         _state != SecurityState.SOFT_LOCK) return;
 
@@ -125,14 +113,19 @@ class ClaController extends ChangeNotifier {
       touchCount: _touchCount,
     );
 
-    if (!verdict.allowed || !_checkCode()) {
+    if (!verdict.allowed) {
       await _fail(verdict.reason);
       return;
     }
 
+    if (!_checkCode()) {
+      await _fail("CODE MISMATCH");
+      return;
+    }
+
     _state = SecurityState.UNLOCKED;
-    _threat = '';
-    await _clear();
+    _threatMessage = "";
+    await _clearSecure();
     _notify();
   }
 
@@ -143,14 +136,25 @@ class ClaController extends ChangeNotifier {
     return true;
   }
 
-  // ─────────────────────────────────────────────
-  // FAILURE / LOCKOUT
-  // ─────────────────────────────────────────────
-  Future<void> _fail(String reason) async {
-    _failures++;
-    _threat = reason;
+  // ================= OVERRIDE =================
 
-    if (_failures >= config.maxAttempts) {
+  void userAcceptsRisk() {
+    _state = SecurityState.LOCKED;
+    _threatMessage = "";
+    _motionConfidence = 0;
+    _touchConfidence = 0;
+    _touchCount = 0;
+    _motionHistory.clear();
+    _notify();
+  }
+
+  // ================= LOCKOUT =================
+
+  Future<void> _fail(String reason) async {
+    _failedAttempts++;
+    _threatMessage = reason;
+
+    if (_failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
       _lockoutUntil = DateTime.now().add(config.jamCooldown);
     } else {
@@ -163,49 +167,51 @@ class ClaController extends ChangeNotifier {
       });
     }
 
-    await _persist();
+    await _saveSecure();
     _notify();
   }
 
-  // ─────────────────────────────────────────────
-  // STORAGE
-  // ─────────────────────────────────────────────
-  Future<void> _restore() async {
-    _failures = int.tryParse(await _vault.read(key: _K_FAIL) ?? '0') ?? 0;
-    final ts = await _vault.read(key: _K_LOCK);
-    if (ts != null) {
-      _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(int.parse(ts));
+  // ================= STORAGE =================
+
+  Future<void> _loadSecure() async {
+    final a = await _storage.read(key: _K_ATTEMPTS);
+    _failedAttempts = int.tryParse(a ?? '0') ?? 0;
+
+    final t = await _storage.read(key: _K_LOCKOUT);
+    if (t != null) {
+      _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(int.parse(t));
       if (DateTime.now().isBefore(_lockoutUntil!)) {
         _state = SecurityState.HARD_LOCK;
+        _notify();
       }
     }
   }
 
-  Future<void> _persist() async {
-    await _vault.write(key: _K_FAIL, value: '$_failures');
+  Future<void> _saveSecure() async {
+    await _storage.write(key: _K_ATTEMPTS, value: '$_failedAttempts');
     if (_lockoutUntil != null) {
-      await _vault.write(
-        key: _K_LOCK,
-        value: _lockoutUntil!.millisecondsSinceEpoch.toString(),
-      );
+      await _storage.write(
+          key: _K_LOCKOUT,
+          value: _lockoutUntil!.millisecondsSinceEpoch.toString());
     }
   }
 
-  Future<void> _clear() async {
-    await _vault.delete(key: _K_FAIL);
-    await _vault.delete(key: _K_LOCK);
-    _failures = 0;
+  Future<void> _clearSecure() async {
+    await _storage.delete(key: _K_ATTEMPTS);
+    await _storage.delete(key: _K_LOCKOUT);
+    _failedAttempts = 0;
     _lockoutUntil = null;
   }
 
-  // ─────────────────────────────────────────────
-  // UI
-  // ─────────────────────────────────────────────
-  void updateWheel(int i, int v) {
+  // ================= UI HELPERS =================
+
+  void updateWheel(int index, int val) {
     if (_state != SecurityState.LOCKED) return;
-    currentValues[i] = v;
+    currentValues[index] = val;
     _notify();
   }
+
+  int getInitialValue(int index) => currentValues[index];
 
   int get remainingLockoutSeconds =>
       _lockoutUntil == null
@@ -217,7 +223,7 @@ class ClaController extends ChangeNotifier {
 
   void _notify() {
     _debounce?.cancel();
-    _debounce = Timer(_tick, notifyListeners);
+    _debounce = Timer(_throttle, notifyListeners);
   }
 
   @override
