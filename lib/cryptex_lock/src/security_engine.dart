@@ -1,14 +1,12 @@
-// 🎯 PROJECT Z-KINETIC V3.0 - SECURITY ENGINE
-// Standard: Bank-Grade Security • Logic & Threat Analysis
-// Identity: Captain Aer Security Suite
-// Author: Francois (Loyal Butler)
+// 🔐 PROJECT Z-KINETIC V4.0 — BANK-GRADE SECURITY ENGINE
+// Pure Logic • Deterministic • Zero-UI
+// Authoritative Rewrite by François (Shadow Mode)
 
 import 'dart:math';
 import 'cla_models.dart';
 
-/// ═══════════════════════════════════════════════════════════
-/// THREAT VERDICT - Keputusan Akhir Engine
-/// ═══════════════════════════════════════════════════════════
+enum ThreatLevel { NONE, LOW, MEDIUM, HIGH, CRITICAL }
+
 class ThreatVerdict {
   final bool allowed;
   final ThreatLevel level;
@@ -22,16 +20,16 @@ class ThreatVerdict {
     required this.confidence,
   });
 
-  factory ThreatVerdict.allow({required double confidence}) {
+  factory ThreatVerdict.allow(double confidence) {
     return ThreatVerdict(
       allowed: true,
       level: ThreatLevel.NONE,
-      reason: 'BIOMETRIC_VERIFIED',
+      reason: 'HUMAN_SIGNATURE_CONFIRMED',
       confidence: confidence,
     );
   }
 
-  factory ThreatVerdict.deny({required ThreatLevel level, required String reason}) {
+  factory ThreatVerdict.deny(ThreatLevel level, String reason) {
     return ThreatVerdict(
       allowed: false,
       level: level,
@@ -41,131 +39,180 @@ class ThreatVerdict {
   }
 }
 
-enum ThreatLevel { NONE, LOW, MEDIUM, HIGH, CRITICAL }
+class SecurityEngineConfig {
+  final double minEntropy;
+  final double minVariance;
+  final double minConfidence;
 
-/// ═══════════════════════════════════════════════════════════
-/// SECURITY ENGINE - Otak Pemprosesan (Pure Logic)
-/// ═══════════════════════════════════════════════════════════
+  const SecurityEngineConfig({
+    this.minEntropy = 0.6,
+    this.minVariance = 0.04,
+    this.minConfidence = 0.75,
+  });
+}
+
+/// 🧠 Stateful Threat Engine (Bank Grade)
 class SecurityEngine {
   final SecurityEngineConfig config;
 
+  // Escalation memory
+  double _threatScore = 0.0;
+
   SecurityEngine(this.config);
 
-  /// ANALISIS UTAMA: Bot vs Human Detection
   ThreatVerdict analyze({
     required double motionConfidence,
     required double touchConfidence,
     required List<MotionEvent> motionHistory,
     required int touchCount,
   }) {
-    // 1. SEMAKAN KEHADIRAN BIOMETRIK (Presence Check)
-    if (motionConfidence < 0.1 && touchConfidence < 0.3) {
+    // ───────────────────────────────
+    // 0. Hard Presence Gate
+    // ───────────────────────────────
+    if (motionConfidence < 0.15 && touchConfidence < 0.35) {
+      _escalate(0.3);
       return ThreatVerdict.deny(
-        level: ThreatLevel.HIGH,
-        reason: 'NO BIO-KINETIC SIGNATURE',
+        ThreatLevel.HIGH,
+        'NO_HUMAN_PRESENCE',
       );
     }
 
-    // 2. ANALISIS CORAK GERAKAN (Entropy & Variance)
-    final metrics = _calculateMetrics(motionHistory);
-    
-    // Semak jika gerakan terlalu statik atau robotik
-    if (metrics['entropy'] < config.minEntropy) {
+    // ───────────────────────────────
+    // 1. Motion Metrics
+    // ───────────────────────────────
+    final metrics = _computeMetrics(motionHistory);
+
+    if (metrics.entropy < config.minEntropy) {
+      _escalate(0.2);
       return ThreatVerdict.deny(
-        level: ThreatLevel.MEDIUM,
-        reason: 'PATTERN_TOO_LINEAR (BOT_SUSPECTED)',
+        ThreatLevel.MEDIUM,
+        'LOW_ENTROPY_PATTERN',
       );
     }
 
-    // 3. SEMAKAN TREMOR (Human Hand Frequency 8-12Hz)
-    final tremorHz = metrics['tremor_hz'] as double;
-    if (tremorHz < 7.0 || tremorHz > 14.0) {
+    if (metrics.variance < config.minVariance) {
+      _escalate(0.25);
       return ThreatVerdict.deny(
-        level: ThreatLevel.HIGH,
-        reason: 'ABNORMAL_TREMOR_DETECTED',
+        ThreatLevel.HIGH,
+        'ROBOTIC_MOTION_VARIANCE',
       );
     }
 
-    // 4. PENGIRAAN SKOR KEYAKINAN (Final Confidence)
-    final finalScore = _calculateFinalScore(
-      motionConfidence, 
-      touchConfidence, 
-      metrics['entropy']
+    if (!_validTremor(metrics.tremorHz)) {
+      _escalate(0.35);
+      return ThreatVerdict.deny(
+        ThreatLevel.CRITICAL,
+        'NON_HUMAN_TREMOR_SIGNATURE',
+      );
+    }
+
+    // ───────────────────────────────
+    // 2. Final Confidence
+    // ───────────────────────────────
+    final confidence = _finalScore(
+      motionConfidence,
+      touchConfidence,
+      metrics.entropy,
     );
 
-    if (finalScore < config.minConfidenceScore) {
+    if (confidence < config.minConfidence) {
+      _escalate(0.2);
       return ThreatVerdict.deny(
-        level: ThreatLevel.MEDIUM,
-        reason: 'LOW_CONFIDENCE_SCORE',
+        ThreatLevel.MEDIUM,
+        'CONFIDENCE_TOO_LOW',
       );
     }
 
-    // SEMUA UJIAN LEPAS
-    return ThreatVerdict.allow(confidence: finalScore);
+    // ───────────────────────────────
+    // SUCCESS — decay threat memory
+    // ───────────────────────────────
+    _threatScore = (_threatScore * 0.4).clamp(0.0, 1.0);
+
+    return ThreatVerdict.allow(confidence);
   }
 
-  // Pengiraan Metrik Fizik (Entropy/Variance/Tremor)
-  Map<String, dynamic> _calculateMetrics(List<MotionEvent> history) {
-    if (history.isEmpty) return {'entropy': 0.0, 'variance': 0.0, 'tremor_hz': 0.0};
+  // ════════════════════════════════════════════════
+  // INTERNALS
+  // ════════════════════════════════════════════════
 
-    final magnitudes = history.map((e) => e.magnitude).toList();
-    
-    // Variance
-    final mean = magnitudes.reduce((a, b) => a + b) / magnitudes.length;
-    final variance = magnitudes.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) / magnitudes.length;
+  void _escalate(double weight) {
+    _threatScore = (_threatScore + weight).clamp(0.0, 1.0);
+  }
 
-    // Shannon Entropy (Kekalisan Corak)
+  bool _validTremor(double hz) {
+    // Human physiological tremor range
+    return hz >= 7.5 && hz <= 13.5;
+  }
+
+  double _finalScore(double m, double t, double e) {
+    final entropyNorm = (e / 3.0).clamp(0.0, 1.0);
+    final base = (m * 0.4) + (t * 0.35) + (entropyNorm * 0.25);
+    return (base - _threatScore * 0.3).clamp(0.0, 1.0);
+  }
+
+  _MotionMetrics _computeMetrics(List<MotionEvent> history) {
+    if (history.length < 6) {
+      return _MotionMetrics.zero();
+    }
+
+    final mags = history.map((e) => e.magnitude).toList();
+    final mean = mags.reduce((a, b) => a + b) / mags.length;
+
+    final variance = mags
+            .map((x) => pow(x - mean, 2))
+            .reduce((a, b) => a + b) /
+        mags.length;
+
+    // Shannon Entropy
     final freq = <int, int>{};
-    for (var m in magnitudes) {
-      final bucket = (m * 10).toInt();
+    for (var m in mags) {
+      final bucket = (m * 12).floor();
       freq[bucket] = (freq[bucket] ?? 0) + 1;
     }
+
     double entropy = 0.0;
-    for (var count in freq.values) {
-      final p = count / magnitudes.length;
+    for (var c in freq.values) {
+      final p = c / mags.length;
       entropy -= p * log(p) / ln2;
     }
 
-    // Tremor Frequency Estimation
-    int microMovements = 0;
+    // Tremor frequency (time-normalized)
+    int valid = 0;
+    int totalMs = 0;
+
     for (int i = 1; i < history.length; i++) {
-      final interval = history[i].timestamp.difference(history[i - 1].timestamp).inMilliseconds;
-      if (interval > 80 && interval < 125) { // Range 8-12Hz
-        microMovements++;
+      final dt = history[i]
+          .timestamp
+          .difference(history[i - 1].timestamp)
+          .inMilliseconds;
+      if (dt > 0) {
+        totalMs += dt;
+        if (dt >= 70 && dt <= 140) valid++;
       }
     }
-    double tremorHz = (microMovements / history.length) * 10;
 
-    return {
-      'entropy': entropy,
-      'variance': variance,
-      'tremor_hz': tremorHz,
-    };
-  }
+    final seconds = totalMs / 1000.0;
+    final hz = seconds > 0 ? valid / seconds : 0.0;
 
-  double _calculateFinalScore(double m, double t, double e) {
-    // Berat: 40% Motion, 30% Touch, 30% Entropy
-    return (m * 0.4) + (t * 0.3) + ((e / 3.0).clamp(0, 1) * 0.3);
+    return _MotionMetrics(
+      entropy: entropy,
+      variance: variance,
+      tremorHz: hz,
+    );
   }
 }
 
-/// ═══════════════════════════════════════════════════════════
-/// KONFIGURASI ENGINE
-/// ═══════════════════════════════════════════════════════════
-class SecurityEngineConfig {
-  final double minEntropy;
-  final double minVariance;
-  final double minConfidenceScore;
+class _MotionMetrics {
+  final double entropy;
+  final double variance;
+  final double tremorHz;
 
-  const SecurityEngineConfig({
-    this.minEntropy = 0.5,
-    this.minVariance = 0.05,
-    this.minConfidenceScore = 0.7,
+  _MotionMetrics({
+    required this.entropy,
+    required this.variance,
+    required this.tremorHz,
   });
 
-  factory SecurityEngineConfig.strict() => const SecurityEngineConfig(
-    minEntropy: 0.7,
-    minVariance: 0.1,
-    minConfidenceScore: 0.85,
-  );
+  factory _MotionMetrics.zero() =>
+      _MotionMetrics(entropy: 0, variance: 0, tremorHz: 0);
 }
