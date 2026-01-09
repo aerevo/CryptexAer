@@ -1,6 +1,6 @@
-// cryptex_lock_ultra_scifi.dart
-// 🚀 FULL SCI-FI GAME UI REDESIGN - FINAL MERGED VERSION
-// Combined & Optimized by Francois for Captain Aer
+// cryptex_lock_aer
+// 🚀 FULL SCI-FI GAME UI REDESIGN - FINAL FIX
+// Fixed: Class renamed to 'CryptexLock' to match main.dart
 
 import 'dart:async';
 import 'dart:math';
@@ -98,13 +98,13 @@ class Particle {
 // 2. MAIN WIDGET
 // ============================================
 
-class CryptexLockUltra extends StatefulWidget {
+class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback onSuccess;
   final VoidCallback onFail;
   final VoidCallback onJammed;
 
-  const CryptexLockUltra({
+  const CryptexLock({
     super.key,
     required this.controller,
     required this.onSuccess,
@@ -113,10 +113,10 @@ class CryptexLockUltra extends StatefulWidget {
   });
 
   @override
-  State<CryptexLockUltra> createState() => _CryptexLockUltraState();
+  State<CryptexLock> createState() => _CryptexLockState();
 }
 
-class _CryptexLockUltraState extends State<CryptexLockUltra> with TickerProviderStateMixin, WidgetsBindingObserver {
+class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin, WidgetsBindingObserver {
   // Original controllers
   StreamSubscription<UserAccelerometerEvent>? _accelSub;
   Timer? _lockoutTimer;
@@ -146,7 +146,6 @@ class _CryptexLockUltraState extends State<CryptexLockUltra> with TickerProvider
   final Color _cyan = const Color(0xFF00FFFF);
   final Color _blue = const Color(0xFF0080FF);
   final Color _purple = const Color(0xFF8000FF);
-  // final Color _pink = const Color(0xFFFF00FF); // Reserved
   final Color _orange = const Color(0xFFFF6B00);
   final Color _red = const Color(0xFFFF0040);
   final Color _green = const Color(0xFF00FF88);
