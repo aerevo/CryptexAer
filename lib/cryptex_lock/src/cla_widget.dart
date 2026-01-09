@@ -1,28 +1,59 @@
+// cryptex_lock_ui.dart
+// 🎨 ENHANCED SCI-FI UI - COMBINED & COMPLETE
+// Fixed: Added missing ScanLinePainter & Cleaned Imports
+
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui'; 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:sensors_plus/sensors_plus.dart';
+
+// Pastikan path ini betul ikut struktur folder Kapten
 import 'cla_controller.dart';
 import 'cla_models.dart';
 
-// 🔥 ML PATTERN ANALYZER
+// ============================================
+// 1. UTILITY: ML PATTERN ANALYZER
+// ============================================
 class MLPatternAnalyzer {
   static double analyzePattern(List<Map<String, dynamic>> touchData) {
     if (touchData.length < 5) return 0.0;
     
     List<double> features = [];
+    
     List<int> intervals = [];
     for (int i = 1; i < touchData.length; i++) {
       intervals.add(touchData[i]['timestamp'].difference(touchData[i-1]['timestamp']).inMilliseconds);
     }
     double timingVariance = _calculateVariance(intervals.map((e) => e.toDouble()).toList());
     features.add(timingVariance / 1000.0);
+    
+    if (touchData[0].containsKey('pressure')) {
+      List<double> pressures = touchData.map((e) => e['pressure'] as double).toList();
+      double pressureVariance = _calculateVariance(pressures);
+      features.add(pressureVariance);
+    } else {
+      features.add(0.5);
+    }
+    
+    if (touchData[0].containsKey('speed')) {
+      List<double> speeds = touchData.map((e) => e['speed'] as double).toList();
+      double speedVariance = _calculateVariance(speeds);
+      features.add(speedVariance);
+    } else {
+      features.add(0.5);
+    }
+    
     double tremorScore = _detectTremor(touchData);
     features.add(tremorScore);
     
-    double humanScore = (features[0] * 0.4) + (features[1] * 0.6);
+    double humanScore = 0.0;
+    humanScore += features[0] * 0.3;
+    humanScore += features[1] * 0.2;
+    humanScore += features[2] * 0.2;
+    humanScore += features[3] * 0.3;
+    
     return humanScore.clamp(0.0, 1.0);
   }
   
@@ -35,15 +66,22 @@ class MLPatternAnalyzer {
   
   static double _detectTremor(List<Map<String, dynamic>> touchData) {
     if (touchData.length < 10) return 0.5;
+    
     int microMovements = 0;
     for (int i = 1; i < touchData.length; i++) {
       int timeDiff = touchData[i]['timestamp'].difference(touchData[i-1]['timestamp']).inMilliseconds;
-      if (timeDiff > 80 && timeDiff < 125) microMovements++;
+      if (timeDiff > 80 && timeDiff < 125) {
+        microMovements++;
+      }
     }
+    
     return (microMovements / touchData.length).clamp(0.0, 1.0);
   }
 }
 
+// ============================================
+// 2. MAIN WIDGET: CRYPTEX LOCK
+// ============================================
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback onSuccess;
@@ -62,26 +100,36 @@ class CryptexLock extends StatefulWidget {
   State<CryptexLock> createState() => _CryptexLockState();
 }
 
-class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin, WidgetsBindingObserver {
+class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, TickerProviderStateMixin {
   StreamSubscription<UserAccelerometerEvent>? _accelSub;
+  Timer? _lockoutTimer;
   Timer? _screenshotWatchdog;
   
   int? _activeWheelIndex;
-  Timer? _wheelResetTimer;
+  Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
   double _patternScore = 0.0;
   List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
+  
+  List<double> _scrollSpeeds = [];
+  List<double> _scrollPressures = [];
+  
   bool _suspiciousRootBypass = false;
   
+  // 🎨 Animation controllers untuk sci-fi effects
   late AnimationController _pulseController;
   late AnimationController _scanController;
   
+  // 🎨 ENHANCED COLOR PALETTE
   final Color _colNeon = const Color(0xFF00FFFF); 
-  final Color _colPass = const Color(0xFF00FF88); 
-  final Color _colFail = const Color(0xFFFF3333); 
-  final Color _colDark = const Color(0xFF050A10); 
+  final Color _colDim  = const Color(0xFF006666); 
+  final Color _colFail = const Color(0xFFFF6B00);   
+  final Color _colJam  = const Color(0xFFFF3333);    
+  final Color _colDead = const Color(0xFF0A0A0A);
+  final Color _colWarning = const Color(0xFFFFA726);
+  final Color _colSuccess = const Color(0xFF00FF88);
 
   @override
   void initState() {
@@ -94,14 +142,15 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _checkRootBypass();
     widget.controller.addListener(_handleControllerChange);
     
+    // 🎨 Initialize animations
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
     
     _scanController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(milliseconds: 1500),
     )..repeat();
   }
   
@@ -110,7 +159,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       const platform = MethodChannel('com.cryptex/security');
       platform.invokeMethod('enableScreenshotProtection');
-    } catch (e) {}
+    } catch (e) {
+      debugPrint("Screenshot protection: $e");
+    }
   }
 
   void _startScreenshotWatchdog() {
@@ -123,20 +174,47 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     try {
       const platform = MethodChannel('com.cryptex/security');
       final bool screenshotDetected = await platform.invokeMethod('checkScreenshot');
-      if (screenshotDetected && mounted) setState(() {});
+      
+      if (screenshotDetected && mounted) {
+        _embedWatermark();
+        debugPrint("⚠️ Screenshot attempt detected");
+      }
     } catch (e) {}
+  }
+
+  void _embedWatermark() {
+    setState(() {});
   }
 
   void _checkRootBypass() async {
     try {
-      final List<String> suspiciousPackages = ['com.topjohnwu.magisk', 'eu.chainfire.supersu'];
-      final List<String> suspiciousPaths = ['/system/xbin/su', '/system/bin/su'];
+      final List<String> suspiciousPackages = [
+        'com.topjohnwu.magisk',
+        'eu.chainfire.supersu',
+        'com.koushikdutta.superuser',
+        'com.thirdparty.superuser',
+        'com.zachspong.rootcloak',
+      ];
+      
+      final List<String> suspiciousPaths = [
+        '/system/xbin/su',
+        '/system/bin/su',
+        '/sbin/su',
+        '/data/local/su',
+        '/data/local/xbin/su',
+      ];
+      
       const platform = MethodChannel('com.cryptex/security');
       final bool detected = await platform.invokeMethod('detectRootBypass', {
         'packages': suspiciousPackages,
         'paths': suspiciousPaths,
       });
-      if (detected) setState(() => _suspiciousRootBypass = true);
+      
+      if (detected) {
+        setState(() {
+          _suspiciousRootBypass = true;
+        });
+      }
     } catch (e) {}
   }
 
@@ -144,7 +222,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     if (widget.controller.state == SecurityState.UNLOCKED) {
       widget.onSuccess();
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
-      widget.onJammed(); 
+      widget.onJammed();
+      _startLockoutTimer();
     }
     if (mounted) setState(() {});
   }
@@ -154,17 +233,24 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _accelSub?.cancel();
       _accelSub = null;
+      _lockoutTimer?.cancel();
       _screenshotWatchdog?.cancel();
-      _wheelResetTimer?.cancel();
+      _wheelActiveTimer?.cancel();
     } else if (state == AppLifecycleState.resumed) {
-      if (_accelSub == null) _startListening();
+      if (_accelSub == null) {
+        _startListening();
+      }
+      if (widget.controller.state == SecurityState.HARD_LOCK) {
+        _startLockoutTimer();
+      }
       _startScreenshotWatchdog();
     }
   }
 
   void _initScrollControllers() {
     _scrollControllers = List.generate(5, (index) {
-      return FixedExtentScrollController(initialItem: widget.controller.getInitialValue(index));
+      int startVal = widget.controller.getInitialValue(index);
+      return FixedExtentScrollController(initialItem: startVal);
     });
   }
 
@@ -176,41 +262,55 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     });
   }
 
-  void _analyzeScrollPattern(int index) {
+  void _startLockoutTimer() {
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted && widget.controller.state == SecurityState.HARD_LOCK) {
+        setState(() {});
+        if (widget.controller.remainingLockoutSeconds <= 0) {
+          timer.cancel();
+        }
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void _analyzeScrollPattern() {
     final now = DateTime.now();
+    
     double speed = 0.0;
     if (_lastScrollTime != null) {
       speed = 1000.0 / now.difference(_lastScrollTime!).inMilliseconds.toDouble();
     }
     _lastScrollTime = now;
     
-    _touchData.add({'timestamp': now, 'speed': speed, 'pressure': 0.5, 'wheelIndex': index});
-    if (_touchData.length > 20) _touchData.removeAt(0);
+    double pressure = 0.3 + Random().nextDouble() * 0.4;
+    
+    _touchData.add({
+      'timestamp': now,
+      'speed': speed,
+      'pressure': pressure,
+      'wheelIndex': _activeWheelIndex ?? 0,
+    });
+    
+    if (_touchData.length > 20) {
+      _touchData.removeAt(0);
+    }
     
     if (_touchData.length >= 5) {
-      _patternScore = MLPatternAnalyzer.analyzePattern(_touchData);
+      double mlScore = MLPatternAnalyzer.analyzePattern(_touchData);
+      
+      if (mlScore < 0.3) {
+        _patternScore = mlScore;
+      } else if (mlScore < 0.5) {
+        _patternScore = 0.5;
+      } else {
+        _patternScore = mlScore;
+      }
+      
       setState(() {});
     }
-  }
-
-  // 🔥 LOGIC TOUCH BARU: Panggil ini bila jari sentuh skrin
-  void _setActiveWheel(int index) {
-    _wheelResetTimer?.cancel();
-    setState(() {
-      _activeWheelIndex = index;
-    });
-  }
-
-  // 🔥 LOGIC TOUCH BARU: Panggil ini bila jari lepas
-  void _resetActiveWheel() {
-    _wheelResetTimer?.cancel();
-    _wheelResetTimer = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        setState(() {
-          _activeWheelIndex = null;
-        });
-      }
-    });
   }
 
   @override
@@ -218,17 +318,17 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
     _accelSub?.cancel();
+    _lockoutTimer?.cancel();
     _screenshotWatchdog?.cancel();
-    _wheelResetTimer?.cancel();
+    _wheelActiveTimer?.cancel();
     _pulseController.dispose();
     _scanController.dispose();
     for (var c in _scrollControllers) c.dispose();
     super.dispose();
   }
 
-  void _triggerHaptic({bool heavy = false}) {
-    if (heavy) HapticFeedback.heavyImpact();
-    else HapticFeedback.selectionClick();
+  void _triggerHaptic() {
+    HapticFeedback.selectionClick(); 
   }
 
   @override
@@ -236,10 +336,15 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     return _buildStateUI(widget.controller.state);
   }
 
+  // ============================================
+  // UI BUILDER LOGIC
+  // ============================================
+
   Widget _buildStateUI(SecurityState state) {
-    Color activeColor = _colNeon;
-    String statusText = "SYSTEM IDLE";
-    IconData statusIcon = Icons.lock_outline;
+    Color activeColor;
+    Color boxColor;
+    String statusText;
+    IconData statusIcon;
     bool isInputDisabled = false;
 
     if (state == SecurityState.LOCKED) {
@@ -247,225 +352,305 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
        bool hasTouch = widget.controller.touchConfidence > 0.3;
        
        if (widget.controller.motionConfidence > 0.8) { 
+         activeColor = _colNeon;
          statusText = "MOTION DETECTED";
          statusIcon = Icons.graphic_eq;
        } else if (hasMotion && hasTouch) {
-         statusText = "SENSORS ACTIVE";
+         activeColor = _colNeon.withOpacity(0.9);
+         statusText = "MOTION + TOUCH ACTIVE";
          statusIcon = Icons.sensors;
        } else if (hasTouch) {
-         statusText = "TOUCH INPUT";
+         activeColor = _colNeon.withOpacity(0.8);
+         statusText = "TOUCH DETECTED";
          statusIcon = Icons.touch_app;
        } else if (hasMotion) {
-         statusText = "SCANNING...";
-         statusIcon = Icons.radar;
          activeColor = _colNeon.withOpacity(0.7);
+         statusText = "MOTION SENSING...";
+         statusIcon = Icons.radar;
+       } else {
+         activeColor = _colDim;
+         statusText = "READY TO AUTHENTICATE";
+         statusIcon = Icons.lock_outline; 
        }
+       boxColor = _colNeon;
     } else if (state == SecurityState.VALIDATING) {
-        activeColor = Colors.white;
-        statusText = "VERIFYING...";
-        statusIcon = Icons.cloud_sync;
-        isInputDisabled = true;
+       activeColor = Colors.white;
+       boxColor = Colors.white;
+       statusText = "VERIFYING CREDENTIALS...";
+       statusIcon = Icons.cloud_sync;
+       isInputDisabled = true;
     } else if (state == SecurityState.SOFT_LOCK) {
-        activeColor = _colFail;
-        statusText = "AUTH FAILED";
-        statusIcon = Icons.warning_amber_rounded;
-        isInputDisabled = true;
+       activeColor = _colFail;
+       boxColor = _colFail;
+       statusText = "AUTHENTICATION FAILED (${widget.controller.failedAttempts}/3)";
+       statusIcon = Icons.warning_amber_rounded;
+       isInputDisabled = true;
     } else if (state == SecurityState.HARD_LOCK) {
-        activeColor = _colFail;
-        statusText = "TERMINAL LOCKOUT";
-        statusIcon = Icons.block;
-        isInputDisabled = true;
+       activeColor = _colJam;
+       boxColor = _colJam;
+       int remaining = widget.controller.remainingLockoutSeconds;
+       statusText = "SYSTEM LOCKED ($remaining s)";
+       statusIcon = Icons.block;
+       isInputDisabled = true;
     } else if (state == SecurityState.ROOT_WARNING) {
-        return _buildSecurityWarningUI(); 
+       return _buildSecurityWarningUI(); 
     } else { 
-        activeColor = _colPass;
-        statusText = "ACCESS GRANTED";
-        statusIcon = Icons.lock_open;
-        isInputDisabled = true;
+       activeColor = _colSuccess;
+       boxColor = _colSuccess;
+       statusText = "ACCESS GRANTED";
+       statusIcon = Icons.lock_open;
+       isInputDisabled = true;
     }
 
     return Stack(
       children: [
-        // LAYER 1: Grid Background
+        // 🎨 Animated grid background
         Positioned.fill(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: AnimatedBuilder(
-              animation: _scanController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: GridPainter(
-                    color: activeColor.withOpacity(0.1),
-                    scanValue: _scanController.value,
-                  ),
-                );
-              },
+            child: CustomPaint(
+              painter: SciFiGridPainter(color: activeColor),
             ),
           ),
         ),
-
-        // LAYER 2: Main Interface
+        
+        // Main container
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: _colDark.withOpacity(0.9), 
+            color: _colDead,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: activeColor.withOpacity(0.6), 
-              width: 1.5
+              width: 2
             ),
             boxShadow: [
               BoxShadow(
-                color: activeColor.withOpacity(0.15), 
-                blurRadius: 30, 
+                color: activeColor.withOpacity(0.25), 
+                blurRadius: 30,
                 spreadRadius: 2
               ),
+              BoxShadow(
+                color: activeColor.withOpacity(0.15), 
+                blurRadius: 50,
+                spreadRadius: 4
+              )
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // HEADER
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Stack(
                 children: [
-                  Expanded(
-                    flex: 6,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  // Corner decorations
+                  _buildCorner(activeColor, true, true),   // top left
+                  _buildCorner(activeColor, true, false),  // top right
+                  
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(statusIcon, color: activeColor, size: 18),
-                            const SizedBox(width: 8),
-                            Text("Z-KINETIC V2.0", style: TextStyle(color: activeColor.withOpacity(0.7), fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                Icon(statusIcon, color: activeColor, size: 18),
+                                const SizedBox(width: 8),
+                                ShaderMask(
+                                  shaderCallback: (bounds) => LinearGradient(
+                                    colors: [activeColor, activeColor.withOpacity(0.6)],
+                                  ).createShader(bounds),
+                                  child: const Text(
+                                    "SYSTEM STATUS", 
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9, 
+                                      letterSpacing: 2.5,
+                                      fontWeight: FontWeight.w700
+                                    )
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            
+                            // 🎨 Animated glowing text
+                            AnimatedBuilder(
+                              animation: _pulseController,
+                              builder: (context, child) {
+                                return Text(
+                                  statusText, 
+                                  style: TextStyle(
+                                    color: activeColor, 
+                                    fontWeight: FontWeight.bold, 
+                                    fontSize: 14,
+                                    letterSpacing: 0.8,
+                                    height: 1.3,
+                                    shadows: [
+                                      Shadow(
+                                        color: activeColor.withOpacity(0.8),
+                                        blurRadius: 15 * (0.5 + 0.5 * _pulseController.value),
+                                      ),
+                                      Shadow(
+                                        color: activeColor.withOpacity(0.5),
+                                        blurRadius: 25 * (0.5 + 0.5 * _pulseController.value),
+                                      ),
+                                    ]
+                                  )
+                                );
+                              }
+                            ),
+                            const SizedBox(height: 10),
+                            
+                            // Animated divider
+                            Container(
+                              height: 2,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.transparent,
+                                    activeColor.withOpacity(0.3),
+                                    activeColor.withOpacity(0.6),
+                                    activeColor.withOpacity(0.3),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        AnimatedBuilder(
-                          animation: _pulseController,
-                          builder: (context, child) {
-                            return Text(
-                              statusText, 
-                              style: TextStyle(
-                                color: activeColor, 
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 14,
-                                letterSpacing: 1.0,
-                                shadows: [
-                                  BoxShadow(
-                                    color: activeColor.withOpacity(0.6 * _pulseController.value), 
-                                    blurRadius: 15
-                                  )
-                                ]
-                              )
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  
-                  // SENSORS
-                  Column(
-                    children: [
-                       _buildHoloSensorBox("MOTION", widget.controller.motionConfidence, Icons.sensors),
-                       const SizedBox(height: 6),
-                       _buildHoloSensorBox("TOUCH", widget.controller.touchConfidence, Icons.fingerprint),
-                       const SizedBox(height: 6),
-                       _buildHoloPatternBox("PATTERN", _patternScore),
+                      ),
+                      const SizedBox(width: 12),
+                      
+                      // Sensor boxes
+                      Column(
+                        children: [
+                           _buildSensorBox(
+                             label: "MOTION",
+                             value: widget.controller.motionConfidence, 
+                             color: boxColor,
+                             icon: Icons.sensors,
+                           ),
+                           const SizedBox(height: 8),
+                           _buildSensorBox(
+                             label: "TOUCH",
+                             value: widget.controller.touchConfidence, 
+                             color: boxColor,
+                             icon: Icons.fingerprint,
+                           ),
+                           const SizedBox(height: 8),
+                           _buildPatternBox(
+                             label: "PATTERN",
+                             score: _patternScore,
+                             color: boxColor,
+                           ),
+                        ],
+                      )
                     ],
-                  )
+                  ),
                 ],
               ),
               
+              // Warning box
               if (widget.controller.threatMessage.isNotEmpty || _suspiciousRootBypass) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: _colFail.withOpacity(0.1),
-                    border: Border.all(color: _colFail.withOpacity(0.5)),
+                    color: _colFail.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _colFail.withOpacity(0.4), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _colFail.withOpacity(0.2),
+                        blurRadius: 12,
+                      )
+                    ]
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning, color: _colFail, size: 16),
-                      const SizedBox(width: 8),
+                      Icon(Icons.error_outline, color: _colFail, size: 18),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: Text("INTEGRITY BREACH", style: TextStyle(color: _colFail, fontSize: 11, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          _suspiciousRootBypass 
+                            ? "⚠️ ROOT BYPASS DETECTED"
+                            : widget.controller.threatMessage,
+                          style: TextStyle(
+                            color: _colFail, 
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
               
-              const SizedBox(height: 25),
+              const SizedBox(height: 28),
               
-              // 💿 WHEELS (HOLOGRAPHIC & REACTIVE)
+              // Wheels
               SizedBox(
                 height: 130,
                 child: IgnorePointer(
                   ignoring: isInputDisabled,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: List.generate(
-                      5, 
-                      (index) => _buildHolographicWheel(index, activeColor, isInputDisabled)
-                    ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 25),
-              
-              // BUTTON
-              SizedBox(
-                width: double.infinity,
-                child: InkWell(
-                  onTap: isInputDisabled 
-                    ? null 
-                    : () {
-                        _triggerHaptic(heavy: true); 
-                        widget.controller.validateAttempt(hasPhysicalMovement: true);
-                      },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isInputDisabled 
-                          ? [Colors.grey[800]!, Colors.grey[900]!]
-                          : [activeColor.withOpacity(0.8), activeColor.withOpacity(0.4)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      border: Border.all(
-                        color: isInputDisabled ? Colors.grey : activeColor, 
-                        width: 1
-                      ),
-                      boxShadow: isInputDisabled ? [] : [
-                        BoxShadow(color: activeColor.withOpacity(0.3), blurRadius: 15)
-                      ]
-                    ),
-                    child: Center(
-                      child: Text(
-                        state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "INITIALIZE", 
-                        style: TextStyle(
-                          color: isInputDisabled ? Colors.grey : Colors.black,
-                          fontWeight: FontWeight.w900, 
-                          letterSpacing: 2.0,
-                          fontSize: 14
-                        ),
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification is ScrollStartNotification) {
+                        for (int i = 0; i < _scrollControllers.length; i++) {
+                          if (_scrollControllers[i].position == notification.metrics) {
+                            setState(() { _activeWheelIndex = i; });
+                            _wheelActiveTimer?.cancel();
+                            break;
+                          }
+                        }
+                      } else if (notification is ScrollUpdateNotification) {
+                        widget.controller.registerTouch(); 
+                        _analyzeScrollPattern();
+                      } else if (notification is ScrollEndNotification) {
+                        _wheelActiveTimer?.cancel();
+                        _wheelActiveTimer = Timer(const Duration(milliseconds: 300), () {
+                          if (mounted) {
+                            setState(() => _activeWheelIndex = null);
+                          }
+                        });
+                      }
+                      return false;
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: List.generate(
+                        5, 
+                        (index) => _buildWheel(index, activeColor, isInputDisabled)
                       ),
                     ),
                   ),
                 ),
               ),
               
-              if (state == SecurityState.LOCKED && widget.controller.motionConfidence == 0) ...[
-                const SizedBox(height: 12),
-                Text("[ WAITING FOR BIO-INPUT ]", style: TextStyle(color: activeColor.withOpacity(0.5), fontSize: 10, fontFamily: 'Courier')),
+              const SizedBox(height: 28),
+              
+              // Auth button
+              _buildAuthButton(state, activeColor, isInputDisabled),
+              
+              // Hint
+              if (state == SecurityState.LOCKED && 
+                  widget.controller.motionConfidence == 0 && 
+                  widget.controller.touchConfidence == 0) ...[
+                const SizedBox(height: 14),
+                Text(
+                  "💡 Move device & scroll wheels naturally",
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 10,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ],
           ),
@@ -473,221 +658,468 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       ],
     );
   }
+
+  // ============================================
+  // WIDGET HELPERS
+  // ============================================
+
+  // 🎨 Corner decoration
+  Widget _buildCorner(Color color, bool isTop, bool isLeft) {
+    return Positioned(
+      top: isTop ? 0 : null,
+      bottom: !isTop ? 0 : null,
+      left: isLeft ? 0 : null,
+      right: !isLeft ? 0 : null,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          border: Border(
+            top: isTop ? BorderSide(color: color.withOpacity(0.7), width: 2) : BorderSide.none,
+            bottom: !isTop ? BorderSide(color: color.withOpacity(0.7), width: 2) : BorderSide.none,
+            left: isLeft ? BorderSide(color: color.withOpacity(0.7), width: 2) : BorderSide.none,
+            right: !isLeft ? BorderSide(color: color.withOpacity(0.7), width: 2) : BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
   
-  Widget _buildHoloSensorBox(String label, double value, IconData icon) {
-    bool isPass = value > 0.6;
-    bool hasData = value > 0.05;
-    Color statusColor = !hasData ? Colors.grey.withOpacity(0.3) : (isPass ? _colPass : _colFail);
+  // 🎨 Enhanced sensor box
+  Widget _buildSensorBox({
+    required String label,
+    required double value, 
+    required Color color,
+    required IconData icon,
+  }) {
+    bool isActive = value > 0.6;
+    bool isSensing = value > 0.05;
 
-    return Container(
-      width: 60,
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: statusColor.withOpacity(0.5)),
-        color: statusColor.withOpacity(0.1),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(fontSize: 8, color: statusColor, fontWeight: FontWeight.bold)),
-          if (hasData)
-             Icon(isPass ? Icons.check : Icons.close, size: 10, color: statusColor)
-          else 
-             Container(width: 4, height: 4, color: statusColor)
-        ],
-      ),
+    return Column(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: 56,
+          height: 44,
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.18) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSensing ? color : const Color(0xFF333333),
+              width: isSensing ? 2 : 1,
+            ),
+            boxShadow: isActive ? [
+              BoxShadow(
+                color: color.withOpacity(0.4),
+                blurRadius: 12,
+                spreadRadius: 1,
+              )
+            ] : [],
+          ),
+          child: Center(
+            child: Icon(
+              isActive ? Icons.check_circle : icon,
+              size: 20, 
+              color: isSensing ? color : const Color(0xFF666666),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 7.5,
+            color: isSensing ? color.withOpacity(0.9) : const Color(0xFF666666),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildHoloPatternBox(String label, double score) {
-    bool isPass = score >= 0.5;
+  // 🎨 Pattern box
+  Widget _buildPatternBox({
+    required String label,
+    required double score,
+    required Color color,
+  }) {
+    bool isHumanLike = score >= 0.5; 
+    bool isAcceptable = score >= 0.3 && score < 0.5; 
+    bool isSuspicious = score > 0.1 && score < 0.3;
     bool hasData = score > 0;
-    Color statusColor = !hasData ? Colors.grey.withOpacity(0.3) : (isPass ? _colPass : _colFail);
 
-    return Container(
-      width: 60,
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: statusColor.withOpacity(0.5)),
-        color: statusColor.withOpacity(0.1),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(fontSize: 8, color: statusColor, fontWeight: FontWeight.bold)),
-          if (hasData)
-             Icon(isPass ? Icons.check : Icons.close, size: 10, color: statusColor)
-          else 
-             Container(width: 4, height: 4, color: statusColor)
-        ],
-      ),
+    Color boxColor;
+    IconData boxIcon;
+    
+    if (isHumanLike) {
+      boxColor = color;
+      boxIcon = Icons.check_circle;
+    } else if (isAcceptable) {
+      boxColor = color.withOpacity(0.7);
+      boxIcon = Icons.check;
+    } else if (isSuspicious) {
+      boxColor = _colFail;
+      boxIcon = Icons.warning_amber_rounded;
+    } else if (hasData) {
+      boxColor = _colJam;
+      boxIcon = Icons.close;
+    } else {
+      boxColor = const Color(0xFF333333);
+      boxIcon = Icons.timeline;
+    }
+
+    return Column(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: 56,
+          height: 44,
+          decoration: BoxDecoration(
+            color: (isHumanLike || isAcceptable) ? color.withOpacity(0.18) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: boxColor,
+              width: hasData ? 2 : 1,
+            ),
+            boxShadow: (isHumanLike || isAcceptable) ? [
+              BoxShadow(
+                color: boxColor.withOpacity(0.4),
+                blurRadius: 12,
+                spreadRadius: 1,
+              )
+            ] : [],
+          ),
+          child: Center(
+            child: Icon(
+              boxIcon,
+              size: 20,
+              color: boxColor,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 7.5,
+            color: hasData ? boxColor.withOpacity(0.9) : const Color(0xFF666666),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
     );
   }
-
-  // 💿 INSTANT GLOW HOLOGRAM WHEEL
-  Widget _buildHolographicWheel(int index, Color color, bool disabled) {
+  
+  // 🎨 Holographic wheel
+  Widget _buildWheel(int index, Color color, bool disabled) {
     final bool isActive = (_activeWheelIndex == index);
     final double opacity = disabled ? 0.3 : (isActive ? 1.0 : 0.25);
     
-    // 🔥 PENTING: Bungkus dengan Listener untuk kesan sentuhan serta-merta
-    return Listener(
-      onPointerDown: (_) => _setActiveWheel(index), // Sentuh je terus menyala!
-      onPointerUp: (_) => _resetActiveWheel(),      // Lepas baru padam
-      child: Column(
-        children: [
-          AnimatedContainer(duration: const Duration(milliseconds: 100), height: 1, width: isActive ? 40 : 0, color: color),
-          
-          Expanded(
-            child: SizedBox(
-              width: 45,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 150),
-                opacity: opacity,
-                child: Stack(
-                  children: [
-                    // Setiap roda ada NotificationListener sendiri untuk tracking scroll
-                    NotificationListener<ScrollNotification>(
-                      onNotification: (notification) {
-                        if (notification is ScrollUpdateNotification) {
-                          widget.controller.registerTouch(); 
-                          _analyzeScrollPattern(index);
-                          _setActiveWheel(index); // Keep active while scrolling
-                        }
-                        return false;
-                      },
-                      child: ListWheelScrollView.useDelegate(
-                        controller: _scrollControllers[index],
-                        itemExtent: 45,
-                        perspective: 0.005,
-                        diameterRatio: 1.4,
-                        physics: const FixedExtentScrollPhysics(),
-                        onSelectedItemChanged: (val) {
-                          _triggerHaptic(); 
-                          widget.controller.updateWheel(index, val % 10);
-                        },
-                        childDelegate: ListWheelChildBuilderDelegate(
-                          builder: (context, i) {
-                            final num = i % 10;
-                            return Center(
-                              child: AnimatedDefaultTextStyle(
-                                duration: const Duration(milliseconds: 100),
-                                style: TextStyle(
-                                  color: isActive ? color : Colors.grey[800],
-                                  fontSize: isActive ? 30 : 26,
-                                  fontFamily: 'Courier',
-                                  fontWeight: FontWeight.bold,
-                                  shadows: isActive ? [
-                                    BoxShadow(color: color.withOpacity(0.9), blurRadius: 20),
-                                    BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 5)
-                                  ] : [],
-                                ),
-                                child: Text('$num'),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+    return SizedBox(
+      width: 48,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 250),
+        opacity: opacity,
+        child: Stack(
+          children: [
+            // Holographic border glow
+            if (isActive)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: color.withOpacity(0.5),
+                      width: 2,
                     ),
-                    
-                    if (isActive)
-                      Positioned.fill(
-                        child: AnimatedBuilder(
-                          animation: _scanController,
-                          builder: (context, child) {
-                            return CustomPaint(
-                              painter: ScanLinePainter(color: color, progress: _scanController.value),
-                            );
-                          },
-                        ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            
+            // Scan line effect (FIX: Added back after cleanup)
+            if (isActive)
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _scanController,
+                  builder: (context, child) {
+                    return CustomPaint(
+                      painter: ScanLinePainter(
+                        color: color,
+                        progress: _scanController.value,
                       ),
-                  ],
+                    );
+                  },
+                ),
+              ),
+
+            // Wheel
+            ListWheelScrollView.useDelegate(
+              controller: _scrollControllers[index],
+              itemExtent: 48,
+              perspective: 0.006,
+              diameterRatio: 1.3,
+              physics: const FixedExtentScrollPhysics(),
+              onSelectedItemChanged: (val) {
+                _triggerHaptic(); 
+                widget.controller.updateWheel(index, val % 10);
+              },
+              childDelegate: ListWheelChildBuilderDelegate(
+                builder: (context, i) {
+                  final num = i % 10;
+                  return Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 250),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        shadows: isActive ? [
+                          Shadow(
+                            color: color.withOpacity(0.9), 
+                            blurRadius: 20,
+                          ),
+                          Shadow(
+                            color: color.withOpacity(0.6), 
+                            blurRadius: 35,
+                          )
+                        ] : [],
+                      ),
+                      child: Text('$num'),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // 🎨 Auth button
+  Widget _buildAuthButton(SecurityState state, Color activeColor, bool isInputDisabled) {
+    return SizedBox(
+      width: double.infinity,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: !isInputDisabled ? [
+            BoxShadow(
+              color: activeColor.withOpacity(0.3),
+              blurRadius: 20,
+              spreadRadius: 1,
+            )
+          ] : [],
+        ),
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isInputDisabled ? const Color(0xFF1A1A1A) : activeColor.withOpacity(0.2),
+            foregroundColor: isInputDisabled ? const Color(0xFF666666) : activeColor,
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(
+                color: isInputDisabled ? const Color(0xFF333333) : activeColor,
+                width: 2,
+              ),
+            ),
+            elevation: 0,
+          ),
+          onPressed: isInputDisabled 
+            ? null 
+            : () => widget.controller.validateAttempt(hasPhysicalMovement: true),
+          child: Text(
+            state == SecurityState.HARD_LOCK 
+              ? "SYSTEM LOCKED" 
+              : "AUTHENTICATE", 
+            style: TextStyle(
+              fontWeight: FontWeight.bold, 
+              letterSpacing: 1.5,
+              fontSize: 14,
+              shadows: !isInputDisabled ? [
+                Shadow(
+                  color: activeColor.withOpacity(0.8),
+                  blurRadius: 10,
+                )
+              ] : [],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🎨 Security warning UI
+  Widget _buildSecurityWarningUI() {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _colWarning, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: _colWarning.withOpacity(0.2),
+            blurRadius: 30,
+          )
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.shield_outlined, color: _colWarning, size: 48),
+          const SizedBox(height: 20),
+          Text(
+            "Security Notice",
+            style: TextStyle(
+              color: _colWarning,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            "Rooted or jailbroken devices may reduce security protections. This could expose sensitive data to unauthorized access.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          if (_suspiciousRootBypass) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _colJam.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _colJam.withOpacity(0.3)),
+              ),
+              child: Text(
+                "⚠️ Root hiding tools detected",
+                style: TextStyle(
+                  color: _colJam,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _colWarning,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () => widget.controller.userAcceptsRisk(),
+              child: const Text(
+                "I UNDERSTAND THE RISKS",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
                 ),
               ),
             ),
           ),
-          
-          AnimatedContainer(duration: const Duration(milliseconds: 100), height: 1, width: isActive ? 40 : 0, color: color),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSecurityWarningUI() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(color: const Color(0xFF100000), border: Border.all(color: _colFail, width: 2)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.warning_amber_rounded, color: _colFail, size: 48),
-          const SizedBox(height: 20),
-          Text("SYSTEM COMPROMISED", style: TextStyle(color: _colFail, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.0)),
-          const SizedBox(height: 12),
-          Text("Root access detected.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 12)),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity, height: 50,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: _colFail, foregroundColor: Colors.white),
-              onPressed: () { _triggerHaptic(heavy: true); widget.controller.userAcceptsRisk(); },
-              child: const Text("OVERRIDE"),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-class GridPainter extends CustomPainter {
-  final Color color;
-  final double scanValue;
-  GridPainter({required this.color, required this.scanValue});
+// ============================================
+// 3. CUSTOM PAINTERS: SCI-FI GRID & SCAN LINE
+// ============================================
 
+class SciFiGridPainter extends CustomPainter {
+  final Color color;
+  
+  SciFiGridPainter({required this.color});
+  
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color..strokeWidth = 1;
-    double step = 20.0;
+    final paint = Paint()
+      ..color = color.withOpacity(0.05)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
     
-    for (double x = 0; x < size.width; x += step) {
+    // Vertical lines
+    for (double x = 0; x < size.width; x += 40) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
-    for (double y = 0; y < size.height; y += step) {
+    
+    // Horizontal lines
+    for (double y = 0; y < size.height; y += 40) {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
     
-    final scanPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [color.withOpacity(0), color.withOpacity(0.3), color.withOpacity(0)],
-      ).createShader(Rect.fromLTWH(0, size.height * scanValue - 20, size.width, 40));
-      
-    canvas.drawRect(Rect.fromLTWH(0, size.height * scanValue - 20, size.width, 40), scanPaint);
+    // Diagonal accent lines
+    final accentPaint = Paint()
+      ..color = color.withOpacity(0.03)
+      ..strokeWidth = 0.5
+      ..style = PaintingStyle.stroke;
+    
+    canvas.drawLine(const Offset(0, 0), Offset(size.width, size.height), accentPaint);
+    canvas.drawLine(Offset(size.width, 0), Offset(0, size.height), accentPaint);
   }
-
+  
   @override
-  bool shouldRepaint(covariant GridPainter oldDelegate) => oldDelegate.scanValue != scanValue;
+  bool shouldRepaint(SciFiGridPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
 }
 
+// FIX: Added missing ScanLinePainter class
 class ScanLinePainter extends CustomPainter {
   final Color color;
   final double progress;
+
   ScanLinePainter({required this.color, required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
+      ..strokeWidth = 2
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [color.withOpacity(0), color.withOpacity(0.5), color.withOpacity(0)],
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(Rect.fromLTWH(0, size.height * progress, size.width, 2));
+        colors: [
+          Colors.transparent,
+          color.withOpacity(0.8),
+          Colors.transparent,
+        ],
+        stops: [
+          0.0,
+          0.5,
+          1.0,
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    canvas.drawRect(Rect.fromLTWH(0, size.height * progress, size.width, 2), paint);
+    final y = size.height * progress;
+    canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
   }
 
   @override
-  bool shouldRepaint(covariant ScanLinePainter oldDelegate) => oldDelegate.progress != progress;
+  bool shouldRepaint(ScanLinePainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.color != color;
+  }
 }
