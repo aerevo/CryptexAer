@@ -28,6 +28,41 @@ class ClaController extends ChangeNotifier {
   double get motionConfidence => _motionConfidence;
   double get touchConfidence => _touchConfidence;
 
+  // ========== NEW: Missing getters for widget ==========
+  double get liveConfidence {
+    // Combined confidence score
+    return (_motionConfidence * 0.5 + _touchConfidence * 0.5).clamp(0.0, 1.0);
+  }
+
+  int get uniqueGestureCount {
+    // Count distinct motion patterns
+    return _motionHistory.length;
+  }
+
+  double get motionEntropy {
+    // Calculate entropy from motion history
+    if (_motionHistory.isEmpty) return 0.0;
+    
+    final mags = _motionHistory.map((e) => e.magnitude).toList();
+    final freq = <int, int>{};
+    
+    for (var m in mags) {
+      final bucket = (m * 12).floor();
+      freq[bucket] = (freq[bucket] ?? 0) + 1;
+    }
+
+    double entropy = 0.0;
+    for (var c in freq.values) {
+      final p = c / mags.length;
+      if (p > 0) {
+        entropy -= p * log(p) / ln2;
+      }
+    }
+    
+    return (entropy / 3.0).clamp(0.0, 1.0); // Normalize to 0-1
+  }
+  // =====================================================
+
   final List<MotionEvent> _motionHistory = [];
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
@@ -68,7 +103,7 @@ class ClaController extends ChangeNotifier {
 
   // ================= SENSOR INPUT =================
 
-  void registerShake(double mag, double dx, dy, dz) {
+  void registerShake(double mag, double dx, double dy, double dz) {
     if (_state != SecurityState.LOCKED) return;
 
     _motionConfidence = (mag * 4).clamp(0.0, 1.0);
@@ -92,6 +127,12 @@ class ClaController extends ChangeNotifier {
     _touchConfidence = (_touchCount / 3).clamp(0.0, 1.0);
     _notify();
   }
+
+  // ========== NEW: Missing method ==========
+  void registerTouchInteraction() {
+    registerTouch(); // Alias for touch tracking
+  }
+  // =========================================
 
   // ================= VALIDATION =================
 
@@ -130,8 +171,18 @@ class ClaController extends ChangeNotifier {
     }
 
     if (!_checkCode()) {
+      if (kDebugMode) {
+        print('❌ CODE MISMATCH!');
+        for (int i = 0; i < config.secret.length; i++) {
+          print('  Position $i: ${currentValues[i]} vs ${config.secret[i]} ${currentValues[i] == config.secret[i] ? "✓" : "✗"}');
+        }
+      }
       await _fail("CODE MISMATCH");
       return;
+    }
+
+    if (kDebugMode) {
+      print('✅ UNLOCKED! Password correct!');
     }
 
     _state = SecurityState.UNLOCKED;
@@ -219,6 +270,11 @@ class ClaController extends ChangeNotifier {
   void updateWheel(int index, int val) {
     if (_state != SecurityState.LOCKED) return;
     currentValues[index] = val;
+    
+    if (kDebugMode) {
+      print('🎯 Wheel $index updated to: $val (Current: $currentValues)');
+    }
+    
     _notify();
   }
 
