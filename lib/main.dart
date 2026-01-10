@@ -46,7 +46,7 @@ class _LockScreenState extends State<LockScreen> {
         minSolveTime: Duration(seconds: 2),
         minShake: 0.15,                 // Min shake for trigger
         thresholdAmount: 1.0,           
-        jamCooldown: Duration(minutes: 5), // Hukuman Jammed: 5 Minit!
+        jamCooldown: Duration(seconds: 5), // Hukuman Jammed: 5 Saat!
         maxAttempts: 3,
         
         // TUNING BARU (Clean Version)
@@ -161,3 +161,4 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 }
+
