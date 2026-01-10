@@ -767,4 +767,76 @@ class KineticPeripheralPainter extends CustomPainter {
           canvas, tp, "ENC: AES256", 4, 45, 6, color.withOpacity(0.6), false);
 
       for (int i = 0; i < 12; i++) {
-        double h = 6 + (valX.abs() *
+        // TAMPALAN: Melengkapkan logik bar graph yang terpotong
+        double h = 6 + (valX.abs() * 5.0); // Selamatkan dengan nilai wajar
+        canvas.drawRect(
+          Rect.fromLTWH(8.0 + (i * 3.0), 100 - h, 2, h),
+          Paint()..color = color.withOpacity(0.4)
+        );
+      }
+      canvas.drawLine(const Offset(2, 10), const Offset(2, 130), p);
+    }
+  }
+
+  void _drawText(Canvas canvas, TextPainter tp, String text, double fontSize, double x, double y, Color color, bool isBold) {
+    tp.text = TextSpan(
+      text: text,
+      style: TextStyle(
+        fontFamily: 'Courier', 
+        fontSize: fontSize, 
+        color: color, 
+        fontWeight: isBold ? FontWeight.bold : FontWeight.normal
+      )
+    );
+    tp.layout();
+    tp.paint(canvas, Offset(x, y));
+  }
+
+  @override
+  bool shouldRepaint(KineticPeripheralPainter old) =>
+      old.color != color || old.valX != valX || old.state != state;
+}
+
+class KineticReticlePainter extends CustomPainter {
+  final Color color; 
+  final double progress;
+  KineticReticlePainter({required this.color, required this.progress});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width/2, size.height/2);
+    final p = Paint()..color = color.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth = 2;
+    canvas.save(); 
+    canvas.translate(c.dx, c.dy); 
+    canvas.rotate(progress * 2 * pi); 
+    canvas.translate(-c.dx, -c.dy);
+    canvas.drawCircle(c, 22, p);
+    for (int i = 0; i < 4; i++) {
+      final a = i * pi / 2;
+      canvas.drawLine(Offset(c.dx + 18 * cos(a), c.dy + 18 * sin(a)), Offset(c.dx + 26 * cos(a), c.dy + 26 * sin(a)), p);
+    }
+    canvas.restore();
+  }
+  @override bool shouldRepaint(KineticReticlePainter old) => old.progress != progress;
+}
+
+class KineticScanLinePainter extends CustomPainter {
+  final Color color; 
+  final double progress;
+  KineticScanLinePainter({required this.color, required this.progress});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..shader = LinearGradient(
+      begin: Alignment.topCenter, 
+      end: Alignment.bottomCenter, 
+      colors: [color.withOpacity(0), color.withOpacity(0.5), color.withOpacity(0)], 
+      stops: [0.0, 0.5, 1.0]
+    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    
+    double y = size.height * progress;
+    canvas.drawLine(Offset(0, y), Offset(size.width, y), Paint()..color = color..strokeWidth = 1);
+    canvas.drawRect(Rect.fromLTWH(0, y - 10, size.width, 20), p);
+  }
+  @override bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress;
+}
