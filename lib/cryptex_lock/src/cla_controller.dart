@@ -111,6 +111,19 @@ class ClaController extends ChangeNotifier {
       touchCount: _touchCount,
     );
 
+    // DEBUG INFO
+    if (kDebugMode) {
+      print('🔍 DEBUG CRYPTEX:');
+      print('  Motion Confidence: $_motionConfidence');
+      print('  Touch Confidence: $_touchConfidence');
+      print('  Touch Count: $_touchCount');
+      print('  Motion History Length: ${_motionHistory.length}');
+      print('  Verdict Allowed: ${verdict.allowed}');
+      print('  Verdict Reason: ${verdict.reason}');
+      print('  Current Code: $currentValues');
+      print('  Secret Code: ${config.secret}');
+    }
+
     if (!verdict.allowed) {
       await _fail(verdict.reason);
       return;
