@@ -50,8 +50,8 @@ class _LockScreenState extends State<LockScreen> {
         maxAttempts: 3,
         
         // TUNING BARU (Clean Version)
-        botDetectionSensitivity: 0.5,   // 0.5 = Balance
-        enableSensors: true,
+        botDetectionSensitivity: 0.0,   // 0.5 = Balance
+        enableSensors: false,
       ),
     );
   }
@@ -161,4 +161,5 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 }
+
 
