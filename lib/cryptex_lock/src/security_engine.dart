@@ -69,7 +69,7 @@ class SecurityEngine {
     // ───────────────────────────────
     // 0. Hard Presence Gate
     // ───────────────────────────────
-    if (motionConfidence < 0.15 && touchConfidence < 0.35) {
+    if (motionConfidence < 0.1 && touchConfidence < 0.2) {
       _escalate(0.3);
       return ThreatVerdict.deny(
         ThreatLevel.HIGH,
@@ -141,7 +141,7 @@ class SecurityEngine {
 
   bool _validTremor(double hz) {
     // Human physiological tremor range
-    return hz >= 7.5 && hz <= 13.5;
+    return hz >= 5.0 && hz <= 15.0;
   }
 
   double _finalScore(double m, double t, double e) {
