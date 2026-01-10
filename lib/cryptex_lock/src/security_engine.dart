@@ -45,9 +45,9 @@ class SecurityEngineConfig {
   final double minConfidence;
 
   const SecurityEngineConfig({
-    this.minEntropy = 0.6,
-    this.minVariance = 0.04,
-    this.minConfidence = 0.75,
+    this.minEntropy = 0.3,
+    this.minVariance = 0.02,
+    this.minConfidence = 0.5,
   });
 }
 
