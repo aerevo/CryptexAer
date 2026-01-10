@@ -44,14 +44,14 @@ class _LockScreenState extends State<LockScreen> {
       const ClaConfig(
         secret: [1, 7, 3, 9, 2],       
         minSolveTime: Duration(seconds: 2),
-        minShake: 0.15,                 // Min shake for trigger
-        thresholdAmount: 1.0,           
+        minShake: 0.08,                 // Min shake for trigger
+        thresholdAmount: 0.7,           
         jamCooldown: Duration(seconds: 5), // Hukuman Jammed: 5 Saat!
-        maxAttempts: 3,
+        maxAttempts: 5,
         
         // TUNING BARU (Clean Version)
-        botDetectionSensitivity: 0.0,   // 0.5 = Balance
-        enableSensors: false,
+        botDetectionSensitivity: 0.3,   // 0.5 = Balance
+        enableSensors: true,
       ),
     );
   }
@@ -161,5 +161,6 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 }
+
 
 
