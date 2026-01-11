@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-// Pastikan import ini betul ikut struktur folder Kapten
 import 'cryptex_lock/src/cla_widget.dart';
 import 'cryptex_lock/src/cla_controller.dart';
 import 'cryptex_lock/src/cla_models.dart'; 
 
 void main() {
-  // Pastikan binding initialize sebelum panggil native code
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Paksa Portrait Mode (Security App biasanya portrait)
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
   runApp(const MyApp());
 }
 
@@ -25,10 +20,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Z-KINETIC V5',
+      title: 'Z-KINETIC DEV',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF050505),
-        primaryColor: const Color(0xFF00FFFF), // Cyan neon
       ),
       home: const LockScreen(),
     );
@@ -49,31 +43,23 @@ class _LockScreenState extends State<LockScreen> {
   void initState() {
     super.initState();
     
-    // ═══════════════════════════════════════════════════════
-    // 🔧 CONFIGURATION: HUMAN FRIENDLY (SWEET SPOT)
-    // ═══════════════════════════════════════════════════════
+    // 🔓 GOD MODE CONFIGURATION
+    // Setting ini mematikan semua "Security Engine" supaya Kapten boleh test password.
+    
     _controller = ClaController(
       const ClaConfig(
-        secret: [1, 7, 3, 9, 2], // Password Kapten
+        secret: [1, 7, 3, 9, 2], 
         
-        // 1. Min Shake: 0.02 (Sangat rendah)
-        // Kalau letak phone atas meja & ketuk skrin, gegaran ~0.03.
-        // Jadi ini cukup untuk detect 'hidup' tanpa perlu pegang.
-        minShake: 0.02,                 
+        // 👇 SET SEMUA JADI KOSONG (0.0)
+        minShake: 0.0,                 // Terima walaupun statik
+        botDetectionSensitivity: 0.0,  // Matikan AI Bot Detector
+        thresholdAmount: 0.0,          // Terima sebarang input
         
-        // 2. Sensitiviti Bot: 0.2 (Rendah)
-        // Kurang paranoid. Dia akan lebih "bersangka baik" pada user.
-        botDetectionSensitivity: 0.2,   
+        minSolveTime: Duration.zero,   // Laju pun takpe
+        jamCooldown: Duration(seconds: 2), // Reset cepat kalau fail
+        maxAttempts: 99,               // Unlimited try
         
-        // 3. Threshold: 0.2
-        // Scroll roda sikit pun dah dikira "input valid".
-        thresholdAmount: 0.2,           
-        
-        minSolveTime: Duration(milliseconds: 200), 
-        jamCooldown: Duration(seconds: 10),
-        maxAttempts: 5,
-        
-        // ⚠️ SENSOR WAJIB HIDUP (Untuk Production)
+        // ✅ SENSOR HIDUP (Untuk UI visual je, bukan untuk block user)
         enableSensors: true,            
       ),
     );
@@ -85,28 +71,24 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
-  // Callback: Bila Berjaya
   void _onSuccess() {
-    print("✅ ACCESS GRANTED");
+    print("✅ PASSWORD BETUL!");
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("ACCESS GRANTED: WELCOME CAPTAIN AER"),
-        backgroundColor: Color(0xFF00FF88),
-        duration: Duration(seconds: 2),
+        content: Text("ACCESS GRANTED"),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 1),
       ),
     );
-    // Di sini navigate ke Home Page
   }
 
-  // Callback: Bila Salah Password
   void _onFail() {
-    print("⚠️ ACCESS DENIED");
+    print("❌ PASSWORD SALAH!");
     HapticFeedback.heavyImpact();
   }
 
-  // Callback: Bila Kena Lock (Bot/Spam)
   void _onJammed() {
-    print("⛔ SYSTEM LOCKDOWN");
+    print("⛔ SYSTEM JAMMED");
     HapticFeedback.vibrate();
   }
 
@@ -119,47 +101,17 @@ class _LockScreenState extends State<LockScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Header Icon
-              Icon(Icons.shield_outlined, size: 40, color: Colors.cyan.withOpacity(0.7)),
-              const SizedBox(height: 20),
-              
-              // Title
-              const Text(
-                "Z-KINETIC V5",
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 20, 
-                  fontWeight: FontWeight.bold, 
-                  letterSpacing: 4,
-                  color: Colors.white
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "IDENTITY VERIFICATION",
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  color: Colors.white.withOpacity(0.5), 
-                  fontSize: 10,
-                  letterSpacing: 2
-                ),
-              ),
+              const Icon(Icons.build_circle, size: 40, color: Colors.orange),
+              const SizedBox(height: 10),
+              const Text("DEV MODE: SECURITY DISABLED", style: TextStyle(color: Colors.orange, letterSpacing: 2)),
               const SizedBox(height: 50),
               
-              // 🔐 THE LOCK WIDGET
+              // WIDGET UI ASAL (V3.5)
               CryptexLock(
                 controller: _controller,
                 onSuccess: _onSuccess,
                 onFail: _onFail,
                 onJammed: _onJammed,
-              ),
-              
-              const SizedBox(height: 50),
-              
-              // Footer
-              Text(
-                "SECURE ENVIRONMENT",
-                style: TextStyle(color: Colors.grey[800], fontSize: 9, letterSpacing: 2),
               ),
             ],
           ),
