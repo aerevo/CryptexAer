@@ -26,7 +26,7 @@ class ClaController extends ChangeNotifier {
   double get motionConfidence => _motionConfidence;
   double get touchConfidence => _touchConfidence;
   
-  // FIX 1: Panggil getter dari variable baru engine
+  // UI Getters
   double get liveConfidence => _engine.lastConfidenceScore;
   int get uniqueGestureCount => _motionHistory.length > 50 ? 10 : (_motionHistory.length / 5).floor();
   double get motionEntropy => _engine.lastEntropyScore;
@@ -39,14 +39,13 @@ class ClaController extends ChangeNotifier {
   ClaController(this.config) {
     currentValues = List.filled(5, 0);
     
-    // FIX 2: Constructor dibetulkan (Buang parameter secret)
+    // Config Engine V5.0
     _engine = SecurityEngine(
       const SecurityEngineConfig(
         minEntropy: 0.35,     
         minVariance: 0.02,
         minConfidence: 0.55,
       ),
-      // config.secret DIBUANG
     );
     _storage = const FlutterSecureStorage();
     _initSecureStorage();
@@ -54,14 +53,23 @@ class ClaController extends ChangeNotifier {
 
   @override
   void dispose() {
-    // FIX 3: Engine sekarang ada method dispose, jadi line ini valid
     _engine.dispose();
     super.dispose();
   }
 
   void registerShake(double magnitude, double x, double y, double z) {
     final now = DateTime.now();
-    _motionHistory.add(MotionEvent(magnitude, now, x, y, z));
+    
+    // 🔧 FIX COMPILATION ERROR DI SINI:
+    // Tukar dari positional arguments ke NAMED arguments
+    _motionHistory.add(MotionEvent(
+      magnitude: magnitude,
+      timestamp: now,
+      deltaX: x,
+      deltaY: y,
+      deltaZ: z,
+    ));
+    
     if (_motionHistory.length > 50) _motionHistory.removeAt(0);
 
     if (magnitude > config.minShake) {
@@ -89,7 +97,7 @@ class ClaController extends ChangeNotifier {
     _state = SecurityState.VALIDATING;
     _notify();
 
-    // Jalankan analisis (Untuk rekod visual sahaja)
+    // Jalankan analisis
     final verdict = _engine.analyze(
       motionConfidence: _motionConfidence,
       touchConfidence: _touchConfidence,
@@ -110,7 +118,6 @@ class ClaController extends ChangeNotifier {
       return; 
     }
 
-    // Kalau password salah, baru hukum
     print("❌ PASSCODE MISMATCH. CHECKING THREAT LEVEL...");
 
     if (!verdict.allowed) {
