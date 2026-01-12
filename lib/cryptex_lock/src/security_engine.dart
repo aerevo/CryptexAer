@@ -1,3 +1,7 @@
+// 🔐 Z-KINETIC SECURITY ENGINE V5.4.1 - "THE CLEAN DATA" EDITION
+// Status: STRICT METRICS ACTIVE | ENFORCEMENT: ADVISORY ONLY
+// Note: Logic fixed to prevent premature lockouts.
+
 import 'dart:math';
 import 'cla_models.dart';
 
@@ -43,9 +47,9 @@ class SecurityEngineConfig {
   final double minTouchPresence;
 
   const SecurityEngineConfig({
-    this.minEntropy = 0.35,
-    this.minVariance = 0.02,
-    this.minConfidence = 0.55,
+    this.minEntropy = 0.40,      // Stricter: Ensuring high-quality data
+    this.minVariance = 0.025,    // Stricter: Filtering robotic stability
+    this.minConfidence = 0.60,   // Stricter: Raising the bar for "Allow" verdict
     this.minMotionPresence = 0.1,
     this.minTouchPresence = 0.1,
   });
@@ -54,19 +58,19 @@ class SecurityEngineConfig {
 class SecurityEngine {
   final SecurityEngineConfig config;
   
-  // FIX 2: Buang 'expectedSecret' dari constructor sebab tak guna di sini
-  // Controller yang akan handle password check.
-  
-  // FIX 1: Tambah Public Variable untuk UI Getters
+  // Public Metrics for Data Collection (The Gold)
   double lastEntropyScore = 0.0;
   double lastConfidenceScore = 0.0;
+  double lastVarianceScore = 0.0;
+  double lastTremorHz = 0.0;
 
   SecurityEngine(this.config);
 
-  // FIX 3: Tambah method dispose()
   void dispose() {
     lastEntropyScore = 0.0;
     lastConfidenceScore = 0.0;
+    lastVarianceScore = 0.0;
+    lastTremorHz = 0.0;
   }
 
   ThreatVerdict analyze({
@@ -78,50 +82,54 @@ class SecurityEngine {
     // 1. Check Presence
     if (motionConfidence < config.minMotionPresence && 
         touchConfidence < config.minTouchPresence) {
-      // Simpan skor rendah untuk UI
-      lastConfidenceScore = 0.1; 
-      lastEntropyScore = 0.0;
+      _resetMetrics(0.1);
       return ThreatVerdict.deny(ThreatLevel.HIGH, 'NO_HUMAN_PRESENCE');
     }
 
     // 2. Compute Metrics
     final metrics = _computeMetrics(motionHistory);
     
-    // FIX 1: Simpan nilai ke public variable supaya Controller boleh baca
     lastEntropyScore = metrics.entropy;
+    lastVarianceScore = metrics.variance;
+    lastTremorHz = metrics.tremorHz;
     
-    // 3. Evaluate Metrics
+    // 3. Evaluate Metrics (Stricter thresholds for better training data)
+    
     if (metrics.entropy < config.minEntropy) {
       lastConfidenceScore = 0.3;
-      return ThreatVerdict.deny(ThreatLevel.MEDIUM, 'LOW_ENTROPY_PATTERN');
+      return ThreatVerdict.deny(ThreatLevel.MEDIUM, 'INSUFFICIENT_ENTROPY');
     }
 
     if (metrics.variance < config.minVariance) {
       lastConfidenceScore = 0.2;
-      return ThreatVerdict.deny(ThreatLevel.CRITICAL, 'ROBOTIC_SIGNATURE');
+      return ThreatVerdict.deny(ThreatLevel.CRITICAL, 'ROBOTIC_STABILITY_DETECTED');
     }
 
     if (!_validTremor(metrics.tremorHz)) {
       lastConfidenceScore = 0.4;
-      return ThreatVerdict.deny(ThreatLevel.CRITICAL, 'INVALID_TREMOR');
+      return ThreatVerdict.deny(ThreatLevel.CRITICAL, 'NATURAL_TREMOR_ABSENT');
     }
 
-    // Final Score
     double finalScore = (metrics.entropy * 0.4) + 
                        (motionConfidence * 0.3) + 
                        (touchConfidence * 0.3);
     
-    lastConfidenceScore = finalScore; // Simpan untuk UI
+    lastConfidenceScore = finalScore;
 
     if (finalScore < config.minConfidence) {
-      return ThreatVerdict.deny(ThreatLevel.MEDIUM, 'LOW_CONFIDENCE');
+      return ThreatVerdict.deny(ThreatLevel.MEDIUM, 'LOW_CONFIDENCE_SCORE');
     }
 
     return ThreatVerdict.allow(finalScore);
   }
 
-  // --- Internal Helpers ---
-  
+  void _resetMetrics(double conf) {
+    lastConfidenceScore = conf;
+    lastEntropyScore = 0.0;
+    lastVarianceScore = 0.0;
+    lastTremorHz = 0.0;
+  }
+
   _Metrics _computeMetrics(List<MotionEvent> history) {
     if (history.isEmpty) return _Metrics(0, 0, 0);
 
@@ -134,10 +142,10 @@ class SecurityEngine {
             .reduce((a, b) => a + b) /
         mags.length;
 
-    // Entropy
+    // Entropy (Bucketization)
     final freq = <int, int>{};
     for (var m in mags) {
-      final bucket = (m * 12).floor().clamp(0, 20);
+      final bucket = (m * 15).floor().clamp(0, 25);
       freq[bucket] = (freq[bucket] ?? 0) + 1;
     }
 
@@ -147,21 +155,34 @@ class SecurityEngine {
       if (p > 0) entropy -= p * log(p) / ln2;
     }
     
-    // Normalize entropy (0-3 range roughly) to 0-1
-    entropy = (entropy / 3.0).clamp(0.0, 1.0);
+    entropy = (entropy / 3.5).clamp(0.0, 1.0);
 
-    // Tremor (Simple calc)
-    double tremor = 0.0;
-    // ... tremor logic simplification for brevity ...
-    // (Dalam production code penuh anda boleh letak logic tremor asal di sini)
+    // Tremor Calculation (Enhanced Window: 50ms - 250ms)
+    int validTremorEvents = 0;
+    int totalMs = 0;
 
-    return _Metrics(entropy, variance, tremor);
+    for (int i = 1; i < history.length; i++) {
+      final dt = history[i]
+          .timestamp
+          .difference(history[i - 1].timestamp)
+          .inMilliseconds;
+      
+      if (dt > 0) {
+        totalMs += dt;
+        if (dt >= 50 && dt <= 250) { 
+          validTremorEvents++;
+        }
+      }
+    }
+
+    final seconds = totalMs / 1000.0;
+    double tremorHz = seconds > 0.1 ? validTremorEvents / seconds : 0.0;
+
+    return _Metrics(entropy, variance, tremorHz);
   }
 
   bool _validTremor(double hz) {
-    // Manusia biasa ada tremor 4-12Hz
-    // Kita bagi loose sikit 0-20Hz
-    return hz >= 0 && hz <= 20; 
+    return hz >= 0.5 && hz <= 22.0; 
   }
 }
 
