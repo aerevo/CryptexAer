@@ -1,7 +1,3 @@
-// 🔐 Z-KINETIC SECURITY ENGINE V5.4.1 - "THE CLEAN DATA" EDITION
-// Status: STRICT METRICS ACTIVE | ENFORCEMENT: ADVISORY ONLY
-// Note: Logic fixed to prevent premature lockouts.
-
 import 'dart:math';
 import 'cla_models.dart';
 
@@ -47,9 +43,9 @@ class SecurityEngineConfig {
   final double minTouchPresence;
 
   const SecurityEngineConfig({
-    this.minEntropy = 0.40,      // Stricter: Ensuring high-quality data
-    this.minVariance = 0.025,    // Stricter: Filtering robotic stability
-    this.minConfidence = 0.60,   // Stricter: Raising the bar for "Allow" verdict
+    this.minEntropy = 0.35,
+    this.minVariance = 0.02,
+    this.minConfidence = 0.55,
     this.minMotionPresence = 0.1,
     this.minTouchPresence = 0.1,
   });
@@ -58,19 +54,15 @@ class SecurityEngineConfig {
 class SecurityEngine {
   final SecurityEngineConfig config;
   
-  // Public Metrics for Data Collection (The Gold)
+  // Public Variable untuk UI Getters (Local Only)
   double lastEntropyScore = 0.0;
   double lastConfidenceScore = 0.0;
-  double lastVarianceScore = 0.0;
-  double lastTremorHz = 0.0;
 
   SecurityEngine(this.config);
 
   void dispose() {
     lastEntropyScore = 0.0;
     lastConfidenceScore = 0.0;
-    lastVarianceScore = 0.0;
-    lastTremorHz = 0.0;
   }
 
   ThreatVerdict analyze({
@@ -82,34 +74,32 @@ class SecurityEngine {
     // 1. Check Presence
     if (motionConfidence < config.minMotionPresence && 
         touchConfidence < config.minTouchPresence) {
-      _resetMetrics(0.1);
+      lastConfidenceScore = 0.1; 
+      lastEntropyScore = 0.0;
       return ThreatVerdict.deny(ThreatLevel.HIGH, 'NO_HUMAN_PRESENCE');
     }
 
     // 2. Compute Metrics
     final metrics = _computeMetrics(motionHistory);
-    
     lastEntropyScore = metrics.entropy;
-    lastVarianceScore = metrics.variance;
-    lastTremorHz = metrics.tremorHz;
     
-    // 3. Evaluate Metrics (Stricter thresholds for better training data)
-    
+    // 3. Evaluate Metrics (Real-time Validation)
     if (metrics.entropy < config.minEntropy) {
       lastConfidenceScore = 0.3;
-      return ThreatVerdict.deny(ThreatLevel.MEDIUM, 'INSUFFICIENT_ENTROPY');
+      return ThreatVerdict.deny(ThreatLevel.MEDIUM, 'LOW_ENTROPY_PATTERN');
     }
 
     if (metrics.variance < config.minVariance) {
       lastConfidenceScore = 0.2;
-      return ThreatVerdict.deny(ThreatLevel.CRITICAL, 'ROBOTIC_STABILITY_DETECTED');
+      return ThreatVerdict.deny(ThreatLevel.CRITICAL, 'ROBOTIC_SIGNATURE');
     }
 
     if (!_validTremor(metrics.tremorHz)) {
       lastConfidenceScore = 0.4;
-      return ThreatVerdict.deny(ThreatLevel.CRITICAL, 'NATURAL_TREMOR_ABSENT');
+      return ThreatVerdict.deny(ThreatLevel.CRITICAL, 'INVALID_TREMOR');
     }
 
+    // Final Score Calculation
     double finalScore = (metrics.entropy * 0.4) + 
                        (motionConfidence * 0.3) + 
                        (touchConfidence * 0.3);
@@ -117,35 +107,30 @@ class SecurityEngine {
     lastConfidenceScore = finalScore;
 
     if (finalScore < config.minConfidence) {
-      return ThreatVerdict.deny(ThreatLevel.MEDIUM, 'LOW_CONFIDENCE_SCORE');
+      return ThreatVerdict.deny(ThreatLevel.MEDIUM, 'LOW_CONFIDENCE');
     }
 
     return ThreatVerdict.allow(finalScore);
   }
 
-  void _resetMetrics(double conf) {
-    lastConfidenceScore = conf;
-    lastEntropyScore = 0.0;
-    lastVarianceScore = 0.0;
-    lastTremorHz = 0.0;
-  }
-
+  // --- Internal Helpers ---
+  
   _Metrics _computeMetrics(List<MotionEvent> history) {
     if (history.isEmpty) return _Metrics(0, 0, 0);
 
     final mags = history.map((e) => e.magnitude).toList();
     final mean = mags.reduce((a, b) => a + b) / mags.length;
 
-    // Variance
+    // Variance calculation
     final variance = mags
             .map((x) => pow(x - mean, 2))
             .reduce((a, b) => a + b) /
         mags.length;
 
-    // Entropy (Bucketization)
+    // Entropy calculation
     final freq = <int, int>{};
     for (var m in mags) {
-      final bucket = (m * 15).floor().clamp(0, 25);
+      final bucket = (m * 12).floor().clamp(0, 20);
       freq[bucket] = (freq[bucket] ?? 0) + 1;
     }
 
@@ -154,10 +139,9 @@ class SecurityEngine {
       final p = c / mags.length;
       if (p > 0) entropy -= p * log(p) / ln2;
     }
-    
-    entropy = (entropy / 3.5).clamp(0.0, 1.0);
+    entropy = (entropy / 3.0).clamp(0.0, 1.0);
 
-    // Tremor Calculation (Enhanced Window: 50ms - 250ms)
+    // 🔥 TREMOR LOGIC RESTORED (FULL MATH) 🔥
     int validTremorEvents = 0;
     int totalMs = 0;
 
@@ -169,7 +153,8 @@ class SecurityEngine {
       
       if (dt > 0) {
         totalMs += dt;
-        if (dt >= 50 && dt <= 250) { 
+        // Frequency of human micro-tremors (60ms to 200ms)
+        if (dt >= 60 && dt <= 200) {
           validTremorEvents++;
         }
       }
@@ -182,7 +167,8 @@ class SecurityEngine {
   }
 
   bool _validTremor(double hz) {
-    return hz >= 0.5 && hz <= 22.0; 
+    // Human tremor range: 0.5Hz to 20Hz
+    return hz >= 0.5 && hz <= 20.0; 
   }
 }
 
