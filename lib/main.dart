@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Z-KINETIC DEV',
+      title: 'Z-KINETIC BALANCED',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF050505),
         primaryColor: Colors.blueAccent,
@@ -56,18 +56,34 @@ class _LockScreenState extends State<LockScreen> {
         const ClaConfig(
           secret: [1, 7, 3, 9, 2],
           
-          // 🔓 GOD MODE: Security Features Disabled
-          minShake: 0.0,
-          botDetectionSensitivity: 0.0,
-          thresholdAmount: 0.0,
-          minSolveTime: Duration.zero,
-          jamCooldown: Duration(seconds: 2),
-          maxAttempts: 99,
+          // 🎚️ BALANCED MODE: Security Enabled but Reasonable
+          
+          // 📱 MOTION DETECTION (Gentle)
+          minShake: 0.8,  // ✅ Require SOME movement (ringan je)
+          // Tips: Goyangkan phone sikit masa unlock (natural motion)
+          
+          // 🤖 BOT DETECTION (Low Sensitivity)
+          botDetectionSensitivity: 0.2,  // ✅ Detect extreme bot behavior only
+          // Tips: Touch screen naturally, don't rush
+          
+          // ⚖️ CONFIDENCE THRESHOLD (Relaxed)
+          thresholdAmount: 0.3,  // ✅ Low bar (easy to pass)
+          // Tips: Just interact normally
+          
+          // ⏱️ SOLVE TIME (Moderate)
+          minSolveTime: Duration(seconds: 1),  // ✅ At least 1 second
+          // Tips: Don't instant submit (too fast = suspicious)
+          
+          // 🔒 LOCKOUT POLICY (Fair)
+          maxAttempts: 5,  // ✅ 5 chances (reasonable)
+          jamCooldown: Duration(seconds: 10),  // ✅ 10 sec cooldown
+          
+          // 🔧 SENSOR (Always On)
           enableSensors: true,
           
-          // ✅ CUSTOM SECRET (Bypass default check)
-          clientId: 'CRYPTER_DEMO',
-          clientSecret: 'captain_aer_testing_secret_2026', // 🔥 CHANGED!
+          // 🔐 TELEMETRY
+          clientId: 'CRYPTER_BALANCED',
+          clientSecret: 'captain_aer_testing_secret_2026',
         ),
       );
       
@@ -75,7 +91,7 @@ class _LockScreenState extends State<LockScreen> {
         _isInitialized = true;
       });
       
-      print("✅ Controller initialized successfully");
+      print("✅ Controller initialized (BALANCED MODE)");
       
     } catch (e, stackTrace) {
       setState(() {
@@ -117,7 +133,7 @@ class _LockScreenState extends State<LockScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          "❌ WRONG PIN (${_controller.failedAttempts}/99)",
+          "❌ WRONG PIN (${_controller.failedAttempts}/5)",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.red,
@@ -130,11 +146,13 @@ class _LockScreenState extends State<LockScreen> {
     print("⛔ SYSTEM JAMMED");
     HapticFeedback.vibrate();
     
+    final remaining = _controller.remainingLockoutSeconds;
+    
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          "⛔ TOO MANY ATTEMPTS - LOCKED",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          "⛔ LOCKED FOR $remaining SECONDS",
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         backgroundColor: Colors.deepOrange,
         duration: Duration(seconds: 3),
@@ -144,7 +162,7 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🚨 ERROR STATE WITH WORKING RETRY
+    // 🚨 ERROR STATE
     if (_errorMessage != null) {
       return Scaffold(
         body: Center(
@@ -180,7 +198,6 @@ class _LockScreenState extends State<LockScreen> {
                 const SizedBox(height: 40),
                 ElevatedButton.icon(
                   onPressed: () {
-                    print("🔄 Retry button pressed");
                     setState(() {
                       _errorMessage = null;
                       _isInitialized = false;
@@ -190,16 +207,10 @@ class _LockScreenState extends State<LockScreen> {
                     });
                   },
                   icon: const Icon(Icons.refresh),
-                  label: const Text("RETRY INITIALIZATION"),
+                  label: const Text("RETRY"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blueAccent,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  "💡 Solution: Change clientSecret in code",
-                  style: TextStyle(color: Colors.orange, fontSize: 12),
                 ),
               ],
             ),
@@ -236,23 +247,23 @@ class _LockScreenState extends State<LockScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 🔧 DEV MODE BANNER
+                // 🎚️ BALANCED MODE BANNER
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
+                    color: Colors.blue.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange, width: 1),
+                    border: Border.all(color: Colors.blueAccent, width: 1),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.build_circle, size: 24, color: Colors.orange),
+                      Icon(Icons.shield_outlined, size: 24, color: Colors.blueAccent),
                       SizedBox(width: 8),
                       Text(
-                        "DEV MODE",
+                        "BALANCED SECURITY",
                         style: TextStyle(
-                          color: Colors.orange,
+                          color: Colors.blueAccent,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 2,
                         ),
@@ -264,7 +275,7 @@ class _LockScreenState extends State<LockScreen> {
                 const SizedBox(height: 10),
                 
                 const Text(
-                  "Security Disabled for Testing",
+                  "Human-Friendly Protection Enabled",
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 
@@ -280,6 +291,47 @@ class _LockScreenState extends State<LockScreen> {
                 
                 const SizedBox(height: 40),
                 
+                // 💡 TIPS BOX
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.blue.withOpacity(0.1),
+                        Colors.purple.withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.lightbulb_outline, color: Colors.yellow, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            "HOW TO UNLOCK SUCCESSFULLY",
+                            style: TextStyle(
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTip("1️⃣", "Set PIN to: 1-7-3-9-2"),
+                      _buildTip("2️⃣", "Goyangkan phone SIKIT (natural motion)"),
+                      _buildTip("3️⃣", "Don't rush - take at least 1-2 seconds"),
+                      _buildTip("4️⃣", "Touch screen normally (like human)"),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
                 // 📊 DEBUG INFO
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -291,11 +343,13 @@ class _LockScreenState extends State<LockScreen> {
                     children: [
                       _buildDebugRow("Target PIN:", "1-7-3-9-2"),
                       const SizedBox(height: 8),
-                      _buildDebugRow("Failed Attempts:", "${_controller.failedAttempts}"),
+                      _buildDebugRow("Attempts:", "${_controller.failedAttempts}/5"),
                       const SizedBox(height: 8),
                       _buildDebugRow("State:", _controller.state.toString().split('.').last),
                       const SizedBox(height: 8),
-                      _buildDebugRow("Max Attempts:", "99 (God Mode)"),
+                      _buildDebugRow("Motion:", "${(_controller.motionConfidence * 100).toStringAsFixed(0)}%"),
+                      const SizedBox(height: 8),
+                      _buildDebugRow("Touch:", "${(_controller.touchConfidence * 100).toStringAsFixed(0)}%"),
                     ],
                   ),
                 ),
@@ -303,6 +357,24 @@ class _LockScreenState extends State<LockScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTip(String emoji, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }
