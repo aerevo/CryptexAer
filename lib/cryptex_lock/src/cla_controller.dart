@@ -1,3 +1,7 @@
+// 🎮 Z-KINETIC CONTROLLER V5.4.1 - "THE BALANCED GUARDIAN"
+// Fix: Removed "CRITICAL" keyword auto-lock.
+// Feature: Contextual Metrics (Tilt/Velocity) for Data Collection.
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -23,12 +27,16 @@ class ClaController extends ChangeNotifier {
   double _touchConfidence = 0.0;
   int _touchCount = 0;
 
+  // Contextual Metrics
+  final List<double> _wheelVelocities = [];
+  double _lastTiltX = 0.0;
+  double _lastTiltY = 0.0;
+  DateTime? _lastWheelUpdateTime;
+
   double get motionConfidence => _motionConfidence;
   double get touchConfidence => _touchConfidence;
   
-  // UI Getters
   double get liveConfidence => _engine.lastConfidenceScore;
-  int get uniqueGestureCount => _motionHistory.length > 50 ? 10 : (_motionHistory.length / 5).floor();
   double get motionEntropy => _engine.lastEntropyScore;
   
   String _threatMessage = "";
@@ -39,13 +47,8 @@ class ClaController extends ChangeNotifier {
   ClaController(this.config) {
     currentValues = List.filled(5, 0);
     
-    // Config Engine V5.0
     _engine = SecurityEngine(
-      const SecurityEngineConfig(
-        minEntropy: 0.35,     
-        minVariance: 0.02,
-        minConfidence: 0.55,
-      ),
+      const SecurityEngineConfig(),
     );
     _storage = const FlutterSecureStorage();
     _initSecureStorage();
@@ -59,9 +62,9 @@ class ClaController extends ChangeNotifier {
 
   void registerShake(double magnitude, double x, double y, double z) {
     final now = DateTime.now();
-    
-    // 🔧 FIX COMPILATION ERROR DI SINI:
-    // Tukar dari positional arguments ke NAMED arguments
+    _lastTiltX = x;
+    _lastTiltY = y;
+
     _motionHistory.add(MotionEvent(
       magnitude: magnitude,
       timestamp: now,
@@ -70,24 +73,36 @@ class ClaController extends ChangeNotifier {
       deltaZ: z,
     ));
     
-    if (_motionHistory.length > 50) _motionHistory.removeAt(0);
+    if (_motionHistory.length > 60) _motionHistory.removeAt(0);
 
     if (magnitude > config.minShake) {
-      _motionConfidence = (_motionConfidence + 0.1).clamp(0.0, 1.0);
+      _motionConfidence = (_motionConfidence + 0.12).clamp(0.0, 1.0);
     } else {
-      _motionConfidence = (_motionConfidence - 0.05).clamp(0.0, 1.0);
+      _motionConfidence = (_motionConfidence - 0.04).clamp(0.0, 1.0);
     }
     
     if (_motionHistory.length % 5 == 0) _notify(); 
   }
 
-  void registerTouch() {
-    _touchCount++;
-    _touchConfidence = 1.0;
-  }
-  
-  void registerTouchInteraction() {
-    registerTouch();
+  void updateWheel(int index, int val) {
+    if (index >= 0 && index < currentValues.length) {
+      final now = DateTime.now();
+      
+      if (_lastWheelUpdateTime != null) {
+        final diff = now.difference(_lastWheelUpdateTime!).inMilliseconds;
+        if (diff > 0) {
+          double velocity = 1000 / diff; 
+          _wheelVelocities.add(velocity);
+          if (_wheelVelocities.length > 25) _wheelVelocities.removeAt(0);
+        }
+      }
+      
+      _lastWheelUpdateTime = now;
+      currentValues[index] = val;
+      _touchCount++;
+      _touchConfidence = 1.0;
+      _notify(); 
+    }
   }
 
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
@@ -97,7 +112,6 @@ class ClaController extends ChangeNotifier {
     _state = SecurityState.VALIDATING;
     _notify();
 
-    // Jalankan analisis
     final verdict = _engine.analyze(
       motionConfidence: _motionConfidence,
       touchConfidence: _touchConfidence,
@@ -105,26 +119,39 @@ class ClaController extends ChangeNotifier {
       touchCount: _touchCount,
     );
     
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 400));
 
-    print("🔐 PRIORITY CHECK: VERIFYING PASSCODE FIRST...");
-
-    // UTAMA: Cek Password DULU (Safe-Unlock Logic)
+    // ✅ Priority 1: Password Check
     if (_checkCode()) {
-      print("✅ PASSCODE MATCH. OVERRIDING SENSOR VERDICT.");
+      _recordBiometricProfile(verdict.allowed);
       _state = SecurityState.UNLOCKED;
       _notify();
       await _clearSecure();
       return; 
     }
 
-    print("❌ PASSCODE MISMATCH. CHECKING THREAT LEVEL...");
+    // ❌ Priority 2: Fail Handling (Safe Logic Applied)
+    await _fail(verdict.allowed ? "INCORRECT PASSCODE" : "INCORRECT PASSCODE + ${verdict.reason}");
+  }
 
-    if (!verdict.allowed) {
-      await _fail("CRITICAL: ${verdict.reason} + WRONG PIN");
-    } else {
-      await _fail("INCORRECT PIN");
+  void _recordBiometricProfile(bool sensorPassed) {
+    if (kDebugMode) {
+      double avgVelocity = _wheelVelocities.isEmpty 
+          ? 0 
+          : _wheelVelocities.reduce((a, b) => a + b) / _wheelVelocities.length;
+
+      print("\n--- 🛡️ [Z-KINETIC V5.4.1 AUDIT] ---");
+      print("Status: AUTHORIZED");
+      print("Sensor Match: ${sensorPassed ? 'YES' : 'NO'}");
+      print("Profile Metrics:");
+      print("  > Entropy:  ${_engine.lastEntropyScore.toStringAsFixed(4)}");
+      print("  > Variance: ${_engine.lastVarianceScore.toStringAsFixed(4)}");
+      print("  > Tremor:   ${_engine.lastTremorHz.toStringAsFixed(2)} Hz");
+      print("  > Wheel Spd: ${avgVelocity.toStringAsFixed(2)} p/s");
+      print("  > Tilt: X=${_lastTiltX.toStringAsFixed(2)}, Y=${_lastTiltY.toStringAsFixed(2)}");
+      print("---------------------------------\n");
     }
+    _wheelVelocities.clear();
   }
 
   bool _checkCode() {
@@ -139,13 +166,14 @@ class ClaController extends ChangeNotifier {
     _threatMessage = reason;
     await _saveSecure();
 
+    // ✅ FIXED: Only lock out based on attempts count.
     if (_failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
       _lockoutUntil = DateTime.now().add(config.jamCooldown);
       await _saveSecure();
     } else {
       _state = SecurityState.SOFT_LOCK;
-      Timer(const Duration(seconds: 1), () {
+      Timer(const Duration(seconds: 2), () {
         if (_state == SecurityState.SOFT_LOCK) {
           _state = SecurityState.LOCKED;
           _threatMessage = ""; 
@@ -165,14 +193,12 @@ class ClaController extends ChangeNotifier {
     if (hasListeners) notifyListeners();
   }
 
-  // ================= STORAGE & INIT =================
   static const _K_ATTEMPTS = 'cla_attempts';
   static const _K_LOCKOUT = 'cla_lockout';
 
   Future<void> _initSecureStorage() async {
     final a = await _storage.read(key: _K_ATTEMPTS);
     _failedAttempts = int.tryParse(a ?? '0') ?? 0;
-
     final t = await _storage.read(key: _K_LOCKOUT);
     if (t != null) {
       _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(int.parse(t));
@@ -188,9 +214,7 @@ class ClaController extends ChangeNotifier {
   Future<void> _saveSecure() async {
     await _storage.write(key: _K_ATTEMPTS, value: '$_failedAttempts');
     if (_lockoutUntil != null) {
-      await _storage.write(
-          key: _K_LOCKOUT,
-          value: _lockoutUntil!.millisecondsSinceEpoch.toString());
+      await _storage.write(key: _K_LOCKOUT, value: _lockoutUntil!.millisecondsSinceEpoch.toString());
     }
   }
 
@@ -201,22 +225,11 @@ class ClaController extends ChangeNotifier {
     _lockoutUntil = null;
   }
 
-  void updateWheel(int index, int val) {
-    if (index >= 0 && index < currentValues.length) {
-      currentValues[index] = val;
-      _notify(); 
-    }
-  }
-
   int getInitialValue(int index) {
-     if (index >= 0 && index < currentValues.length) {
-       return currentValues[index];
-     }
+     if (index >= 0 && index < currentValues.length) return currentValues[index];
      return 0;
   }
   
   int get remainingLockoutSeconds =>
-      _lockoutUntil == null
-          ? 0
-          : _lockoutUntil!.difference(DateTime.now()).inSeconds;
+      _lockoutUntil == null ? 0 : _lockoutUntil!.difference(DateTime.now()).inSeconds;
 }
