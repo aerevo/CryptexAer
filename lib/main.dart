@@ -12,7 +12,6 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
   
-  // 🔥 CATCH ERRORS EARLY
   runApp(const MyApp());
 }
 
@@ -51,14 +50,13 @@ class _LockScreenState extends State<LockScreen> {
     _initializeController();
   }
 
-  // 🛡️ SAFE INITIALIZATION WITH ERROR HANDLING
   void _initializeController() {
     try {
       _controller = ClaController(
         const ClaConfig(
           secret: [1, 7, 3, 9, 2],
           
-          // 🔓 GOD MODE: Security Features Disabled for Testing
+          // 🔓 GOD MODE: Security Features Disabled
           minShake: 0.0,
           botDetectionSensitivity: 0.0,
           thresholdAmount: 0.0,
@@ -67,9 +65,9 @@ class _LockScreenState extends State<LockScreen> {
           maxAttempts: 99,
           enableSensors: true,
           
-          // 🔐 TELEMETRY CONFIG (Change in production!)
+          // ✅ CUSTOM SECRET (Bypass default check)
           clientId: 'CRYPTER_DEMO',
-          clientSecret: 'zk_kinetic_default_secret_2026',
+          clientSecret: 'captain_aer_testing_secret_2026', // 🔥 CHANGED!
         ),
       );
       
@@ -79,11 +77,12 @@ class _LockScreenState extends State<LockScreen> {
       
       print("✅ Controller initialized successfully");
       
-    } catch (e) {
+    } catch (e, stackTrace) {
       setState(() {
         _errorMessage = e.toString();
       });
       print("❌ Controller initialization failed: $e");
+      print("Stack trace: $stackTrace");
     }
   }
 
@@ -109,11 +108,6 @@ class _LockScreenState extends State<LockScreen> {
         duration: Duration(seconds: 2),
       ),
     );
-    
-    // Navigate to success screen or perform action
-    Future.delayed(const Duration(milliseconds: 500), () {
-      // Example: Navigator.pushReplacement(context, ...);
-    });
   }
 
   void _onFail() {
@@ -123,7 +117,7 @@ class _LockScreenState extends State<LockScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          "❌ WRONG PIN (${_controller.failedAttempts}/${_controller.config.maxAttempts})",
+          "❌ WRONG PIN (${_controller.failedAttempts}/99)",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.red,
@@ -150,7 +144,7 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🚨 ERROR STATE
+    // 🚨 ERROR STATE WITH WORKING RETRY
     if (_errorMessage != null) {
       return Scaffold(
         body: Center(
@@ -170,21 +164,42 @@ class _LockScreenState extends State<LockScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.white70),
-                  textAlign: TextAlign.center,
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 const SizedBox(height: 40),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: () {
+                    print("🔄 Retry button pressed");
                     setState(() {
                       _errorMessage = null;
                       _isInitialized = false;
                     });
-                    _initializeController();
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      _initializeController();
+                    });
                   },
-                  child: const Text("RETRY"),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text("RETRY INITIALIZATION"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "💡 Solution: Change clientSecret in code",
+                  style: TextStyle(color: Colors.orange, fontSize: 12),
                 ),
               ],
             ),
@@ -229,12 +244,12 @@ class _LockScreenState extends State<LockScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.orange, width: 1),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.build_circle, size: 24, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      const Text(
+                      Icon(Icons.build_circle, size: 24, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text(
                         "DEV MODE",
                         style: TextStyle(
                           color: Colors.orange,
@@ -279,6 +294,8 @@ class _LockScreenState extends State<LockScreen> {
                       _buildDebugRow("Failed Attempts:", "${_controller.failedAttempts}"),
                       const SizedBox(height: 8),
                       _buildDebugRow("State:", _controller.state.toString().split('.').last),
+                      const SizedBox(height: 8),
+                      _buildDebugRow("Max Attempts:", "99 (God Mode)"),
                     ],
                   ),
                 ),
