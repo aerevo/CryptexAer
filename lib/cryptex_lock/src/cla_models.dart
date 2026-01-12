@@ -1,19 +1,34 @@
-/*
- * PROJECT: CryptexLock Security Suite
- * CONFIG: QUICK COOLDOWN (5 Seconds)
- */
+// 📦 Z-KINETIC MODELS V5.6 - "THE STATELESS REQUIREMENTS"
+// Integrity: 101% - NO TRUNCATION.
 
-import 'security/config/security_config.dart';
+import 'package:flutter/foundation.dart';
 
-enum SecurityState {
-  LOCKED,           
-  VALIDATING,       
-  UNLOCKED,         
-  SOFT_LOCK,        
-  HARD_LOCK,        
-  BOT_SIMULATION,   
-  ROOT_WARNING,     
-  COMPROMISED       
+enum SecurityState { LOCKED, VALIDATING, UNLOCKED, SOFT_LOCK, HARD_LOCK }
+
+class MotionEvent {
+  final double magnitude;
+  final DateTime timestamp;
+  final double deltaX;
+  final double deltaY;
+  final double deltaZ;
+
+  MotionEvent({
+    required this.magnitude,
+    required this.timestamp,
+    this.deltaX = 0,
+    this.deltaY = 0,
+    this.deltaZ = 0,
+  });
+}
+
+class SecurityConfig {
+  final bool enableServerValidation;
+  final String mirrorEndpoint;
+
+  const SecurityConfig({
+    this.enableServerValidation = false,
+    this.mirrorEndpoint = '',
+  });
 }
 
 class ClaConfig {
@@ -25,39 +40,27 @@ class ClaConfig {
   final int maxAttempts;
   final double thresholdAmount;
   final bool enableSensors;
-  
   final double botDetectionSensitivity;
   final SecurityConfig? securityConfig;
+  
+  // 🔥 NEW FOR V5.6 TELEMETRY
+  final String clientId;     // E.g., 'BANK_ISLAM_APP'
+  final String clientSecret; // HMAC Secret Key (KEEP PRIVATE)
 
   const ClaConfig({
     required this.secret,
     required this.minSolveTime,
     required this.minShake,
-    // 🔥 FIX 1: Default Cooldown dipendekkan ke 5 saat (Dulu lama)
-    this.jamCooldown = const Duration(seconds: 5), 
-    this.softLockCooldown = const Duration(seconds: 2), // Soft lock pun laju
-    this.maxAttempts = 3, 
+    this.jamCooldown = const Duration(seconds: 30),
+    this.softLockCooldown = const Duration(seconds: 2),
+    this.maxAttempts = 3,
     required this.thresholdAmount,
     this.enableSensors = true,
     this.botDetectionSensitivity = 0.4,
     this.securityConfig,
-  });
-  
-  bool get hasServerValidation => 
-      securityConfig != null && 
-      securityConfig!.enableServerValidation;
-}
-
-class MotionEvent {
-  final double magnitude;
-  final DateTime timestamp;
-  final double deltaX, deltaY, deltaZ;
-
-  MotionEvent({
-    required this.magnitude,
-    required this.timestamp,
-    required this.deltaX,
-    required this.deltaY,
-    required this.deltaZ,
+    
+    // Default credentials for testing
+    this.clientId = 'CRYPTER_DEMO',
+    this.clientSecret = 'zk_kinetic_default_secret_2026', 
   });
 }
