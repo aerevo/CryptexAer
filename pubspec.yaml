@@ -9,12 +9,17 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
+  
+  # 🛡️ SENSOR & STORAGE (CORE)
   sensors_plus: ^5.0.0
   shared_preferences: ^2.2.0
-  flutter_jailbreak_detection: ^1.1.0
   flutter_secure_storage: ^9.0.0
   
-  # ✨ TAMBAH 3 DEPENDENCIES NI:
+  # 🔒 SECURITY & INTEGRITY
+  flutter_jailbreak_detection: ^1.1.0
+  
+  # ✨ NEW: CRYPTOGRAPHIC & TELEMETRY SUITE (V5.6)
+  # Diperlukan untuk HMAC Signing, Ephemeral ID, dan Reporting
   crypto: ^3.0.3
   device_info_plus: ^9.1.1
   http: ^1.1.0
@@ -26,7 +31,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-
-
-
