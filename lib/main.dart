@@ -59,11 +59,11 @@ class _LockScreenState extends State<LockScreen> {
           // 🎚️ BALANCED MODE: Security Enabled but Reasonable
           
           // 📱 MOTION DETECTION (Gentle)
-          minShake: 0.8,  // ✅ Require SOME movement (ringan je)
+          minShake: 1.2,  // ✅ Require SOME movement (ringan je)
           // Tips: Goyangkan phone sikit masa unlock (natural motion)
           
           // 🤖 BOT DETECTION (Low Sensitivity)
-          botDetectionSensitivity: 0.2,  // ✅ Detect extreme bot behavior only
+          botDetectionSensitivity: 0.4,  // ✅ Detect extreme bot behavior only
           // Tips: Touch screen naturally, don't rush
           
           // ⚖️ CONFIDENCE THRESHOLD (Relaxed)
@@ -71,7 +71,7 @@ class _LockScreenState extends State<LockScreen> {
           // Tips: Just interact normally
           
           // ⏱️ SOLVE TIME (Moderate)
-          minSolveTime: Duration(seconds: 1),  // ✅ At least 1 second
+          minSolveTime: Duration(seconds: 2),  // ✅ At least 1 second
           // Tips: Don't instant submit (too fast = suspicious)
           
           // 🔒 LOCKOUT POLICY (Fair)
@@ -399,3 +399,4 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 }
+
