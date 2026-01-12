@@ -63,7 +63,7 @@ class _LockScreenState extends State<LockScreen> {
           // Tips: Goyangkan phone sikit masa unlock (natural motion)
           
           // 🤖 BOT DETECTION (Low Sensitivity)
-          botDetectionSensitivity: 0.4,  // ✅ Detect extreme bot behavior only
+          botDetectionSensitivity: 0.6,  // ✅ Detect extreme bot behavior only
           // Tips: Touch screen naturally, don't rush
           
           // ⚖️ CONFIDENCE THRESHOLD (Relaxed)
@@ -399,4 +399,5 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 }
+
 
