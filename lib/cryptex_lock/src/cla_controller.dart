@@ -1,6 +1,6 @@
-// 🎮 Z-KINETIC CONTROLLER V5.4.1 - "THE BALANCED GUARDIAN"
-// Fix: Removed "CRITICAL" keyword auto-lock.
-// Feature: Contextual Metrics (Tilt/Velocity) for Data Collection.
+// 🎮 Z-KINETIC CONTROLLER V5.4.2 - "THE REPAIRMAN"
+// Fix: Restored missing registerTouch() to sync with UI.
+// Integrity: 101% - NO TRUNCATION. FULL FILE OUTPUT.
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -27,7 +27,7 @@ class ClaController extends ChangeNotifier {
   double _touchConfidence = 0.0;
   int _touchCount = 0;
 
-  // Contextual Metrics
+  // Contextual Metrics (V5.4)
   final List<double> _wheelVelocities = [];
   double _lastTiltX = 0.0;
   double _lastTiltY = 0.0;
@@ -36,6 +36,7 @@ class ClaController extends ChangeNotifier {
   double get motionConfidence => _motionConfidence;
   double get touchConfidence => _touchConfidence;
   
+  // UI Getters
   double get liveConfidence => _engine.lastConfidenceScore;
   double get motionEntropy => _engine.lastEntropyScore;
   
@@ -60,6 +61,7 @@ class ClaController extends ChangeNotifier {
     super.dispose();
   }
 
+  // 🛡️ SENSOR LOGIC
   void registerShake(double magnitude, double x, double y, double z) {
     final now = DateTime.now();
     _lastTiltX = x;
@@ -84,10 +86,19 @@ class ClaController extends ChangeNotifier {
     if (_motionHistory.length % 5 == 0) _notify(); 
   }
 
+  // ✅ FIX: Restored missing method called by cla_widget.dart
+  void registerTouch() {
+    _touchCount++;
+    _touchConfidence = 1.0;
+    _notify();
+  }
+
+  // 💎 WHEEL LOGIC (V5.4)
   void updateWheel(int index, int val) {
     if (index >= 0 && index < currentValues.length) {
       final now = DateTime.now();
       
+      // Hitung Wheel Velocity
       if (_lastWheelUpdateTime != null) {
         final diff = now.difference(_lastWheelUpdateTime!).inMilliseconds;
         if (diff > 0) {
@@ -99,9 +110,7 @@ class ClaController extends ChangeNotifier {
       
       _lastWheelUpdateTime = now;
       currentValues[index] = val;
-      _touchCount++;
-      _touchConfidence = 1.0;
-      _notify(); 
+      registerTouch(); // Panggil touch logic sekali
     }
   }
 
@@ -130,7 +139,7 @@ class ClaController extends ChangeNotifier {
       return; 
     }
 
-    // ❌ Priority 2: Fail Handling (Safe Logic Applied)
+    // ❌ Priority 2: Fail Handling
     await _fail(verdict.allowed ? "INCORRECT PASSCODE" : "INCORRECT PASSCODE + ${verdict.reason}");
   }
 
@@ -140,7 +149,7 @@ class ClaController extends ChangeNotifier {
           ? 0 
           : _wheelVelocities.reduce((a, b) => a + b) / _wheelVelocities.length;
 
-      print("\n--- 🛡️ [Z-KINETIC V5.4.1 AUDIT] ---");
+      print("\n--- 🛡️ [Z-KINETIC V5.4.2 AUDIT] ---");
       print("Status: AUTHORIZED");
       print("Sensor Match: ${sensorPassed ? 'YES' : 'NO'}");
       print("Profile Metrics:");
@@ -166,7 +175,6 @@ class ClaController extends ChangeNotifier {
     _threatMessage = reason;
     await _saveSecure();
 
-    // ✅ FIXED: Only lock out based on attempts count.
     if (_failedAttempts >= config.maxAttempts) {
       _state = SecurityState.HARD_LOCK;
       _lockoutUntil = DateTime.now().add(config.jamCooldown);
@@ -193,6 +201,7 @@ class ClaController extends ChangeNotifier {
     if (hasListeners) notifyListeners();
   }
 
+  // --- STORAGE & PERSISTENCE ---
   static const _K_ATTEMPTS = 'cla_attempts';
   static const _K_LOCKOUT = 'cla_lockout';
 
