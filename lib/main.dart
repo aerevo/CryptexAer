@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Z-KINETIC BALANCED',
+      title: 'Z-KINETIC REALISTIC',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF050505),
         primaryColor: Colors.blueAccent,
@@ -56,33 +56,33 @@ class _LockScreenState extends State<LockScreen> {
         const ClaConfig(
           secret: [1, 7, 3, 9, 2],
           
-          // 🎚️ BALANCED MODE: Security Enabled but Reasonable
+          // 🎯 REALISTIC MODE: Security ON + Human-Friendly
           
-          // 📱 MOTION DETECTION (Gentle)
-          minShake: 1.2,  // ✅ Require SOME movement (ringan je)
-          // Tips: Goyangkan phone sikit masa unlock (natural motion)
+          // 📱 MOTION DETECTION (Light Touch)
+          minShake: 0.4,  // ✅ Very light - natural phone movement
+          // Tips: Angkat phone dari meja = cukup
           
-          // 🤖 BOT DETECTION (Low Sensitivity)
-          botDetectionSensitivity: 0.6,  // ✅ Detect extreme bot behavior only
-          // Tips: Touch screen naturally, don't rush
+          // 🤖 BOT DETECTION (Balanced)
+          botDetectionSensitivity: 0.25,  // ✅ Catches bots, allows humans
+          // Tips: Just interact naturally - no special effort needed
           
-          // ⚖️ CONFIDENCE THRESHOLD (Relaxed)
-          thresholdAmount: 0.3,  // ✅ Low bar (easy to pass)
-          // Tips: Just interact normally
+          // ⚖️ CONFIDENCE THRESHOLD (Forgiving)
+          thresholdAmount: 0.25,  // ✅ Low requirement
+          // Tips: Normal behavior passes easily
           
-          // ⏱️ SOLVE TIME (Moderate)
-          minSolveTime: Duration(seconds: 2),  // ✅ At least 1 second
-          // Tips: Don't instant submit (too fast = suspicious)
+          // ⏱️ SOLVE TIME (Realistic)
+          minSolveTime: Duration(milliseconds: 600),  // ✅ 0.6s minimum
+          // Tips: Don't instant submit - pause sikit je
           
           // 🔒 LOCKOUT POLICY (Fair)
-          maxAttempts: 5,  // ✅ 5 chances (reasonable)
+          maxAttempts: 5,  // ✅ 5 chances
           jamCooldown: Duration(seconds: 10),  // ✅ 10 sec cooldown
           
           // 🔧 SENSOR (Always On)
           enableSensors: true,
           
           // 🔐 TELEMETRY
-          clientId: 'CRYPTER_BALANCED',
+          clientId: 'CRYPTER_REALISTIC',
           clientSecret: 'captain_aer_testing_secret_2026',
         ),
       );
@@ -91,7 +91,7 @@ class _LockScreenState extends State<LockScreen> {
         _isInitialized = true;
       });
       
-      print("✅ Controller initialized (BALANCED MODE)");
+      print("✅ Controller initialized (REALISTIC MODE)");
       
     } catch (e, stackTrace) {
       setState(() {
@@ -128,16 +128,28 @@ class _LockScreenState extends State<LockScreen> {
 
   void _onFail() {
     print("❌ PASSWORD INCORRECT!");
+    print("   Threat: ${_controller.threatMessage}");
     HapticFeedback.heavyImpact();
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          "❌ WRONG PIN (${_controller.failedAttempts}/5)",
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "❌ WRONG PIN (${_controller.failedAttempts}/5)",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            if (_controller.threatMessage.isNotEmpty)
+              Text(
+                _controller.threatMessage,
+                style: const TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+          ],
         ),
         backgroundColor: Colors.red,
-        duration: const Duration(seconds: 1),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -155,7 +167,7 @@ class _LockScreenState extends State<LockScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         backgroundColor: Colors.deepOrange,
-        duration: Duration(seconds: 3),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -247,23 +259,23 @@ class _LockScreenState extends State<LockScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 🎚️ BALANCED MODE BANNER
+                // 🎯 REALISTIC MODE BANNER
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.2),
+                    color: Colors.green.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blueAccent, width: 1),
+                    border: Border.all(color: Colors.greenAccent, width: 1),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.shield_outlined, size: 24, color: Colors.blueAccent),
+                      Icon(Icons.verified_user, size: 24, color: Colors.greenAccent),
                       SizedBox(width: 8),
                       Text(
-                        "BALANCED SECURITY",
+                        "REALISTIC SECURITY",
                         style: TextStyle(
-                          color: Colors.blueAccent,
+                          color: Colors.greenAccent,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 2,
                         ),
@@ -275,7 +287,7 @@ class _LockScreenState extends State<LockScreen> {
                 const SizedBox(height: 10),
                 
                 const Text(
-                  "Human-Friendly Protection Enabled",
+                  "Smart Protection • Easy Access",
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 
@@ -297,24 +309,24 @@ class _LockScreenState extends State<LockScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
+                        Colors.green.withOpacity(0.1),
                         Colors.blue.withOpacity(0.1),
-                        Colors.purple.withOpacity(0.1),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                    border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(Icons.lightbulb_outline, color: Colors.yellow, size: 20),
-                          const SizedBox(width: 8),
+                          Icon(Icons.tips_and_updates, color: Colors.yellow, size: 20),
+                          SizedBox(width: 8),
                           Text(
-                            "HOW TO UNLOCK SUCCESSFULLY",
+                            "UNLOCK NATURALLY",
                             style: TextStyle(
-                              color: Colors.blueAccent,
+                              color: Colors.greenAccent,
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -322,34 +334,69 @@ class _LockScreenState extends State<LockScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _buildTip("1️⃣", "Set PIN to: 1-7-3-9-2"),
-                      _buildTip("2️⃣", "Goyangkan phone SIKIT (natural motion)"),
-                      _buildTip("3️⃣", "Don't rush - take at least 1-2 seconds"),
-                      _buildTip("4️⃣", "Touch screen normally (like human)"),
+                      _buildTip("🎯", "Target: 1-7-3-9-2"),
+                      _buildTip("📱", "Angkat phone naturally (motion auto-detect)"),
+                      _buildTip("⏱️", "Take ~1 second to set wheels"),
+                      _buildTip("✨", "That's it! System detects human behavior"),
                     ],
                   ),
                 ),
                 
                 const SizedBox(height: 20),
                 
-                // 📊 DEBUG INFO
+                // 📊 DEBUG INFO (Enhanced)
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _getHealthColor().withOpacity(0.3),
+                      width: 2,
+                    ),
                   ),
                   child: Column(
                     children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "SECURITY STATUS",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _getHealthColor().withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              _getHealthStatus(),
+                              style: TextStyle(
+                                color: _getHealthColor(),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 16, color: Colors.white24),
                       _buildDebugRow("Target PIN:", "1-7-3-9-2"),
                       const SizedBox(height: 8),
                       _buildDebugRow("Attempts:", "${_controller.failedAttempts}/5"),
                       const SizedBox(height: 8),
                       _buildDebugRow("State:", _controller.state.toString().split('.').last),
                       const SizedBox(height: 8),
-                      _buildDebugRow("Motion:", "${(_controller.motionConfidence * 100).toStringAsFixed(0)}%"),
+                      _buildDebugRowWithBar("Motion:", _controller.motionConfidence),
                       const SizedBox(height: 8),
-                      _buildDebugRow("Touch:", "${(_controller.touchConfidence * 100).toStringAsFixed(0)}%"),
+                      _buildDebugRowWithBar("Touch:", _controller.touchConfidence),
+                      const SizedBox(height: 8),
+                      _buildDebugRowWithBar("Confidence:", _controller.liveConfidence),
                     ],
                   ),
                 ),
@@ -398,6 +445,62 @@ class _LockScreenState extends State<LockScreen> {
       ],
     );
   }
+
+  Widget _buildDebugRowWithBar(String label, double value) {
+    final percentage = (value * 100).toStringAsFixed(0);
+    final color = value > 0.5 ? Colors.green : (value > 0.2 ? Colors.orange : Colors.red);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white54, fontSize: 14),
+            ),
+            Text(
+              "$percentage%",
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: value.clamp(0.0, 1.0),
+            backgroundColor: Colors.white10,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 6,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getHealthColor() {
+    final motion = _controller.motionConfidence;
+    final touch = _controller.touchConfidence;
+    final avg = (motion + touch) / 2;
+    
+    if (avg > 0.5) return Colors.green;
+    if (avg > 0.2) return Colors.orange;
+    return Colors.red;
+  }
+
+  String _getHealthStatus() {
+    final motion = _controller.motionConfidence;
+    final touch = _controller.touchConfidence;
+    final avg = (motion + touch) / 2;
+    
+    if (avg > 0.5) return "HEALTHY";
+    if (avg > 0.2) return "MODERATE";
+    return "LOW";
+  }
 }
-
-
