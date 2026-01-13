@@ -287,46 +287,34 @@ class _LockScreenState extends State<LockScreen> {
                 const SizedBox(height: 10),
                 
                 const Text(
-                  "Smart Protection • Easy Access",
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                  "Your security is being enhanced",
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
                 
                 const SizedBox(height: 20),
                 
-                // 🔥 WYSIWYS - Transaction Verification Display
+                // 🔥 SIMPLE VERIFICATION NOTICE
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.amber.withOpacity(0.1),
-                        Colors.orange.withOpacity(0.1),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.withOpacity(0.3), width: 2),
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.amber, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            "VERIFY WHAT YOU'RE UNLOCKING",
-                            style: TextStyle(
-                              color: Colors.amber,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
+                      Icon(Icons.verified_user, color: Colors.blueAccent, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "You are unlocking: Demo Mode\nCancel if this doesn't look right",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            height: 1.4,
                           ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      _buildVerifyRow("Action:", "Unlock App Demo"),
-                      _buildVerifyRow("Security Level:", "Realistic Mode"),
-                      _buildVerifyRow("Device:", "Your Current Device"),
                     ],
                   ),
                 ),
@@ -384,35 +372,45 @@ class _LockScreenState extends State<LockScreen> {
                 
                 const SizedBox(height: 20),
                 
-                // 📊 DEBUG INFO (Enhanced)
+                // 📊 DEBUG INFO (MATRIX STYLE - Enhanced)
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.black.withOpacity(0.6),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: _getHealthColor().withOpacity(0.3),
+                      color: _getHealthColor(),
                       width: 2,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _getHealthColor().withOpacity(0.3),
+                        blurRadius: 12,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             "SECURITY STATUS",
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: _getHealthColor(),
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                              fontFamily: 'monospace',
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: _getHealthColor().withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: _getHealthColor(), width: 1),
                             ),
                             child: Text(
                               _getHealthStatus(),
@@ -420,23 +418,27 @@ class _LockScreenState extends State<LockScreen> {
                                 color: _getHealthColor(),
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const Divider(height: 16, color: Colors.white24),
-                      _buildDebugRow("Target PIN:", "1-7-3-9-2"),
+                      Divider(height: 16, color: _getHealthColor().withOpacity(0.3)),
+                      
+                      _buildMatrixDebugRow("TARGET:", "1-7-3-9-2"),
                       const SizedBox(height: 8),
-                      _buildDebugRow("Attempts:", "${_controller.failedAttempts}/5"),
+                      _buildMatrixDebugRow("ATTEMPTS:", "${_controller.failedAttempts}/5"),
                       const SizedBox(height: 8),
-                      _buildDebugRow("State:", _controller.state.toString().split('.').last),
-                      const SizedBox(height: 8),
-                      _buildDebugRowWithBar("Motion:", _controller.motionConfidence),
-                      const SizedBox(height: 8),
-                      _buildDebugRowWithBar("Touch:", _controller.touchConfidence),
-                      const SizedBox(height: 8),
-                      _buildDebugRowWithBar("Confidence:", _controller.liveConfidence),
+                      _buildMatrixDebugRow("STATE:", _controller.state.toString().split('.').last),
+                      const SizedBox(height: 12),
+                      
+                      // MATRIX STYLE PROGRESS BARS
+                      _buildMatrixBar("MOTION", _controller.motionConfidence),
+                      const SizedBox(height: 10),
+                      _buildMatrixBar("PATTERN", _controller.liveConfidence),
+                      const SizedBox(height: 10),
+                      _buildMatrixBar("TOUCH", _controller.touchConfidence),
                     ],
                   ),
                 ),
@@ -486,27 +488,144 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 
-  Widget _buildVerifyRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white60, fontSize: 13),
+  // 🎬 MATRIX STYLE DEBUG ROW (Green monospace text)
+  Widget _buildMatrixDebugRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: const Color(0xFF00FF00).withOpacity(0.6),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            fontFamily: 'monospace',
+            letterSpacing: 1,
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Color(0xFF00FF00),
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'monospace',
+            letterSpacing: 1,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 🎬 MATRIX STYLE ANIMATED BAR (Red → Yellow → Green)
+  Widget _buildMatrixBar(String label, double value) {
+    final percentage = (value * 100).toStringAsFixed(0);
+    final color = _getMatrixColor(value);
+    final status = _getMatrixStatus(value);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+                letterSpacing: 1.5,
+              ),
+            ),
+            Row(
+              children: [
+                Text(
+                  "$percentage%",
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  status,
+                  style: TextStyle(
+                    color: color.withOpacity(0.7),
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: color.withOpacity(0.3), width: 1),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: Stack(
+              children: [
+                // Background grid effect
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withOpacity(0.8),
+                        Colors.black.withOpacity(0.4),
+                      ],
+                    ),
+                  ),
+                ),
+                // Progress bar with glow
+                FractionallySizedBox(
+                  widthFactor: value.clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          color,
+                          color.withOpacity(0.7),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withOpacity(0.5),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
+  }
+
+  // 🎨 Matrix color transitions: Red → Yellow → Green
+  Color _getMatrixColor(double value) {
+    if (value >= 0.6) return const Color(0xFF00FF00); // Matrix Green
+    if (value >= 0.3) return const Color(0xFFFFFF00); // Yellow
+    return const Color(0xFFFF0000); // Red
+  }
+
+  String _getMatrixStatus(double value) {
+    if (value >= 0.6) return "[OK]";
+    if (value >= 0.3) return "[--]";
+    return "[!!]";
   }
 
   Widget _buildDebugRowWithBar(String label, double value) {
