@@ -259,25 +259,33 @@ class _LockScreenState extends State<LockScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 🎯 REALISTIC MODE BANNER
+                // 🎚️ REALISTIC MODE BANNER (MATRIX GREEN)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
+                    color: const Color(0xFF00FF00).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.greenAccent, width: 1),
+                    border: Border.all(color: const Color(0xFF00FF00), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00FF00).withOpacity(0.3),
+                        blurRadius: 12,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.verified_user, size: 24, color: Colors.greenAccent),
+                      Icon(Icons.verified_user, size: 24, color: Color(0xFF00FF00)),
                       SizedBox(width: 8),
                       Text(
-                        "REALISTIC SECURITY",
+                        "BIOMETRIC ACTIVE",
                         style: TextStyle(
-                          color: Colors.greenAccent,
+                          color: Color(0xFF00FF00),
                           fontWeight: FontWeight.bold,
                           letterSpacing: 2,
+                          fontFamily: 'monospace',
                         ),
                       ),
                     ],
@@ -287,33 +295,145 @@ class _LockScreenState extends State<LockScreen> {
                 const SizedBox(height: 10),
                 
                 const Text(
-                  "Your security is being enhanced",
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                  "Enhanced biometric authentication in progress",
+                  style: TextStyle(
+                    color: Color(0xFF00FF00),
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
                 ),
                 
                 const SizedBox(height: 20),
                 
-                // 🔥 SIMPLE VERIFICATION NOTICE
+                // 🚨 POWERFUL ALERT BOX
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    color: Colors.black.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.5),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.verified_user, color: Colors.blueAccent, size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          "You are unlocking: Demo Mode\nCancel if this doesn't look right",
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            height: 1.4,
+                      Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
+                          const SizedBox(width: 10),
+                          const Text(
+                            "SECURITY VERIFICATION",
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              letterSpacing: 1.5,
+                              fontFamily: 'monospace',
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.withOpacity(0.3)),
                         ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "YOU ARE TRANSFERRING:",
+                              style: TextStyle(
+                                color: Colors.red.shade300,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "RM 50,000.00",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Text(
+                                  "TO ACCOUNT: ",
+                                  style: TextStyle(
+                                    color: Colors.red.shade300,
+                                    fontSize: 11,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                                Text(
+                                  "1234-5678-9012",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  "RECIPIENT: ",
+                                  style: TextStyle(
+                                    color: Colors.red.shade300,
+                                    fontSize: 11,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                                Text(
+                                  "Ali bin Ahmad",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.orange, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Cancel immediately if details don't match",
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
