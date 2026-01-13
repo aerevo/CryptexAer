@@ -291,7 +291,47 @@ class _LockScreenState extends State<LockScreen> {
                   style: TextStyle(color: Colors.white54, fontSize: 12),
                 ),
                 
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
+                
+                // 🔥 WYSIWYS - Transaction Verification Display
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.amber.withOpacity(0.1),
+                        Colors.orange.withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withOpacity(0.3), width: 2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "VERIFY WHAT YOU'RE UNLOCKING",
+                            style: TextStyle(
+                              color: Colors.amber,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildVerifyRow("Action:", "Unlock App Demo"),
+                      _buildVerifyRow("Security Level:", "Realistic Mode"),
+                      _buildVerifyRow("Device:", "Your Current Device"),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
                 
                 // 🎮 CRYPTEX LOCK WIDGET
                 CryptexLock(
@@ -443,6 +483,29 @@ class _LockScreenState extends State<LockScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildVerifyRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
