@@ -1,12 +1,11 @@
-// 🎮 Z-KINETIC CONTROLLER V5.6.1 - "THE PRODUCTION SENTINEL"
-// Audit Version: APPROVED (A-)
-// Enhancements: Timeout Protection, Error Handling, Secure ID Rotation.
-// Integrity: 101% - NO TRUNCATION.
+// 🎮 Z-KINETIC CONTROLLER V5.7 - "THE ENFORCER"
+// FIX: Security Engine now BLOCKS before password check
+// Audit Version: CRITICAL FIX
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:io'; // Tambah untuk SocketException
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart'; 
@@ -48,7 +47,6 @@ class ClaController extends ChangeNotifier {
     _engine = SecurityEngine(const SecurityEngineConfig());
     _storage = const FlutterSecureStorage();
 
-    // ⚠️ Security Assert: Ensure secret is changed in Production
     if (!kDebugMode && config.clientSecret == 'zk_kinetic_default_secret_2026') {
       throw Exception("CRITICAL: Default Client Secret detected in Release Build!");
     }
@@ -111,7 +109,7 @@ class ClaController extends ChangeNotifier {
     }
   }
 
-  // --- 🔐 VALIDATION & TELEMETRY ---
+  // --- 🔐 VALIDATION & TELEMETRY (FIXED!) ---
 
   Future<void> validateAttempt({required bool hasPhysicalMovement}) async {
     if (_state == SecurityState.HARD_LOCK || _state == SecurityState.VALIDATING) return;
@@ -119,6 +117,7 @@ class ClaController extends ChangeNotifier {
     _state = SecurityState.VALIDATING;
     _notify();
 
+    // 🔥 STEP 1: CHECK BEHAVIOR FIRST (CRITICAL FIX!)
     final verdict = _engine.analyze(
       motionConfidence: _motionConfidence,
       touchConfidence: _touchConfidence,
@@ -128,20 +127,31 @@ class ClaController extends ChangeNotifier {
     
     await Future.delayed(const Duration(milliseconds: 300));
 
+    // 🚨 STEP 2: BLOCK IF SUSPICIOUS BEHAVIOR (BEFORE PASSWORD CHECK!)
+    if (!verdict.allowed) {
+      if (kDebugMode) print("🚫 BLOCKED: ${verdict.reason}");
+      
+      // Report threat to server
+      if (verdict.level == ThreatLevel.CRITICAL || verdict.level == ThreatLevel.HIGH) {
+        _reportThreatToServer(verdict);
+      }
+      
+      await _fail("BLOCKED: ${verdict.reason}");
+      return;
+    }
+
+    // ✅ STEP 3: NOW CHECK PASSWORD (Only if behavior passed)
     if (_checkCode()) {
+      if (kDebugMode) print("✅ PASSWORD CORRECT + BEHAVIOR VALID");
       _state = SecurityState.UNLOCKED;
       _notify();
       await _clearSecure();
       return; 
     }
 
-    // 📡 REPORTING: Triggered on High Threats
-    if (verdict.level == ThreatLevel.CRITICAL || verdict.level == ThreatLevel.HIGH) {
-      // Kita panggil tanpa 'await' supaya tak melambatkan UI
-      _reportThreatToServer(verdict);
-    }
-
-    await _fail(verdict.allowed ? "INCORRECT PIN" : "INCORRECT PIN + ${verdict.reason}");
+    // ❌ STEP 4: Wrong password (but behavior was OK)
+    if (kDebugMode) print("❌ PASSWORD WRONG (but behavior was acceptable)");
+    await _fail("INCORRECT PIN");
   }
 
   Future<void> _reportThreatToServer(ThreatVerdict verdict) async {
@@ -161,12 +171,11 @@ class ClaController extends ChangeNotifier {
         'signature': _signReport(report),
       };
 
-      // 🚀 PRODUCTION READY HTTP POST
       final response = await http.post(
-        Uri.parse('https://api.cryptexaer.com/v1/telemetry'), // Tukar ke URL server Kapten
+        Uri.parse('https://api.cryptexaer.com/v1/telemetry'),
         body: jsonEncode(payload),
         headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 5)); // ✅ FIX: Timeout Protection
+      ).timeout(const Duration(seconds: 5));
 
       if (kDebugMode) print("📡 INTEL SENT. Server Status: ${response.statusCode}");
       
