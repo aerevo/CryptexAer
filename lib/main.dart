@@ -1,22 +1,20 @@
-// 📱 MAIN ENTRY POINT - "FULL FLOW: FORM -> WYSIWYS -> MATRIX LOCK"
-// Status: ULTIMATE INTEGRATION
-// Features: Transfer Form + Hacker Simulation + Neon Matrix Green Numbers
+// 🛡️ Z-KINETIC HYBRID - CYAN UI + MATRIX NUMBERS
+// Status: FINAL VISUAL FIX
+// Features: UI Cyan (Safe) + Data Numbers Matrix Green (John Wick Style)
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'cryptex_lock/src/cla_widget.dart';
 import 'cryptex_lock/src/cla_controller.dart';
 import 'cryptex_lock/src/cla_models.dart';
+import 'dart:async'; // Untuk simulasi koordinat "bermain-main"
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Kunci orientasi ke Portrait sahaja
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
   runApp(const MyApp());
 }
 
@@ -27,92 +25,86 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Z-KINETIC FINAL',
+      title: 'Z-KINETIC HYBRID',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF050505),
-        primaryColor: Colors.blueAccent,
+        // 🔥 UI UTAMA KEKAL CYAN (BIRU NEON)
+        primaryColor: Colors.cyanAccent,
+        colorScheme: const ColorScheme.dark(
+          primary: Colors.cyanAccent,
+          secondary: Colors.cyanAccent,
+        ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.black,
           elevation: 0,
         ),
       ),
-      // 🔥 Mula dari Page Transfer (Isi Borang)
-      home: const TransferPage(),
+      home: const SystemSelectorPage(),
     );
   }
 }
 
 // ==========================================
-// 1️⃣ PAGE PERTAMA: TRANSFER FORM (INPUT)
+// 1️⃣ PAGE PEMILIHAN SISTEM
 // ==========================================
-class TransferPage extends StatefulWidget {
-  const TransferPage({super.key});
+class SystemSelectorPage extends StatefulWidget {
+  const SystemSelectorPage({super.key});
 
   @override
-  State<TransferPage> createState() => _TransferPageState();
+  State<SystemSelectorPage> createState() => _SystemSelectorPageState();
 }
 
-class _TransferPageState extends State<TransferPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController(text: "5000.00");
-  final _accountController = TextEditingController(text: "1234-5678-9012");
-  final _nameController = TextEditingController(text: "ALI BIN AHMAD");
+class _SystemSelectorPageState extends State<SystemSelectorPage> {
+  String _selectedSystem = "DEFENSE_GRID_ALPHA"; 
+  
+  final Map<String, IconData> _systemIcons = {
+    "DEFENSE_GRID_ALPHA": Icons.shield,
+    "CRYPTO_COLD_STORAGE": Icons.currency_bitcoin,
+    "SOCIAL_ADMIN_PANEL": Icons.public,
+    "CLONE_PROTOCOL_V2": Icons.fingerprint,
+  };
 
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _accountController.dispose();
-    _nameController.dispose();
-    super.dispose();
-  }
+  void _initiateSequence({bool isCompromised = false}) {
+    final String targetSystem = isCompromised ? "UNKNOWN_SERVER_RUSSIA" : _selectedSystem;
+    final String securityLevel = isCompromised ? "⚠️ CRITICAL RISK" : "LEVEL 5 (MAX)";
 
-  void _proceedToVerification({bool isHacked = false}) {
-    if (_formKey.currentState!.validate()) {
-      
-      // Jika Mode Hacker, kita ubah data secara senyap! 😈
-      final String displayAmount = isHacked ? "RM 99,999.00" : "RM ${_amountController.text}";
-      final String displayName = isHacked ? "SCAMMER ACCOUNT" : _nameController.text.toUpperCase();
-      final String transactionType = isHacked ? "⚠️ INTERCEPTED" : "TRANSFER FUNDS";
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => LockScreen(
-            transactionType: transactionType,
-            amount: displayAmount,
-            recipientName: displayName,
-            accountNumber: _accountController.text,
-            onUnlockSuccess: () {
-              _showSuccessDialog(displayAmount, displayName);
-            },
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LockScreen(
+          systemName: targetSystem,
+          securityLevel: securityLevel,
+          isCompromised: isCompromised,
+          onUnlockSuccess: () {
+            _showAccessGranted(targetSystem);
+          },
         ),
-      );
-    }
+      ),
+    );
   }
 
-  void _showSuccessDialog(String amount, String name) {
+  void _showAccessGranted(String system) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.black,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.green)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.cyanAccent)),
         title: const Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            Icon(Icons.lock_open, color: Colors.cyanAccent, size: 28),
             SizedBox(width: 10),
-            Text("SUCCESS", style: TextStyle(color: Colors.green)),
+            Text("ACCESS GRANTED", style: TextStyle(color: Colors.cyanAccent)),
           ],
         ),
         content: Text(
-          "Transaction of $amount to $name has been authorized via Biometric Lock.",
+          "Uplink established to: $system\nSession encryption: AES-256",
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
-            child: const Text("DONE", style: TextStyle(color: Colors.greenAccent)),
+            child: const Text("ENTER SYSTEM", style: TextStyle(color: Colors.cyanAccent)),
           ),
         ],
       ),
@@ -122,68 +114,77 @@ class _TransferPageState extends State<TransferPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Z-KINETIC BANKING")),
+      appBar: AppBar(title: const Text("Z-KINETIC GATEWAY")),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 20),
-                const Icon(Icons.account_balance_wallet, size: 60, color: Colors.blueAccent),
-                const SizedBox(height: 20),
-                const Text(
-                  "Secure Transfer",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 30),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.hub, size: 80, color: Colors.cyanAccent),
+              const SizedBox(height: 20),
+              const Text(
+                "SELECT TARGET SYSTEM",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.cyanAccent),
+              ),
+              const SizedBox(height: 40),
 
-                // FORM INPUTS
-                TextFormField(
-                  controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Amount (RM)", border: OutlineInputBorder(), prefixIcon: Icon(Icons.attach_money)),
-                  validator: (v) => v!.isEmpty ? "Required" : null,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.cyanAccent),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 15),
-                TextFormField(
-                  controller: _accountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Account No.", border: OutlineInputBorder(), prefixIcon: Icon(Icons.credit_card)),
-                  validator: (v) => v!.isEmpty ? "Required" : null,
-                ),
-                const SizedBox(height: 15),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: "Recipient Name", border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
-                  validator: (v) => v!.isEmpty ? "Required" : null,
-                ),
-                const SizedBox(height: 40),
-
-                // NORMAL BUTTON
-                ElevatedButton(
-                  onPressed: () => _proceedToVerification(isHacked: false),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedSystem,
+                    dropdownColor: Colors.black,
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.cyanAccent),
+                    isExpanded: true,
+                    items: _systemIcons.keys.map((String key) {
+                      return DropdownMenuItem<String>(
+                        value: key,
+                        child: Row(
+                          children: [
+                            Icon(_systemIcons[key], size: 20, color: Colors.grey),
+                            const SizedBox(width: 12),
+                            Text(key, style: const TextStyle(color: Colors.white, fontFamily: 'monospace')),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedSystem = newValue!;
+                      });
+                    },
                   ),
-                  child: const Text("PROCEED TO VERIFY", style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-                
-                const SizedBox(height: 15),
-                
-                // HACKER BUTTON (Utk demo WYSIWYS)
-                OutlinedButton.icon(
-                  onPressed: () => _proceedToVerification(isHacked: true),
-                  icon: const Icon(Icons.bug_report, color: Colors.red),
-                  label: const Text("SIMULATE HACKER ATTACK", style: TextStyle(color: Colors.red)),
-                  style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+              ),
+
+              const SizedBox(height: 40),
+
+              ElevatedButton.icon(
+                onPressed: () => _initiateSequence(isCompromised: false),
+                icon: const Icon(Icons.vpn_key, color: Colors.black),
+                label: const Text("INITIATE SECURITY SEQUENCE", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.cyanAccent, // 🔥 BUTANG KEKAL CYAN
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                 ),
-              ],
-            ),
+              ),
+
+              const Spacer(),
+
+              OutlinedButton.icon(
+                onPressed: () => _initiateSequence(isCompromised: true),
+                icon: const Icon(Icons.warning, color: Colors.red),
+                label: const Text("SIMULATE SIGNAL HIJACK", style: TextStyle(color: Colors.red)),
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+              ),
+            ],
           ),
         ),
       ),
@@ -192,21 +193,19 @@ class _TransferPageState extends State<TransferPage> {
 }
 
 // ==========================================
-// 2️⃣ PAGE KEDUA: LOCK SCREEN (MATRIX STYLE)
+// 2️⃣ PAGE KEDUA: LOCK SCREEN (HYBRID MATRIX)
 // ==========================================
 class LockScreen extends StatefulWidget {
-  final String transactionType;
-  final String amount;
-  final String recipientName;
-  final String accountNumber;
+  final String systemName;
+  final String securityLevel;
+  final bool isCompromised; 
   final VoidCallback? onUnlockSuccess;
 
   const LockScreen({
     super.key,
-    required this.transactionType,
-    required this.amount,
-    required this.recipientName,
-    required this.accountNumber,
+    required this.systemName,
+    required this.securityLevel,
+    this.isCompromised = false,
     this.onUnlockSuccess,
   });
 
@@ -218,20 +217,28 @@ class _LockScreenState extends State<LockScreen> {
   late ClaController _controller;
   bool _isInitialized = false;
   String? _errorMessage;
+  Timer? _matrixTimer;
+  String _randomCoord = "34.0522° N"; // Dummy coord untuk efek visual
 
   @override
   void initState() {
     super.initState();
     _initializeController();
+    // Timer untuk buat koordinat "bermain-main"
+    _matrixTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (mounted) {
+        setState(() {
+          _randomCoord = "${(34 + (timer.tick % 100) * 0.01).toStringAsFixed(4)}° N";
+        });
+      }
+    });
   }
 
   void _initializeController() {
     try {
       _controller = ClaController(
         const ClaConfig(
-          // 🔑 PASSWORD RAHSIA
           secret: [1, 7, 3, 9, 2],
-          // 🎯 SETTINGS
           minShake: 0.4, 
           botDetectionSensitivity: 0.25,  
           thresholdAmount: 0.25, 
@@ -239,8 +246,8 @@ class _LockScreenState extends State<LockScreen> {
           maxAttempts: 5,  
           jamCooldown: Duration(seconds: 10), 
           enableSensors: true,
-          clientId: 'CRYPTER_FULL_FLOW',
-          clientSecret: 'matrix_green_mode_active',
+          clientId: 'Z_KINETIC_HYBRID',
+          clientSecret: 'cyan_green_mix',
         ),
       );
       setState(() => _isInitialized = true);
@@ -252,13 +259,14 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void dispose() {
     if (_isInitialized) _controller.dispose();
+    _matrixTimer?.cancel();
     super.dispose();
   }
 
   void _onSuccess() {
     HapticFeedback.mediumImpact();
     if (widget.onUnlockSuccess != null) {
-      widget.onUnlockSuccess!(); // Panggil callback ke page sebelum
+      widget.onUnlockSuccess!();
     } else {
       Navigator.pop(context);
     }
@@ -267,26 +275,33 @@ class _LockScreenState extends State<LockScreen> {
   void _onFail() {
     HapticFeedback.heavyImpact();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("❌ WRONG PIN (${_controller.failedAttempts}/5)"), backgroundColor: Colors.red),
+      SnackBar(content: Text("❌ ACCESS DENIED (${_controller.failedAttempts}/5)"), backgroundColor: Colors.red),
     );
   }
 
   void _onJammed() {
     HapticFeedback.vibrate();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("⛔ LOCKED FOR ${_controller.remainingLockoutSeconds}s"), backgroundColor: Colors.deepOrange),
+      SnackBar(content: Text("⛔ TERMINAL LOCKED FOR ${_controller.remainingLockoutSeconds}s"), backgroundColor: Colors.deepOrange),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.blueAccent)));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.cyanAccent)));
     }
+
+    // 🔥 LOGIK WARNA: 
+    // UI Utama = Cyan (Safe) atau Merah (Hacked).
+    // Nombor Data = Sentiasa Hijau Matrix (melainkan Hacked, data pun merah sebab corrupt).
+    final Color uiColor = widget.isCompromised ? Colors.red : Colors.cyanAccent;
+    final Color dataColor = widget.isCompromised ? Colors.red : const Color(0xFF00FF00); // HIJAU MATRIX
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("SECURITY CHECK"),
+        title: Text("SECURITY CLEARANCE: ${widget.isCompromised ? 'FAILED' : 'ACTIVE'}", 
+          style: TextStyle(color: uiColor, fontSize: 14, fontFamily: 'monospace')),
         backgroundColor: Colors.black,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -300,77 +315,50 @@ class _LockScreenState extends State<LockScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 🎚️ BANNER (MATRIX STYLE)
+                
+                // ⚠️ ALERT BOX (WARNA IKUT UI - CYAN/MERAH)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00FF00).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF00FF00), width: 1),
+                    color: Colors.black.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: uiColor, width: 2), 
                     boxShadow: [
-                      BoxShadow(color: const Color(0xFF00FF00).withOpacity(0.2), blurRadius: 10),
+                      BoxShadow(color: uiColor.withOpacity(0.2), blurRadius: 20, spreadRadius: 2), 
                     ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.verified_user, size: 24, color: Color(0xFF00FF00)),
-                      SizedBox(width: 8),
-                      Text("BIOMETRIC ACTIVE", style: TextStyle(color: Color(0xFF00FF00), fontWeight: FontWeight.bold, letterSpacing: 2, fontFamily: 'monospace')),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 20),
-                
-                // 🚨 WYSIWYS ALERT BOX (DATA DARI FORM)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red, width: 2),
-                    boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.3), blurRadius: 15)],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
-                          SizedBox(width: 10),
-                          Text("VERIFY TRANSACTION", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'monospace')),
+                          Icon(widget.isCompromised ? Icons.gpp_bad : Icons.gpp_good, color: uiColor, size: 28),
+                          const SizedBox(width: 12),
+                          Text("ACCESS REQUEST", style: TextStyle(color: uiColor, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'monospace', letterSpacing: 1)),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.withOpacity(0.3)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(widget.transactionType, style: TextStyle(color: Colors.red.shade300, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1, fontFamily: 'monospace')),
-                            const SizedBox(height: 8),
-                            // 🔥 DATA DINAMIK DARI FORM
-                            Text(widget.amount, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-                            const SizedBox(height: 6),
-                            Text("TO: ${widget.accountNumber}", style: TextStyle(color: Colors.red.shade300, fontSize: 13, fontFamily: 'monospace')),
-                            Text(widget.recipientName, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-                          ],
-                        ),
+                      const Divider(color: Colors.white24, height: 30),
+                      
+                      const Text("TARGET SYSTEM:", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1)),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.systemName, 
+                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                       ),
-                      const SizedBox(height: 10),
-                      const Text("Cancel if details don't match", style: TextStyle(color: Colors.orange, fontSize: 11, fontFamily: 'monospace')),
+                      
+                      const SizedBox(height: 16),
+                      
+                      const Text("SECURITY PROTOCOL:", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1)),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.securityLevel,
+                        style: TextStyle(color: Colors.white70, fontSize: 14, fontFamily: 'monospace', backgroundColor: widget.isCompromised ? Colors.red.withOpacity(0.3) : null),
+                      ),
                     ],
                   ),
                 ),
                 
-                const SizedBox(height: 20),
+                const SizedBox(height: 30),
                 
                 // 🎮 CRYPTEX LOCK WIDGET
                 CryptexLock(
@@ -382,57 +370,39 @@ class _LockScreenState extends State<LockScreen> {
                 
                 const SizedBox(height: 30),
 
-                // 💡 TIPS BOX
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [Colors.green.withOpacity(0.1), Colors.blue.withOpacity(0.1)]),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.tips_and_updates, color: Colors.yellow, size: 20),
-                          SizedBox(width: 8),
-                          Text("UNLOCK NATURALLY", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 13)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTip("🎯", "Target: 1-7-3-9-2"),
-                      _buildTip("📱", "Angkat phone naturally"),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-                
-                // 📊 MATRIX DEBUG INFO (HIJAU NEON + GLOW)
+                // 📊 MATRIX TELEMETRY BOX
+                // 🔥 INI BAHAGIAN YG KAPTEN NAK HIJAU ("Nombor2 bermain bawah coord")
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.3), width: 1),
+                    // Border luar kekal Cyan (matching UI atas)
+                    border: Border.all(color: uiColor.withOpacity(0.5), width: 1),
                   ),
                   child: Column(
                     children: [
-                      _buildMatrixDebugRow("TARGET", "1-7-3-9-2"),
-                      const SizedBox(height: 8),
-                      _buildMatrixDebugRow("ATTEMPTS", "${_controller.failedAttempts}/5"),
-                      const SizedBox(height: 8),
-                      _buildMatrixDebugRow("STATE", _controller.state.toString().split('.').last.toUpperCase()),
+                      // Header Label (Cyan/Merah)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("LIVE TELEMETRY", style: TextStyle(color: uiColor, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                          Icon(Icons.data_usage, color: uiColor, size: 16),
+                        ],
+                      ),
+                      const Divider(color: Colors.white12),
                       
-                      const Divider(height: 20, color: Colors.white10),
-                      
-                      // Progress Bars
-                      _buildMatrixBar("MOTION", _controller.motionConfidence),
-                      const SizedBox(height: 10),
-                      _buildMatrixBar("PATTERN", _controller.liveConfidence),
-                      const SizedBox(height: 10),
-                      _buildMatrixBar("TOUCH", _controller.touchConfidence),
+                      // 🔥 COORD (YANG BERMAIN-MAIN)
+                      _buildMatrixRow("GEO-COORD", _randomCoord, uiColor, dataColor),
+                      const SizedBox(height: 8),
+                      // 🔥 TARGET (NOMBOR HIJAU)
+                      _buildMatrixRow("TARGET PIN", "1-7-3-9-2", uiColor, dataColor),
+                      const SizedBox(height: 8),
+                      // 🔥 MOTION (NOMBOR HIJAU)
+                      _buildMatrixRow("MOTION SENS", "${(_controller.motionConfidence * 100).toInt()}%", uiColor, dataColor),
+                      const SizedBox(height: 8),
+                      // 🔥 PATTERN (NOMBOR HIJAU)
+                      _buildMatrixRow("PATTERN MATCH", "${(_controller.liveConfidence * 100).toInt()}%", uiColor, dataColor),
                     ],
                   ),
                 ),
@@ -444,60 +414,33 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 
-  Widget _buildTip(String emoji, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Row(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 13))),
-        ],
-      ),
-    );
-  }
-
-  // 🔥 FUNGSI UTAMA: TEXT JADI HIJAU NEON (GLOW)
-  Widget _buildMatrixDebugRow(String label, String value) {
+  // 🛠️ FUNGSI BINA ROW: LABEL (CYAN) vs VALUE (MATRIX GREEN)
+  Widget _buildMatrixRow(String label, String value, Color labelColor, Color valueColor) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: const Color(0xFF00FF00).withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace', letterSpacing: 1)),
-        Text(value, style: const TextStyle(
-          color: Color(0xFF00FF00), // ✅ Matrix Green
-          fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'monospace', letterSpacing: 1,
-          shadows: [Shadow(color: Color(0xFF00FF00), blurRadius: 10)], // ✅ Glow
-        )),
-      ],
-    );
-  }
-
-  // 🔥 FUNGSI BAR: NOMBOR PERATUSAN JADI HIJAU NEON
-  Widget _buildMatrixBar(String label, double value) {
-    final percentage = (value * 100).toStringAsFixed(0);
-    final barColor = value >= 0.6 ? const Color(0xFF00FF00) : (value >= 0.3 ? const Color(0xFFFFFF00) : const Color(0xFFFF0000));
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: TextStyle(color: barColor, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace', letterSpacing: 1)),
-            Text("$percentage%", style: const TextStyle(
-              color: Color(0xFF00FF00), // ✅ Force Matrix Green
-              fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'monospace',
-              shadows: [Shadow(color: Color(0xFF00FF00), blurRadius: 8)],
-            )),
-          ],
+        // Label ikut tema UI (Cyan)
+        Text(
+          label, 
+          style: TextStyle(
+            color: labelColor.withOpacity(0.7), 
+            fontSize: 12, 
+            fontFamily: 'monospace',
+            letterSpacing: 1,
+          ),
         ),
-        const SizedBox(height: 6),
-        Container(
-          height: 6,
-          decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(3), border: Border.all(color: barColor.withOpacity(0.3))),
-          child: FractionallySizedBox(
-            widthFactor: value.clamp(0.0, 1.0),
-            child: Container(decoration: BoxDecoration(color: barColor, boxShadow: [BoxShadow(color: barColor.withOpacity(0.6), blurRadius: 6)])),
+        // Value "BERMAIN-MAIN" jadi MATRIX GREEN (0xFF00FF00) + GLOW
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor, // 🔥 INI KEKUNCI DIA (HIJAU MATRIX)
+            fontSize: 14, 
+            fontWeight: FontWeight.bold, 
+            fontFamily: 'monospace', 
+            letterSpacing: 1.5,
+            shadows: [
+              Shadow(color: valueColor, blurRadius: 10), // Glow Effect
+            ],
           ),
         ),
       ],
