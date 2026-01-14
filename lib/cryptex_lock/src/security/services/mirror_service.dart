@@ -6,13 +6,62 @@
  */
 
 import 'dart:async';
-import 'dart:convert';
+import 'dart:convert'; // ✅ FIX: Wajib ada untuk jsonEncode/Decode
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import '../models/secure_payload.dart';
 import 'package:flutter/foundation.dart';
 
-// Import models
-import '../models/secure_payload.dart';
+// ✅ FIX: Definisi Model Lengkap SecurityIncidentReport (Shared Model)
+class SecurityIncidentReport {
+  final String incidentId;
+  final String timestamp;
+  final String deviceId;
+  final String attackType;
+  final String detectedValue;
+  final String expectedSignature;
+  final String action;
+
+  SecurityIncidentReport({
+    required this.incidentId,
+    required this.timestamp,
+    required this.deviceId,
+    required this.attackType,
+    required this.detectedValue,
+    required this.expectedSignature,
+    required this.action,
+  });
+
+  // Convert ke JSON untuk dihantar ke server
+  Map<String, dynamic> toJson() => {
+    'incident_id': incidentId,
+    'timestamp': timestamp,
+    'threat_intel': {
+      'type': attackType,
+      'detected': detectedValue,
+      'signature': expectedSignature,
+      'integrity_fail': true,
+    },
+    'device_id': deviceId,
+    'status': action,
+  };
+
+  // Convert dari JSON (Wajib untuk IncidentReporter baca balik data offline)
+  factory SecurityIncidentReport.fromJson(Map<String, dynamic> json) {
+    // Handle struktur nested jika datang dari storage vs fresh creation
+    final threatIntel = json['threat_intel'] ?? {};
+    
+    return SecurityIncidentReport(
+      incidentId: json['incident_id'] ?? '',
+      timestamp: json['timestamp'] ?? '',
+      deviceId: json['device_id'] ?? '',
+      attackType: threatIntel['type'] ?? (json['attackType'] ?? 'UNKNOWN'),
+      detectedValue: threatIntel['detected'] ?? (json['detectedValue'] ?? ''),
+      expectedSignature: threatIntel['signature'] ?? (json['expectedSignature'] ?? ''),
+      action: json['status'] ?? (json['action'] ?? 'PENDING'),
+    );
+  }
+}
 
 class MirrorService {
   static const String DEFAULT_ENDPOINT = 'https://api.yourdomain.com';
@@ -40,7 +89,7 @@ class MirrorService {
     }
   }
   
-  /// ðŸ”¥ NEW: Report security incident to server
+  /// 🔥 NEW: Report security incident to server
   /// Returns incident receipt with server actions
   Future<IncidentReceipt> reportIncident(SecurityIncidentReport incident) async {
     try {
@@ -56,225 +105,142 @@ class MirrorService {
             },
             body: jsonEncode(incident.toJson()),
           )
-          .timeout(Duration(seconds: 10)); // Longer timeout for reports
+          .timeout(timeout);
       
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final json = jsonDecode(response.body);
         return IncidentReceipt.fromJson(json);
       } else {
-        // Server error, but still return receipt (logged locally)
-        return IncidentReceipt.localFallback(incident.incidentId);
+        throw HttpException('Server rejected report: ${response.statusCode}');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Incident Report Error: $e');
-      }
-      // Offline mode - report stored locally
-      return IncidentReceipt.localFallback(incident.incidentId);
+      rethrow;
     }
   }
-  
-  /// Verify with retry logic
-  Future<ServerVerdict> _verifyWithRetry(
-    SecurePayload payload, {
-    required int retries,
-  }) async {
+
+  Future<ServerVerdict> _verifyWithRetry(SecurePayload payload, {required int retries}) async {
     for (int attempt = 0; attempt <= retries; attempt++) {
       try {
         return await _makeRequest(payload);
       } catch (e) {
-        if (attempt == retries) {
-          rethrow;
-        }
-        await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
+        if (attempt == retries) rethrow;
+        await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
       }
     }
-    
-    throw Exception('All retry attempts failed');
+    return ServerVerdict.offlineFallback();
   }
-  
-  /// Make HTTP request to server
+
   Future<ServerVerdict> _makeRequest(SecurePayload payload) async {
     final url = Uri.parse('$endpoint/api/v1/verify');
-    
-    final response = await http
-        .post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Client-Version': '3.0.0',
-            'X-Device-ID': payload.deviceId,
-          },
-          body: jsonEncode(payload.toJson()),
-        )
-        .timeout(timeout);
-    
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Client-Version': '2.0.4',
+        'X-Device-ID': payload.deviceId,
+      },
+      body: jsonEncode(payload.toJson()),
+    ).timeout(timeout);
+
     if (response.statusCode == 200) {
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return ServerVerdict.fromJson(json);
-    } else if (response.statusCode == 429) {
-      return ServerVerdict.denied('rate_limit_exceeded');
-    } else if (response.statusCode == 403) {
-      return ServerVerdict.denied('device_not_authorized');
+      return ServerVerdict.fromJson(jsonDecode(response.body));
     } else {
-      throw HttpException('Server error: ${response.statusCode}');
-    }
-  }
-  
-  /// Health check
-  Future<bool> healthCheck() async {
-    try {
-      final url = Uri.parse('$endpoint/health');
-      final response = await http.get(url).timeout(Duration(seconds: 3));
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
+      return ServerVerdict.denied('server_error');
     }
   }
 }
 
-// =========================================================
-// ðŸ”¥ NEW: INCIDENT REPORTING MODELS
-// =========================================================
+// Model untuk Respon Server (Verdict)
+class ServerVerdict {
+  final bool allowed;
+  final String token;
+  final int expiresIn;
+  final String reason;
 
-/// Security incident report sent to server
-class SecurityIncidentReport {
-  final String incidentId;
-  final String timestamp;
-  final String deviceId;
-  final String attackType;
-  final String originalAmount;
-  final String manipulatedAmount;
-  final String status;
-
-  SecurityIncidentReport({
-    required this.incidentId,
-    required this.timestamp,
-    required this.deviceId,
-    required this.attackType,
-    required this.originalAmount,
-    required this.manipulatedAmount,
-    required this.status,
+  ServerVerdict({
+    required this.allowed,
+    required this.token,
+    required this.expiresIn,
+    this.reason = '',
   });
 
-  Map<String, dynamic> toJson() => {
-    'incident_id': incidentId,
-    'timestamp': timestamp,
-    'device_fingerprint': deviceId,
-    'threat_intel': {
-      'type': attackType,
-      'original_val': originalAmount,
-      'manipulated_val': manipulatedAmount,
-      'severity': 'CRITICAL',
-    },
-    'security_context': {
-      // Additional context can be added here
-    },
-    'action_taken': status,
-  };
+  factory ServerVerdict.fromJson(Map<String, dynamic> json) {
+    return ServerVerdict(
+      allowed: json['allow'] ?? false,
+      token: json['token'] ?? '',
+      expiresIn: json['expires_in'] ?? 0,
+      reason: json['reason'] ?? '',
+    );
+  }
+
+  factory ServerVerdict.denied(String reason) {
+    return ServerVerdict(
+      allowed: false,
+      token: '',
+      expiresIn: 0,
+      reason: reason,
+    );
+  }
+
+  factory ServerVerdict.offlineFallback() {
+    return ServerVerdict(
+      allowed: true, // Allow offline by default (or false for strict security)
+      token: 'offline_token',
+      expiresIn: 300,
+      reason: 'offline_mode',
+    );
+  }
 }
 
-/// Server's incident receipt
 class IncidentReceipt {
-  final bool success;
   final String incidentId;
-  final String receivedAt;
-  final String severity;
-  final IncidentActions actionsTaken;
+  final String status;
+  final IncidentActions actions;
   final ThreatAnalysis? threatAnalysis;
 
   IncidentReceipt({
-    required this.success,
     required this.incidentId,
-    required this.receivedAt,
-    required this.severity,
-    required this.actionsTaken,
+    required this.status,
+    required this.actions,
     this.threatAnalysis,
   });
 
   factory IncidentReceipt.fromJson(Map<String, dynamic> json) {
     return IncidentReceipt(
-      success: json['success'] ?? false,
       incidentId: json['incident_id'] ?? '',
-      receivedAt: json['received_at'] ?? '',
-      severity: json['severity'] ?? 'UNKNOWN',
-      actionsTaken: IncidentActions.fromJson(json['actions_taken'] ?? {}),
+      status: json['status'] ?? 'UNKNOWN',
+      actions: IncidentActions.fromJson(json['actions'] ?? {}),
       threatAnalysis: json['threat_analysis'] != null 
-          ? ThreatAnalysis.fromJson(json['threat_analysis'])
+          ? ThreatAnalysis.fromJson(json['threat_analysis']) 
           : null,
-    );
-  }
-  
-  /// Local fallback when server unavailable
-  factory IncidentReceipt.localFallback(String incidentId) {
-    return IncidentReceipt(
-      success: true,
-      incidentId: incidentId,
-      receivedAt: DateTime.now().toIso8601String(),
-      severity: 'LOGGED_LOCALLY',
-      actionsTaken: IncidentActions(
-        logged: true,
-        deviceBlacklisted: false,
-        ipRestricted: false,
-        lawEnforcementNotified: false,
-      ),
-      threatAnalysis: null,
     );
   }
 }
 
-/// Actions taken by server
 class IncidentActions {
   final bool logged;
   final bool deviceBlacklisted;
-  final bool ipRestricted;
-  final bool lawEnforcementNotified;
 
-  IncidentActions({
-    required this.logged,
-    required this.deviceBlacklisted,
-    required this.ipRestricted,
-    required this.lawEnforcementNotified,
-  });
+  IncidentActions({required this.logged, required this.deviceBlacklisted});
 
   factory IncidentActions.fromJson(Map<String, dynamic> json) {
     return IncidentActions(
       logged: json['logged'] ?? false,
       deviceBlacklisted: json['device_blacklisted'] ?? false,
-      ipRestricted: json['ip_restricted'] ?? false,
-      lawEnforcementNotified: json['law_enforcement_notified'] ?? false,
     );
   }
 }
 
-/// Threat analysis from server
 class ThreatAnalysis {
   final String type;
-  final String attackVector;
   final double confidence;
 
-  ThreatAnalysis({
-    required this.type,
-    required this.attackVector,
-    required this.confidence,
-  });
+  ThreatAnalysis({required this.type, required this.confidence});
 
   factory ThreatAnalysis.fromJson(Map<String, dynamic> json) {
     return ThreatAnalysis(
       type: json['type'] ?? 'UNKNOWN',
-      attackVector: json['attack_vector'] ?? 'UNKNOWN',
       confidence: (json['confidence'] ?? 0.0).toDouble(),
     );
-  }
-}
-
-/// Certificate Pinning Helper
-class CertificatePinning {
-  static final List<String> _trustedCertificates = [
-    'sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-  ];
-  
-  static bool verifyCertificate(X509Certificate cert) {
-    return true;
   }
 }
