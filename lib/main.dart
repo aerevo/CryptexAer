@@ -1,10 +1,11 @@
-// 🛡️ Z-KINETIC HERO EDITION
-// Status: INTELLIGENT DETECTION
-// Features: Passive Safety / Active Threat Warning + Hero Report Protocol
+// 🛡️ Z-KINETIC CLEAN INTELLIGENCE
+// Status: SENSORS REMOVED
+// Features: Intelligence Hub Logic + Anti-Scam UI + Cryptex Only
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:async'; 
+import 'dart:async';
+import 'dart:convert'; // Untuk JSON encoding
 import 'cryptex_lock/src/cla_widget.dart';
 import 'cryptex_lock/src/cla_controller.dart';
 import 'cryptex_lock/src/cla_models.dart';
@@ -25,7 +26,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Z-KINETIC HERO',
+      title: 'Z-KINETIC INTEL',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF000000),
         primaryColor: Colors.cyanAccent,
@@ -34,28 +35,60 @@ class MyApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      // ⚠️ TUKAR 'isHacked' KE 'true' UNTUK TEST JADI HERO
-      // ⚠️ TUKAR KE 'false' UNTUK TEST SITUASI SELAMAT
+      // ⚠️ TUKAR 'isHacked' KE 'true' UNTUK TEST SYSTEM REPORTING
       home: const LockScreen(
         systemName: "TRANSFER FUNDS",
         originalAmount: "RM 50.00",
-        // 🔥 Cuba tukar ini jadi 'true' untuk tengok amaran merah keluar!
-        isHacked: true, 
+        isHacked: true, // 🔥 TEST MODE: TRUE
       ),
     );
   }
 }
 
+// 🧠 MODEL DATA INTELLIGENCE (BACKEND READY)
+class SecurityIncidentReport {
+  final String incidentId;
+  final String timestamp;
+  final String deviceId;
+  final String attackType;
+  final String originalAmount;
+  final String manipulatedAmount;
+  final String status;
+
+  SecurityIncidentReport({
+    required this.incidentId,
+    required this.timestamp,
+    required this.deviceId,
+    required this.attackType,
+    required this.originalAmount,
+    required this.manipulatedAmount,
+    required this.status,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'incident_id': incidentId,
+    'timestamp': timestamp,
+    'device_fingerprint': deviceId,
+    'threat_intel': {
+      'type': attackType,
+      'original_val': originalAmount,
+      'manipulated_val': manipulatedAmount,
+      'severity': 'CRITICAL',
+    },
+    'action_taken': status,
+  };
+}
+
 class LockScreen extends StatefulWidget {
   final String systemName;
   final String originalAmount;
-  final bool isHacked; // 🔥 Logik Pengesanan Automatik
+  final bool isHacked;
 
   const LockScreen({
     super.key,
     required this.systemName,
     required this.originalAmount,
-    this.isHacked = false, // Default selamat
+    this.isHacked = false,
   });
 
   @override
@@ -65,24 +98,11 @@ class LockScreen extends StatefulWidget {
 class _LockScreenState extends State<LockScreen> {
   late ClaController _controller;
   bool _isInitialized = false;
-  Timer? _matrixTimer;
-  String _randomCoord = "00.0000° N";
 
   @override
   void initState() {
     super.initState();
     _initializeController();
-    
-    // Animasi Sensor Matrix
-    _matrixTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (mounted) {
-        setState(() {
-          double lat = 34 + (timer.tick % 99) * 0.013;
-          double long = 118 + (timer.tick % 88) * 0.017;
-          _randomCoord = "${lat.toStringAsFixed(4)}° N, ${long.toStringAsFixed(4)}° W";
-        });
-      }
-    });
   }
 
   void _initializeController() {
@@ -96,8 +116,8 @@ class _LockScreenState extends State<LockScreen> {
         maxAttempts: 5,  
         jamCooldown: Duration(seconds: 10), 
         enableSensors: true, 
-        clientId: 'Z_KINETIC_HERO',
-        clientSecret: 'hero_v1',
+        clientId: 'Z_KINETIC_CLEAN_INTEL',
+        clientSecret: 'intel_clean_v1',
       ),
     );
     setState(() => _isInitialized = true);
@@ -106,18 +126,29 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void dispose() {
     _controller.dispose();
-    _matrixTimer?.cancel();
     super.dispose();
   }
 
-  // 🦸‍♂️ FUNGSI HERO: CANCEL & REPORT
-  void _handleReportAndCancel() {
-    HapticFeedback.heavyImpact(); // Gegar kuat tanda bahaya
+  // 🦸‍♂️ FUNGSI REPORTING (INTELLIGENCE HUB)
+  Future<void> _handleReportAndCancel() async {
+    HapticFeedback.heavyImpact();
     
-    // 1. Simpan Log (Simulasi)
-    print("🚨 REPORT GENERATED: MANIPULATION DETECTED");
-    
-    // 2. Papar Dialog Hero
+    // 1. CAPTURE DATA
+    final report = SecurityIncidentReport(
+      incidentId: "INC-${DateTime.now().millisecondsSinceEpoch}",
+      timestamp: DateTime.now().toIso8601String(),
+      deviceId: "DEVICE-ID-${(DateTime.now().millisecondsSinceEpoch % 1000)}",
+      attackType: "MITM_AMOUNT_MANIPULATION",
+      originalAmount: widget.originalAmount,
+      manipulatedAmount: "RM 50,000.00",
+      status: "BLOCKED_BY_USER",
+    );
+
+    // 2. GENERATE JSON PAYLOAD
+    final String jsonPayload = jsonEncode(report.toJson());
+    print("📡 SENDING INTEL TO HQ:\n$jsonPayload");
+
+    // 3. UI LOADING
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -125,23 +156,43 @@ class _LockScreenState extends State<LockScreen> {
         backgroundColor: Colors.red.shade900,
         title: const Row(
           children: [
-            Icon(Icons.shield, color: Colors.white),
-            SizedBox(width: 10),
-            Text("REPORT GENERATED", style: TextStyle(color: Colors.white)),
+            SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+            SizedBox(width: 15),
+            Text("SECURING...", style: TextStyle(color: Colors.white, fontSize: 14)),
           ],
         ),
-        content: const Text(
-          "Laporan pemesongan data telah dijana.\n\n"
-          "Fail ini telah dihantar ke terminal Kapten Aer untuk tindakan lanjut ke pihak Bank.",
-          style: TextStyle(color: Colors.white70),
+        content: const Text("Encrypting forensic data...\nAlerting Bank Protocol...", style: TextStyle(color: Colors.white70, fontSize: 12)),
+      ),
+    );
+
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    // 4. SUCCESS
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.green.shade900,
+        title: const Row(
+          children: [
+            Icon(Icons.shield, color: Colors.white),
+            SizedBox(width: 10),
+            Text("SECURED", style: TextStyle(color: Colors.white, fontSize: 14)),
+          ],
+        ),
+        content: Text(
+          "✅ REPORT #${report.incidentId} SENT\n✅ THREAT BLOCKED",
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Tutup dialog
-              Navigator.pop(context); // Keluar dari screen (Cancel transaction)
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
-            child: const Text("CLOSE & SECURE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text("CLOSE", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -150,30 +201,21 @@ class _LockScreenState extends State<LockScreen> {
 
   void _onSuccess() {
     if (widget.isHacked) {
-      // Kalau user degil nak unlock juga masa hacked
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ WARNING: YOU AUTHORIZED A COMPROMISED TRANSACTION"), backgroundColor: Colors.red),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("⚠️ WARNING: COMPROMISED!"), backgroundColor: Colors.red));
     } else {
       HapticFeedback.mediumImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("ACCESS GRANTED"), backgroundColor: Colors.green),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("ACCESS GRANTED"), backgroundColor: Colors.green));
     }
   }
 
   void _onFail() {
     HapticFeedback.heavyImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("INVALID CREDENTIALS (${_controller.failedAttempts}/5)"), backgroundColor: Colors.red),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("INVALID CREDENTIALS (${_controller.failedAttempts}/5)"), backgroundColor: Colors.red));
   }
 
   void _onJammed() {
     HapticFeedback.vibrate();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("LOCKED: ${_controller.remainingLockoutSeconds}s"), backgroundColor: Colors.deepOrange),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("LOCKED: ${_controller.remainingLockoutSeconds}s"), backgroundColor: Colors.deepOrange));
   }
 
   @override
@@ -182,13 +224,10 @@ class _LockScreenState extends State<LockScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.cyanAccent)));
     }
 
-    const Color uiColor = Colors.cyanAccent;
-    const Color dataColor = Color(0xFF00FF00); // Matrix Green
-
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const Text("SECURE GATEWAY", style: TextStyle(color: uiColor, fontSize: 14, fontFamily: 'monospace', letterSpacing: 2)),
+        title: const Text("SECURE GATEWAY", style: TextStyle(color: Colors.cyanAccent, fontSize: 14, fontFamily: 'monospace', letterSpacing: 2)),
       ),
       body: SafeArea(
         child: Center(
@@ -198,17 +237,15 @@ class _LockScreenState extends State<LockScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 
-                // 🔥 LOGIK INTELLIGENCE: TENTUKAN PAPARAN
+                // 1️⃣ LOGIK PAPARAN (INTELLIGENT UI)
                 if (widget.isHacked)
-                  _buildHackedNotice() // 🔴 Paparan Bising (Bahaya)
+                  _buildHackedNotice()
                 else
-                  _buildSafeNotice(), // 🟢 Paparan Senyap (Selamat)
+                  _buildSafeNotice(),
                 
-                const SizedBox(height: 40),
+                const SizedBox(height: 50),
 
-                // 2️⃣ CRYPTEX LOCK (ALAT UTAMA)
-                // Jika Hacked, kita boleh disable atau biarkan user buat pilihan bodoh.
-                // Di sini saya biarkan aktif tapi ada amaran merah.
+                // 2️⃣ CRYPTEX LOCK (FOKUS UTAMA)
                 CryptexLock(
                   controller: _controller,
                   onSuccess: _onSuccess,
@@ -216,41 +253,7 @@ class _LockScreenState extends State<LockScreen> {
                   onJammed: _onJammed,
                 ),
 
-                const SizedBox(height: 40),
-
-                // 3️⃣ SENSOR ARRAY (Matrix Green)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: uiColor.withOpacity(0.3), width: 1),
-                  ),
-                  child: Column(
-                    children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text("LIVE SENSORS", style: TextStyle(color: uiColor, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-                          Icon(Icons.query_stats, color: uiColor, size: 14),
-                        ],
-                      ),
-                      const Divider(color: Colors.white12),
-
-                      _buildSimpleRow("GEO-COORD", _randomCoord, uiColor, dataColor),
-                      const SizedBox(height: 5),
-                      _buildSimpleRow("TARGET PIN", "1-7-3-9-2", uiColor, dataColor),
-                      
-                      const Divider(color: Colors.white12, height: 15),
-
-                      _buildSensorBar("MOTION FLUX", _controller.motionConfidence, uiColor, dataColor),
-                      const SizedBox(height: 10),
-                      _buildSensorBar("PATTERN MATCH", _controller.liveConfidence, uiColor, dataColor),
-                      const SizedBox(height: 10),
-                      _buildSensorBar("TOUCH PRESS", _controller.touchConfidence, uiColor, dataColor),
-                    ],
-                  ),
-                ),
+                // TIADA LAGI SENSOR SEMAK DI BAWAH NI! 🧹✨
               ],
             ),
           ),
@@ -259,7 +262,7 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 
-  // 🟢 PAPARAN SELAMAT (SENYAP)
+  // 🟢 SAFE UI
   Widget _buildSafeNotice() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -274,7 +277,7 @@ class _LockScreenState extends State<LockScreen> {
           const Icon(Icons.check_circle, color: Colors.green, size: 20),
           const SizedBox(width: 10),
           Text(
-            "100% SECURE. PROCEED TO UNLOCK.",
+            "VERIFIED: ${widget.systemName}",
             style: TextStyle(color: Colors.green.shade300, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
           ),
         ],
@@ -282,7 +285,7 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 
-  // 🔴 PAPARAN HACKED (BISING & HERO ACTION)
+  // 🔴 HACKED UI (INTELLIGENCE TRIGGER)
   Widget _buildHackedNotice() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -304,19 +307,19 @@ class _LockScreenState extends State<LockScreen> {
           ),
           const SizedBox(height: 15),
           const Text(
-            "AMARAN: Jumlah asal anda (RM 50) telah diubah kepada RM 50,000 oleh pihak ketiga!",
+            "ALERT: Original amount (RM 50) changed to RM 50,000 via MITM Attack.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 13),
+            style: TextStyle(color: Colors.white, fontSize: 12),
           ),
           const SizedBox(height: 20),
           
-          // 🔥 BUTANG HERO
+          // 🔥 BUTANG HERO (REPORT)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _handleReportAndCancel,
-              icon: const Icon(Icons.report, color: Colors.white),
-              label: const Text("CANCEL & REPORT TO HQ", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.cloud_upload, color: Colors.white),
+              label: const Text("CAPTURE DATA & REPORT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade800,
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -325,44 +328,6 @@ class _LockScreenState extends State<LockScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  // Helper Widgets
-  Widget _buildSimpleRow(String label, String value, Color uiColor, Color dataColor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(color: uiColor.withOpacity(0.6), fontSize: 10, fontFamily: 'monospace')),
-        Text(value, style: TextStyle(color: dataColor, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace', shadows: [Shadow(color: dataColor, blurRadius: 5)])),
-      ],
-    );
-  }
-
-  Widget _buildSensorBar(String label, double value, Color uiColor, Color dataColor) {
-    final percentage = (value * 100).toStringAsFixed(0);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: TextStyle(color: uiColor, fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-            Text("$percentage%", style: TextStyle(color: dataColor, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace', shadows: [Shadow(color: dataColor, blurRadius: 5)])),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          height: 4,
-          decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2)),
-          child: FractionallySizedBox(
-            widthFactor: value.clamp(0.0, 1.0),
-            child: Container(
-              decoration: BoxDecoration(color: uiColor, boxShadow: [BoxShadow(color: uiColor.withOpacity(0.5), blurRadius: 4)]),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
