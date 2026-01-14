@@ -1,6 +1,7 @@
 name: cryptex_aer
-description: Secure Biometric Authentication System by Captain Aer.
-version: 0.0.1
+description: Z-KINETIC Intelligence Hub - Secure Biometric Authentication with Incident Reporting
+version: 3.0.0
+publish_to: 'none' # Prevent accidental publishing
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -8,26 +9,59 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  
+  # UI Components
   cupertino_icons: ^1.0.2
   
-  # 🛡️ SENSOR & STORAGE (CORE)
-  sensors_plus: ^5.0.0
-  shared_preferences: ^2.2.0
-  flutter_secure_storage: ^9.0.0
+  # =========================================================
+  # ðŸ›¡ï¸ CORE SECURITY SUITE
+  # =========================================================
   
-  # 🔒 SECURITY & INTEGRITY
-  flutter_jailbreak_detection: ^1.1.0
+  # Sensors (Motion Detection)
+  sensors_plus: ^5.0.1
   
-  # ✨ NEW: CRYPTOGRAPHIC & TELEMETRY SUITE (V5.6)
-  # Diperlukan untuk HMAC Signing, Ephemeral ID, dan Reporting
+  # Storage (Secure & Preferences)
+  shared_preferences: ^2.2.3
+  flutter_secure_storage: ^9.2.2
+  
+  # Device Security
+  flutter_jailbreak_detection: ^1.10.0
+  
+  # =========================================================
+  # ðŸ” CRYPTOGRAPHY & AUTHENTICATION
+  # =========================================================
+  
+  # Cryptographic Functions (SHA-256, HMAC, Hashing)
   crypto: ^3.0.3
-  device_info_plus: ^9.1.1
-  http: ^1.1.0
+  
+  # =========================================================
+  # ðŸ“¡ NETWORK & SERVER COMMUNICATION
+  # =========================================================
+  
+  # HTTP Client (Server Validation & Incident Reporting)
+  http: ^1.2.1
+  
+  # =========================================================
+  # ðŸ” DEVICE IDENTIFICATION
+  # =========================================================
+  
+  # Device Info (Device Fingerprinting)
+  device_info_plus: ^10.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
+  
+  # Linting
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
+  
+  # =========================================================
+  # ðŸ“ OPTIONAL: Custom Fonts (Monospace for Logs)
+  # =========================================================
+  # fonts:
+  #   - family: Courier
+  #     fonts:
+  #       - asset: fonts/CourierPrime-Regular.ttf
