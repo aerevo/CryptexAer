@@ -1,13 +1,13 @@
-// 🛡️ Z-KINETIC HYBRID - CYAN UI + MATRIX NUMBERS
-// Status: FINAL VISUAL FIX
-// Features: UI Cyan (Safe) + Data Numbers Matrix Green (John Wick Style)
+// 🛡️ Z-KINETIC HERO EDITION
+// Status: INTELLIGENT DETECTION
+// Features: Passive Safety / Active Threat Warning + Hero Report Protocol
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async'; 
 import 'cryptex_lock/src/cla_widget.dart';
 import 'cryptex_lock/src/cla_controller.dart';
 import 'cryptex_lock/src/cla_models.dart';
-import 'dart:async'; // Untuk simulasi koordinat "bermain-main"
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,188 +25,37 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Z-KINETIC HYBRID',
+      title: 'Z-KINETIC HERO',
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF050505),
-        // 🔥 UI UTAMA KEKAL CYAN (BIRU NEON)
+        scaffoldBackgroundColor: const Color(0xFF000000),
         primaryColor: Colors.cyanAccent,
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.cyanAccent,
-          secondary: Colors.cyanAccent,
-        ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.black,
           elevation: 0,
         ),
       ),
-      home: const SystemSelectorPage(),
-    );
-  }
-}
-
-// ==========================================
-// 1️⃣ PAGE PEMILIHAN SISTEM
-// ==========================================
-class SystemSelectorPage extends StatefulWidget {
-  const SystemSelectorPage({super.key});
-
-  @override
-  State<SystemSelectorPage> createState() => _SystemSelectorPageState();
-}
-
-class _SystemSelectorPageState extends State<SystemSelectorPage> {
-  String _selectedSystem = "DEFENSE_GRID_ALPHA"; 
-  
-  final Map<String, IconData> _systemIcons = {
-    "DEFENSE_GRID_ALPHA": Icons.shield,
-    "CRYPTO_COLD_STORAGE": Icons.currency_bitcoin,
-    "SOCIAL_ADMIN_PANEL": Icons.public,
-    "CLONE_PROTOCOL_V2": Icons.fingerprint,
-  };
-
-  void _initiateSequence({bool isCompromised = false}) {
-    final String targetSystem = isCompromised ? "UNKNOWN_SERVER_RUSSIA" : _selectedSystem;
-    final String securityLevel = isCompromised ? "⚠️ CRITICAL RISK" : "LEVEL 5 (MAX)";
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LockScreen(
-          systemName: targetSystem,
-          securityLevel: securityLevel,
-          isCompromised: isCompromised,
-          onUnlockSuccess: () {
-            _showAccessGranted(targetSystem);
-          },
-        ),
-      ),
-    );
-  }
-
-  void _showAccessGranted(String system) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.black,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.cyanAccent)),
-        title: const Row(
-          children: [
-            Icon(Icons.lock_open, color: Colors.cyanAccent, size: 28),
-            SizedBox(width: 10),
-            Text("ACCESS GRANTED", style: TextStyle(color: Colors.cyanAccent)),
-          ],
-        ),
-        content: Text(
-          "Uplink established to: $system\nSession encryption: AES-256",
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
-            child: const Text("ENTER SYSTEM", style: TextStyle(color: Colors.cyanAccent)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Z-KINETIC GATEWAY")),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.hub, size: 80, color: Colors.cyanAccent),
-              const SizedBox(height: 20),
-              const Text(
-                "SELECT TARGET SYSTEM",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.cyanAccent),
-              ),
-              const SizedBox(height: 40),
-
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.cyanAccent),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedSystem,
-                    dropdownColor: Colors.black,
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.cyanAccent),
-                    isExpanded: true,
-                    items: _systemIcons.keys.map((String key) {
-                      return DropdownMenuItem<String>(
-                        value: key,
-                        child: Row(
-                          children: [
-                            Icon(_systemIcons[key], size: 20, color: Colors.grey),
-                            const SizedBox(width: 12),
-                            Text(key, style: const TextStyle(color: Colors.white, fontFamily: 'monospace')),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedSystem = newValue!;
-                      });
-                    },
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              ElevatedButton.icon(
-                onPressed: () => _initiateSequence(isCompromised: false),
-                icon: const Icon(Icons.vpn_key, color: Colors.black),
-                label: const Text("INITIATE SECURITY SEQUENCE", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.cyanAccent, // 🔥 BUTANG KEKAL CYAN
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                ),
-              ),
-
-              const Spacer(),
-
-              OutlinedButton.icon(
-                onPressed: () => _initiateSequence(isCompromised: true),
-                icon: const Icon(Icons.warning, color: Colors.red),
-                label: const Text("SIMULATE SIGNAL HIJACK", style: TextStyle(color: Colors.red)),
-                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
-              ),
-            ],
-          ),
-        ),
+      // ⚠️ TUKAR 'isHacked' KE 'true' UNTUK TEST JADI HERO
+      // ⚠️ TUKAR KE 'false' UNTUK TEST SITUASI SELAMAT
+      home: const LockScreen(
+        systemName: "TRANSFER FUNDS",
+        originalAmount: "RM 50.00",
+        // 🔥 Cuba tukar ini jadi 'true' untuk tengok amaran merah keluar!
+        isHacked: true, 
       ),
     );
   }
 }
 
-// ==========================================
-// 2️⃣ PAGE KEDUA: LOCK SCREEN (HYBRID MATRIX)
-// ==========================================
 class LockScreen extends StatefulWidget {
   final String systemName;
-  final String securityLevel;
-  final bool isCompromised; 
-  final VoidCallback? onUnlockSuccess;
+  final String originalAmount;
+  final bool isHacked; // 🔥 Logik Pengesanan Automatik
 
   const LockScreen({
     super.key,
     required this.systemName,
-    required this.securityLevel,
-    this.isCompromised = false,
-    this.onUnlockSuccess,
+    required this.originalAmount,
+    this.isHacked = false, // Default selamat
   });
 
   @override
@@ -216,73 +65,114 @@ class LockScreen extends StatefulWidget {
 class _LockScreenState extends State<LockScreen> {
   late ClaController _controller;
   bool _isInitialized = false;
-  String? _errorMessage;
   Timer? _matrixTimer;
-  String _randomCoord = "34.0522° N"; // Dummy coord untuk efek visual
+  String _randomCoord = "00.0000° N";
 
   @override
   void initState() {
     super.initState();
     _initializeController();
-    // Timer untuk buat koordinat "bermain-main"
+    
+    // Animasi Sensor Matrix
     _matrixTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (mounted) {
         setState(() {
-          _randomCoord = "${(34 + (timer.tick % 100) * 0.01).toStringAsFixed(4)}° N";
+          double lat = 34 + (timer.tick % 99) * 0.013;
+          double long = 118 + (timer.tick % 88) * 0.017;
+          _randomCoord = "${lat.toStringAsFixed(4)}° N, ${long.toStringAsFixed(4)}° W";
         });
       }
     });
   }
 
   void _initializeController() {
-    try {
-      _controller = ClaController(
-        const ClaConfig(
-          secret: [1, 7, 3, 9, 2],
-          minShake: 0.4, 
-          botDetectionSensitivity: 0.25,  
-          thresholdAmount: 0.25, 
-          minSolveTime: Duration(milliseconds: 600),
-          maxAttempts: 5,  
-          jamCooldown: Duration(seconds: 10), 
-          enableSensors: true,
-          clientId: 'Z_KINETIC_HYBRID',
-          clientSecret: 'cyan_green_mix',
-        ),
-      );
-      setState(() => _isInitialized = true);
-    } catch (e) {
-      setState(() => _errorMessage = e.toString());
-    }
+    _controller = ClaController(
+      const ClaConfig(
+        secret: [1, 7, 3, 9, 2],
+        minShake: 0.4, 
+        botDetectionSensitivity: 0.25,  
+        thresholdAmount: 0.25, 
+        minSolveTime: Duration(milliseconds: 600),
+        maxAttempts: 5,  
+        jamCooldown: Duration(seconds: 10), 
+        enableSensors: true, 
+        clientId: 'Z_KINETIC_HERO',
+        clientSecret: 'hero_v1',
+      ),
+    );
+    setState(() => _isInitialized = true);
   }
 
   @override
   void dispose() {
-    if (_isInitialized) _controller.dispose();
+    _controller.dispose();
     _matrixTimer?.cancel();
     super.dispose();
   }
 
+  // 🦸‍♂️ FUNGSI HERO: CANCEL & REPORT
+  void _handleReportAndCancel() {
+    HapticFeedback.heavyImpact(); // Gegar kuat tanda bahaya
+    
+    // 1. Simpan Log (Simulasi)
+    print("🚨 REPORT GENERATED: MANIPULATION DETECTED");
+    
+    // 2. Papar Dialog Hero
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.red.shade900,
+        title: const Row(
+          children: [
+            Icon(Icons.shield, color: Colors.white),
+            SizedBox(width: 10),
+            Text("REPORT GENERATED", style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          "Laporan pemesongan data telah dijana.\n\n"
+          "Fail ini telah dihantar ke terminal Kapten Aer untuk tindakan lanjut ke pihak Bank.",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Tutup dialog
+              Navigator.pop(context); // Keluar dari screen (Cancel transaction)
+            },
+            child: const Text("CLOSE & SECURE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _onSuccess() {
-    HapticFeedback.mediumImpact();
-    if (widget.onUnlockSuccess != null) {
-      widget.onUnlockSuccess!();
+    if (widget.isHacked) {
+      // Kalau user degil nak unlock juga masa hacked
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ WARNING: YOU AUTHORIZED A COMPROMISED TRANSACTION"), backgroundColor: Colors.red),
+      );
     } else {
-      Navigator.pop(context);
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("ACCESS GRANTED"), backgroundColor: Colors.green),
+      );
     }
   }
 
   void _onFail() {
     HapticFeedback.heavyImpact();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("❌ ACCESS DENIED (${_controller.failedAttempts}/5)"), backgroundColor: Colors.red),
+      SnackBar(content: Text("INVALID CREDENTIALS (${_controller.failedAttempts}/5)"), backgroundColor: Colors.red),
     );
   }
 
   void _onJammed() {
     HapticFeedback.vibrate();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("⛔ TERMINAL LOCKED FOR ${_controller.remainingLockoutSeconds}s"), backgroundColor: Colors.deepOrange),
+      SnackBar(content: Text("LOCKED: ${_controller.remainingLockoutSeconds}s"), backgroundColor: Colors.deepOrange),
     );
   }
 
@@ -292,21 +182,13 @@ class _LockScreenState extends State<LockScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.cyanAccent)));
     }
 
-    // 🔥 LOGIK WARNA: 
-    // UI Utama = Cyan (Safe) atau Merah (Hacked).
-    // Nombor Data = Sentiasa Hijau Matrix (melainkan Hacked, data pun merah sebab corrupt).
-    final Color uiColor = widget.isCompromised ? Colors.red : Colors.cyanAccent;
-    final Color dataColor = widget.isCompromised ? Colors.red : const Color(0xFF00FF00); // HIJAU MATRIX
+    const Color uiColor = Colors.cyanAccent;
+    const Color dataColor = Color(0xFF00FF00); // Matrix Green
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("SECURITY CLEARANCE: ${widget.isCompromised ? 'FAILED' : 'ACTIVE'}", 
-          style: TextStyle(color: uiColor, fontSize: 14, fontFamily: 'monospace')),
-        backgroundColor: Colors.black,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        centerTitle: true,
+        title: const Text("SECURE GATEWAY", style: TextStyle(color: uiColor, fontSize: 14, fontFamily: 'monospace', letterSpacing: 2)),
       ),
       body: SafeArea(
         child: Center(
@@ -316,93 +198,56 @@ class _LockScreenState extends State<LockScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 
-                // ⚠️ ALERT BOX (WARNA IKUT UI - CYAN/MERAH)
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: uiColor, width: 2), 
-                    boxShadow: [
-                      BoxShadow(color: uiColor.withOpacity(0.2), blurRadius: 20, spreadRadius: 2), 
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(widget.isCompromised ? Icons.gpp_bad : Icons.gpp_good, color: uiColor, size: 28),
-                          const SizedBox(width: 12),
-                          Text("ACCESS REQUEST", style: TextStyle(color: uiColor, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'monospace', letterSpacing: 1)),
-                        ],
-                      ),
-                      const Divider(color: Colors.white24, height: 30),
-                      
-                      const Text("TARGET SYSTEM:", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1)),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.systemName, 
-                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      const Text("SECURITY PROTOCOL:", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1)),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.securityLevel,
-                        style: TextStyle(color: Colors.white70, fontSize: 14, fontFamily: 'monospace', backgroundColor: widget.isCompromised ? Colors.red.withOpacity(0.3) : null),
-                      ),
-                    ],
-                  ),
-                ),
+                // 🔥 LOGIK INTELLIGENCE: TENTUKAN PAPARAN
+                if (widget.isHacked)
+                  _buildHackedNotice() // 🔴 Paparan Bising (Bahaya)
+                else
+                  _buildSafeNotice(), // 🟢 Paparan Senyap (Selamat)
                 
-                const SizedBox(height: 30),
-                
-                // 🎮 CRYPTEX LOCK WIDGET
+                const SizedBox(height: 40),
+
+                // 2️⃣ CRYPTEX LOCK (ALAT UTAMA)
+                // Jika Hacked, kita boleh disable atau biarkan user buat pilihan bodoh.
+                // Di sini saya biarkan aktif tapi ada amaran merah.
                 CryptexLock(
                   controller: _controller,
                   onSuccess: _onSuccess,
                   onFail: _onFail,
                   onJammed: _onJammed,
                 ),
-                
-                const SizedBox(height: 30),
 
-                // 📊 MATRIX TELEMETRY BOX
-                // 🔥 INI BAHAGIAN YG KAPTEN NAK HIJAU ("Nombor2 bermain bawah coord")
+                const SizedBox(height: 40),
+
+                // 3️⃣ SENSOR ARRAY (Matrix Green)
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(12),
-                    // Border luar kekal Cyan (matching UI atas)
-                    border: Border.all(color: uiColor.withOpacity(0.5), width: 1),
+                    border: Border.all(color: uiColor.withOpacity(0.3), width: 1),
                   ),
                   child: Column(
                     children: [
-                      // Header Label (Cyan/Merah)
-                      Row(
+                      const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text("LIVE TELEMETRY", style: TextStyle(color: uiColor, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-                          Icon(Icons.data_usage, color: uiColor, size: 16),
+                          Text("LIVE SENSORS", style: TextStyle(color: uiColor, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                          Icon(Icons.query_stats, color: uiColor, size: 14),
                         ],
                       ),
                       const Divider(color: Colors.white12),
+
+                      _buildSimpleRow("GEO-COORD", _randomCoord, uiColor, dataColor),
+                      const SizedBox(height: 5),
+                      _buildSimpleRow("TARGET PIN", "1-7-3-9-2", uiColor, dataColor),
                       
-                      // 🔥 COORD (YANG BERMAIN-MAIN)
-                      _buildMatrixRow("GEO-COORD", _randomCoord, uiColor, dataColor),
-                      const SizedBox(height: 8),
-                      // 🔥 TARGET (NOMBOR HIJAU)
-                      _buildMatrixRow("TARGET PIN", "1-7-3-9-2", uiColor, dataColor),
-                      const SizedBox(height: 8),
-                      // 🔥 MOTION (NOMBOR HIJAU)
-                      _buildMatrixRow("MOTION SENS", "${(_controller.motionConfidence * 100).toInt()}%", uiColor, dataColor),
-                      const SizedBox(height: 8),
-                      // 🔥 PATTERN (NOMBOR HIJAU)
-                      _buildMatrixRow("PATTERN MATCH", "${(_controller.liveConfidence * 100).toInt()}%", uiColor, dataColor),
+                      const Divider(color: Colors.white12, height: 15),
+
+                      _buildSensorBar("MOTION FLUX", _controller.motionConfidence, uiColor, dataColor),
+                      const SizedBox(height: 10),
+                      _buildSensorBar("PATTERN MATCH", _controller.liveConfidence, uiColor, dataColor),
+                      const SizedBox(height: 10),
+                      _buildSensorBar("TOUCH PRESS", _controller.touchConfidence, uiColor, dataColor),
                     ],
                   ),
                 ),
@@ -414,33 +259,107 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 
-  // 🛠️ FUNGSI BINA ROW: LABEL (CYAN) vs VALUE (MATRIX GREEN)
-  Widget _buildMatrixRow(String label, String value, Color labelColor, Color valueColor) {
+  // 🟢 PAPARAN SELAMAT (SENYAP)
+  Widget _buildSafeNotice() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        border: Border.all(color: Colors.green),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle, color: Colors.green, size: 20),
+          const SizedBox(width: 10),
+          Text(
+            "100% SECURE. PROCEED TO UNLOCK.",
+            style: TextStyle(color: Colors.green.shade300, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔴 PAPARAN HACKED (BISING & HERO ACTION)
+  Widget _buildHackedNotice() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        border: Border.all(color: Colors.red, width: 2),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.2), blurRadius: 20)],
+      ),
+      child: Column(
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.warning, color: Colors.red),
+              SizedBox(width: 10),
+              Text("DATA MANIPULATION DETECTED!", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 15),
+          const Text(
+            "AMARAN: Jumlah asal anda (RM 50) telah diubah kepada RM 50,000 oleh pihak ketiga!",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white, fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          
+          // 🔥 BUTANG HERO
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _handleReportAndCancel,
+              icon: const Icon(Icons.report, color: Colors.white),
+              label: const Text("CANCEL & REPORT TO HQ", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade800,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper Widgets
+  Widget _buildSimpleRow(String label, String value, Color uiColor, Color dataColor) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Label ikut tema UI (Cyan)
-        Text(
-          label, 
-          style: TextStyle(
-            color: labelColor.withOpacity(0.7), 
-            fontSize: 12, 
-            fontFamily: 'monospace',
-            letterSpacing: 1,
-          ),
+        Text(label, style: TextStyle(color: uiColor.withOpacity(0.6), fontSize: 10, fontFamily: 'monospace')),
+        Text(value, style: TextStyle(color: dataColor, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace', shadows: [Shadow(color: dataColor, blurRadius: 5)])),
+      ],
+    );
+  }
+
+  Widget _buildSensorBar(String label, double value, Color uiColor, Color dataColor) {
+    final percentage = (value * 100).toStringAsFixed(0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(color: uiColor, fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+            Text("$percentage%", style: TextStyle(color: dataColor, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace', shadows: [Shadow(color: dataColor, blurRadius: 5)])),
+          ],
         ),
-        // Value "BERMAIN-MAIN" jadi MATRIX GREEN (0xFF00FF00) + GLOW
-        Text(
-          value,
-          style: TextStyle(
-            color: valueColor, // 🔥 INI KEKUNCI DIA (HIJAU MATRIX)
-            fontSize: 14, 
-            fontWeight: FontWeight.bold, 
-            fontFamily: 'monospace', 
-            letterSpacing: 1.5,
-            shadows: [
-              Shadow(color: valueColor, blurRadius: 10), // Glow Effect
-            ],
+        const SizedBox(height: 4),
+        Container(
+          height: 4,
+          decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2)),
+          child: FractionallySizedBox(
+            widthFactor: value.clamp(0.0, 1.0),
+            child: Container(
+              decoration: BoxDecoration(color: uiColor, boxShadow: [BoxShadow(color: uiColor.withOpacity(0.5), blurRadius: 4)]),
+            ),
           ),
         ),
       ],
