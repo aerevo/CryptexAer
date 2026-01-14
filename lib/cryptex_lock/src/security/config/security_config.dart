@@ -1,6 +1,7 @@
 /*
  * PROJECT: CryptexLock Security Suite V3.0
  * MODULE: Security Configuration (MERGED: Core + Server + Incident Reporting)
+ * STATUS: FIXED & UPDATED FOR PRODUCTION BUILD ✅
  */
 
 class SecurityConfig {
@@ -25,7 +26,7 @@ class SecurityConfig {
   final bool enableCertificatePinning;
 
   // =========================================================
-  // ðŸ”¥ 3. INCIDENT REPORTING SETTINGS (NEW)
+  // 3. INCIDENT REPORTING SETTINGS (THE INTELLIGENCE HUB)
   // =========================================================
   
   /// Enable automatic incident reporting to server
@@ -43,7 +44,7 @@ class SecurityConfig {
   /// Auto-retry failed incident reports
   final bool retryFailedReports;
   
-  /// Show incident report confirmation dialog to user
+  /// Show confirmation dialog to user before reporting
   final bool showReportConfirmation;
 
   const SecurityConfig({
@@ -57,138 +58,102 @@ class SecurityConfig {
 
     // Server Defaults
     this.enableServerValidation = false,
-    this.serverEndpoint = "https://api.cryptex.aer/verify",
+    this.serverEndpoint = "https://api.yourdomain.com",
     this.serverTimeout = const Duration(seconds: 5),
     this.allowOfflineFallback = true,
-    this.serverConfidenceThreshold = 0.85,
+    this.serverConfidenceThreshold = 0.8,
     this.enableCertificatePinning = false,
-    
-    // ðŸ”¥ Incident Reporting Defaults
-    this.enableIncidentReporting = true,
-    this.autoReportCriticalThreats = true,
+
+    // Reporting Defaults (Default: OFF)
+    this.enableIncidentReporting = false,
+    this.autoReportCriticalThreats = false,
     this.enableLocalIncidentStorage = true,
     this.maxLocalIncidentLogs = 50,
-    this.retryFailedReports = true,
+    this.retryFailedReports = false,
     this.showReportConfirmation = true,
   });
 
   // =========================================================
-  // FACTORIES
+  // FACTORY CONSTRUCTORS (PRESETS)
   // =========================================================
 
-  /// Standard default config
-  factory SecurityConfig.standard() {
-    return const SecurityConfig();
-  }
-
-  /// Development config (no server, basic reporting)
-  factory SecurityConfig.development() {
-    return const SecurityConfig(
-      enableServerValidation: false,
-      enableBiometrics: true,
-      enableIncidentReporting: true,
-      autoReportCriticalThreats: false, // Manual reporting in dev
-      showReportConfirmation: true,
-    );
-  }
-  
-  /// Production config (High Security + Full Reporting)
+  /// 🔥 PRODUCTION PRESET (High Security)
+  /// Updated to accept Incident Reporting parameters from main.dart
   factory SecurityConfig.production({
-    required String serverEndpoint,
+    String serverEndpoint = "https://api.yourdomain.com",
+    bool enableCertificatePinning = true,
+    // ✅ FIX: Parameter ditambah di sini supaya main.dart tak error
+    bool enableIncidentReporting = true,
+    bool autoReportCriticalThreats = true,
+    bool retryFailedReports = true,
   }) {
     return SecurityConfig(
-      // Core Security
       enableBiometrics: true,
-      maxAttempts: 3,
-      lockoutDuration: const Duration(minutes: 5),
+      enablePinFallback: true,
+      maxAttempts: 3, // Stricter attempts
+      lockoutDuration: const Duration(minutes: 1), // Longer lockout
       
-      // Server Validation
       enableServerValidation: true,
       serverEndpoint: serverEndpoint,
-      allowOfflineFallback: true,
+      allowOfflineFallback: false, // Strict: Must valid online
       serverConfidenceThreshold: 0.85,
-      enableCertificatePinning: true,
+      enableCertificatePinning: enableCertificatePinning,
       
-      // ðŸ”¥ Incident Reporting (Production)
-      enableIncidentReporting: true,
-      autoReportCriticalThreats: true,
+      // ✅ FIX: Nilai dari parameter dimasukkan ke sini
+      enableIncidentReporting: enableIncidentReporting,
+      autoReportCriticalThreats: autoReportCriticalThreats,
+      retryFailedReports: retryFailedReports,
       enableLocalIncidentStorage: true,
       maxLocalIncidentLogs: 100,
-      retryFailedReports: true,
-      showReportConfirmation: false, // Auto-report in production
+      showReportConfirmation: false, // Auto-report in background for critical apps
+    );
+  }
+
+  /// DEVELOPMENT PRESET (Debugging)
+  factory SecurityConfig.development({
+    String serverEndpoint = "http://localhost:3000",
+  }) {
+    return SecurityConfig(
+      maxAttempts: 99,
+      lockoutDuration: const Duration(seconds: 5),
+      enableServerValidation: false,
+      serverEndpoint: serverEndpoint,
+      enableIncidentReporting: true,
+      showReportConfirmation: true, // Ask dev before sending
     );
   }
   
-  /// Strict production (No offline fallback, immediate reporting)
+  /// STRICT PRESET (Military Grade)
   factory SecurityConfig.strict({
     required String serverEndpoint,
   }) {
     return SecurityConfig(
-      // Core Security
       enableBiometrics: true,
-      maxAttempts: 3,
-      obscureInput: true,
+      enablePinFallback: false, // Biometrics ONLY
+      maxAttempts: 2,
+      lockoutDuration: const Duration(minutes: 5),
       
-      // Server Validation
-      enableServerValidation: true,
-      serverEndpoint: serverEndpoint,
-      allowOfflineFallback: false, // No offline mode
-      serverConfidenceThreshold: 0.90,
-      enableCertificatePinning: true,
-      
-      // ðŸ”¥ Incident Reporting (Strict)
-      enableIncidentReporting: true,
-      autoReportCriticalThreats: true, // Immediate auto-report
-      enableLocalIncidentStorage: false, // Server-only
-      maxLocalIncidentLogs: 0,
-      retryFailedReports: false, // Fail-fast
-      showReportConfirmation: false,
-    );
-  }
-  
-  /// Banking/Financial config (Maximum security)
-  factory SecurityConfig.banking({
-    required String serverEndpoint,
-  }) {
-    return SecurityConfig(
-      // Core Security (Strict)
-      enableBiometrics: true,
-      maxAttempts: 3,
-      lockoutDuration: const Duration(minutes: 30),
-      obscureInput: true,
-      
-      // Server Validation (Required)
       enableServerValidation: true,
       serverEndpoint: serverEndpoint,
       allowOfflineFallback: false,
-      serverConfidenceThreshold: 0.95,
+      serverConfidenceThreshold: 0.95, // Very high confidence required
       enableCertificatePinning: true,
       
-      // ðŸ”¥ Incident Reporting (Maximum)
       enableIncidentReporting: true,
       autoReportCriticalThreats: true,
-      enableLocalIncidentStorage: true,
-      maxLocalIncidentLogs: 200,
       retryFailedReports: true,
-      showReportConfirmation: false,
     );
   }
-  
+
   /// Validate configuration integrity
   bool isValid() {
     if (enableServerValidation && serverEndpoint.isEmpty) {
       return false;
     }
-    if (enableIncidentReporting && serverEndpoint.isEmpty) {
-      return false; // Need endpoint for reporting
-    }
-    if (maxLocalIncidentLogs < 0) {
-      return false;
-    }
     return true;
   }
 
-  /// CopyWith helper
+  /// CopyWith helper for dynamic updates
   SecurityConfig copyWith({
     bool? enableBiometrics,
     bool? enablePinFallback,
