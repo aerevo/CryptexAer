@@ -1,7 +1,6 @@
-// 🛡️ Z-KINETIC FINAL PRODUCTION (AUDIT PASSED)
-// Version: 1.0.0
-// Status: READY TO DEPLOY
-// Duty: Intelligence Hub + Anti-Manipulation Enforcer
+// 🛡️ Z-KINETIC FINAL PRODUCTION (BUG-FIXED)
+// Status: COMPILATION ERROR FIXED ✅
+// Duty: Intelligence Hub + Forensic Reporting + Production Stability
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,7 +13,6 @@ import 'cryptex_lock/src/cla_models.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 📱 Enforce Portrait Mode for Sensor Integrity
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -32,25 +30,23 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Z-KINETIC PRO',
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF000000), // Pure Black for Matrix Feel
+        scaffoldBackgroundColor: const Color(0xFF000000), 
         primaryColor: Colors.cyanAccent,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.black,
           elevation: 0,
         ),
       ),
-      // 🧪 SIMULASI SERANGAN (Audit Point #1: Auto-detect Manipulation)
-      // Situasi: Hacker ubah paparan RM 50 -> RM 50,000
       home: const LockScreen(
         systemName: "SECURE BANKING UPLINK",
-        displayedAmount: "RM 50,000.00", // 😈 Manipulated Value
-        secureHash: "HASH-RM50.00",      // 🛡️ Original Integrity Signature
+        displayedAmount: "RM 50,000.00", 
+        secureHash: "HASH-RM50.00",      
       ),
     );
   }
 }
 
-// 🧠 SECURITY INCIDENT MODEL (Audit Point: JSON Reporting)
+// 🧠 SECURITY INCIDENT MODEL
 class SecurityIncidentReport {
   final String incidentId;
   final String timestamp;
@@ -84,7 +80,6 @@ class SecurityIncidentReport {
   };
 }
 
-// 🔒 LOCK SCREEN: THE GATEKEEPER
 class LockScreen extends StatefulWidget {
   final String systemName;
   final String displayedAmount;
@@ -109,28 +104,23 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void initState() {
     super.initState();
-    _performIntegrityAudit(); // 🕵️‍♂️ Audit data sebelum unlock
+    _performIntegrityAudit(); 
     _initializeController();
   }
 
-  // 🕵️‍♂️ INTERNAL DATA AUDIT LOGIC
   void _performIntegrityAudit() {
-    // Generate expected hash from current display
     final calculatedHash = "HASH-${widget.displayedAmount.replaceAll(' ', '').replaceAll(',', '')}";
-    
-    // Check mismatch
     if (calculatedHash != widget.secureHash) {
       setState(() {
         _isCompromised = true;
       });
-      debugPrint("🚨 AUDIT ALERT: Integrity mismatch detected!");
     }
   }
 
   void _initializeController() {
     _controller = ClaController(
       const ClaConfig(
-        secret: [1, 7, 3, 9, 2], // 🔑 Secret Target
+        secret: [1, 7, 3, 9, 2], 
         minShake: 0.4, 
         botDetectionSensitivity: 0.25,  
         thresholdAmount: 0.25, 
@@ -151,7 +141,6 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
-  // 🦸‍♂️ HERO ACTION: FORENSIC REPORTING
   Future<void> _handleReportAndCancel() async {
     HapticFeedback.heavyImpact();
     
@@ -164,8 +153,6 @@ class _LockScreenState extends State<LockScreen> {
       expectedSignature: widget.secureHash,
       action: "BLOCK_AND_REPORT",
     );
-
-    debugPrint("📡 UPLOADING FORENSICS: ${jsonEncode(report.toJson())}");
 
     showDialog(
       context: context,
@@ -185,7 +172,7 @@ class _LockScreenState extends State<LockScreen> {
 
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
-    Navigator.pop(context); // Close loading
+    Navigator.pop(context); 
 
     showDialog(
       context: context,
@@ -224,6 +211,17 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 
+  // ✅ FIX: Ditambah semula untuk mengelakkan ralat kompilasi
+  void _onJammed() {
+    HapticFeedback.vibrate();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("⛔ SECURITY LOCKOUT: ${_controller.remainingLockoutSeconds}s"),
+        backgroundColor: Colors.deepOrange,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -239,16 +237,15 @@ class _LockScreenState extends State<LockScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 🎭 DUAL UI BASED ON AUDIT
               _isCompromised ? _buildHackedNotice() : _buildSafeNotice(),
               
               const SizedBox(height: 50),
 
-              // 🎡 CRYPTEX WIDGET (Audit Point: Neon/Sci-Fi Integration)
               CryptexLock(
                 controller: _controller,
                 onSuccess: _onSuccess,
                 onFail: _onFail,
+                onJammed: _onJammed, // 🔥 FIX: Parameter wajib disediakan
               ),
               
               const SizedBox(height: 30),
