@@ -1,18 +1,154 @@
 /**
- * CryptexLock Mirror Server
- * Device Authentication & Verification
- * Prevents unauthorized device access
+ * CryptexLock Mirror Server V3.0
+ * Device Authentication & Blacklist Management
+ * NEW: Dynamic blacklisting for compromised devices
  */
 
 const crypto = require('crypto');
 
-// In-memory device registry (in production, use database)
+// In-memory stores (in production, use Redis/Database)
 const registeredDevices = new Map();
 const deviceNonces = new Map();
 
+// ðŸ”¥ NEW: Blacklist management
+const blacklistedDevices = new Map();
+const suspiciousDevices = new Map();
+
+// Blacklist configuration
+const BLACKLIST_CONFIG = {
+  // Auto-blacklist if device hits these thresholds
+  maxSuspiciousReports: 3,
+  maxFailedAttempts: 5,
+  
+  // Blacklist durations (milliseconds)
+  temporaryBanDuration: 3600000, // 1 hour
+  permanentBanThreshold: 10, // After 10 incidents, permanent ban
+  
+  // Grace period for first-time offenders
+  gracePeriod: 300000, // 5 minutes
+};
+
+/**
+ * ðŸ”¥ NEW: Check if device is blacklisted
+ */
+function isDeviceBlacklisted(deviceId) {
+  const blacklistEntry = blacklistedDevices.get(deviceId);
+  
+  if (!blacklistEntry) return false;
+  
+  // Check if temporary ban expired
+  if (blacklistEntry.type === 'TEMPORARY') {
+    const now = Date.now();
+    if (now > blacklistEntry.expiresAt) {
+      // Ban expired, remove from blacklist
+      blacklistedDevices.delete(deviceId);
+      return false;
+    }
+  }
+  
+  // Still blacklisted
+  return true;
+}
+
+/**
+ * ðŸ”¥ NEW: Blacklist a device
+ */
+function blacklistDevice(deviceId, reason = {}) {
+  const existingEntry = blacklistedDevices.get(deviceId);
+  
+  // Check if should be permanent ban
+  const incidentCount = existingEntry ? existingEntry.incidentCount + 1 : 1;
+  const isPermanent = incidentCount >= BLACKLIST_CONFIG.permanentBanThreshold;
+  
+  const blacklistEntry = {
+    deviceId,
+    type: isPermanent ? 'PERMANENT' : 'TEMPORARY',
+    reason: reason.reason || 'SECURITY_INCIDENT',
+    incidentId: reason.incident_id,
+    timestamp: reason.timestamp || new Date().toISOString(),
+    incidentCount,
+    blacklistedAt: Date.now(),
+    expiresAt: isPermanent ? null : Date.now() + BLACKLIST_CONFIG.temporaryBanDuration,
+  };
+  
+  blacklistedDevices.set(deviceId, blacklistEntry);
+  
+  console.log(`ðŸš« Device Blacklisted: ${deviceId} (${blacklistEntry.type})`);
+  
+  return blacklistEntry;
+}
+
+/**
+ * ðŸ”¥ NEW: Mark device as suspicious (warning system)
+ */
+function flagDeviceAsSuspicious(deviceId, reason) {
+  let suspiciousEntry = suspiciousDevices.get(deviceId);
+  
+  if (!suspiciousEntry) {
+    suspiciousEntry = {
+      deviceId,
+      flags: [],
+      firstFlaggedAt: Date.now(),
+    };
+  }
+  
+  suspiciousEntry.flags.push({
+    reason,
+    timestamp: Date.now(),
+  });
+  
+  suspiciousDevices.set(deviceId, suspiciousEntry);
+  
+  // Auto-blacklist if too many flags
+  if (suspiciousEntry.flags.length >= BLACKLIST_CONFIG.maxSuspiciousReports) {
+    blacklistDevice(deviceId, {
+      reason: 'EXCESSIVE_SUSPICIOUS_ACTIVITY',
+      incident_id: `AUTO-${Date.now()}`,
+    });
+  }
+  
+  return suspiciousEntry;
+}
+
+/**
+ * ðŸ”¥ NEW: Remove device from blacklist (admin action)
+ */
+function unblacklistDevice(deviceId) {
+  const wasBlacklisted = blacklistedDevices.has(deviceId);
+  
+  if (wasBlacklisted) {
+    blacklistedDevices.delete(deviceId);
+    suspiciousDevices.delete(deviceId);
+    console.log(`âœ… Device Unblacklisted: ${deviceId}`);
+  }
+  
+  return wasBlacklisted;
+}
+
+/**
+ * ðŸ”¥ NEW: Get blacklist statistics
+ */
+function getBlacklistStats() {
+  const stats = {
+    total: blacklistedDevices.size,
+    permanent: 0,
+    temporary: 0,
+    suspicious: suspiciousDevices.size,
+  };
+  
+  for (const entry of blacklistedDevices.values()) {
+    if (entry.type === 'PERMANENT') {
+      stats.permanent++;
+    } else {
+      stats.temporary++;
+    }
+  }
+  
+  return stats;
+}
+
 /**
  * Verify device signature
- * Ensures request comes from legitimate app
  */
 function verifyDeviceSignature(req, res, next) {
   const { device_id, app_signature } = req.body;
@@ -25,8 +161,10 @@ function verifyDeviceSignature(req, res, next) {
     });
   }
   
-  // Verify app signature format
   if (!isValidSignature(app_signature)) {
+    // Flag as suspicious
+    flagDeviceAsSuspicious(device_id, 'invalid_signature');
+    
     return res.status(403).json({
       allow: false,
       reason: 'invalid_app_signature',
@@ -34,7 +172,6 @@ function verifyDeviceSignature(req, res, next) {
     });
   }
   
-  // Optional: Check device whitelist
   if (process.env.DEVICE_WHITELIST_ENABLED === 'true') {
     if (!isDeviceWhitelisted(device_id)) {
       return res.status(403).json({
@@ -57,7 +194,7 @@ function verifyDeviceSignature(req, res, next) {
  * Verify request nonce (prevent replay attacks)
  */
 function verifyNonce(req, res, next) {
-  const { nonce, timestamp } = req.body;
+  const { nonce, timestamp, device_id } = req.body;
   
   if (!nonce || !timestamp) {
     return res.status(400).json({
@@ -67,7 +204,7 @@ function verifyNonce(req, res, next) {
     });
   }
   
-  // Check timestamp freshness (within 30 seconds)
+  // Check timestamp freshness
   const now = Date.now();
   const requestTime = parseInt(timestamp);
   const timeDiff = Math.abs(now - requestTime);
@@ -81,9 +218,12 @@ function verifyNonce(req, res, next) {
   }
   
   // Check if nonce already used (replay attack)
-  const nonceKey = `${req.body.device_id}:${nonce}`;
+  const nonceKey = `${device_id}:${nonce}`;
   
   if (deviceNonces.has(nonceKey)) {
+    // Flag as suspicious - replay attack attempt
+    flagDeviceAsSuspicious(device_id, 'replay_attack_attempt');
+    
     return res.status(403).json({
       allow: false,
       reason: 'replay_attack_detected',
@@ -91,7 +231,7 @@ function verifyNonce(req, res, next) {
     });
   }
   
-  // Store nonce (expire after 1 minute)
+  // Store nonce
   deviceNonces.set(nonceKey, Date.now());
   setTimeout(() => deviceNonces.delete(nonceKey), 60000);
   
@@ -100,7 +240,6 @@ function verifyNonce(req, res, next) {
 
 /**
  * Verify Zero-Knowledge Proof
- * Checks if user knows the code without revealing it
  */
 function verifyZKProof(req, res, next) {
   const { device_id, zk_proof, nonce } = req.body;
@@ -113,22 +252,20 @@ function verifyZKProof(req, res, next) {
     });
   }
   
-  // Get expected proof hash for this device
-  // In production, this comes from secure database
   const expectedProof = getExpectedProofHash(device_id);
   
   if (!expectedProof) {
-    // First time user - store their proof
     storeProofHash(device_id, zk_proof);
     req.zkVerified = true;
     return next();
   }
   
-  // Verify proof matches (user knows correct code)
-  // Note: Proof includes nonce, so changes each request
   const isValid = verifyProofHash(zk_proof, expectedProof, nonce);
   
   if (!isValid) {
+    // Flag as suspicious - invalid proof
+    flagDeviceAsSuspicious(device_id, 'invalid_zk_proof');
+    
     return res.status(403).json({
       allow: false,
       reason: 'invalid_zk_proof',
@@ -141,51 +278,26 @@ function verifyZKProof(req, res, next) {
 }
 
 /**
- * Helper: Validate signature format
+ * Helper functions
  */
 function isValidSignature(signature) {
-  // Basic validation - in production, verify actual signature
   return signature && signature.length >= 32;
 }
 
-/**
- * Helper: Check device whitelist
- */
 function isDeviceWhitelisted(deviceId) {
-  // In production, check against database
   return true; // Allow all for now
 }
 
-/**
- * Helper: Get expected proof hash for device
- */
 function getExpectedProofHash(deviceId) {
-  // In production, retrieve from secure database
-  // For now, return stored hash if exists
   return registeredDevices.get(deviceId);
 }
 
-/**
- * Helper: Store proof hash for device
- */
 function storeProofHash(deviceId, proofHash) {
-  // In production, store in secure database
   registeredDevices.set(deviceId, proofHash);
 }
 
-/**
- * Helper: Verify proof hash
- */
 function verifyProofHash(providedProof, expectedProof, nonce) {
-  // In production, implement proper cryptographic verification
-  // For now, basic hash comparison
-  
-  // Extract base proof (without nonce)
-  // Since proof = hash(code:nonce:secret), we can't directly compare
-  // Server should regenerate expected hash with same nonce
-  
-  // Simplified: just check if proof format is valid
-  return providedProof && providedProof.length === 64; // SHA-256 length
+  return providedProof && providedProof.length === 64;
 }
 
 /**
@@ -202,12 +314,48 @@ function logSuspiciousActivity(req, reason) {
   
   console.warn('[SECURITY]', JSON.stringify(log));
   
-  // In production, send to monitoring system (Sentry, CloudWatch, etc.)
+  // Flag device as suspicious
+  if (req.body?.device_id) {
+    flagDeviceAsSuspicious(req.body.device_id, reason);
+  }
 }
+
+/**
+ * ðŸ”¥ NEW: Periodic cleanup of expired entries
+ */
+function cleanupExpiredEntries() {
+  const now = Date.now();
+  
+  // Clean expired blacklist entries
+  for (const [deviceId, entry] of blacklistedDevices.entries()) {
+    if (entry.type === 'TEMPORARY' && now > entry.expiresAt) {
+      blacklistedDevices.delete(deviceId);
+      console.log(`ðŸ§¹ Expired blacklist removed: ${deviceId}`);
+    }
+  }
+  
+  // Clean old suspicious flags (after 24 hours)
+  const maxAge = 24 * 60 * 60 * 1000;
+  for (const [deviceId, entry] of suspiciousDevices.entries()) {
+    if (now - entry.firstFlaggedAt > maxAge) {
+      suspiciousDevices.delete(deviceId);
+    }
+  }
+}
+
+// Run cleanup every 10 minutes
+setInterval(cleanupExpiredEntries, 10 * 60 * 1000);
 
 module.exports = {
   verifyDeviceSignature,
   verifyNonce,
   verifyZKProof,
-  logSuspiciousActivity
+  logSuspiciousActivity,
+  
+  // ðŸ”¥ NEW exports
+  isDeviceBlacklisted,
+  blacklistDevice,
+  unblacklistDevice,
+  flagDeviceAsSuspicious,
+  getBlacklistStats,
 };
