@@ -1,13 +1,9 @@
-// 📦 Z-KINETIC MODELS (SYNCED V3.0)
-// Status: ARCHITECTURE FIXED ✅
-// Role: Define contracts clearly so Controller & Engine can speak.
+// 📦 Z-KINETIC MODELS (SYNCED V3.1)
+// Status: COMPATIBILITY FIXED ✅
+// Role: Define contracts clearly.
 
 import 'package:flutter/foundation.dart';
-import 'security/config/security_config.dart'; // Import config server/reporting
-
-// ==========================================
-// 1. DATA STRUCTURES (EVENT & STATE)
-// ==========================================
+import 'security/config/security_config.dart'; 
 
 enum SecurityState { LOCKED, VALIDATING, UNLOCKED, SOFT_LOCK, HARD_LOCK }
 
@@ -27,11 +23,6 @@ class MotionEvent {
   });
 }
 
-// ==========================================
-// 2. CONFIGURATION CONTRACTS
-// ==========================================
-
-/// 🔥 ENGINE CONFIG: Tetapan sensitiviti untuk SecurityEngine
 class SecurityEngineConfig {
   final double minEntropy;
   final double minVariance;
@@ -46,23 +37,14 @@ class SecurityEngineConfig {
     this.minMotionPresence = 0.05,
     this.botThreshold = 0.4,
   });
-  
-  // Factory untuk tetapan ketat/longgar
-  factory SecurityEngineConfig.standard() => const SecurityEngineConfig();
-  factory SecurityEngineConfig.strict() => const SecurityEngineConfig(
-    minEntropy: 0.3, 
-    minConfidence: 0.5,
-    botThreshold: 0.3
-  );
 }
 
-/// 🔥 MAIN CONFIG: Config induk yang pegang semua sub-config
 class ClaConfig {
   // A. Core Settings
   final List<int> secret;
   final Duration minSolveTime;
   final double minShake;
-  final double thresholdAmount; // e.g. 0.25 screen height
+  final double thresholdAmount; 
   final int maxAttempts;
   
   // B. Cooldowns
@@ -72,13 +54,16 @@ class ClaConfig {
   // C. Feature Flags
   final bool enableSensors;
   
-  // D. Identity (Telemetry)
+  // D. Identity
   final String clientId;
   final String clientSecret;
 
-  // E. SUB-CONFIGS (Punca Error Dulu: Ini wajib ada!)
-  final SecurityConfig? securityConfig;       // Server & Reporting Config
-  final SecurityEngineConfig engineConfig;    // Logic Config (Human/Bot)
+  // E. SUB-CONFIGS
+  final SecurityConfig? securityConfig;       
+  final SecurityEngineConfig engineConfig;    
+  
+  // ✅ FIX: Parameter ini ditambah untuk support main.dart lama
+  final double botDetectionSensitivity;
 
   const ClaConfig({
     required this.secret,
@@ -92,6 +77,8 @@ class ClaConfig {
     this.clientId = 'DEFAULT_CLIENT',
     this.clientSecret = '',
     this.securityConfig,
-    this.engineConfig = const SecurityEngineConfig(), // Default engine config
+    this.engineConfig = const SecurityEngineConfig(),
+    // Default value jika tak diberi
+    this.botDetectionSensitivity = 0.25, 
   });
 }
