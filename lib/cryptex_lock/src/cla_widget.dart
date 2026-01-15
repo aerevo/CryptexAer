@@ -1,6 +1,8 @@
-// 🎯 PROJECT Z-KINETIC V3.9 - HYPER SENSITIVE UI (COMPLETE BUILD)
-// Status: COMPILATION FIXED ✅
-// Features: Instant Touch Green + Hyper Motion Sensitivity + All Graphics Restored
+// 🎯 PROJECT Z-KINETIC V3.9 - HYPER SENSITIVE UI (COMPLETE)
+// Status: INSTANT REACTION FIX ✅
+// 1. Touch: Tap once -> INSTANT 100% GREEN (Memory 3s)
+// 2. Motion: Micro-shakes -> INSTANT 100% GREEN
+// 3. ALL PAINTERS INCLUDED ✅
 
 import 'dart:async';
 import 'dart:math';
@@ -11,22 +13,14 @@ import 'package:sensors_plus/sensors_plus.dart';
 
 import 'cla_controller.dart';
 import 'cla_models.dart';
-import 'security_engine.dart';
 
-// ============================================
-// 1. PATTERN ANALYZER (Visual Helper)
-// ============================================
 class PatternAnalyzer {
   static double analyze(List<Map<String, dynamic>> touchData) {
-    // 🔥 VISUAL HACK: Asalkan ada data, bagi markah penuh visual
     if (touchData.isNotEmpty) return 1.0; 
     return 0.0;
   }
 }
 
-// ============================================
-// 2. MAIN WIDGET: CRYPTEX LOCK
-// ============================================
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback onSuccess;
@@ -52,26 +46,21 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // Data Visualisasi
   double _patternScore = 0.0;
   double _liveMotionScore = 0.0; 
   double _liveTouchScore = 0.0;  
   
-  // Touch Memory
   Timer? _touchDecayTimer;
   
-  // Motion Calculation
   double _lastX = 0, _lastY = 0, _lastZ = 0;
   
   List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
   
-  // Sensor Data for UI
   double _accelX = 0.0;
   double _accelY = 0.0;
   DateTime? _lastUiUpdate;
   
-  // Animations
   late AnimationController _pulseController;
   late AnimationController _scanController;
   late AnimationController _reticleController;
@@ -125,21 +114,17 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       _accelX = e.x;
       _accelY = e.y;
       
-      // 🔥 FIX MOTION: Kira 'Delta' (Perubahan), bukan raw gravity
       double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
       
-      // Amplify x10! Goyang sikit je visual dah penuh.
       double amplifiedMotion = (delta * 10.0).clamp(0.0, 1.0);
       
-      // Hantar data mentah ke Controller (Biarkan engine fikir sendiri)
       widget.controller.registerShake(delta, e.x, e.y, e.z);
 
-      // Visual Score (Fast Attack, Slow Decay)
       if (amplifiedMotion > _liveMotionScore) {
         _liveMotionScore = amplifiedMotion;
       } else {
-        _liveMotionScore = (_liveMotionScore * 0.92); // Decay lambat sikit
+        _liveMotionScore = (_liveMotionScore * 0.92);
       }
 
       final now = DateTime.now();
@@ -160,19 +145,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     });
   }
 
-  // 🔥 FIX TOUCH: Fungsi ini dipanggil bila jari kena skrin (Tap/Scroll)
   void _triggerTouchActive() {
-    _liveTouchScore = 1.0; // TERUS HIJAU
-    setState(() => _patternScore = 1.0); // Pattern pun hijau
+    _liveTouchScore = 1.0;
+    setState(() => _patternScore = 1.0);
     
     _touchDecayTimer?.cancel();
-    _touchDecayTimer = Timer(const Duration(seconds: 3), () {
-      // Lepas 3 saat baru indicator turun (Memory)
-    });
+    _touchDecayTimer = Timer(const Duration(seconds: 3), () {});
   }
 
   void _analyzeScrollPattern() {
-    _triggerTouchActive(); // Panggil touch active logic
+    _triggerTouchActive();
     
     final now = DateTime.now();
     double speed = _lastScrollTime != null ? 1000.0 / now.difference(_lastScrollTime!).inMilliseconds : 0.0;
@@ -185,8 +167,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
-    _accelSub?.cancel(); _lockoutTimer?.cancel(); _wheelActiveTimer?.cancel(); _touchDecayTimer?.cancel();
-    _pulseController.dispose(); _scanController.dispose(); _reticleController.dispose();
+    _accelSub?.cancel(); 
+    _lockoutTimer?.cancel(); 
+    _wheelActiveTimer?.cancel(); 
+    _touchDecayTimer?.cancel();
+    _pulseController.dispose(); 
+    _scanController.dispose(); 
+    _reticleController.dispose();
     for (var c in _scrollControllers) c.dispose();
     super.dispose();
   }
@@ -200,7 +187,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     
     String statusLabel = _getStatusLabel(state);
     
-    // Logic Decay Visual
     if (_touchDecayTimer != null && _touchDecayTimer!.isActive) {
       _liveTouchScore = 1.0; 
     } else {
@@ -212,7 +198,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       physics: const BouncingScrollPhysics(),
       child: Stack(
         children: [
-          // ⚠️ PENTING: Class ini ada di bahagian bawah fail
           Positioned.fill(child: CustomPaint(painter: KineticGridPainter(color: activeColor))),
           
           Container(
@@ -232,10 +217,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
                 const SizedBox(height: 28),
                 
-                // INTERACTIVE AREA
                 Listener(
                   onPointerDown: (_) {
-                    _triggerTouchActive(); // TAP PUN DIKIRA
+                    _triggerTouchActive();
                     widget.controller.registerTouch();
                   },
                   child: _buildInteractiveTumblerArea(activeColor, state),
@@ -275,7 +259,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Widget _buildHUDHeader(Color color, String status) {
     return Stack(
       children: [
-        _buildHUDCorner(color, true, true), _buildHUDCorner(color, true, false),
+        _buildHUDCorner(color, true, true), 
+        _buildHUDCorner(color, true, false),
         Row(
           children: [
             Expanded(
@@ -319,7 +304,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             left: 0, top: 0, bottom: 0, 
             child: CustomPaint(
               size: const Size(45, 140), 
-              // ⚠️ PENTING: Painter ini ada di bahagian bawah
               painter: KineticPeripheralPainter(
                 color: color, side: 'left', valX: _accelX, valY: _accelY, state: state,
               )
@@ -372,7 +356,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         onPointerDown: (_) {
           setState(() => _activeWheelIndex = index);
           _wheelActiveTimer?.cancel();
-          _triggerTouchActive(); // TAP RODA TERUS HIJAU
+          _triggerTouchActive();
           widget.controller.registerTouch();
         },
         onPointerUp: (_) => _resetActiveWheelTimer(),
@@ -459,22 +443,27 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 }
 
 // ============================================
-// 4. CUSTOM PAINTERS (INI BAHAGIAN YANG HILANG TADI)
+// 🎨 CUSTOM PAINTERS (COMPLETE)
 // ============================================
 
 class KineticGridPainter extends CustomPainter {
-  final Color color; KineticGridPainter({required this.color});
+  final Color color;
+  KineticGridPainter({required this.color});
+  
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()..color = color.withOpacity(0.04)..strokeWidth = 1;
     for (double x = 0; x < size.width; x += 40) canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
     for (double y = 0; y < size.height; y += 40) canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
   }
-  @override bool shouldRepaint(KineticGridPainter old) => old.color != color;
+  
+  @override 
+  bool shouldRepaint(KineticGridPainter old) => old.color != color;
 }
 
 class KineticPeripheralPainter extends CustomPainter {
-  final Color color; final String side;
+  final Color color;
+  final String side;
   final double valX, valY;
   final SecurityState state;
 
@@ -514,7 +503,8 @@ class KineticPeripheralPainter extends CustomPainter {
 
   void _drawText(Canvas c, TextPainter tp, String s, double x, double y, double sz, Color col, bool b) {
     tp.text = TextSpan(text: s, style: TextStyle(color: col, fontSize: sz, fontWeight: b ? FontWeight.bold : FontWeight.normal, fontFamily: 'Courier'));
-    tp.layout(); tp.paint(c, Offset(x, y));
+    tp.layout(); 
+    tp.paint(c, Offset(x, y));
   }
   
   @override 
@@ -523,13 +513,19 @@ class KineticPeripheralPainter extends CustomPainter {
 }
 
 class KineticReticlePainter extends CustomPainter {
-  final Color color; final double progress;
+  final Color color;
+  final double progress;
+  
   KineticReticlePainter({required this.color, required this.progress});
+  
   @override
   void paint(Canvas canvas, Size size) {
     final c = Offset(size.width/2, size.height/2);
     final p = Paint()..color = color.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth = 2;
-    canvas.save(); canvas.translate(c.dx, c.dy); canvas.rotate(progress * 2 * pi); canvas.translate(-c.dx, -c.dy);
+    canvas.save(); 
+    canvas.translate(c.dx, c.dy); 
+    canvas.rotate(progress * 2 * pi); 
+    canvas.translate(-c.dx, -c.dy);
     canvas.drawCircle(c, 22, p);
     for (int i = 0; i < 4; i++) {
       final a = i * pi / 2;
@@ -537,16 +533,23 @@ class KineticReticlePainter extends CustomPainter {
     }
     canvas.restore();
   }
-  @override bool shouldRepaint(KineticReticlePainter old) => old.progress != progress;
+  
+  @override 
+  bool shouldRepaint(KineticReticlePainter old) => old.progress != progress;
 }
 
 class KineticScanLinePainter extends CustomPainter {
-  final Color color; final double progress;
+  final Color color;
+  final double progress;
+  
   KineticScanLinePainter({required this.color, required this.progress});
+  
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, color.withOpacity(0.6), Colors.transparent]).createShader(Rect.fromLTWH(0, size.height * progress - 2, size.width, 4));
     canvas.drawRect(Rect.fromLTWH(0, size.height * progress - 2, size.width, 4), p);
   }
-  @override bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress;
+  
+  @override 
+  bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress;
 }
