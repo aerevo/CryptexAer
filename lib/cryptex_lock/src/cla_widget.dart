@@ -1,7 +1,6 @@
-// 🎯 PROJECT Z-KINETIC V3.9 - HYPER SENSITIVE UI
-// Status: INSTANT REACTION FIX ✅
-// 1. Touch: Tap once -> INSTANT 100% GREEN (Memory 3s)
-// 2. Motion: Micro-shakes -> INSTANT 100% GREEN
+// 🎯 PROJECT Z-KINETIC V3.9 - HYPER SENSITIVE UI (COMPLETE BUILD)
+// Status: COMPILATION FIXED ✅
+// Features: Instant Touch Green + Hyper Motion Sensitivity + All Graphics Restored
 
 import 'dart:async';
 import 'dart:math';
@@ -14,15 +13,20 @@ import 'cla_controller.dart';
 import 'cla_models.dart';
 import 'security_engine.dart';
 
+// ============================================
+// 1. PATTERN ANALYZER (Visual Helper)
+// ============================================
 class PatternAnalyzer {
   static double analyze(List<Map<String, dynamic>> touchData) {
     // 🔥 VISUAL HACK: Asalkan ada data, bagi markah penuh visual
-    // Supaya user tak panik tengok indicator merah.
     if (touchData.isNotEmpty) return 1.0; 
     return 0.0;
   }
 }
 
+// ============================================
+// 2. MAIN WIDGET: CRYPTEX LOCK
+// ============================================
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback onSuccess;
@@ -122,7 +126,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       _accelY = e.y;
       
       // 🔥 FIX MOTION: Kira 'Delta' (Perubahan), bukan raw gravity
-      // Ini kesan gegaran tangan halus (tremor)
       double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
       
@@ -209,6 +212,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       physics: const BouncingScrollPhysics(),
       child: Stack(
         children: [
+          // ⚠️ PENTING: Class ini ada di bahagian bawah fail
           Positioned.fill(child: CustomPaint(painter: KineticGridPainter(color: activeColor))),
           
           Container(
@@ -228,8 +232,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
                 const SizedBox(height: 28),
                 
-                // 3. INTERACTIVE AREA (Wheels + Peripherals)
-                // 🔥 Balut dengan Listener besar
+                // INTERACTIVE AREA
                 Listener(
                   onPointerDown: (_) {
                     _triggerTouchActive(); // TAP PUN DIKIRA
@@ -316,6 +319,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             left: 0, top: 0, bottom: 0, 
             child: CustomPaint(
               size: const Size(45, 140), 
+              // ⚠️ PENTING: Painter ini ada di bahagian bawah
               painter: KineticPeripheralPainter(
                 color: color, side: 'left', valX: _accelX, valY: _accelY, state: state,
               )
@@ -365,7 +369,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     bool isActive = _activeWheelIndex == index;
     return Expanded(
       child: Listener(
-        // LISTENER DI SINI JUGA PENTING UNTUK INDIVIDUAL WHEEL
         onPointerDown: (_) {
           setState(() => _activeWheelIndex = index);
           _wheelActiveTimer?.cancel();
@@ -455,7 +458,95 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   }
 }
 
-// ... PAINTERS DI BAWAH KEKAL SAMA SEPERTI FAIL SEBELUMNYA ...
-// (Untuk jimat ruang chat, Kapten boleh guna balik painters yang sama)
-// Tapi kalau Kapten nak saya paste FULL FILE termasuk painters, bagitahu.
-// Buat masa ini sila salin dari "class KineticGridPainter" ke bawah dari fail V3.8 tadi.
+// ============================================
+// 4. CUSTOM PAINTERS (INI BAHAGIAN YANG HILANG TADI)
+// ============================================
+
+class KineticGridPainter extends CustomPainter {
+  final Color color; KineticGridPainter({required this.color});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = color.withOpacity(0.04)..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 40) canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
+    for (double y = 0; y < size.height; y += 40) canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+  }
+  @override bool shouldRepaint(KineticGridPainter old) => old.color != color;
+}
+
+class KineticPeripheralPainter extends CustomPainter {
+  final Color color; final String side;
+  final double valX, valY;
+  final SecurityState state;
+
+  KineticPeripheralPainter({required this.color, required this.side, required this.valX, required this.valY, required this.state});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = color.withOpacity(0.3)..strokeWidth = 1;
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+
+    if (side == 'left') {
+      canvas.drawRect(const Rect.fromLTWH(0, 10, 42, 14), Paint()..color = color.withOpacity(0.15));
+      _drawText(canvas, tp, "COORD", 4, 13, 7, color, true);
+      
+      for (int i = 0; i < 4; i++) {
+        double lat = ((valX * 10) + (i * 1.5)).clamp(-90, 90);
+        double lng = ((valY * 10) - (i * 2.1)).clamp(-180, 180);
+        _drawText(canvas, tp, "${lat.toStringAsFixed(2)}°", 2, 35.0 + (i*24), 6, color.withOpacity(0.6), false);
+        _drawText(canvas, tp, "${lng.toStringAsFixed(2)}°", 2, 45.0 + (i*24), 6, color.withOpacity(0.6), false);
+      }
+      canvas.drawLine(const Offset(42, 10), const Offset(42, 130), p);
+    } else {
+      canvas.drawRect(const Rect.fromLTWH(2, 10, 42, 14), Paint()..color = color.withOpacity(0.15));
+      _drawText(canvas, tp, "SYS-ID", 6, 13, 7, color, true);
+      
+      String authStatus = state == SecurityState.VALIDATING ? "PROC" : (state == SecurityState.UNLOCKED ? "COMP" : "PEND");
+      _drawText(canvas, tp, "AUTH: $authStatus", 4, 35, 6, color.withOpacity(0.8), true);
+      _drawText(canvas, tp, "ENC: AES256", 4, 45, 6, color.withOpacity(0.6), false);
+
+      for (int i = 0; i < 12; i++) {
+        double h = 6 + (valX.abs() * 2) + (i % 3);
+        canvas.drawLine(Offset(6.0 + (i*3), 60), Offset(6.0 + (i*3), 60 + h), Paint()..color = color.withOpacity(0.5)..strokeWidth = 1.2);
+      }
+      canvas.drawLine(const Offset(2, 10), const Offset(2, 130), p);
+    }
+  }
+
+  void _drawText(Canvas c, TextPainter tp, String s, double x, double y, double sz, Color col, bool b) {
+    tp.text = TextSpan(text: s, style: TextStyle(color: col, fontSize: sz, fontWeight: b ? FontWeight.bold : FontWeight.normal, fontFamily: 'Courier'));
+    tp.layout(); tp.paint(c, Offset(x, y));
+  }
+  
+  @override 
+  bool shouldRepaint(KineticPeripheralPainter old) => 
+    old.valX != valX || old.valY != valY || old.state != state;
+}
+
+class KineticReticlePainter extends CustomPainter {
+  final Color color; final double progress;
+  KineticReticlePainter({required this.color, required this.progress});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width/2, size.height/2);
+    final p = Paint()..color = color.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth = 2;
+    canvas.save(); canvas.translate(c.dx, c.dy); canvas.rotate(progress * 2 * pi); canvas.translate(-c.dx, -c.dy);
+    canvas.drawCircle(c, 22, p);
+    for (int i = 0; i < 4; i++) {
+      final a = i * pi / 2;
+      canvas.drawLine(Offset(c.dx + 18 * cos(a), c.dy + 18 * sin(a)), Offset(c.dx + 26 * cos(a), c.dy + 26 * sin(a)), p);
+    }
+    canvas.restore();
+  }
+  @override bool shouldRepaint(KineticReticlePainter old) => old.progress != progress;
+}
+
+class KineticScanLinePainter extends CustomPainter {
+  final Color color; final double progress;
+  KineticScanLinePainter({required this.color, required this.progress});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, color.withOpacity(0.6), Colors.transparent]).createShader(Rect.fromLTWH(0, size.height * progress - 2, size.width, 4));
+    canvas.drawRect(Rect.fromLTWH(0, size.height * progress - 2, size.width, 4), p);
+  }
+  @override bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress;
+}
