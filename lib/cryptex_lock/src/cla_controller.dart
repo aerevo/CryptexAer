@@ -1,8 +1,9 @@
-// 🎮 Z-KINETIC CONTROLLER (SYNCED V3.0)
-// Status: BUG FIXED ✅
-// Role: Orchestrator. Uses 'engineConfig' correctly now.
+// 🎮 Z-KINETIC CONTROLLER (SYNCED V3.1)
+// Status: ADAPTER PATTERN APPLIED ✅
+// Role: Orchestrator. Bridges UI requests to Security Engine logic.
 
 import 'dart:async';
+import 'dart:math'; // ✅ FIX: Wajib ada untuk fungsi max()
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -11,7 +12,7 @@ import 'security_engine.dart';
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
-  late final SecurityEngine _engine; // Otak
+  late final SecurityEngine _engine;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   // State
@@ -27,7 +28,11 @@ class ClaController extends ChangeNotifier {
   // Telemetry
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
+  
+  // ✅ FIX: Getter untuk UI Widget (Bridging)
   double get liveConfidence => _engine.lastConfidenceScore;
+  double get motionConfidence => _engine.lastEntropyScore; // UI minta motion confidence
+  double get touchConfidence => _engine.lastConfidenceScore; // UI minta touch confidence
 
   final List<MotionEvent> _motionHistory = [];
   int _touchCount = 0;
@@ -35,26 +40,55 @@ class ClaController extends ChangeNotifier {
 
   ClaController(this.config) {
     currentValues = List.filled(5, 0);
-    
-    // ✅ FIX: Inilah puncanya dulu. Sekarang 'config.engineConfig' wujud!
     _engine = SecurityEngine(config.engineConfig);
-    
     _initSecureStorage();
   }
 
-  // --- SENSOR INPUT ---
+  // --- SENSOR INPUT ADAPTERS (Untuk UI Widget) ---
+
+  // ✅ FIX: UI panggil registerShake, kita hantar ke onMotion
+  void registerShake(double rawMag, double x, double y, double z) {
+    onMotion(x, y, z);
+  }
+
+  // ✅ FIX: UI panggil registerTouch, kita hantar ke onTouch
+  void registerTouch() {
+    onTouch();
+  }
+  
+  // ✅ FIX: UI perlu update nilai roda
+  void updateWheel(int index, int value) {
+    if (index >= 0 && index < currentValues.length) {
+      currentValues[index] = value;
+      notifyListeners();
+    }
+  }
+  
+  // ✅ FIX: UI perlu nilai awal
+  int getInitialValue(int index) {
+    if (index >= 0 && index < currentValues.length) {
+      return currentValues[index];
+    }
+    return 0;
+  }
+  
+  // ✅ FIX: UI panggil validateAttempt
+  Future<bool> validateAttempt({bool hasPhysicalMovement = true}) async {
+    return attemptUnlock();
+  }
+
+  // --- INTERNAL LOGIC ---
 
   void onMotion(double x, double y, double z) {
     if (!config.enableSensors) return;
     
-    final mag = x.abs() + y.abs() + z.abs(); // Simplified magnitude
+    final mag = x.abs() + y.abs() + z.abs();
     _motionHistory.add(MotionEvent(
       magnitude: mag, 
       timestamp: DateTime.now(),
       deltaX: x, deltaY: y, deltaZ: z
     ));
     
-    // Keep clean memory
     if (_motionHistory.length > 50) _motionHistory.removeAt(0);
   }
 
@@ -71,7 +105,6 @@ class ClaController extends ChangeNotifier {
   // --- CORE LOGIC (UNLOCK ATTEMPT) ---
 
   Future<bool> attemptUnlock() async {
-    // 1. Check Hard Lockout (Persistence)
     if (_state == SecurityState.HARD_LOCK) {
       if (_lockoutUntil != null && DateTime.now().isAfter(_lockoutUntil!)) {
         _resetLockout();
@@ -85,10 +118,9 @@ class ClaController extends ChangeNotifier {
     _state = SecurityState.VALIDATING;
     notifyListeners();
 
-    // 2. ANALISIS BOT (ENGINE FIRST) 🛡️
-    // Kita check bot DULU sebelum check password.
     final duration = DateTime.now().difference(_interactionStart ?? DateTime.now());
     
+    // Panggil Engine untuk analisis
     final verdict = _engine.analyze(
       motionHistory: _motionHistory, 
       touchCount: _touchCount, 
@@ -96,12 +128,10 @@ class ClaController extends ChangeNotifier {
     );
 
     if (!verdict.allowed) {
-      // 🚨 BOT DIKESAN!
       _handleBotDetection(verdict);
       return false;
     }
 
-    // 3. PASSWORD CHECK (Jika lulus bot check)
     bool isPassCorrect = listEquals(currentValues, config.secret);
     
     if (isPassCorrect) {
@@ -117,10 +147,9 @@ class ClaController extends ChangeNotifier {
 
   void _handleBotDetection(ThreatVerdict verdict) {
     _threatMessage = "SECURITY ALERT: ${verdict.reason}";
-    _state = SecurityState.SOFT_LOCK; // Kunci sekejap
+    _state = SecurityState.SOFT_LOCK;
     notifyListeners();
     
-    // Auto-reset soft lock
     Future.delayed(config.softLockCooldown, () {
       if (_state == SecurityState.SOFT_LOCK) {
         _state = SecurityState.LOCKED;
@@ -146,7 +175,7 @@ class ClaController extends ChangeNotifier {
     if (_failedAttempts >= config.maxAttempts) {
       _triggerHardLockout();
     } else {
-      _saveSecureStorage(); // Simpan attempt count
+      _saveSecureStorage();
     }
     notifyListeners();
   }
@@ -158,7 +187,6 @@ class ClaController extends ChangeNotifier {
     await _saveSecureStorage();
     notifyListeners();
 
-    // Timer unlock
     Timer(config.jamCooldown, () {
       if (_state == SecurityState.HARD_LOCK) {
         _resetLockout();
@@ -175,12 +203,13 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
   }
   
+  // ✅ FIX: getter max() kini berfungsi sebab dah import dart:math
   int get remainingLockoutSeconds {
     if (_lockoutUntil == null) return 0;
     return max(0, _lockoutUntil!.difference(DateTime.now()).inSeconds);
   }
 
-  // --- PERSISTENCE (SECURE STORAGE) ---
+  // --- PERSISTENCE ---
 
   Future<void> _initSecureStorage() async {
     final attempts = await _storage.read(key: 'cla_attempts');
