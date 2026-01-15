@@ -1,7 +1,7 @@
-// 🎯 PROJECT Z-KINETIC V3.5 - VISUAL RESTORATION
+// 🎯 PROJECT Z-KINETIC V3.6 - VISUAL & TIMER FIX
 // Identity: Captain Aer (Visionary)
-// UI Status: 100% ORIGINAL SCI-FI DESIGN RESTORED ✅
-// Logic Status: SENSOR WIRE FIXED (Claude's Fix integrated invisibly)
+// UI Status: LIVE FEEDBACK ENABLED (Sensor menyala serta-merta) ✅
+// Logic Status: TIMER AUTO-START (Speed anomaly fixed) ✅
 
 import 'dart:async';
 import 'dart:math';
@@ -14,7 +14,7 @@ import 'cla_controller.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 1. PATTERN ANALYZER (Logic Otak)
+// 1. PATTERN ANALYZER (Visual Helper)
 // ============================================
 class PatternAnalyzer {
   static double analyze(List<Map<String, dynamic>> touchData) {
@@ -77,8 +77,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // Data Visualisasi
+  // Data Visualisasi (LOCAL STATE - Supaya menyala serta merta!)
   double _patternScore = 0.0;
+  double _liveMotionScore = 0.0; // 🔥 FIX: Live Motion Visual
+  double _liveTouchScore = 0.0;  // 🔥 FIX: Live Touch Visual
+  
   List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
   
@@ -92,7 +95,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   late AnimationController _scanController;
   late AnimationController _reticleController;
   
-  // Original Colors (Yang Kapten Suka)
+  // Original Colors
   final Color _neonCyan = const Color(0xFF00FFFF);
   final Color _neonGreen = const Color(0xFF00FF88);
   final Color _neonRed = const Color(0xFFFF3366);
@@ -103,6 +106,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
+    
+    // 🔥 FIX 1: Mulakan Jam Randik (Timer) serta-merta!
+    // Ini menyelesaikan masalah "Speed Anomaly Too Fast"
+    widget.controller.onInteractionStart(); 
+    
     _startListening();
     widget.controller.addListener(_handleControllerChange);
     
@@ -129,14 +137,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   void _initScrollControllers() {
     _scrollControllers = List.generate(5, (i) {
-        // Safe access to initial value
         int val = 0;
         try { val = widget.controller.getInitialValue(i); } catch(e) {}
         return FixedExtentScrollController(initialItem: val);
     });
   }
 
-  // 🔧 FIX: INI BAHAGIAN PENTING YANG CLAUDE BETULKAN, TAPI KITA GUNA DALAM UI LAMA
   void _startListening() {
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((e) {
@@ -144,13 +150,19 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       _accelX = e.x;
       _accelY = e.y;
       
-      // 2. Hantar data ke Controller (Fix parameter mismatch)
+      // 2. Hantar data ke Controller (Security Logic)
       double rawMag = e.x.abs() + e.y.abs() + e.z.abs();
       widget.controller.registerShake(rawMag, e.x, e.y, e.z);
 
-      // 3. Update UI (Throttled 60ms supaya tak berat)
+      // 🔥 FIX 2: Kemaskini Visual Score Secara Tempatan (Local)
+      // Kita tak tunggu controller. Kita update terus UI supaya nampak 'hidup'.
+      // Nilai > 2.0 dianggap pergerakan aktif.
+      double normalizedMotion = (rawMag / 9.8).clamp(0.0, 1.0);
+      _liveMotionScore = (_liveMotionScore * 0.9) + (normalizedMotion * 0.1); // Smooth transition
+
+      // 3. Update UI (Throttled 30ms for 30fps smoothness)
       final now = DateTime.now();
-      if (_lastUiUpdate == null || now.difference(_lastUiUpdate!).inMilliseconds > 60) {
+      if (_lastUiUpdate == null || now.difference(_lastUiUpdate!).inMilliseconds > 30) {
         _lastUiUpdate = now;
         if (mounted) setState(() {});
       }
@@ -173,6 +185,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _lastScrollTime = now;
     _touchData.add({'timestamp': now, 'speed': speed, 'pressure': 0.5, 'wheelIndex': _activeWheelIndex ?? 0});
     if (_touchData.length > 20) _touchData.removeAt(0);
+    
+    // Update local visual score
+    if (_touchData.length >= 2) {
+      _liveTouchScore = 1.0; // Touch dikesan!
+      // Decay touch score slowly in build() or timer if needed
+    }
     
     if (_touchData.length >= 5) {
       double score = PatternAnalyzer.analyze(_touchData);
@@ -199,6 +217,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         : (state == SecurityState.UNLOCKED ? _neonGreen : _neonCyan);
     
     String statusLabel = _getStatusLabel(state);
+    
+    // Decay Touch Score Visual (Supaya dia fade out kalau tak sentuh)
+    if (_liveTouchScore > 0) _liveTouchScore -= 0.02;
+    if (_liveTouchScore < 0) _liveTouchScore = 0;
     
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -232,7 +254,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 _buildAuthButton(activeColor, state),
                 const SizedBox(height: 20),
                 Text(
-                  "POWERED BY Z-KINETIC ENGINE V3.5",
+                  "POWERED BY Z-KINETIC ENGINE V3.6",
                   style: TextStyle(
                     color: activeColor.withOpacity(0.4),
                     fontSize: 8,
@@ -284,9 +306,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             const SizedBox(width: 12),
             Column(
               children: [
-                _buildSensorBox("MOTION", widget.controller.motionConfidence, color, Icons.sensors),
+                // 🔥 FIX 3: Guna Local Score (_liveMotionScore) supaya indicator menyala
+                _buildSensorBox("MOTION", _liveMotionScore, color, Icons.sensors),
                 const SizedBox(height: 8),
-                _buildSensorBox("TOUCH", widget.controller.touchConfidence, color, Icons.fingerprint),
+                _buildSensorBox("TOUCH", _liveTouchScore, color, Icons.fingerprint),
                 const SizedBox(height: 8),
                 _buildPatternBox("PATTERN", _patternScore, color),
               ],
@@ -336,8 +359,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                     }
                   }
                 } else if (notification is ScrollUpdateNotification) {
-                  widget.controller.registerTouch(); // Touch Logic
-                  _analyzeScrollPattern();
+                  widget.controller.registerTouch(); // Touch Logic Security
+                  _analyzeScrollPattern(); // Touch Logic Visual
                 } else if (notification is ScrollEndNotification) {
                   _resetActiveWheelTimer();
                 }
@@ -361,6 +384,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         onPointerDown: (_) {
           setState(() => _activeWheelIndex = index);
           _wheelActiveTimer?.cancel();
+          _liveTouchScore = 1.0; // Indicator Touch Menyala!
         },
         onPointerUp: (_) => _resetActiveWheelTimer(),
         child: AnimatedOpacity(
@@ -378,6 +402,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 onSelectedItemChanged: (v) { 
                   widget.controller.updateWheel(index, v % 10); 
                   HapticFeedback.selectionClick(); 
+                  _liveTouchScore = 1.0; // Indicator Touch Menyala!
                 },
                 childDelegate: ListWheelChildBuilderDelegate(builder: (context, i) => Center(child: Text('${i % 10}', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, shadows: isActive ? [Shadow(color: color, blurRadius: 20)] : [])))),
               ),
