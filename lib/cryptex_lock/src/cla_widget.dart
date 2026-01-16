@@ -1,8 +1,7 @@
-// 🎯 PROJECT Z-KINETIC V3.9 - HYPER SENSITIVE UI (COMPLETE)
-// Status: INSTANT REACTION FIX ✅
-// 1. Touch: Tap once -> INSTANT 100% GREEN (Memory 3s)
-// 2. Motion: Micro-shakes -> INSTANT 100% GREEN
-// 3. ALL PAINTERS INCLUDED ✅
+// 🎯 Z-KINETIC UI V7.0 (USER EDUCATION)
+// Status: "JARVIS" MODE ✅
+// Feature: Holographic Tutorial Overlay
+// Logic: Show instructions if user is idle. Hide when motion/touch detected.
 
 import 'dart:async';
 import 'dart:math';
@@ -14,13 +13,59 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'cla_controller.dart';
 import 'cla_models.dart';
 
-class PatternAnalyzer {
-  static double analyze(List<Map<String, dynamic>> touchData) {
-    if (touchData.isNotEmpty) return 1.0; 
-    return 0.0;
+// ============================================
+// 1. TUTORIAL OVERLAY WIDGET (NEW)
+// ============================================
+class TutorialOverlay extends StatelessWidget {
+  final bool isVisible;
+  final Color color;
+
+  const TutorialOverlay({super.key, required this.isVisible, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer( // Biar user boleh tembus sentuh roda di belakang
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 500),
+        opacity: isVisible ? 1.0 : 0.0,
+        child: Container(
+          color: Colors.black.withOpacity(0.6), // Gelapkan sikit background
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.screen_rotation, color: color, size: 48),
+                const SizedBox(height: 10),
+                Text(
+                  "TILT & ROTATE",
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 3,
+                    fontSize: 16,
+                    shadows: [Shadow(color: color, blurRadius: 10)]
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  "Engage kinetic sensors to unlock",
+                  style: TextStyle(color: color.withOpacity(0.7), fontSize: 10),
+                ),
+                const SizedBox(height: 30),
+                // Arrow pointing down to wheels
+                Icon(Icons.keyboard_double_arrow_down, color: color.withOpacity(0.5), size: 30),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
+// ============================================
+// 2. MAIN WIDGET: CRYPTEX LOCK
+// ============================================
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback onSuccess;
@@ -46,21 +91,30 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
+  // Data Visualisasi
   double _patternScore = 0.0;
   double _liveMotionScore = 0.0; 
   double _liveTouchScore = 0.0;  
   
+  // 🔥 Tutorial Logic
+  bool _showTutorial = true;
+  Timer? _tutorialHideTimer;
+
+  // Touch Memory
   Timer? _touchDecayTimer;
   
+  // Motion Calculation
   double _lastX = 0, _lastY = 0, _lastZ = 0;
   
   List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
   
+  // Sensor Data for UI
   double _accelX = 0.0;
   double _accelY = 0.0;
   DateTime? _lastUiUpdate;
   
+  // Animations
   late AnimationController _pulseController;
   late AnimationController _scanController;
   late AnimationController _reticleController;
@@ -83,6 +137,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _scanController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
     _reticleController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
+
+    // Auto-hide tutorial selepas 5 saat kalau user blur
+    _tutorialHideTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showTutorial = false);
+    });
   }
   
   void _handleControllerChange() {
@@ -108,6 +167,15 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     });
   }
 
+  // 🔥 Fungsi untuk hilangkan tutorial bila user mula berinteraksi
+  void _userInteracted() {
+    if (_showTutorial) {
+      setState(() => _showTutorial = false);
+      _tutorialHideTimer?.cancel();
+    }
+    _triggerTouchActive();
+  }
+
   void _startListening() {
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((e) {
@@ -119,12 +187,15 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       
       double amplifiedMotion = (delta * 10.0).clamp(0.0, 1.0);
       
+      // Kalau user goyang kuat, hilangkan tutorial juga
+      if (amplifiedMotion > 0.5) _userInteracted();
+
       widget.controller.registerShake(delta, e.x, e.y, e.z);
 
       if (amplifiedMotion > _liveMotionScore) {
         _liveMotionScore = amplifiedMotion;
       } else {
-        _liveMotionScore = (_liveMotionScore * 0.92);
+        _liveMotionScore = (_liveMotionScore * 0.92); 
       }
 
       final now = DateTime.now();
@@ -146,15 +217,15 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   }
 
   void _triggerTouchActive() {
-    _liveTouchScore = 1.0;
-    setState(() => _patternScore = 1.0);
+    _liveTouchScore = 1.0; 
+    setState(() => _patternScore = 1.0); 
     
     _touchDecayTimer?.cancel();
     _touchDecayTimer = Timer(const Duration(seconds: 3), () {});
   }
 
   void _analyzeScrollPattern() {
-    _triggerTouchActive();
+    _userInteracted(); // Panggil ini bila scroll
     
     final now = DateTime.now();
     double speed = _lastScrollTime != null ? 1000.0 / now.difference(_lastScrollTime!).inMilliseconds : 0.0;
@@ -167,13 +238,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
-    _accelSub?.cancel(); 
-    _lockoutTimer?.cancel(); 
-    _wheelActiveTimer?.cancel(); 
-    _touchDecayTimer?.cancel();
-    _pulseController.dispose(); 
-    _scanController.dispose(); 
-    _reticleController.dispose();
+    _accelSub?.cancel(); _lockoutTimer?.cancel(); _wheelActiveTimer?.cancel(); _touchDecayTimer?.cancel(); _tutorialHideTimer?.cancel();
+    _pulseController.dispose(); _scanController.dispose(); _reticleController.dispose();
     for (var c in _scrollControllers) c.dispose();
     super.dispose();
   }
@@ -197,6 +263,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Stack(
+        alignment: Alignment.center,
         children: [
           Positioned.fill(child: CustomPaint(painter: KineticGridPainter(color: activeColor))),
           
@@ -217,9 +284,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
                 const SizedBox(height: 28),
                 
+                // Interactive Area
                 Listener(
                   onPointerDown: (_) {
-                    _triggerTouchActive();
+                    _userInteracted(); // Hilangkan tutorial bila sentuh
                     widget.controller.registerTouch();
                   },
                   child: _buildInteractiveTumblerArea(activeColor, state),
@@ -229,7 +297,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 _buildAuthButton(activeColor, state),
                 const SizedBox(height: 20),
                 Text(
-                  "POWERED BY Z-KINETIC ENGINE V3.9",
+                  "POWERED BY Z-KINETIC ENGINE V7.0",
                   style: TextStyle(
                     color: activeColor.withOpacity(0.4),
                     fontSize: 8,
@@ -238,6 +306,14 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   ),
                 ),
               ],
+            ),
+          ),
+          
+          // 🔥 TUTORIAL OVERLAY (Paling Atas)
+          Positioned.fill(
+            child: TutorialOverlay(
+              isVisible: _showTutorial && state == SecurityState.LOCKED,
+              color: activeColor,
             ),
           ),
         ],
@@ -259,8 +335,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Widget _buildHUDHeader(Color color, String status) {
     return Stack(
       children: [
-        _buildHUDCorner(color, true, true), 
-        _buildHUDCorner(color, true, false),
+        _buildHUDCorner(color, true, true), _buildHUDCorner(color, true, false),
         Row(
           children: [
             Expanded(
@@ -268,7 +343,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("CAPTAIN AER SECURITY SUITE", style: TextStyle(color: color.withOpacity(0.6), fontSize: 9, letterSpacing: 2.5, fontWeight: FontWeight.w900)),
+                  Text("AER SECURITY SUITE", style: TextStyle(color: color.withOpacity(0.6), fontSize: 9, letterSpacing: 2.5, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 8),
                   AnimatedBuilder(
                     animation: _pulseController,
@@ -356,7 +431,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         onPointerDown: (_) {
           setState(() => _activeWheelIndex = index);
           _wheelActiveTimer?.cancel();
-          _triggerTouchActive();
+          _userInteracted();
           widget.controller.registerTouch();
         },
         onPointerUp: (_) => _resetActiveWheelTimer(),
@@ -443,27 +518,22 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 }
 
 // ============================================
-// 🎨 CUSTOM PAINTERS (COMPLETE)
+// 4. CUSTOM PAINTERS (ALL INCLUDED)
 // ============================================
 
 class KineticGridPainter extends CustomPainter {
-  final Color color;
-  KineticGridPainter({required this.color});
-  
+  final Color color; KineticGridPainter({required this.color});
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()..color = color.withOpacity(0.04)..strokeWidth = 1;
     for (double x = 0; x < size.width; x += 40) canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
     for (double y = 0; y < size.height; y += 40) canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
   }
-  
-  @override 
-  bool shouldRepaint(KineticGridPainter old) => old.color != color;
+  @override bool shouldRepaint(KineticGridPainter old) => old.color != color;
 }
 
 class KineticPeripheralPainter extends CustomPainter {
-  final Color color;
-  final String side;
+  final Color color; final String side;
   final double valX, valY;
   final SecurityState state;
 
@@ -503,8 +573,7 @@ class KineticPeripheralPainter extends CustomPainter {
 
   void _drawText(Canvas c, TextPainter tp, String s, double x, double y, double sz, Color col, bool b) {
     tp.text = TextSpan(text: s, style: TextStyle(color: col, fontSize: sz, fontWeight: b ? FontWeight.bold : FontWeight.normal, fontFamily: 'Courier'));
-    tp.layout(); 
-    tp.paint(c, Offset(x, y));
+    tp.layout(); tp.paint(c, Offset(x, y));
   }
   
   @override 
@@ -513,19 +582,13 @@ class KineticPeripheralPainter extends CustomPainter {
 }
 
 class KineticReticlePainter extends CustomPainter {
-  final Color color;
-  final double progress;
-  
+  final Color color; final double progress;
   KineticReticlePainter({required this.color, required this.progress});
-  
   @override
   void paint(Canvas canvas, Size size) {
     final c = Offset(size.width/2, size.height/2);
     final p = Paint()..color = color.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth = 2;
-    canvas.save(); 
-    canvas.translate(c.dx, c.dy); 
-    canvas.rotate(progress * 2 * pi); 
-    canvas.translate(-c.dx, -c.dy);
+    canvas.save(); canvas.translate(c.dx, c.dy); canvas.rotate(progress * 2 * pi); canvas.translate(-c.dx, -c.dy);
     canvas.drawCircle(c, 22, p);
     for (int i = 0; i < 4; i++) {
       final a = i * pi / 2;
@@ -533,23 +596,16 @@ class KineticReticlePainter extends CustomPainter {
     }
     canvas.restore();
   }
-  
-  @override 
-  bool shouldRepaint(KineticReticlePainter old) => old.progress != progress;
+  @override bool shouldRepaint(KineticReticlePainter old) => old.progress != progress;
 }
 
 class KineticScanLinePainter extends CustomPainter {
-  final Color color;
-  final double progress;
-  
+  final Color color; final double progress;
   KineticScanLinePainter({required this.color, required this.progress});
-  
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, color.withOpacity(0.6), Colors.transparent]).createShader(Rect.fromLTWH(0, size.height * progress - 2, size.width, 4));
     canvas.drawRect(Rect.fromLTWH(0, size.height * progress - 2, size.width, 4), p);
   }
-  
-  @override 
-  bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress;
+  @override bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress;
 }
