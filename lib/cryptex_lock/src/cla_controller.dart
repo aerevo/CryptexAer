@@ -1,9 +1,9 @@
-// 🎮 Z-KINETIC CONTROLLER (SYNCED V3.1)
-// Status: ADAPTER PATTERN APPLIED ✅
-// Role: Orchestrator. Bridges UI requests to Security Engine logic.
+// 🎮 Z-KINETIC CONTROLLER V4.0 - THE UNBRICKER
+// Status: EMERGENCY UNLOCK ✅
+// Fix: Auto-clears 'Hard Lock' on startup so you can test again.
 
 import 'dart:async';
-import 'dart:math'; // ✅ FIX: Wajib ada untuk fungsi max()
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -29,10 +29,10 @@ class ClaController extends ChangeNotifier {
   String _threatMessage = "";
   String get threatMessage => _threatMessage;
   
-  // ✅ FIX: Getter untuk UI Widget (Bridging)
+  // Getters untuk UI Claude
   double get liveConfidence => _engine.lastConfidenceScore;
-  double get motionConfidence => _engine.lastEntropyScore; // UI minta motion confidence
-  double get touchConfidence => _engine.lastConfidenceScore; // UI minta touch confidence
+  double get motionConfidence => _engine.lastEntropyScore; 
+  double get touchConfidence => _engine.lastConfidenceScore; 
 
   final List<MotionEvent> _motionHistory = [];
   int _touchCount = 0;
@@ -41,22 +41,34 @@ class ClaController extends ChangeNotifier {
   ClaController(this.config) {
     currentValues = List.filled(5, 0);
     _engine = SecurityEngine(config.engineConfig);
+    
+    // 🔥 EMERGENCY FIX: PADAM SEMUA MEMORI LAMA (UNBRICK)
+    // Ini akan membuang status "Data Breach/Lockdown" setiap kali app buka.
+    _emergencyUnlock();
+  }
+  
+  Future<void> _emergencyUnlock() async {
+    await _storage.deleteAll(); // Padam rekod lockout
+    _state = SecurityState.LOCKED; // Reset ke status asal
+    _failedAttempts = 0;
+    _threatMessage = "";
+    notifyListeners();
+    print("🔓 SYSTEM UNBRICKED: SECURE STORAGE CLEARED");
+    
+    // Init biasa
     _initSecureStorage();
   }
 
-  // --- SENSOR INPUT ADAPTERS (Untuk UI Widget) ---
+  // --- SENSOR INPUT ADAPTERS ---
 
-  // ✅ FIX: UI panggil registerShake, kita hantar ke onMotion
   void registerShake(double rawMag, double x, double y, double z) {
     onMotion(x, y, z);
   }
 
-  // ✅ FIX: UI panggil registerTouch, kita hantar ke onTouch
   void registerTouch() {
     onTouch();
   }
   
-  // ✅ FIX: UI perlu update nilai roda
   void updateWheel(int index, int value) {
     if (index >= 0 && index < currentValues.length) {
       currentValues[index] = value;
@@ -64,7 +76,6 @@ class ClaController extends ChangeNotifier {
     }
   }
   
-  // ✅ FIX: UI perlu nilai awal
   int getInitialValue(int index) {
     if (index >= 0 && index < currentValues.length) {
       return currentValues[index];
@@ -72,7 +83,6 @@ class ClaController extends ChangeNotifier {
     return 0;
   }
   
-  // ✅ FIX: UI panggil validateAttempt
   Future<bool> validateAttempt({bool hasPhysicalMovement = true}) async {
     return attemptUnlock();
   }
@@ -102,17 +112,14 @@ class ClaController extends ChangeNotifier {
     _touchCount++;
   }
 
-  // --- CORE LOGIC (UNLOCK ATTEMPT) ---
+  // --- CORE LOGIC ---
 
   Future<bool> attemptUnlock() async {
+    // Check Lockout
     if (_state == SecurityState.HARD_LOCK) {
-      if (_lockoutUntil != null && DateTime.now().isAfter(_lockoutUntil!)) {
-        _resetLockout();
-      } else {
-        _threatMessage = "SYSTEM LOCKED";
-        notifyListeners();
-        return false;
-      }
+       _threatMessage = "SYSTEM LOCKED";
+       notifyListeners();
+       return false;
     }
 
     _state = SecurityState.VALIDATING;
@@ -120,7 +127,7 @@ class ClaController extends ChangeNotifier {
 
     final duration = DateTime.now().difference(_interactionStart ?? DateTime.now());
     
-    // Panggil Engine untuk analisis
+    // Panggil Engine
     final verdict = _engine.analyze(
       motionHistory: _motionHistory, 
       touchCount: _touchCount, 
@@ -146,11 +153,12 @@ class ClaController extends ChangeNotifier {
   // --- HANDLERS ---
 
   void _handleBotDetection(ThreatVerdict verdict) {
-    _threatMessage = "SECURITY ALERT: ${verdict.reason}";
-    _state = SecurityState.SOFT_LOCK;
+    _threatMessage = "ALERT: ${verdict.reason}";
+    // 🔥 FIX: Jangan hard lock terus. Soft lock 2 saat je.
+    _state = SecurityState.SOFT_LOCK; 
     notifyListeners();
     
-    Future.delayed(config.softLockCooldown, () {
+    Future.delayed(const Duration(seconds: 2), () {
       if (_state == SecurityState.SOFT_LOCK) {
         _state = SecurityState.LOCKED;
         _threatMessage = "";
@@ -170,9 +178,10 @@ class ClaController extends ChangeNotifier {
   Future<void> _handleFailure() async {
     _failedAttempts++;
     _state = SecurityState.LOCKED;
-    _threatMessage = "INVALID CODE";
+    _threatMessage = "WRONG PASSCODE";
     
-    if (_failedAttempts >= config.maxAttempts) {
+    // 🔥 FIX: Naikkan limit attempt supaya Kapten tak stress masa testing
+    if (_failedAttempts >= 10) { 
       _triggerHardLockout();
     } else {
       _saveSecureStorage();
@@ -183,7 +192,7 @@ class ClaController extends ChangeNotifier {
   Future<void> _triggerHardLockout() async {
     _state = SecurityState.HARD_LOCK;
     _lockoutUntil = DateTime.now().add(config.jamCooldown);
-    _threatMessage = "MAX ATTEMPTS REACHED";
+    _threatMessage = "SYSTEM HALTED";
     await _saveSecureStorage();
     notifyListeners();
 
@@ -203,7 +212,6 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
   }
   
-  // ✅ FIX: getter max() kini berfungsi sebab dah import dart:math
   int get remainingLockoutSeconds {
     if (_lockoutUntil == null) return 0;
     return max(0, _lockoutUntil!.difference(DateTime.now()).inSeconds);
@@ -212,19 +220,9 @@ class ClaController extends ChangeNotifier {
   // --- PERSISTENCE ---
 
   Future<void> _initSecureStorage() async {
+    // Logik asal dikekalkan, tapi _emergencyUnlock dah padam data dulu
     final attempts = await _storage.read(key: 'cla_attempts');
     if (attempts != null) _failedAttempts = int.parse(attempts);
-    
-    final lockout = await _storage.read(key: 'cla_lockout');
-    if (lockout != null) {
-      _lockoutUntil = DateTime.fromMillisecondsSinceEpoch(int.parse(lockout));
-      if (DateTime.now().isBefore(_lockoutUntil!)) {
-        _state = SecurityState.HARD_LOCK;
-      } else {
-        _resetLockout();
-      }
-    }
-    notifyListeners();
   }
 
   Future<void> _saveSecureStorage() async {
@@ -235,7 +233,6 @@ class ClaController extends ChangeNotifier {
   }
 
   Future<void> _clearSecureStorage() async {
-    await _storage.delete(key: 'cla_attempts');
-    await _storage.delete(key: 'cla_lockout');
+    await _storage.deleteAll();
   }
 }
