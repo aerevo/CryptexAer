@@ -1,6 +1,9 @@
-// 🛡️ Z-KINETIC INTELLIGENCE HUB V4.5 (CLEAN ARCHITECTURE)
-// Status: PRODUCTION READY UI ✅
-// Data Source: Fully Decoupled via TransactionService
+// 🛡️ Z-KINETIC INTELLIGENCE HUB V5.5 (MERGED FINAL)
+// Status: PRODUCTION READY + PANIC MODE ✅
+// Features: 
+// 1. Clean Architecture (TransactionService)
+// 2. Integrity Check (Smart Warning)
+// 3. Panic Mode (Fake Dashboard RM0.00)
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -45,7 +48,6 @@ class MyApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      // Mula dengan 'BootLoader' untuk tarik air dari paip dulu
       home: const BootLoader(), 
     );
   }
@@ -74,11 +76,10 @@ class _BootLoaderState extends State<BootLoader> {
     try {
       data = await TransactionService.fetchCurrentTransaction();
     } catch (e) {
-      // Fallback kalau paip pecah
       data = TransactionData(amount: "ERROR", securityHash: "ERR", transactionId: "0");
     }
     
-    // 2. Setup Security Reporter (Production Grade)
+    // 2. Setup Security Reporter
     final config = SecurityConfig.production(
        serverEndpoint: 'https://api.yourdomain.com',
        enableIncidentReporting: true,
@@ -92,14 +93,14 @@ class _BootLoaderState extends State<BootLoader> {
        config: config
     );
 
-    // 3. Masuk ke LockScreen dengan data yang SUCI
+    // 3. Masuk ke LockScreen
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => LockScreen(
           systemName: "SECURE BANKING UPLINK",
-          displayedAmount: data.amount,       // <--- Data dari Paip
-          secureHash: data.securityHash,      // <--- Hash dari Paip
+          displayedAmount: data.amount,       
+          secureHash: data.securityHash,     
           transactionId: data.transactionId,
           incidentReporter: incidentReporter,
         ),
@@ -117,10 +118,7 @@ class _BootLoaderState extends State<BootLoader> {
           children: [
             CircularProgressIndicator(color: Colors.cyanAccent),
             SizedBox(height: 20),
-            Text(
-              "ESTABLISHING SECURE CONNECTION...", 
-              style: TextStyle(color: Colors.white54, letterSpacing: 2, fontSize: 10)
-            ),
+            Text("ESTABLISHING SECURE CONNECTION...", style: TextStyle(color: Colors.white54, letterSpacing: 2, fontSize: 10)),
           ],
         ),
       ),
@@ -156,6 +154,9 @@ class _LockScreenState extends State<LockScreen> {
   bool _isInitialized = false;
   bool _isCompromised = false;
   bool _userAcknowledgedThreat = false;
+  
+  // 🔥 FAKE DASHBOARD STATE (Panic Mode UI)
+  bool _showFakeDashboard = false;
 
   @override
   void initState() {
@@ -164,13 +165,8 @@ class _LockScreenState extends State<LockScreen> {
     _initializeController();
   }
 
-  // AUDIT: Bandingkan Hash dengan Amount yang dipaparkan
   void _performIntegrityAudit() {
-    // Hash Calculation Logic (Simple version for demo)
-    // Dalam real production, hash ini logicnya lebih kompleks di server
     final calculatedHash = "HASH-${widget.displayedAmount.replaceAll(' ', '').replaceAll(',', '')}";
-    
-    // Perbandingan Integriti
     if (calculatedHash != widget.secureHash) {
       setState(() => _isCompromised = true);
       debugPrint("🚨 DATA BREACH: Display(${widget.displayedAmount}) != Hash(${widget.secureHash})");
@@ -202,6 +198,25 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
+  // 🔥 SILENT ALARM LOGIC
+  Future<void> _triggerSilentPanic() async {
+    String deviceId = "UNKNOWN";
+    try { deviceId = await DeviceFingerprint.getDeviceId(); } catch (_) {}
+
+    final report = SecurityIncidentReport(
+      incidentId: "SOS-${DateTime.now().millisecondsSinceEpoch}",
+      timestamp: DateTime.now().toIso8601String(),
+      deviceId: deviceId,
+      attackType: "DURESS_PANIC_CODE_ACTIVATED",
+      detectedValue: "USER_UNDER_THREAT",
+      expectedSignature: "REVOKED",
+      action: "SILENT_ALARM_SENT",
+    );
+
+    widget.incidentReporter?.report(report);
+    debugPrint("🚨 SILENT ALARM SENT TO HQ");
+  }
+
   // --- LOGIC PRODUCTION: WARN BUT ALLOW ---
 
   Future<void> _autoReportIncident() async {
@@ -223,7 +238,6 @@ class _LockScreenState extends State<LockScreen> {
 
   Future<void> _handleReportAndCancel() async {
     HapticFeedback.heavyImpact();
-    // Simulate reporting delay
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -231,9 +245,8 @@ class _LockScreenState extends State<LockScreen> {
     );
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
-    Navigator.pop(context); // Close loading
+    Navigator.pop(context); 
     
-    // Show Done
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -246,8 +259,19 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   void _onSuccess() {
+    // 1. CHECK PANIC MODE DULU! (Added by Francois)
+    if (_controller.isPanicMode) {
+      _triggerSilentPanic(); // Hantar SOS
+      setState(() {
+        _showFakeDashboard = true; // Tunjuk akaun kosong
+      });
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🔓 ACCESS GRANTED"), backgroundColor: Colors.green));
+      return; // STOP DI SINI
+    }
+
+    // 2. Normal Flow
     if (_isCompromised && !_userAcknowledgedThreat) {
-      // ⚠️ CASE: ATTACK DETECTED
       setState(() => _userAcknowledgedThreat = true);
       _autoReportIncident();
       HapticFeedback.mediumImpact();
@@ -271,7 +295,6 @@ class _LockScreenState extends State<LockScreen> {
         ),
       );
     } else {
-      // ✅ CASE: CLEAN
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🔓 ACCESS GRANTED"), backgroundColor: Colors.green));
     }
@@ -290,6 +313,29 @@ class _LockScreenState extends State<LockScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) return const Scaffold(backgroundColor: Colors.black);
+
+    // 🔥 JIKA PANIC MODE: Tunjuk Dashboard Palsu (Akaun Kosong)
+    if (_showFakeDashboard) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(title: const Text("MY ACCOUNT", style: TextStyle(color: Colors.white))),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.account_balance_wallet, size: 64, color: Colors.grey),
+              SizedBox(height: 20),
+              Text("BALANCE AVAILABLE", style: TextStyle(color: Colors.grey, fontSize: 12)),
+              SizedBox(height: 10),
+              // PENTING: Duit Kosong!
+              Text("RM 0.00", style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+              SizedBox(height: 20),
+              Text("No active transactions.", style: TextStyle(color: Colors.white38)),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
