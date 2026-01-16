@@ -1,9 +1,9 @@
-// 🎮 Z-KINETIC CONTROLLER V9.0 (FINAL GOLD)
-// Status: PANIC MODE ENABLED 🚨
-// Feature: 
-// 1. Detects Reverse PIN as Panic Code.
-// 2. Fakes a successful unlock.
-// 3. Flags 'isPanicMode' for the UI to wipe data.
+// 🎮 Z-KINETIC CONTROLLER V10.0 (SECURE CORE)
+// Status: HARDENED ✅
+// Fix 2: SENSOR VALIDATION ENFORCED
+// - Prevents bypassing sensors by calling validateAttempt() directly.
+// - Checks actual motion history before allowing unlock.
+// - Stealth Panic Mode (No debug prints).
 
 import 'dart:async';
 import 'dart:math';
@@ -120,7 +120,36 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
   
   int getInitialValue(int index) => currentValues[index];
   
+  // 🔥 FIX 2: SENSOR VALIDATION ENFORCEMENT
   Future<bool> validateAttempt({bool hasPhysicalMovement = true}) async {
+    // 1. Check Forced Parameter
+    if (config.enableSensors && !hasPhysicalMovement) {
+      _threatMessage = "SENSOR BYPASS BLOCKED";
+      notifyListeners();
+      return false;
+    }
+
+    // 2. Check Actual Motion History (Anti-Bot)
+    // Kalau history kosong atau total pergerakan terlalu lemah -> REJECT
+    final totalMotion = _motionHistory.fold(0.0, (sum, e) => sum + e.magnitude);
+    
+    // Threshold: Mesti ada sekurang-kurangnya 3.0 total magnitude dalam sejarah
+    // (User mesti dah goyang sikit masa pegang phone)
+    if (config.enableSensors && totalMotion < 3.0 && _touchCount < 1) {
+       _state = SecurityState.SOFT_LOCK;
+       _threatMessage = "NO KINETIC SIGNATURE";
+       notifyListeners();
+       
+       // Reset cepat sikit supaya user boleh cuba lagi
+       Future.delayed(const Duration(seconds: 2), () {
+         if (_state == SecurityState.SOFT_LOCK) {
+           _state = SecurityState.LOCKED;
+           notifyListeners();
+         }
+       });
+       return false;
+    }
+
     return attemptUnlock();
   }
 
@@ -138,18 +167,15 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
 
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // Engine Check
     final verdict = _engine.analyze(
       motionHistory: _motionHistory, 
       touchCount: _touchCount, 
       interactionDuration: const Duration(seconds: 1)
     );
 
-    // 1. Check Passcode Betul
     bool isPassCorrect = listEquals(currentValues, config.secret);
     
-    // 2. Check Panic Code (Nombor Terbalik)
-    // 🔥 PANIC LOGIC: Reverse the secret list
+    // Panic Logic: Reverse PIN
     bool isPanicCode = listEquals(currentValues, config.secret.reversed.toList());
 
     if (isPassCorrect) {
@@ -157,8 +183,6 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
       return true;
     } 
     else if (isPanicCode) {
-      // 🔥 TRICK: Kalau Panic Code, kita tetap panggil SUCCESS
-      // supaya perompak tak tahu. Tapi kita set flag panic.
       _handleSuccess(panic: true);
       return true;
     } 
@@ -171,15 +195,14 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
   void _handleSuccess({required bool panic}) {
     _state = SecurityState.UNLOCKED;
     _failedAttempts = 0;
-    _threatMessage = panic ? "SILENT ALARM SENT" : "";
-    _isPanicMode = panic; // Simpan status panic untuk UI baca
+    _threatMessage = panic ? "SILENT ALARM SENT" : ""; // Message ni internal je
+    _isPanicMode = panic; 
     
     _isPaused = true; 
     _storage.deleteAll();
     
-    if (panic) {
-      debugPrint("🚨 DURESS SIGNAL TRIGGERED! FAKING SUCCESS UI.");
-    }
+    // 🔥 STEALTH MODE: Tiada lagi debugPrint("DURESS TRIGGERED")
+    // Kita simpan rahsia ni ketat-ketat.
     
     notifyListeners();
   }
