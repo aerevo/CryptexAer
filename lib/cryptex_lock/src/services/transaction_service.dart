@@ -1,36 +1,53 @@
-// 🏦 TRANSACTION SERVICE (The Pipeline Manager)
-// Status: MOCK MODE (Placeholder Pintar)
-// Note: Bila server dah siap, kita ubah fail ini SAHAJA. UI tak perlu sentuh.
+// 🏦 TRANSACTION SERVICE (The Data Pipeline)
+// Status: MOCK MODE ACTIVE 🚰
+// Fix: Added transactionId & Named Parameters to match main.dart
+
+import 'dart:async';
 
 class TransactionData {
   final String amount;
   final String securityHash;
-  final bool isSecure;
+  final String transactionId;
 
-  TransactionData(this.amount, this.securityHash, this.isSecure);
+  // 🔥 PENTING: Guna Named Parameters ({}) supaya main.dart tak error
+  TransactionData({
+    required this.amount, 
+    required this.securityHash,
+    required this.transactionId
+  });
 }
 
 class TransactionService {
-  // Ubah 'true' ke 'false' bila nak sambung server sebenar nanti
+  // 🎛️ SUIS UTAMA: True = Guna Data Palsu | False = Guna Server
   static const bool useMockData = true; 
 
   static Future<TransactionData> fetchCurrentTransaction() async {
-    // Simulasi loading (network delay)
+    // Simulasi network loading (0.8 saat) supaya nampak real
     await Future.delayed(const Duration(milliseconds: 800));
 
     if (useMockData) {
-      // --- MODE 1: MOCK (Guna ini sebelum Server siap) ---
-      // Kapten boleh tukar value di sini sesuka hati untuk test
+      // --- 🚰 TANGKI AIR SIMPANAN (MOCK DATA) ---
+      
       return TransactionData(
-        "RM 50,000.00",    // <--- Nilai Display
-        "HASH-RM50.00",    // <--- Nilai Sebenar (Mismatch = Hack)
-        false              // <--- Status (Hack detected)
+        amount: "RM 50,000.00",       // Nilai Display
+        securityHash: "HASH-RM50.00", // Nilai Hash Sebenar
+        transactionId: "TXN-${DateTime.now().millisecondsSinceEpoch}"
       );
+      
     } else {
-      // --- MODE 2: REAL PRODUCTION (Bila Server dah siap) ---
-      // final response = await http.get('https://api.bank.com/tx/123');
-      // return TransactionData.fromJson(response.body);
-      throw UnimplementedError("Server belum siap, bos!");
+      // --- 🌊 PAIP UTAMA (REAL SERVER) ---
+      /*
+      final response = await http.get(Uri.parse('https://api.bank.com/secure/tx/current'));
+      if (response.statusCode == 200) {
+         // Pastikan JSON parsing pun guna named parameters nanti
+         return TransactionData(
+            amount: json['amount'],
+            securityHash: json['hash'],
+            transactionId: json['id']
+         );
+      }
+      */
+      throw UnimplementedError("Server belum disambung, Kapten!");
     }
   }
 }
