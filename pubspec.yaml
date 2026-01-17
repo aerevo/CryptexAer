@@ -10,6 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
 
+  device_info_plus: ^11.1.0   # Untuk Guard 1 (Check Emulator)
+  package_info_plus: ^8.1.0   # Untuk baca version app
+  http: ^1.2.0                # Untuk Guard 2 (Call Server)
+  # -------------------------------------------
+
   # Core Security
   crypto: ^3.0.3
   flutter_secure_storage: ^9.0.0
@@ -34,3 +39,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
