@@ -1,9 +1,11 @@
-// 📦 Z-KINETIC MODELS (SYNCED V3.1)
-// Status: COMPATIBILITY FIXED ✅
-// Role: Define contracts clearly.
+// 📦 Z-KINETIC MODELS (SYNCED V3.2)
+// Status: CIRCULAR DEPENDENCY FIXED ✅
+// Role: Define contracts clearly. Clean Architecture enforced.
 
 import 'package:flutter/foundation.dart';
-import 'security/config/security_config.dart'; 
+
+// Note: Removed import to security_config.dart to prevent circular dependency crash.
+// The SecurityConfig reference in ClaConfig has been decoupled.
 
 enum SecurityState { LOCKED, VALIDATING, UNLOCKED, SOFT_LOCK, HARD_LOCK }
 
@@ -21,6 +23,15 @@ class MotionEvent {
     this.deltaY = 0,
     this.deltaZ = 0,
   });
+
+  // Helper untuk debugging/logging
+  Map<String, dynamic> toJson() => {
+    'm': magnitude.toStringAsFixed(4),
+    't': timestamp.toIso8601String(),
+    'dx': deltaX.toStringAsFixed(4),
+    'dy': deltaY.toStringAsFixed(4),
+    'dz': deltaZ.toStringAsFixed(4),
+  };
 }
 
 class SecurityEngineConfig {
@@ -59,10 +70,11 @@ class ClaConfig {
   final String clientSecret;
 
   // E. SUB-CONFIGS
-  final SecurityConfig? securityConfig;       
+  // Removed direct strict typing to prevent circular dependency
+  // final SecurityConfig? securityConfig; 
   final SecurityEngineConfig engineConfig;    
   
-  // ✅ FIX: Parameter ini ditambah untuk support main.dart lama
+  // F. Bot Detection
   final double botDetectionSensitivity;
 
   const ClaConfig({
@@ -74,11 +86,9 @@ class ClaConfig {
     this.jamCooldown = const Duration(seconds: 30),
     this.softLockCooldown = const Duration(seconds: 2),
     this.enableSensors = true,
-    this.clientId = 'DEFAULT_CLIENT',
+    this.clientId = 'default_client',
     this.clientSecret = '',
-    this.securityConfig,
     this.engineConfig = const SecurityEngineConfig(),
-    // Default value jika tak diberi
-    this.botDetectionSensitivity = 0.25, 
+    this.botDetectionSensitivity = 1.0,
   });
 }
