@@ -1,6 +1,7 @@
-// 🧠 SECURITY ENGINE V4.1 (HARDENED)
-// Status: STRICTER SCORING ✅
-// Fix: Removed "Touch = Instant Pass" loophole.
+// 🧠 SECURITY ENGINE V5.0 (FORTIFIED)
+// Status: SECURITY HOLE PATCHED ✅
+// Fix: Removed "Touch = Auto Pass" logic.
+// New: Weighted Scoring System (Entropy + Variance + Timing)
 
 import 'dart:math';
 import 'cla_models.dart';
@@ -12,88 +13,115 @@ class ThreatVerdict {
   final ThreatLevel level;
   final String reason;
   final double confidence;
-  final double riskScore;
   
   const ThreatVerdict({
     required this.allowed,
     required this.level,
     required this.reason,
     required this.confidence,
-    required this.riskScore,
   });
 
   factory ThreatVerdict.allow(double confidence) {
     return ThreatVerdict(
       allowed: true,
       level: ThreatLevel.SAFE,
-      reason: 'VERIFIED',
+      reason: 'VERIFIED_HUMAN',
       confidence: confidence,
-      riskScore: (1.0 - confidence) * 100,
     );
   }
 
-  factory ThreatVerdict.flag(ThreatLevel level, String reason) {
+  factory ThreatVerdict.block(ThreatLevel level, String reason) {
     return ThreatVerdict(
       allowed: false,
       level: level,
       reason: reason,
       confidence: 0.0,
-      riskScore: 100,
     );
   }
 }
 
 class SecurityEngine {
   final SecurityEngineConfig config;
-  
-  SecurityEngine(this.config);
+
+  SecurityEngine({required this.config});
 
   ThreatVerdict analyze({
-    required List<MotionEvent> history,
+    required List<MotionEvent> motionHistory,
     required int touchCount,
     required Duration interactionDuration,
   }) {
-    
-    // 1. BASIC CHECK: Empty History (Telepathy Attack)
-    if (history.isEmpty && touchCount == 0) {
-      return ThreatVerdict.flag(ThreatLevel.CRITICAL, 'NO_INPUT_DATA');
+    // 1. FAST FAIL: Zero Interaction
+    if (motionHistory.isEmpty && touchCount == 0) {
+      return ThreatVerdict.block(ThreatLevel.CRITICAL, 'NO_INTERACTION_DATA');
     }
 
-    // 2. ENTROPY CALCULATION
-    final mags = history.map((e) => e.magnitude).toList();
-    double entropy = 0.5; // Default neutral
-    double variance = 0.0;
-    
-    if (mags.isNotEmpty) {
-      double sum = mags.reduce((a, b) => a + b);
-      double mean = sum / mags.length;
-      variance = mags.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) / mags.length;
-      
-      // Robot biasanya variance = 0.0 (Gerakan sempurna)
-      if (variance < config.minVariance && touchCount < 3) {
-         // Flag as suspicious but don't block instantly in Demo Mode
-         entropy = 0.2; 
-      } else {
-         entropy = 0.9;
-      }
+    // 2. SPEED CHECK: Superhuman Speed
+    // Manusia perlukan masa > 500ms untuk input 5 digit dengan tepat
+    if (interactionDuration.inMilliseconds < 300) {
+       return ThreatVerdict.block(ThreatLevel.HIGH_RISK, 'SUPERHUMAN_SPEED');
     }
 
-    // 3. SCORING SYSTEM (REVISED)
-    // Formula lama: (entropy * 0.5) + (variance * 0.5)
-    // Formula baru: Base Score + Touch Bonus
+    // 3. BIOMETRIC ANALYSIS
+    double entropy = _calculateEntropy(motionHistory);
+    double variance = _calculateVariance(motionHistory);
     
-    double score = 0.4; // Base trust
+    // 🚨 FIX: Strict logic. No more free pass.
+    bool hasMicroTremors = entropy > config.minEntropy;
+    bool hasNaturalMotion = variance > config.minVariance;
     
-    if (variance > config.minVariance) score += 0.4; // Human shake
-    if (touchCount > 0) score += 0.2; // Touch bonus (Max 0.2, bukan auto 1.0)
+    // Scoring Algorithm
+    // Entropy (Ketar tangan) weight: 50%
+    // Variance (Gerak peranti) weight: 30%
+    // Touch (Interaksi fizikal) weight: 20%
     
-    score = score.clamp(0.0, 1.0);
+    double score = 0.0;
     
-    // Strict Threshold Check
-    if (score < config.minConfidence) {
-      return ThreatVerdict.flag(ThreatLevel.HIGH_RISK, 'LOW_CONFIDENCE_SCORE');
+    score += (entropy * 10).clamp(0.0, 0.5); // Max 0.5
+    score += (variance * 100).clamp(0.0, 0.3); // Max 0.3
+    if (touchCount > 0) score += 0.2; // Bonus 0.2
+    
+    // Threshold Check
+    if (score < config.botThreshold) {
+       return ThreatVerdict.block(
+         ThreatLevel.HIGH_RISK, 
+         'ROBOTIC_MOVEMENT (Score: ${score.toStringAsFixed(2)})'
+       );
     }
 
     return ThreatVerdict.allow(score);
+  }
+
+  // Helper: Calculate Shannon Entropy of motion magnitude
+  double _calculateEntropy(List<MotionEvent> history) {
+    if (history.isEmpty) return 0.0;
+    
+    // Normalize magnitudes to buckets
+    final Map<int, int> buckets = {};
+    for (var m in history) {
+      int bucket = (m.magnitude * 10).round(); // Reduced resolution
+      buckets[bucket] = (buckets[bucket] ?? 0) + 1;
+    }
+    
+    // Shannon formula
+    double entropy = 0.0;
+    int total = history.length;
+    
+    buckets.forEach((_, count) {
+      double p = count / total;
+      if (p > 0) entropy -= p * (log(p) / log(2));
+    });
+    
+    return entropy;
+  }
+
+  // Helper: Calculate Variance (Jitter)
+  double _calculateVariance(List<MotionEvent> history) {
+    if (history.length < 2) return 0.0;
+    
+    final magnitudes = history.map((e) => e.magnitude).toList();
+    double mean = magnitudes.reduce((a, b) => a + b) / magnitudes.length;
+    
+    double sumSquaredDiff = magnitudes.fold(0.0, (sum, val) => sum + pow(val - mean, 2));
+    return sumSquaredDiff / magnitudes.length;
   }
 }
