@@ -1,176 +1,180 @@
 /*
- * PROJECT: CryptexLock Security Suite V3.0
- * MODULE: Local Incident Storage (The Black Box)
- * PURPOSE: Permanent forensic backup and offline queue management
+ * PROJECT: CryptexLock Security Suite V4.0 (ULTRA-SECURE)
+ * MODULE: Local Incident Storage (The Black Box - SQL Edition)
+ * PURPOSE: High-performance forensic logging and offline queueing.
+ * STATUS: PRODUCTION READY ✅
  */
 
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../models/secure_payload.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 import 'package:flutter/foundation.dart';
+import 'mirror_service.dart'; // Untuk model SecurityIncidentReport
 
 class IncidentStorage {
-  static const String _KEY_INCIDENTS = 'security_incidents';
-  static const String _KEY_PENDING_REPORTS = 'pending_incident_reports';
-  static const int _MAX_INCIDENTS = 100; // Had simpanan untuk elak memori penuh
-  
-  /// 🔥 MENYIMPAN INSIDEN (LOCAL BACKUP)
-  /// Fungsi ini memastikan bukti jenayah disimpan sebelum dihantar ke server.
-  static Future<bool> saveIncident(Map<String, dynamic> incidentData) async {
+  static Database? _database;
+  static const String _DB_NAME = 'z_kinetic_forensics.db';
+  static const String _TABLE_INCIDENTS = 'incidents';
+  static const int _MAX_RECORDS = 1000; // Kapasiti jauh lebih besar dari Prefs
+
+  // ============================================
+  // DATABASE INITIALIZATION
+  // ============================================
+  static Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDb();
+    return _database!;
+  }
+
+  static Future<Database> _initDb() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, _DB_NAME);
+
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: (db, version) async {
+        await db.execute('''
+          CREATE TABLE $_TABLE_INCIDENTS (
+            id TEXT PRIMARY KEY,
+            timestamp TEXT,
+            device_id TEXT,
+            attack_type TEXT,
+            detected_value TEXT,
+            expected_signature TEXT,
+            action TEXT,
+            is_synced INTEGER DEFAULT 0
+          )
+        ''');
+        
+        // Index untuk carian pantas
+        await db.execute('CREATE INDEX idx_synced ON $_TABLE_INCIDENTS (is_synced)');
+      },
+    );
+  }
+
+  // ============================================
+  // CORE OPERATIONS
+  // ============================================
+
+  /// 🔥 MENYIMPAN INSIDEN (LOCAL SQL BACKUP)
+  /// Menyimpan bukti serangan dengan struktur yang rigid.
+  static Future<void> saveIncident(SecurityIncidentReport incident) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final db = await database;
       
-      // Ambil senarai insiden sedia ada
-      final incidents = await getStoredIncidents();
+      await db.insert(
+        _TABLE_INCIDENTS,
+        {
+          'id': incident.incidentId,
+          'timestamp': incident.timestamp,
+          'device_id': incident.deviceId,
+          'attack_type': incident.attackType,
+          'detected_value': incident.detectedValue,
+          'expected_signature': incident.expectedSignature,
+          'action': incident.action,
+          'is_synced': 0,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      // Auto-cleanup: Buang rekod lama jika melebihi had
+      await _purgeOldRecords(db);
       
-      // Masukkan data baru dengan metadata forensik
-      incidents.add({
-        ...incidentData,
-        'stored_at': DateTime.now().toIso8601String(),
-        'synced': false,
-      });
-      
-      // Jika melebihi had, buang yang paling lama (FIFO)
-      if (incidents.length > _MAX_INCIDENTS) {
-        incidents.removeAt(0);
-      }
-      
-      // Simpan semula ke memori kekal
-      final encoded = jsonEncode(incidents);
-      await prefs.setString(_KEY_INCIDENTS, encoded);
-      
-      if (kDebugMode) {
-        print('🛡️ [INTELLIGENCE] Evidence secured in local storage');
-      }
-      
-      return true;
+      if (kDebugMode) print('🛡️ [FORENSICS] Incident logged to SQL: ${incident.incidentId}');
     } catch (e) {
-      if (kDebugMode) print('🚨 [ERROR] Storage failure: $e');
-      return false;
+      if (kDebugMode) print('❌ [STORAGE ERROR] Failed to save to SQL: $e');
     }
   }
-  
-  /// MENGAMBIL SEMUA REKOD JENAYAH
-  static Future<List<Map<String, dynamic>>> getStoredIncidents() async {
+
+  /// Menukar status kepada 'Synced' selepas berjaya hantar ke server
+  static Future<void> markAsSynced(String incidentId) async {
+    final db = await database;
+    await db.update(
+      _TABLE_INCIDENTS,
+      {'is_synced': 1},
+      where: 'id = ?',
+      whereArgs: [incidentId],
+    );
+  }
+
+  /// Memadam rekod dari queue (biasanya selepas sync)
+  static Future<void> removeFromPending(String incidentId) async {
+    final db = await database;
+    await db.delete(
+      _TABLE_INCIDENTS,
+      where: 'id = ?',
+      whereArgs: [incidentId],
+    );
+  }
+
+  // ============================================
+  // DATA RETRIEVAL
+  // ============================================
+
+  /// Mengambil semua laporan yang belum dihantar ke server
+  static Future<List<String>> getPendingReports() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? encoded = prefs.getString(_KEY_INCIDENTS);
-      
-      if (encoded == null || encoded.isEmpty) return [];
-      
-      final List<dynamic> decoded = jsonDecode(encoded);
-      return decoded.map((i) => i as Map<String, dynamic>).toList();
+      final db = await database;
+      final List<Map<String, dynamic>> maps = await db.query(
+        _TABLE_INCIDENTS,
+        where: 'is_synced = ?',
+        whereArgs: [0],
+        orderBy: 'timestamp ASC',
+      );
+
+      // Convert balik ke format JSON String untuk keserasian IncidentReporter
+      return List.generate(maps.length, (i) {
+        final report = {
+          'incident_id': maps[i]['id'],
+          'timestamp': maps[i]['timestamp'],
+          'device_id': maps[i]['device_id'],
+          'threat_intel': {
+            'type': maps[i]['attack_type'],
+            'detected': maps[i]['detected_value'],
+            'signature': maps[i]['expected_signature'],
+          },
+          'status': maps[i]['action'],
+        };
+        return jsonEncode(report);
+      });
     } catch (e) {
       return [];
     }
   }
-  
-  /// MENGAMBIL INSIDEN YANG BELUM DI-SYNC (UNTUK RETRY)
-  static Future<List<Map<String, dynamic>>> getUnsyncedIncidents() async {
-    final all = await getStoredIncidents();
-    return all.where((i) => i['synced'] == false).toList();
-  }
-  
-  /// MENANDAKAN REKOD SEBAGAI "BERJAYA DIHANTAR"
-  static Future<void> markAsSynced(String incidentId) async {
-    final incidents = await getStoredIncidents();
-    
-    bool found = false;
-    for (var i = 0; i < incidents.length; i++) {
-      if (incidents[i]['incident_id'] == incidentId) {
-        incidents[i]['synced'] = true;
-        found = true;
-        break;
-      }
-    }
-    
-    if (found) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_KEY_INCIDENTS, jsonEncode(incidents));
-    }
-  }
-  
-  /// MENAMBAH KE QUEUE RETRY (JIKA SERVER DOWN)
-  static Future<void> addToPendingReports(String incidentJson) async {
-    final prefs = await SharedPreferences.getInstance();
-    final pending = await getPendingReports();
-    
-    if (!pending.contains(incidentJson)) {
-      pending.add(incidentJson);
-      await prefs.setStringList(_KEY_PENDING_REPORTS, pending);
-    }
-  }
-  
-  /// MENGAMBIL SENARAI RETRY
-  static Future<List<String>> getPendingReports() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_KEY_PENDING_REPORTS) ?? [];
-  }
-  
-  /// MEMBUANG DARI QUEUE RETRY (SELEPAS BERJAYA)
-  static Future<void> removeFromPending(String incidentJson) async {
-    final prefs = await SharedPreferences.getInstance();
-    final pending = await getPendingReports();
-    pending.remove(incidentJson);
-    await prefs.setStringList(_KEY_PENDING_REPORTS, pending);
-  }
 
-  /// PEMBERSIHAN AUTOMATIK (MAINTENANCE)
-  /// Membuang log yang sudah synced dan lama (7 hari default)
-  static Future<bool> clearOldIncidents({int maxAgeDays = 7}) async {
-    try {
-      final incidents = await getStoredIncidents();
-      final now = DateTime.now();
-      
-      final filtered = incidents.where((incident) {
-        if (incident['stored_at'] == null) return true;
-        
-        final stored = DateTime.parse(incident['stored_at']);
-        final age = now.difference(stored).inDays;
-        
-        // Simpan jika: Belum sync OR Umur kurang dari had
-        return incident['synced'] != true || age < maxAgeDays;
-      }).toList();
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_KEY_INCIDENTS, jsonEncode(filtered));
-      
-      final removed = incidents.length - filtered.length;
-      if (kDebugMode && removed > 0) {
-        print('🧹 [CLEANUP] Purged $removed old incident logs');
-      }
-      
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// MENGAMBIL STATISTIK UNTUK DASHBOARD KAPTEN
+  /// Mengambil statistik untuk dashboard forensik Kapten
   static Future<Map<String, int>> getStats() async {
-    final incidents = await getStoredIncidents();
-    final pending = await getPendingReports();
+    final db = await database;
     
-    final synced = incidents.where((i) => i['synced'] == true).length;
-    final unsynced = incidents.length - synced;
+    final total = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $_TABLE_INCIDENTS')) ?? 0;
+    final pending = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $_TABLE_INCIDENTS WHERE is_synced = 0')) ?? 0;
     
     return {
-      'total_stored': incidents.length,
-      'synced': synced,
-      'unsynced': unsynced,
-      'pending_reports': pending.length,
+      'total_logs': total,
+      'pending_sync': pending,
+      'synced': total - pending,
     };
   }
-  
-  /// RESET SEMUA DATA (ADMIN ONLY)
-  static Future<bool> clearAll() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_KEY_INCIDENTS);
-      await prefs.remove(_KEY_PENDING_REPORTS);
-      return true;
-    } catch (e) {
-      return false;
-    }
+
+  // ============================================
+  // MAINTENANCE
+  // ============================================
+
+  static Future<void> _purgeOldRecords(Database db) async {
+    // FIFO (First In First Out)
+    await db.execute('''
+      DELETE FROM $_TABLE_INCIDENTS 
+      WHERE id IN (
+        SELECT id FROM $_TABLE_INCIDENTS 
+        ORDER BY timestamp DESC 
+        LIMIT -1 OFFSET $_MAX_RECORDS
+      )
+    ''');
+  }
+
+  static Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete(_TABLE_INCIDENTS);
   }
 }
