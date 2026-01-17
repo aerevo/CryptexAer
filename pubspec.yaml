@@ -1,7 +1,7 @@
 name: cryptex_aer
-description: Z-KINETIC Intelligence Hub - Secure Biometric Authentication with Incident Reporting
-version: 3.0.0
-publish_to: 'none' # Prevent accidental publishing
+description: Z-KINETIC Security Suite
+publish_to: 'none'
+version: 1.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -9,63 +9,28 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
-  # UI Components
-  cupertino_icons: ^1.0.2
-  
-  # =========================================================
-  # 🛡️ CORE SECURITY SUITE
-  # =========================================================
-  
-  # Sensors (Motion Detection)
-  # Updated to ^5.0.1 for stability on latest Android/iOS
-  sensors_plus: ^5.0.1
-  
-  # Storage (Secure & Preferences)
-  shared_preferences: ^2.2.3
-  flutter_secure_storage: ^9.2.2
-  
-  # Device Security
-  flutter_jailbreak_detection: ^1.10.0
-  
-  # =========================================================
-  # 🔐 CRYPTOGRAPHY & AUTHENTICATION
-  # =========================================================
-  
-  # Cryptographic Functions (SHA-256, HMAC, Hashing)
-  crypto: ^3.0.3
 
-  # Unique Identifier Generation (New Addition)
-  uuid: ^4.0.0
+  # Core Security
+  crypto: ^3.0.3
+  flutter_secure_storage: ^9.0.0
   
-  # =========================================================
-  # 📡 NETWORK & SERVER COMMUNICATION
-  # =========================================================
+  # Device & Sensors
+  device_info_plus: ^9.0.0
+  sensors_plus: ^3.0.0
+  shared_preferences: ^2.2.0
   
-  # HTTP Client (Server Validation & Incident Reporting)
-  http: ^1.2.1
+  # Networking
+  http: ^1.1.0
   
-  # =========================================================
-  # 🔍 DEVICE IDENTIFICATION
-  # =========================================================
-  
-  # Device Info (Device Fingerprinting)
-  device_info_plus: ^10.1.0
+  # ✅ CRITICAL: Add these missing dependencies
+  sqflite: ^2.3.0      # For SQL incident storage
+  path: ^1.8.3         # For database path
+  uuid: ^4.0.0         # For unique device ID
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  
-  # Linting
-  flutter_lints: ^4.0.0
+  flutter_lints: ^2.0.0
 
 flutter:
   uses-material-design: true
-  
-  # =========================================================
-  # 📝 OPTIONAL: Custom Fonts (Monospace for Logs)
-  # =========================================================
-  # fonts:
-  #   - family: Courier
-  #     fonts:
-  #       - asset: fonts/CourierPrime-Regular.ttf
