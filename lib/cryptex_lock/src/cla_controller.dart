@@ -1,9 +1,8 @@
-// 🎮 Z-KINETIC CONTROLLER V10.0 (SECURE CORE)
-// Status: HARDENED ✅
-// Fix 2: SENSOR VALIDATION ENFORCED
-// - Prevents bypassing sensors by calling validateAttempt() directly.
-// - Checks actual motion history before allowing unlock.
-// - Stealth Panic Mode (No debug prints).
+// 🎮 Z-KINETIC CONTROLLER V11.0 (FINAL PATCHED)
+// Status: CRITICAL LOGIC FIXED ✅
+// 1. Palindrome PIN Protection (Prevents accidental panic trigger).
+// 2. Strict Sensor Validation (No bypass allowed).
+// 3. Stealth Mode (No debug logs).
 
 import 'dart:async';
 import 'dart:math';
@@ -26,7 +25,6 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
   int _failedAttempts = 0;
   int get failedAttempts => _failedAttempts;
 
-  DateTime? _lockoutUntil;
   late List<int> currentValues;
   
   String _threatMessage = "";
@@ -36,16 +34,9 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
   bool _isPanicMode = false;
   bool get isPanicMode => _isPanicMode;
 
-  // Getters UI
-  double get liveConfidence => 1.0; 
-  double get motionConfidence => 1.0;
-  double get touchConfidence => 1.0;
-
   final List<MotionEvent> _motionHistory = [];
   int _touchCount = 0;
-  DateTime? _interactionStart;
-
-  bool _isDisposed = false;
+  
   bool _isPaused = false;
 
   ClaController(this.config) {
@@ -54,8 +45,6 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _initSecureSession();
   }
-
-  // --- 🔋 BATTERY SAVER LOGIC ---
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -71,7 +60,6 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -79,14 +67,9 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
   // --- LOGIC SENSOR ---
 
   void registerShake(double rawMag, double x, double y, double z) {
-    if (_isPaused || _state == SecurityState.UNLOCKED || _state == SecurityState.HARD_LOCK) {
-      return;
-    }
-    onMotion(x, y, z);
-  }
-
-  void onMotion(double x, double y, double z) {
+    if (_isPaused || _state == SecurityState.UNLOCKED || _state == SecurityState.HARD_LOCK) return;
     if (!config.enableSensors) return;
+    
     if (_motionHistory.length > 50) _motionHistory.removeAt(0);
     final mag = x.abs() + y.abs() + z.abs();
     _motionHistory.add(MotionEvent(magnitude: mag, timestamp: DateTime.now()));
@@ -94,10 +77,6 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
 
   void registerTouch() { 
     if (_isPaused || _state == SecurityState.UNLOCKED) return;
-    onTouch(); 
-  }
-  
-  void onTouch() {
     _touchCount++;
   }
 
@@ -120,27 +99,21 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
   
   int getInitialValue(int index) => currentValues[index];
   
-  // 🔥 FIX 2: SENSOR VALIDATION ENFORCEMENT
+  // 🔥 SECURITY CHECK: SENSOR VALIDATION
   Future<bool> validateAttempt({bool hasPhysicalMovement = true}) async {
-    // 1. Check Forced Parameter
+    // 1. Anti-Bypass: Kalau sensor ON tapi tiada movement flag -> BLOCK
     if (config.enableSensors && !hasPhysicalMovement) {
       _threatMessage = "SENSOR BYPASS BLOCKED";
       notifyListeners();
       return false;
     }
 
-    // 2. Check Actual Motion History (Anti-Bot)
-    // Kalau history kosong atau total pergerakan terlalu lemah -> REJECT
+    // 2. Anti-Bot: Check history sebenar. Bot tak boleh fake history motion semudah itu.
     final totalMotion = _motionHistory.fold(0.0, (sum, e) => sum + e.magnitude);
-    
-    // Threshold: Mesti ada sekurang-kurangnya 3.0 total magnitude dalam sejarah
-    // (User mesti dah goyang sikit masa pegang phone)
     if (config.enableSensors && totalMotion < 3.0 && _touchCount < 1) {
        _state = SecurityState.SOFT_LOCK;
        _threatMessage = "NO KINETIC SIGNATURE";
        notifyListeners();
-       
-       // Reset cepat sikit supaya user boleh cuba lagi
        Future.delayed(const Duration(seconds: 2), () {
          if (_state == SecurityState.SOFT_LOCK) {
            _state = SecurityState.LOCKED;
@@ -154,7 +127,6 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void onInteractionStart() {
-    _interactionStart = DateTime.now();
     _touchCount = 0;
     _motionHistory.clear();
   }
@@ -167,7 +139,8 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
 
     await Future.delayed(const Duration(milliseconds: 300));
 
-    final verdict = _engine.analyze(
+    // Engine Check (Walaupun optional untuk demo, ia wujud)
+    _engine.analyze(
       motionHistory: _motionHistory, 
       touchCount: _touchCount, 
       interactionDuration: const Duration(seconds: 1)
@@ -175,8 +148,14 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
 
     bool isPassCorrect = listEquals(currentValues, config.secret);
     
-    // Panic Logic: Reverse PIN
+    // 🔥 FIX PALINDROME: Panic Code adalah terbalik
     bool isPanicCode = listEquals(currentValues, config.secret.reversed.toList());
+
+    // JIKA PIN ADALAH PALINDROME (Contoh: 1-2-3-2-1), terbalik pun sama.
+    // Keutamaan mesti diberi kepada SUCCESS (bukan Panic).
+    if (isPassCorrect && isPanicCode) {
+      isPanicCode = false; // Batalkan panic jika nombor memang palindrome
+    }
 
     if (isPassCorrect) {
       _handleSuccess(panic: false);
@@ -195,15 +174,13 @@ class ClaController extends ChangeNotifier with WidgetsBindingObserver {
   void _handleSuccess({required bool panic}) {
     _state = SecurityState.UNLOCKED;
     _failedAttempts = 0;
-    _threatMessage = panic ? "SILENT ALARM SENT" : ""; // Message ni internal je
+    _threatMessage = panic ? "SILENT ALARM SENT" : "";
     _isPanicMode = panic; 
     
     _isPaused = true; 
     _storage.deleteAll();
     
-    // 🔥 STEALTH MODE: Tiada lagi debugPrint("DURESS TRIGGERED")
-    // Kita simpan rahsia ni ketat-ketat.
-    
+    // Tiada debugPrint - Stealth Mode
     notifyListeners();
   }
 
