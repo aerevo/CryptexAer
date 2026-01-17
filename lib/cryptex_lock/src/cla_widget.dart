@@ -1,10 +1,7 @@
-// 🎯 Z-KINETIC UI V11.0 (PERFORMANCE EDITION)
-// Status: 60 FPS OPTIMIZED ⚡
-// Features: 
-// 1. Uses ValueNotifier for sensor updates (No full rebuilds).
-// 2. RepaintBoundary added to static layers.
-// 3. Tactile Haptics Engine integrated.
-// 4. Preserves Stress Test & Tutorial Logic.
+// 🎯 Z-KINETIC UI V11.1 (GRAY SCREEN FIX)
+// Status: FIXED & OPTIMIZED ✅
+// Fix: Moved RepaintBoundary INSIDE Positioned.fill.
+// Features: 60 FPS, Haptics, Stress Test, Tutorial.
 
 import 'dart:async';
 import 'dart:math';
@@ -93,28 +90,21 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // 🔥 OPTIMIZATION: ValueNotifiers (Ganti setState untuk sensor)
+  // ValueNotifiers
   final ValueNotifier<double> _motionScoreNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
   final ValueNotifier<Offset> _accelNotifier = ValueNotifier(Offset.zero);
   
-  // Data Visualisasi
   double _patternScore = 0.0;
   
-  // Tutorial Logic
   bool _showTutorial = true;
   Timer? _tutorialHideTimer;
-
-  // Touch Memory
   Timer? _touchDecayTimer;
   
-  // Motion Calculation
   double _lastX = 0, _lastY = 0, _lastZ = 0;
-  
   List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
   
-  // Animations
   late AnimationController _pulseController;
   late AnimationController _scanController;
   late AnimationController _reticleController;
@@ -153,7 +143,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       _startLockoutTimer();
       widget.onJammed();
     }
-    if (mounted) setState(() {}); // UI Update untuk State sahaja (Bukan sensor)
+    if (mounted) setState(() {});
   }
 
   @override
@@ -181,7 +171,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _startListening() {
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((e) {
-      // 🔥 OPTIMIZATION: Update Notifier, BUKAN setState
       _accelNotifier.value = Offset(e.x, e.y);
       
       double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
@@ -193,7 +182,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
       widget.controller.registerShake(delta, e.x, e.y, e.z);
 
-      // Smooth decaying value
       double currentScore = _motionScoreNotifier.value;
       if (amplifiedMotion > currentScore) {
         _motionScoreNotifier.value = amplifiedMotion;
@@ -219,9 +207,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     
     _touchDecayTimer?.cancel();
     _touchDecayTimer = Timer(const Duration(seconds: 3), () {});
-    
-    // Auto-decay logic handled by periodic check or simple decay on next frame if needed
-    // For now, let's keep it simple: reset after 3s
     Future.delayed(const Duration(milliseconds: 100), _decayTouch);
   }
   
@@ -243,7 +228,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     if (_touchData.length > 20) _touchData.removeAt(0);
   }
 
-  // 🔥 REAL ENTERPRISE STRESS TEST
   Future<void> _runStressTest() async {
     setState(() {
       _isStressTesting = true;
@@ -300,9 +284,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // 🔥 REPAINT BOUNDARY: Background tak perlu lukis semula
-          RepaintBoundary(
-            child: Positioned.fill(child: CustomPaint(painter: KineticGridPainter(color: activeColor))),
+          // 🔥 FIX SINI: Positioned.fill DULU, baru RepaintBoundary
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: CustomPaint(painter: KineticGridPainter(color: activeColor)),
+            ),
           ),
           
           Container(
@@ -333,7 +319,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 const SizedBox(height: 28),
                 _buildAuthButton(activeColor, state),
                 
-                // STRESS TEST UI
                 const SizedBox(height: 20),
                 if (_stressResult.isNotEmpty)
                   Container(
@@ -387,6 +372,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
+  // --- HELPER METHODS & PAINTERS (Tiada Perubahan) ---
+  
   String _getStatusLabel(SecurityState state) {
     switch (state) {
       case SecurityState.LOCKED: return "BIOMETRIC SCAN STANDBY";
@@ -423,7 +410,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             const SizedBox(width: 12),
             Column(
               children: [
-                // 🔥 OPTIMIZED: Guna ValueListenableBuilder
                 ValueListenableBuilder<double>(
                   valueListenable: _motionScoreNotifier,
                   builder: (context, val, _) => _buildSensorBox("MOTION", val, color, Icons.sensors),
@@ -512,7 +498,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           _wheelActiveTimer?.cancel();
           _userInteracted();
           widget.controller.registerTouch();
-          HapticFeedback.lightImpact(); // 🔥 HAPTICS FEEDBACK
+          HapticFeedback.lightImpact(); 
         },
         onPointerUp: (_) => _resetActiveWheelTimer(),
         child: AnimatedOpacity(
@@ -529,7 +515,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 physics: const FixedExtentScrollPhysics(),
                 onSelectedItemChanged: (v) { 
                   widget.controller.updateWheel(index, v % 10); 
-                  HapticFeedback.selectionClick(); // 🔥 TACTILE FEEL MASA PUSING
+                  HapticFeedback.selectionClick();
                   _analyzeScrollPattern(); 
                 },
                 childDelegate: ListWheelChildBuilderDelegate(builder: (context, i) => Center(child: Text('${i % 10}', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, shadows: isActive ? [Shadow(color: color, blurRadius: 20)] : [])))),
