@@ -1,201 +1,119 @@
 /*
- * PROJECT: CryptexLock Security Suite V3.0
- * MODULE: Incident Reporter (The Intelligence Agent)
- * PURPOSE: Secure communication agent with auto-retry and server analysis
+ * PROJECT: CryptexLock Security Suite V3.1 (LEAK FREE)
+ * MODULE: Incident Reporter
+ * STATUS: MEMORY SAFE ✅
  */
 
 import 'dart:async';
-import 'dart:convert'; // ✅ FIX: Library ini wajib ada untuk jsonEncode/jsonDecode
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'mirror_service.dart'; // ✅ FIX: Import model SecurityIncidentReport dari sini
+import 'mirror_service.dart'; 
 import 'incident_storage.dart';
-import '../config/security_config.dart';
+// import '../config/security_config.dart'; // Optional depending on file structure
 
-/// The Result of an incident reporting operation
 class IncidentReportResult {
   final bool success;
   final String status;
   final String incidentId;
-  final String? errorMessage;
-  final IncidentReceipt? receipt;
 
-  IncidentReportResult({
-    required this.success,
-    required this.status,
-    required this.incidentId,
-    this.errorMessage,
-    this.receipt,
-  });
+  IncidentReportResult({required this.success, required this.status, required this.incidentId});
   
-  factory IncidentReportResult.success(IncidentReceipt receipt) {
-    return IncidentReportResult(
-      success: true,
-      status: 'REPORTED_TO_SERVER',
-      incidentId: receipt.incidentId,
-      receipt: receipt,
-    );
-  }
-  
-  factory IncidentReportResult.queuedForRetry(String incidentId) {
-    return IncidentReportResult(
-      success: true,
-      status: 'QUEUED_OFFLINE',
-      incidentId: incidentId,
-    );
-  }
-  
-  factory IncidentReportResult.failed(String incidentId, String error) {
-    return IncidentReportResult(
-      success: false,
-      status: 'CRITICAL_FAILURE',
-      incidentId: incidentId,
-      errorMessage: error,
-    );
-  }
-  
-  factory IncidentReportResult.disabled() {
-    return IncidentReportResult(
-      success: false,
-      status: 'REPORTING_PROTOCOL_DISABLED',
-      incidentId: '',
-    );
-  }
-}
-
-class RetryResult {
-  final int totalPending;
-  final int succeeded;
-  final int failed;
-  final List<String> errorLogs;
-
-  RetryResult({
-    required this.totalPending,
-    required this.succeeded,
-    required this.failed,
-    required this.errorLogs,
-  });
-  
-  factory RetryResult.empty() => RetryResult(
-    totalPending: 0, 
-    succeeded: 0, 
-    failed: 0, 
-    errorLogs: []
-  );
+  factory IncidentReportResult.empty() => IncidentReportResult(success: false, status: 'EMPTY', incidentId: '');
 }
 
 class IncidentReporter {
   final MirrorService _mirrorService;
-  final SecurityConfig _config;
-  
-  static const Duration _BACKGROUND_SYNC_INTERVAL = Duration(minutes: 5);
-  
   Timer? _backgroundSyncTimer;
   bool _isSyncing = false;
-  
-  IncidentReporter({
-    required MirrorService mirrorService,
-    required SecurityConfig config,
-  })  : _mirrorService = mirrorService,
-        _config = config {
-    
-    if (_config.retryFailedReports) {
-      _initializeBackgroundAgent();
-    }
-  }
+  bool _isDisposed = false; // 🛡️ GUARD FLAG
 
-  Future<IncidentReportResult> report(SecurityIncidentReport incident) async {
-    if (!_config.enableIncidentReporting) {
-      if (kDebugMode) print('🛡️ [INTEL] Reporting protocol is disabled.');
-      return IncidentReportResult.disabled();
-    }
+  static const Duration _BACKGROUND_SYNC_INTERVAL = Duration(minutes: 5);
 
-    final String incidentId = incident.incidentId;
-    final Map<String, dynamic> incidentData = incident.toJson();
-
-    if (_config.enableLocalIncidentStorage) {
-      // ✅ FIX: jsonEncode wujud sekarang sebab ada 'dart:convert'
-      await IncidentStorage.saveIncident(incidentData);
-    }
-
-    try {
-      final receipt = await _mirrorService.reportIncident(incident);
-      
-      if (_config.enableLocalIncidentStorage) {
-        await IncidentStorage.markAsSynced(incidentId);
-      }
-      
-      return IncidentReportResult.success(receipt);
-
-    } on SocketException catch (e) {
-      if (kDebugMode) print('🌐 [OFFLINE] Queuing $incidentId.');
-      await IncidentStorage.addToPendingReports(jsonEncode(incidentData));
-      return IncidentReportResult.queuedForRetry(incidentId);
-      
-    } on TimeoutException catch (e) {
-      if (kDebugMode) print('⏳ [TIMEOUT] Queuing $incidentId.');
-      await IncidentStorage.addToPendingReports(jsonEncode(incidentData));
-      return IncidentReportResult.queuedForRetry(incidentId);
-
-    } catch (e) {
-      if (kDebugMode) print('❌ [ERROR] Critical failure: $e');
-      await IncidentStorage.addToPendingReports(jsonEncode(incidentData));
-      return IncidentReportResult.failed(incidentId, e.toString());
-    }
+  IncidentReporter({MirrorService? mirrorService}) 
+      : _mirrorService = mirrorService ?? MirrorService() {
+    _initializeBackgroundAgent();
   }
 
   void _initializeBackgroundAgent() {
+    // 🚨 FIX: Store reference to timer to cancel it later
     _backgroundSyncTimer = Timer.periodic(_BACKGROUND_SYNC_INTERVAL, (timer) {
-      if (!_isSyncing) {
+      if (!_isSyncing && !_isDisposed) {
         retryAllPending();
       }
     });
   }
 
-  Future<RetryResult> retryAllPending() async {
-    if (_isSyncing) return RetryResult.empty();
+  /// Main entry point to report security violation
+  Future<IncidentReportResult> report({
+    required String deviceId,
+    required String type,
+    required Map<String, dynamic> metadata,
+  }) async {
+    if (_isDisposed) return IncidentReportResult.empty();
+
+    final incidentId = 'INC-${DateTime.now().millisecondsSinceEpoch}';
     
-    _isSyncing = true;
-    final List<String> pendingLogs = await IncidentStorage.getPendingReports();
-    
-    if (pendingLogs.isEmpty) {
-      _isSyncing = false;
-      return RetryResult.empty();
-    }
-
-    int succeeded = 0;
-    int failed = 0;
-    List<String> errors = [];
-
-    for (String rawJson in pendingLogs) {
-      try {
-        final Map<String, dynamic> data = jsonDecode(rawJson);
-        // ✅ FIX: Menggunakan SecurityIncidentReport.fromJson dari mirror_service
-        final incident = SecurityIncidentReport.fromJson(data);
-        
-        final receipt = await _mirrorService.reportIncident(incident);
-        
-        if (receipt.incidentId.isNotEmpty) {
-          await IncidentStorage.markAsSynced(incident.incidentId);
-          await IncidentStorage.removeFromPending(rawJson);
-          succeeded++;
-        }
-      } catch (e) {
-        failed++;
-        errors.add(e.toString());
-      }
-    }
-
-    _isSyncing = false;
-    return RetryResult(
-      totalPending: pendingLogs.length,
-      succeeded: succeeded,
-      failed: failed,
-      errorLogs: errors,
+    final report = SecurityIncidentReport(
+      incidentId: incidentId,
+      timestamp: DateTime.now().toIso8601String(),
+      deviceId: deviceId,
+      attackType: type,
+      detectedValue: metadata['detected'] ?? 'unknown',
+      expectedSignature: metadata['expected'] ?? 'unknown',
+      action: 'FLAGGED',
     );
+
+    // 1. Cuba hantar online
+    try {
+      final receipt = await _mirrorService.reportIncident(report);
+      return IncidentReportResult(success: true, status: 'SENT', incidentId: receipt.incidentId);
+    } catch (e) {
+      // 2. Kalau gagal, simpan offline (Queue)
+      await IncidentStorage.saveOffline(report);
+      return IncidentReportResult(success: false, status: 'QUEUED_OFFLINE', incidentId: incidentId);
+    }
   }
 
+  Future<void> retryAllPending() async {
+    if (_isSyncing || _isDisposed) return;
+    
+    _isSyncing = true;
+    
+    try {
+      final List<String> pendingLogs = await IncidentStorage.getPendingReports();
+      if (pendingLogs.isEmpty) {
+        _isSyncing = false;
+        return;
+      }
+
+      for (String rawJson in pendingLogs) {
+        if (_isDisposed) break; // Stop if disposed mid-loop
+
+        try {
+          final Map<String, dynamic> data = jsonDecode(rawJson);
+          final incident = SecurityIncidentReport.fromJson(data);
+          
+          await _mirrorService.reportIncident(incident);
+          
+          // Only delete if successful
+          await IncidentStorage.removeFromPending(incident.incidentId); 
+        } catch (e) {
+          debugPrint("Sync failed for item: $e");
+        }
+      }
+    } catch (e) {
+      debugPrint("Batch sync error: $e");
+    } finally {
+      _isSyncing = false;
+    }
+  }
+
+  // 🛡️ MEMORY LEAK FIX
   void dispose() {
+    _isDisposed = true;
     _backgroundSyncTimer?.cancel();
+    _backgroundSyncTimer = null;
+    debugPrint("IncidentReporter disposed. Background tasks killed.");
   }
 }
