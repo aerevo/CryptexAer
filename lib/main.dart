@@ -1,51 +1,40 @@
-// 🛡️ Z-KINETIC INTELLIGENCE HUB V6.5 (MERGED & FINAL)
-// Status: PRODUCTION READY + PANIC MODE ✅
-// Features: 
-// 1. Clean Architecture (TransactionService)
-// 2. Integrity Check (Smart Warning)
-// 3. Panic Mode (Fake Dashboard RM0.00)
-// 4. Hardened SQLite Persistence
-// 5. Automated Security Policy Injection
+// 🛡️ Z-KINETIC INTELLIGENCE HUB V6.6 (BUILD FIXED)
+// Status: COMPILE READY ✅
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-// Core Imports (Struktur Folder src Kapten)
-import 'cryptex_lock/src/cla_widget.dart';
+// Core Imports
+import 'cryptex_lock/cryptex_lock.dart'; // Main export file
 import 'cryptex_lock/src/cla_controller.dart';
-import 'cryptex_lock/src/cla_models.dart' hide SecurityConfig; 
+import 'cryptex_lock/src/cla_models.dart';
 
 // Services & Security
 import 'cryptex_lock/src/security/config/security_config.dart';
 import 'cryptex_lock/src/security/services/mirror_service.dart';
 import 'cryptex_lock/src/security/services/device_fingerprint.dart';
 import 'cryptex_lock/src/security/services/incident_reporter.dart';
-import 'cryptex_lock/src/security/services/incident_storage.dart'; // SQLite Service
-
-// The Pipeline
+import 'cryptex_lock/src/security/services/incident_storage.dart';
 import 'cryptex_lock/src/services/transaction_service.dart';
 
 void main() async {
-  // 1. Pastikan Flutter Binding dimulakan untuk plugin Native
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 2. Kunci orientasi peranti (Security Best Practice)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
-  // 3. BOOTLOADER: Inisialisasi Black Box (SQLite)
-  // Memastikan log boleh ditulis sebaik sahaja aplikasi bernafas.
+  
+  // Initialize Black Box (SQLite)
   try {
     await IncidentStorage.database;
-    if (kDebugMode) print("🛡️ Francois: Black Box (SQL) Initialized.");
+    if (kDebugMode) print("🛡️ Black Box (SQL) Initialized.");
   } catch (e) {
-    if (kDebugMode) print("⚠️ Francois: Database Error: $e");
+    if (kDebugMode) print("⚠️ Database Error: $e");
   }
-
+  
   runApp(const MyApp());
 }
 
@@ -58,21 +47,18 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Z-KINETIC PRO',
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF000000), 
+        scaffoldBackgroundColor: const Color(0xFF000000),
         primaryColor: Colors.cyanAccent,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.black,
           elevation: 0,
         ),
       ),
-      home: const BootLoader(), 
+      home: const BootLoader(),
     );
   }
 }
 
-// ==========================================
-// 1. BOOTLOADER (Tarik Data Dulu)
-// ==========================================
 class BootLoader extends StatefulWidget {
   const BootLoader({super.key});
 
@@ -88,40 +74,43 @@ class _BootLoaderState extends State<BootLoader> {
   }
 
   Future<void> _initializeSecureSession() async {
-    // 1. Tarik Data Transaksi dari Pipeline
+    // 1. Fetch Transaction Data
     TransactionData data;
     try {
       data = await TransactionService.fetchCurrentTransaction();
     } catch (e) {
       data = TransactionData(
-        amount: "RM 0.00", 
-        securityHash: "ERR_HASH", 
+        amount: "RM 0.00",
+        securityHash: "ERR_HASH",
         transactionId: "FAILED_CONNECTION"
       );
     }
     
-    // 2. Setup Security Reporter & Policy
+    // 2. Setup Security Config (FIXED PARAMETERS)
     const config = SecurityConfig(
-       enableCertificatePinning: true,
-       autoReportViolations: true,
+      enableCertificatePinning: true,
+      enableIncidentReporting: true,
+      autoReportCriticalThreats: true,
+      retryFailedReports: true,
     );
     
-    final mirrorService = MirrorService(); // Menggunakan default config internal
+    final mirrorService = MirrorService();
+    
+    // FIXED: Added required 'config' parameter
     final incidentReporter = IncidentReporter(
-       mirrorService: mirrorService
+      mirrorService: mirrorService,
+      config: config,
     );
 
-    // 3. Masuk ke LockScreen (Peralihan Mulus)
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => LockScreen(
           systemName: "SECURE BANKING UPLINK",
-          displayedAmount: data.amount,       
-          secureHash: data.securityHash,     
+          displayedAmount: data.amount,
+          secureHash: data.securityHash,
           transactionId: data.transactionId,
           incidentReporter: incidentReporter,
-          securityConfig: config,
         ),
         transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
       )
@@ -138,7 +127,7 @@ class _BootLoaderState extends State<BootLoader> {
             CircularProgressIndicator(color: Colors.cyanAccent),
             SizedBox(height: 20),
             Text(
-              "ESTABLISHING SECURE CONNECTION...", 
+              "ESTABLISHING SECURE CONNECTION...",
               style: TextStyle(color: Colors.white54, letterSpacing: 2, fontSize: 10)
             ),
           ],
@@ -148,16 +137,12 @@ class _BootLoaderState extends State<BootLoader> {
   }
 }
 
-// ==========================================
-// 2. LOCK SCREEN (UI Utama)
-// ==========================================
 class LockScreen extends StatefulWidget {
   final String systemName;
   final String displayedAmount;
   final String secureHash;
   final String transactionId;
   final IncidentReporter? incidentReporter;
-  final SecurityConfig securityConfig;
 
   const LockScreen({
     super.key,
@@ -165,7 +150,6 @@ class LockScreen extends StatefulWidget {
     required this.displayedAmount,
     required this.secureHash,
     required this.transactionId,
-    required this.securityConfig,
     this.incidentReporter,
   });
 
@@ -178,20 +162,16 @@ class _LockScreenState extends State<LockScreen> {
   bool _isInitialized = false;
   bool _isCompromised = false;
   bool _userAcknowledgedThreat = false;
-  
-  // 🔥 FAKE DASHBOARD STATE (Panic Mode UI)
   bool _showFakeDashboard = false;
 
   @override
   void initState() {
     super.initState();
-    _performIntegrityAudit(); 
+    _performIntegrityAudit();
     _initializeController();
   }
 
-  /// Audit Integriti: Memastikan RM yang dipaparkan sepadan dengan Hash
   void _performIntegrityAudit() {
-    // Logik audit disesuaikan dengan TransactionService V2.0
     final isValid = TransactionService.validateTransaction(
       TransactionData(
         amount: widget.displayedAmount,
@@ -199,26 +179,26 @@ class _LockScreenState extends State<LockScreen> {
         transactionId: widget.transactionId
       )
     );
-
+    
     if (!isValid) {
       setState(() => _isCompromised = true);
-      debugPrint("🚨 DATA BREACH: Integrity Check Failed for ${widget.transactionId}");
+      debugPrint("🚨 DATA BREACH: Integrity Check Failed");
     }
   }
 
   void _initializeController() {
+    // FIXED: Proper constructor with required parameter
     _controller = ClaController(
-      config: ClaConfig(
-        secret: const [1, 7, 3, 9, 2], // 🚨 AMARAN: Jangan guna Palindrome!
-        minShake: 0.4, 
-        thresholdAmount: 0.25, 
+      ClaConfig(
+        secret: const [1, 7, 3, 9, 2],
+        minShake: 0.4,
+        thresholdAmount: 0.25,
         minSolveTime: const Duration(milliseconds: 600),
-        maxAttempts: 5,  
-        jamCooldown: const Duration(seconds: 10), 
-        enableSensors: true, 
+        maxAttempts: 5,
+        jamCooldown: const Duration(seconds: 10),
+        enableSensors: true,
         clientId: 'Z_KINETIC_PRO',
         clientSecret: 'secured_session_key',
-        securityConfig: widget.securityConfig,
       ),
     );
     setState(() => _isInitialized = true);
@@ -231,40 +211,44 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
-  // 🔥 SILENT ALARM LOGIC (Dikonfigurasi oleh Francois)
+  // FIXED: Proper method signature with SecurityIncidentReport
   Future<void> _triggerSilentPanic() async {
     String deviceId = "UNKNOWN";
-    try { 
-      deviceId = await DeviceFingerprint.getDeviceId(); 
+    try {
+      deviceId = await DeviceFingerprint.getDeviceId();
     } catch (_) {}
 
-    await widget.incidentReporter?.report(
+    final report = SecurityIncidentReport(
+      incidentId: "SOS-${DateTime.now().millisecondsSinceEpoch}",
+      timestamp: DateTime.now().toIso8601String(),
       deviceId: deviceId,
-      type: "DURESS_PANIC_CODE_ACTIVATED",
-      metadata: {
-        "user_state": "UNDER_THREAT",
-        "action": "SILENT_ALARM_SENT",
-        "location_context": "DASHBOARD_MIRROR_ACTIVE"
-      },
+      attackType: "DURESS_PANIC_CODE_ACTIVATED",
+      detectedValue: "USER_UNDER_THREAT",
+      expectedSignature: "REVOKED",
+      action: "SILENT_ALARM_SENT",
     );
-    debugPrint("🚨 SOS: Silent Alarm logged to SQL and Mirror.");
+
+    await widget.incidentReporter?.report(report);
+    debugPrint("🚨 SILENT ALARM SENT");
   }
 
   Future<void> _autoReportIncident() async {
     String deviceId = "UNKNOWN";
-    try { 
-      deviceId = await DeviceFingerprint.getDeviceId(); 
+    try {
+      deviceId = await DeviceFingerprint.getDeviceId();
     } catch (_) {}
 
-    await widget.incidentReporter?.report(
+    final report = SecurityIncidentReport(
+      incidentId: "INC-${DateTime.now().millisecondsSinceEpoch}",
+      timestamp: DateTime.now().toIso8601String(),
       deviceId: deviceId,
-      type: "INTEGRITY_MISMATCH_BYPASSED",
-      metadata: {
-        "amount": widget.displayedAmount,
-        "hash": widget.secureHash,
-        "action": "ALLOWED_WITH_WARNING",
-      },
+      attackType: "INTEGRITY_MISMATCH_BYPASSED",
+      detectedValue: widget.displayedAmount,
+      expectedSignature: widget.secureHash,
+      action: "ALLOWED_WITH_WARNING",
     );
+
+    await widget.incidentReporter?.report(report);
   }
 
   Future<void> _handleReportAndCancel() async {
@@ -277,17 +261,17 @@ class _LockScreenState extends State<LockScreen> {
     
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
-    Navigator.pop(context); 
+    Navigator.pop(context);
     
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.green.shade900,
         title: const Text("✅ REPORT SENT"),
-        content: const Text("Transaction cancelled and logged for security."),
+        content: const Text("Transaction cancelled for security."),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context), 
+            onPressed: () => Navigator.pop(context),
             child: const Text("CLOSE", style: TextStyle(color: Colors.white))
           )
         ],
@@ -296,20 +280,18 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   void _onSuccess() {
-    // 1. CHECK PANIC MODE DULU!
+    // Check Panic Mode
     if (_controller.isPanicMode) {
-      _triggerSilentPanic(); 
-      setState(() {
-        _showFakeDashboard = true; 
-      });
+      _triggerSilentPanic();
+      setState(() => _showFakeDashboard = true);
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("🔓 ACCESS GRANTED"), backgroundColor: Colors.green)
       );
-      return; 
+      return;
     }
 
-    // 2. Normal Flow
+    // Normal Flow
     if (_isCompromised && !_userAcknowledgedThreat) {
       setState(() => _userAcknowledgedThreat = true);
       _autoReportIncident();
@@ -321,12 +303,12 @@ class _LockScreenState extends State<LockScreen> {
         builder: (context) => AlertDialog(
           backgroundColor: Colors.orange.shade900,
           title: const Row(children: [
-            Icon(Icons.warning_amber, color: Colors.white), 
-            SizedBox(width: 10), 
+            Icon(Icons.warning_amber, color: Colors.white),
+            SizedBox(width: 10),
             Text("SECURITY ALERT", style: TextStyle(color: Colors.white, fontSize: 16))
           ]),
           content: const Text(
-            "Data Integrity Mismatch detected.\nAccess granted based on kinetic verification, but this incident has been recorded in the black box.", 
+            "Data Integrity Mismatch detected.\nAccess granted based on biometric verification.",
             style: TextStyle(color: Colors.white70)
           ),
           actions: [
@@ -346,11 +328,6 @@ class _LockScreenState extends State<LockScreen> {
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("🔓 ACCESS GRANTED"), backgroundColor: Colors.green)
-      );
-      
-      // Navigasi ke Dashboard Sebenar
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const RealSuccessDashboard())
       );
     }
   }
@@ -373,11 +350,11 @@ class _LockScreenState extends State<LockScreen> {
   Widget build(BuildContext context) {
     if (!_isInitialized) return const Scaffold(backgroundColor: Colors.black);
 
-    // 🔥 JIKA PANIC MODE: Tunjuk Dashboard Palsu (Akaun Kosong)
+    // Panic Mode UI
     if (_showFakeDashboard) {
       return Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(title: const Text("MY ACCOUNT", style: TextStyle(color: Colors.white))),
+        appBar: AppBar(title: const Text("MY ACCOUNT")),
         body: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -409,10 +386,12 @@ class _LockScreenState extends State<LockScreen> {
               _isCompromised ? _buildHackedNotice() : _buildSafeNotice(),
               const SizedBox(height: 50),
               
-              // Widget Panggilan Utama
-              ClaWidget(
+              // FIXED: Widget name is CryptexLock, not ClaWidget!
+              CryptexLock(
                 controller: _controller,
-                onUnlock: _onSuccess,
+                onSuccess: _onSuccess,
+                onFail: _onFail,
+                onJammed: _onJammed,
               ),
               
               const SizedBox(height: 30),
@@ -421,8 +400,8 @@ class _LockScreenState extends State<LockScreen> {
                   "TXN ID: ${widget.transactionId}\nStatus: ${_userAcknowledgedThreat ? 'MONITORED' : 'SECURE'}",
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _userAcknowledgedThreat ? Colors.orange.withOpacity(0.5) : Colors.green.withOpacity(0.5), 
-                    fontSize: 10, 
+                    color: _userAcknowledgedThreat ? Colors.orange.withOpacity(0.5) : Colors.green.withOpacity(0.5),
+                    fontSize: 10,
                     fontFamily: 'monospace'
                   ),
                 ),
@@ -437,8 +416,8 @@ class _LockScreenState extends State<LockScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.05), 
-        border: Border.all(color: Colors.green.withOpacity(0.5)), 
+        color: Colors.green.withOpacity(0.05),
+        border: Border.all(color: Colors.green.withOpacity(0.5)),
         borderRadius: BorderRadius.circular(12)
       ),
       child: Row(
@@ -448,7 +427,7 @@ class _LockScreenState extends State<LockScreen> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text("DATA INTEGRITY: VERIFIED", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            Text(widget.displayedAmount, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+            Text(widget.displayedAmount, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           ])),
         ],
       ),
@@ -459,44 +438,30 @@ class _LockScreenState extends State<LockScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.05), 
-        border: Border.all(color: Colors.red, width: 2), 
-        borderRadius: BorderRadius.circular(12), 
+        color: Colors.red.withOpacity(0.05),
+        border: Border.all(color: Colors.red, width: 2),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.2), blurRadius: 20)]
       ),
       child: Column(children: [
         const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.report_problem, color: Colors.red, size: 24), 
-          SizedBox(width: 10), 
+          Icon(Icons.report_problem, color: Colors.red, size: 24),
+          SizedBox(width: 10),
           Text("INTEGRITY BREACH", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))
         ]),
         const SizedBox(height: 15),
         Text("Value '${widget.displayedAmount}' mismatch.", textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 12)),
         const SizedBox(height: 20),
         SizedBox(
-          width: double.infinity, 
+          width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: _handleReportAndCancel, 
-            icon: const Icon(Icons.security, color: Colors.white), 
-            label: const Text("REPORT THREAT", style: TextStyle(color: Colors.white)), 
+            onPressed: _handleReportAndCancel,
+            icon: const Icon(Icons.security, color: Colors.white),
+            label: const Text("REPORT THREAT", style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade900)
           )
         ),
       ]),
-    );
-  }
-}
-
-class RealSuccessDashboard extends StatelessWidget {
-  const RealSuccessDashboard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("DASHBOARD")),
-      body: const Center(
-        child: Text("WELCOME. ACCESS FULLY GRANTED."),
-      ),
     );
   }
 }
