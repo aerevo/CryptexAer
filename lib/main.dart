@@ -1,17 +1,23 @@
-// 🛡️ Z-KINETIC INTELLIGENCE HUB V7.0 (ENTERPRISE READY)
-// Status: ALL IMPORTS FIXED ✅
-// Changes from V6.5:
-// 1. Clean barrel imports (no more src/ paths)
-// 2. incident_reporter API fixed (named params)
-// 3. Production-ready error handling
+// 🛡️ Z-KINETIC INTELLIGENCE HUB V7.1 (HYBRID SECURITY ACTIVE)
+// Status: INTEGRATED WITH V2 ENGINE ✅
+// Changes:
+// 1. Swapped Controller V1 -> V2
+// 2. Added Composite Attestation (Local + Server)
+// 3. Ready for Advanced Biometric Scoring
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-// ✅ FIX: Clean import via barrel file
-import 'cryptex_lock/cryptex_lock.dart';
+// ✅ FIX: Clean import via barrel file, TAPI kita sembunyikan Controller lama
+import 'cryptex_lock/cryptex_lock.dart' hide ClaController; 
+
+// 🚀 IMPORT ENGINE BARU (V2) & GUARDS
+import 'cryptex_lock/src/cla_controller_v2.dart';
+import 'cryptex_lock/src/device_integrity_attestation.dart';
+import 'cryptex_lock/src/server_attestation_provider.dart';
+import 'cryptex_lock/src/composite_attestation.dart';
 
 void main() async {
   // 1. Pastikan Flutter Binding dimulakan untuk plugin Native
@@ -88,14 +94,14 @@ class _BootLoaderState extends State<BootLoader> {
     // 2. Setup Security Reporter & Policy
     const config = SecurityConfig(
       enableCertificatePinning: true,
-      enableIncidentReporting: true,      // ✅ FIX: Correct parameter
-      autoReportCriticalThreats: true,    // ✅ FIX: Correct parameter name
+      enableIncidentReporting: true,
+      autoReportCriticalThreats: true,
     );
 
     final mirrorService = MirrorService();
     final incidentReporter = IncidentReporter(
       mirrorService: mirrorService,
-      config: config,  // ✅ FIX: Pass config explicitly
+      config: config,
     );
 
     // 3. Masuk ke LockScreen (Peralihan Mulus)
@@ -191,10 +197,12 @@ class _LockScreenState extends State<LockScreen> {
     }
   }
 
+  // 🛡️ INI BAHAGIAN PALING PENTING: WIRING HYBRID SECURITY
   void _initializeController() {
     _controller = ClaController(
       ClaConfig(
-        secret: const [1, 7, 3, 9, 2], // 🚨 PRODUCTION: Load from secure storage!
+        // 1. Setting Asal Tuan
+        secret: const [1, 7, 3, 9, 2],
         minShake: 0.4,
         thresholdAmount: 0.25,
         minSolveTime: const Duration(milliseconds: 600),
@@ -203,6 +211,24 @@ class _LockScreenState extends State<LockScreen> {
         enableSensors: true,
         clientId: 'Z_KINETIC_PRO',
         clientSecret: 'secured_session_key',
+        
+        // 2. ✅ HYBRID SECURITY (Local First -> Then Server)
+        attestationProvider: CompositeAttestationProvider(
+          
+          // Guard 1: Local (Percuma) - Check Emulator & Root
+          localProvider: DeviceIntegrityAttestation(
+            allowDebugMode: true,    // Ubah ke 'false' bila dah ready production!
+            allowEmulators: false,   // Block emulator
+          ),
+          
+          // Guard 2: Server (Bayar 0.06 sen) - Check Bil & Attack Pattern
+          serverProvider: ServerAttestationProvider(
+            ServerAttestationConfig(
+              endpoint: 'https://api.z-kinetic.com/v1/unlock', // TUKAR KE URL SERVER TUAN NANTI
+              apiKey: 'ZK_BETA_KEY_2026',
+            ),
+          ),
+        ),
       ),
     );
     setState(() => _isInitialized = true);
@@ -215,24 +241,30 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
-  // 🔥 SILENT ALARM LOGIC
+  // 🔥 SILENT ALARM LOGIC (Updated for V2 Forensics)
   Future<void> _triggerSilentPanic() async {
     String deviceId = "UNKNOWN";
     try {
       deviceId = await DeviceFingerprint.getDeviceId();
     } catch (_) {}
 
-    // ✅ FIX: Use named parameters API
+    // 🕵️ SEDUT DATA FORENSIK DARI V2
+    final sessionData = _controller.getSessionSnapshot();
+
     await widget.incidentReporter?.report(
       deviceId: deviceId,
       type: "DURESS_PANIC_CODE_ACTIVATED",
       metadata: {
         "user_state": "UNDER_THREAT",
         "action": "SILENT_ALARM_SENT",
-        "location_context": "DASHBOARD_MIRROR_ACTIVE"
+        "biometrics": {
+            "confidence": _controller.liveConfidence,
+            "hand_tremor": _controller.motionEntropy,
+            "session_id": sessionData['session_id']
+        }
       },
     );
-    debugPrint("🚨 SOS: Silent Alarm logged to SQL and Mirror.");
+    debugPrint("🚨 SOS: Silent Alarm logged with Biometric Evidence.");
   }
 
   Future<void> _autoReportIncident() async {
@@ -241,7 +273,6 @@ class _LockScreenState extends State<LockScreen> {
       deviceId = await DeviceFingerprint.getDeviceId();
     } catch (_) {}
 
-    // ✅ FIX: Use named parameters API
     await widget.incidentReporter?.report(
       deviceId: deviceId,
       type: "INTEGRITY_MISMATCH_BYPASSED",
@@ -342,8 +373,13 @@ class _LockScreenState extends State<LockScreen> {
 
   void _onFail() {
     HapticFeedback.heavyImpact();
+    
+    // 🔥 UPDATE: Tunjuk reason sebenar dari Guard (cth: "ROOT_DETECTED" atau "BILL_OVERDUE")
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("❌ INVALID (${_controller.failedAttempts}/5)"), backgroundColor: Colors.red)
+      SnackBar(
+        content: Text("❌ ${_controller.threatMessage.isNotEmpty ? _controller.threatMessage : 'INVALID CODE'}"), 
+        backgroundColor: Colors.red
+      )
     );
   }
 
@@ -404,7 +440,7 @@ class _LockScreenState extends State<LockScreen> {
               const SizedBox(height: 30),
               if (!_isCompromised)
                 Text(
-                  "TXN ID: ${widget.transactionId}\nStatus: ${_userAcknowledgedThreat ? 'MONITORED' : 'SECURE'}",
+                  "TXN ID: ${widget.transactionId}\nStatus: ${_userAcknowledgedThreat ? 'MONITORED' : 'SECURE'}\nGuard: Hybrid Active",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: _userAcknowledgedThreat ? Colors.orange.withOpacity(0.5) : Colors.green.withOpacity(0.5),
