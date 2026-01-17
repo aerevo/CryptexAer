@@ -1,9 +1,10 @@
-// 🎯 Z-KINETIC UI V10.0 (ENTERPRISE BENCHMARK)
-// Status: REAL STRESS TEST ✅
-// Feature: 
-// 1. Simulates 50 CONCURRENT threads (not sequential).
-// 2. Adds Network Jitter (Random Delays).
-// 3. Calculates TPS (Transactions Per Second).
+// 🎯 Z-KINETIC UI V11.0 (PERFORMANCE EDITION)
+// Status: 60 FPS OPTIMIZED ⚡
+// Features: 
+// 1. Uses ValueNotifier for sensor updates (No full rebuilds).
+// 2. RepaintBoundary added to static layers.
+// 3. Tactile Haptics Engine integrated.
+// 4. Preserves Stress Test & Tutorial Logic.
 
 import 'dart:async';
 import 'dart:math';
@@ -16,7 +17,7 @@ import 'cla_controller.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 1. TUTORIAL OVERLAY (KEKAL)
+// 1. TUTORIAL OVERLAY
 // ============================================
 class TutorialOverlay extends StatelessWidget {
   final bool isVisible;
@@ -92,10 +93,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
+  // 🔥 OPTIMIZATION: ValueNotifiers (Ganti setState untuk sensor)
+  final ValueNotifier<double> _motionScoreNotifier = ValueNotifier(0.0);
+  final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
+  final ValueNotifier<Offset> _accelNotifier = ValueNotifier(Offset.zero);
+  
   // Data Visualisasi
   double _patternScore = 0.0;
-  double _liveMotionScore = 0.0; 
-  double _liveTouchScore = 0.0;  
   
   // Tutorial Logic
   bool _showTutorial = true;
@@ -110,17 +114,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
   
-  // Sensor Data for UI
-  double _accelX = 0.0;
-  double _accelY = 0.0;
-  DateTime? _lastUiUpdate;
-  
   // Animations
   late AnimationController _pulseController;
   late AnimationController _scanController;
   late AnimationController _reticleController;
   
-  // 🔥 STRESS TEST VARIABLES
+  // Stress Test
   bool _isStressTesting = false;
   String _stressResult = "";
   
@@ -154,7 +153,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       _startLockoutTimer();
       widget.onJammed();
     }
-    if (mounted) setState(() {});
+    if (mounted) setState(() {}); // UI Update untuk State sahaja (Bukan sensor)
   }
 
   @override
@@ -182,8 +181,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _startListening() {
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((e) {
-      _accelX = e.x;
-      _accelY = e.y;
+      // 🔥 OPTIMIZATION: Update Notifier, BUKAN setState
+      _accelNotifier.value = Offset(e.x, e.y);
       
       double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
@@ -194,16 +193,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
       widget.controller.registerShake(delta, e.x, e.y, e.z);
 
-      if (amplifiedMotion > _liveMotionScore) {
-        _liveMotionScore = amplifiedMotion;
+      // Smooth decaying value
+      double currentScore = _motionScoreNotifier.value;
+      if (amplifiedMotion > currentScore) {
+        _motionScoreNotifier.value = amplifiedMotion;
       } else {
-        _liveMotionScore = (_liveMotionScore * 0.92); 
-      }
-
-      final now = DateTime.now();
-      if (_lastUiUpdate == null || now.difference(_lastUiUpdate!).inMilliseconds > 30) {
-        _lastUiUpdate = now;
-        if (mounted) setState(() {});
+        _motionScoreNotifier.value = (currentScore * 0.92); 
       }
     });
   }
@@ -219,16 +214,28 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   }
 
   void _triggerTouchActive() {
-    _liveTouchScore = 1.0; 
+    _touchScoreNotifier.value = 1.0; 
     setState(() => _patternScore = 1.0); 
     
     _touchDecayTimer?.cancel();
     _touchDecayTimer = Timer(const Duration(seconds: 3), () {});
+    
+    // Auto-decay logic handled by periodic check or simple decay on next frame if needed
+    // For now, let's keep it simple: reset after 3s
+    Future.delayed(const Duration(milliseconds: 100), _decayTouch);
+  }
+  
+  void _decayTouch() {
+    if (!mounted) return;
+    if (_touchScoreNotifier.value > 0) {
+      _touchScoreNotifier.value -= 0.05;
+      if (_touchScoreNotifier.value < 0) _touchScoreNotifier.value = 0;
+      Future.delayed(const Duration(milliseconds: 50), _decayTouch);
+    }
   }
 
   void _analyzeScrollPattern() {
     _userInteracted(); 
-    
     final now = DateTime.now();
     double speed = _lastScrollTime != null ? 1000.0 / now.difference(_lastScrollTime!).inMilliseconds : 0.0;
     _lastScrollTime = now;
@@ -246,22 +253,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     final stopwatch = Stopwatch()..start();
     final random = Random();
     
-    // 🔥 1. Simulasi Serangan Serentak (Concurrent)
-    // Kita guna Future.wait untuk paksa semua jalan sekali
     await Future.wait(List.generate(50, (index) async {
-      
-      // 🔥 2. Network Jitter (0-50ms)
-      // Setiap serangan ada delay sikit, macam real world traffic
       await Future.delayed(Duration(milliseconds: random.nextInt(50)));
-      
-      // Tembak!
       await widget.controller.validateAttempt(hasPhysicalMovement: true);
     }));
 
     stopwatch.stop();
-
-    // 🔥 3. Kira TPS (Transactions Per Second)
-    // Formula: Jumlah Request / Masa (saat)
     final double tps = 50 / (stopwatch.elapsedMilliseconds / 1000);
 
     setState(() {
@@ -273,7 +270,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           "Integrity: STABLE (No Crash)";
     });
     
-    // Auto clear result
     Future.delayed(const Duration(seconds: 8), () {
       if (mounted) setState(() => _stressResult = "");
     });
@@ -286,6 +282,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _accelSub?.cancel(); _lockoutTimer?.cancel(); _wheelActiveTimer?.cancel(); _touchDecayTimer?.cancel(); _tutorialHideTimer?.cancel();
     _pulseController.dispose(); _scanController.dispose(); _reticleController.dispose();
     for (var c in _scrollControllers) c.dispose();
+    _motionScoreNotifier.dispose(); _touchScoreNotifier.dispose(); _accelNotifier.dispose();
     super.dispose();
   }
 
@@ -298,19 +295,15 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     
     String statusLabel = _getStatusLabel(state);
     
-    if (_touchDecayTimer != null && _touchDecayTimer!.isActive) {
-      _liveTouchScore = 1.0; 
-    } else {
-      if (_liveTouchScore > 0) _liveTouchScore -= 0.05;
-      if (_liveTouchScore < 0) _liveTouchScore = 0;
-    }
-    
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Positioned.fill(child: CustomPaint(painter: KineticGridPainter(color: activeColor))),
+          // 🔥 REPAINT BOUNDARY: Background tak perlu lukis semula
+          RepaintBoundary(
+            child: Positioned.fill(child: CustomPaint(painter: KineticGridPainter(color: activeColor))),
+          ),
           
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -340,7 +333,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 const SizedBox(height: 28),
                 _buildAuthButton(activeColor, state),
                 
-                // 🔥 STRESS TEST UI
+                // STRESS TEST UI
                 const SizedBox(height: 20),
                 if (_stressResult.isNotEmpty)
                   Container(
@@ -394,10 +387,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // ... (BAHAGIAN BAWAH KEKAL SAMA - Helper Methods & Painters) ...
-  // Saya sertakan semua helper methods dan painters di bawah untuk memudahkan Copy-Paste
-  // tanpa risiko tertinggal kod penting.
-  
   String _getStatusLabel(SecurityState state) {
     switch (state) {
       case SecurityState.LOCKED: return "BIOMETRIC SCAN STANDBY";
@@ -434,9 +423,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             const SizedBox(width: 12),
             Column(
               children: [
-                _buildSensorBox("MOTION", _liveMotionScore, color, Icons.sensors),
+                // 🔥 OPTIMIZED: Guna ValueListenableBuilder
+                ValueListenableBuilder<double>(
+                  valueListenable: _motionScoreNotifier,
+                  builder: (context, val, _) => _buildSensorBox("MOTION", val, color, Icons.sensors),
+                ),
                 const SizedBox(height: 8),
-                _buildSensorBox("TOUCH", _liveTouchScore, color, Icons.fingerprint),
+                ValueListenableBuilder<double>(
+                  valueListenable: _touchScoreNotifier,
+                  builder: (context, val, _) => _buildSensorBox("TOUCH", val, color, Icons.fingerprint),
+                ),
                 const SizedBox(height: 8),
                 _buildPatternBox("PATTERN", _patternScore, color),
               ],
@@ -454,20 +450,26 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         children: [
           Positioned(
             left: 0, top: 0, bottom: 0, 
-            child: CustomPaint(
-              size: const Size(45, 140), 
-              painter: KineticPeripheralPainter(
-                color: color, side: 'left', valX: _accelX, valY: _accelY, state: state,
-              )
+            child: ValueListenableBuilder<Offset>(
+              valueListenable: _accelNotifier,
+              builder: (context, offset, _) => CustomPaint(
+                size: const Size(45, 140), 
+                painter: KineticPeripheralPainter(
+                  color: color, side: 'left', valX: offset.dx, valY: offset.dy, state: state,
+                )
+              ),
             )
           ),
           Positioned(
             right: 0, top: 0, bottom: 0, 
-            child: CustomPaint(
-              size: const Size(45, 140), 
-              painter: KineticPeripheralPainter(
-                color: color, side: 'right', valX: _accelX, valY: _accelY, state: state,
-              )
+            child: ValueListenableBuilder<Offset>(
+              valueListenable: _accelNotifier,
+              builder: (context, offset, _) => CustomPaint(
+                size: const Size(45, 140), 
+                painter: KineticPeripheralPainter(
+                  color: color, side: 'right', valX: offset.dx, valY: offset.dy, state: state,
+                )
+              ),
             )
           ),
           Padding(
@@ -510,6 +512,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           _wheelActiveTimer?.cancel();
           _userInteracted();
           widget.controller.registerTouch();
+          HapticFeedback.lightImpact(); // 🔥 HAPTICS FEEDBACK
         },
         onPointerUp: (_) => _resetActiveWheelTimer(),
         child: AnimatedOpacity(
@@ -526,7 +529,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 physics: const FixedExtentScrollPhysics(),
                 onSelectedItemChanged: (v) { 
                   widget.controller.updateWheel(index, v % 10); 
-                  HapticFeedback.selectionClick(); 
+                  HapticFeedback.selectionClick(); // 🔥 TACTILE FEEL MASA PUSING
                   _analyzeScrollPattern(); 
                 },
                 childDelegate: ListWheelChildBuilderDelegate(builder: (context, i) => Center(child: Text('${i % 10}', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, shadows: isActive ? [Shadow(color: color, blurRadius: 20)] : [])))),
