@@ -1,21 +1,28 @@
 /*
- * PROJECT: CryptexLock Security Suite
- * MODULE: Device Fingerprinting V2.0 (HARDENED)
- * PURPOSE: Generate TRULY unique device identifiers using UUID + Hardware Info
+ * PROJECT: CryptexLock Security Suite V3.5
+ * MODULE: Device Fingerprinting (HYBRID BEST VERSION)
+ * PURPOSE: Generate TRULY unique device identifiers
+ * FEATURES:
+ * - UUID v4 for guaranteed uniqueness (from Gemini)
+ * - getDeviceSecret() restored (from Original)
+ * - Error handling improved
+ * - Random.secure() for cryptographic strength
  */
 
 import 'dart:io';
+import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart'; // Wajib tambah di pubspec.yaml
+import 'package:uuid/uuid.dart'; // Add to pubspec.yaml: uuid: ^4.0.0
 
 class DeviceFingerprint {
   static const String _KEY_DEVICE_ID = 'secure_device_id_v2';
   static const String _KEY_DEVICE_SECRET = 'secure_device_secret';
   
-  /// Get or generate unique device ID (Persistent & Unique)
+  /// Get or generate unique device ID (Persistent & TRULY Unique)
+  /// Uses UUID v4 + Hardware Info for absolute uniqueness
   static Future<String> getDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
     
@@ -32,38 +39,68 @@ class DeviceFingerprint {
     try {
       if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
-        // Gunakan komponen yang jarang berubah
+        // Combine stable hardware identifiers
         hardwareSignature = '${androidInfo.brand}:${androidInfo.model}:${androidInfo.hardware}';
       } else if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
+        // Use vendor identifier + hardware details
         hardwareSignature = '${iosInfo.identifierForVendor}:${iosInfo.model}:${iosInfo.utsname.machine}';
       } else {
         hardwareSignature = 'unknown_platform_${Platform.operatingSystem}';
       }
     } catch (e) {
-      hardwareSignature = 'fallback_signature';
+      // Fallback if device info fails
+      hardwareSignature = 'fallback_signature_${DateTime.now().millisecondsSinceEpoch}';
     }
 
-    // Combine Hardware Info + Random UUID for absolute uniqueness
-    // Even same phone model will have different IDs now
+    // 🔥 CRITICAL: Combine Hardware Info + Random UUID
+    // This ensures even identical phone models have different IDs
     final uuid = const Uuid().v4();
     final combinedKey = '$hardwareSignature:$uuid';
     final deviceId = _hash(combinedKey);
     
+    // Persist for future use
     await prefs.setString(_KEY_DEVICE_ID, deviceId);
     return deviceId;
+  }
+  
+  /// Get or generate device secret (for ZK proof)
+  /// ✅ RESTORED: This method is required by secure_payload.dart
+  static Future<String> getDeviceSecret() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    String? existingSecret = prefs.getString(_KEY_DEVICE_SECRET);
+    if (existingSecret != null && existingSecret.isNotEmpty) {
+      return existingSecret;
+    }
+    
+    // Generate cryptographically secure random secret
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final deviceId = await getDeviceId();
+    final random = '$timestamp:$deviceId:${_generateRandomString(32)}';
+    final secret = _hash(random);
+    
+    await prefs.setString(_KEY_DEVICE_SECRET, secret);
+    return secret;
   }
   
   /// Get app signature (detects repackaged APKs)
   static Future<String> getAppSignature() async {
     final deviceInfo = DeviceInfoPlugin();
     
-    if (Platform.isAndroid) {
-      final androidInfo = await deviceInfo.androidInfo;
-      return _hash('${androidInfo.version.release}:${androidInfo.version.sdkInt}:build_v1');
-    } else if (Platform.isIOS) {
-      final iosInfo = await deviceInfo.iosInfo;
-      return _hash('${iosInfo.systemVersion}:${iosInfo.model}:build_v1');
+    try {
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        // In production, get actual APK signature via platform channels
+        // For now, use build signature
+        return _hash('${androidInfo.version.release}:${androidInfo.version.sdkInt}:build_v2');
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        return _hash('${iosInfo.systemVersion}:${iosInfo.model}:build_v2');
+      }
+    } catch (e) {
+      // Fallback if device info fails
+      return _hash('fallback_signature');
     }
     
     return _hash('default_signature');
@@ -83,10 +120,10 @@ class DeviceFingerprint {
     return digest.toString();
   }
   
-  // Helper: Generate random string
+  // Helper: Generate cryptographically secure random string
   static String _generateRandomString(int length) {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final rand = Random.secure();
+    final rand = Random.secure(); // 🔥 Use secure random, not timestamp-based
     return List.generate(length, (index) => chars[rand.nextInt(chars.length)]).join();
   }
 }
