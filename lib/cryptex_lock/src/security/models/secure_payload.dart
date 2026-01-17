@@ -2,6 +2,8 @@
  * PROJECT: CryptexLock Security Suite
  * MODULE: Server Validation Payload
  * SECURITY LEVEL: Zero-Knowledge Proof
+ * 
+ * NOTE: ServerVerdict moved to mirror_service.dart to avoid export conflict
  */
 
 import 'package:crypto/crypto.dart';
@@ -13,7 +15,7 @@ class SecurePayload {
   final String appSignature;
   final String nonce;
   final int timestamp;
-  
+
   // Biometric metrics
   final double entropy;
   final double tremorHz;
@@ -21,10 +23,10 @@ class SecurePayload {
   final double averageMagnitude;
   final int uniqueGestureCount;
   final int interactionTimeMs;
-  
+
   // Zero-Knowledge Proof (proves code knowledge without revealing it)
   final String zkProof;
-  
+
   // Motion signature hash (not actual motion data)
   final String motionSignature;
 
@@ -61,50 +63,6 @@ class SecurePayload {
   };
 }
 
-/// Server response verdict
-class ServerVerdict {
-  final bool allowed;
-  final String token;
-  final int expiresIn;
-  final String? reason;
-
-  ServerVerdict({
-    required this.allowed,
-    required this.token,
-    required this.expiresIn,
-    this.reason,
-  });
-
-  factory ServerVerdict.fromJson(Map<String, dynamic> json) {
-    return ServerVerdict(
-      allowed: json['allow'] ?? false,
-      token: json['token'] ?? '',
-      expiresIn: json['expires_in'] ?? 0,
-      reason: json['reason'],
-    );
-  }
-  
-  /// Offline fallback when server unavailable
-  factory ServerVerdict.offlineFallback() {
-    return ServerVerdict(
-      allowed: true,
-      token: 'offline_mode',
-      expiresIn: 30,
-      reason: 'server_unavailable_fallback',
-    );
-  }
-  
-  /// Failed verification
-  factory ServerVerdict.denied(String reason) {
-    return ServerVerdict(
-      allowed: false,
-      token: '',
-      expiresIn: 0,
-      reason: reason,
-    );
-  }
-}
-
 /// Zero-Knowledge Proof Generator
 class ZeroKnowledgeProof {
   /// Generate proof that user knows the code WITHOUT revealing it
@@ -121,7 +79,7 @@ class ZeroKnowledgeProof {
     final digest = sha256.convert(bytes);
     return digest.toString();
   }
-  
+
   /// Verify token signature from server
   static bool verifyToken({
     required String token,
