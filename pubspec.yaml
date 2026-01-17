@@ -14,10 +14,11 @@ dependencies:
   cupertino_icons: ^1.0.2
   
   # =========================================================
-  # ðŸ›¡ï¸ CORE SECURITY SUITE
+  # 🛡️ CORE SECURITY SUITE
   # =========================================================
   
   # Sensors (Motion Detection)
+  # Updated to ^5.0.1 for stability on latest Android/iOS
   sensors_plus: ^5.0.1
   
   # Storage (Secure & Preferences)
@@ -28,21 +29,24 @@ dependencies:
   flutter_jailbreak_detection: ^1.10.0
   
   # =========================================================
-  # ðŸ” CRYPTOGRAPHY & AUTHENTICATION
+  # 🔐 CRYPTOGRAPHY & AUTHENTICATION
   # =========================================================
   
   # Cryptographic Functions (SHA-256, HMAC, Hashing)
   crypto: ^3.0.3
+
+  # Unique Identifier Generation (New Addition)
+  uuid: ^4.0.0
   
   # =========================================================
-  # ðŸ“¡ NETWORK & SERVER COMMUNICATION
+  # 📡 NETWORK & SERVER COMMUNICATION
   # =========================================================
   
   # HTTP Client (Server Validation & Incident Reporting)
   http: ^1.2.1
   
   # =========================================================
-  # ðŸ” DEVICE IDENTIFICATION
+  # 🔍 DEVICE IDENTIFICATION
   # =========================================================
   
   # Device Info (Device Fingerprinting)
@@ -59,7 +63,7 @@ flutter:
   uses-material-design: true
   
   # =========================================================
-  # ðŸ“ OPTIONAL: Custom Fonts (Monospace for Logs)
+  # 📝 OPTIONAL: Custom Fonts (Monospace for Logs)
   # =========================================================
   # fonts:
   #   - family: Courier
