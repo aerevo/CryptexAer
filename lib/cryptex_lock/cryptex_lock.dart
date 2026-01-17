@@ -26,10 +26,12 @@ export 'src/security_engine.dart';
 export 'src/security/config/security_config.dart';
 export 'src/security/models/secure_payload.dart';
 
-export 'src/security/services/mirror_service.dart';
+// NOTE: mirror_service must be exported AFTER secure_payload
+// to avoid ServerVerdict conflict (mirror_service has the complete definition)
 export 'src/security/services/device_fingerprint.dart';
 export 'src/security/services/incident_reporter.dart';
 export 'src/security/services/incident_storage.dart';
+export 'src/security/services/mirror_service.dart'; // Moved to end
 
 // ============================================
 // BUSINESS SERVICES
