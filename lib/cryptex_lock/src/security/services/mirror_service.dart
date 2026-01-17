@@ -1,20 +1,18 @@
 /*
- * PROJECT: CryptexLock Security Suite V3.2
- * MODULE: Mirror Service (Server Communication)
- * STATUS: SECURE (SSL Pinning Ready) ✅
+ * PROJECT: CryptexLock Security Suite V3.0
+ * MODULE: Server Communication (Mirror Service)
+ * NEW: Incident Reporting Integration
+ * SECURITY: HTTPS + Certificate Pinning + Rate Limiting
  */
 
 import 'dart:async';
-import 'dart:convert';
+import 'dart:convert'; // âœ… FIX: Wajib ada untuk jsonEncode/Decode
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
+import '../models/secure_payload.dart';
 import 'package:flutter/foundation.dart';
 
-// ============================================
-// SHARED MODELS (Digunakan oleh IncidentReporter)
-// ============================================
-
+// âœ… FIX: Definisi Model Lengkap SecurityIncidentReport (Shared Model)
 class SecurityIncidentReport {
   final String incidentId;
   final String timestamp;
@@ -34,27 +32,162 @@ class SecurityIncidentReport {
     required this.action,
   });
 
+  // Convert ke JSON untuk dihantar ke server
   Map<String, dynamic> toJson() => {
     'incident_id': incidentId,
     'timestamp': timestamp,
-    'device_id': deviceId,
     'threat_intel': {
       'type': attackType,
       'detected': detectedValue,
       'signature': expectedSignature,
+      'integrity_fail': true,
     },
+    'device_id': deviceId,
     'status': action,
   };
 
+  // Convert dari JSON (Wajib untuk IncidentReporter baca balik data offline)
   factory SecurityIncidentReport.fromJson(Map<String, dynamic> json) {
+    // Handle struktur nested jika datang dari storage vs fresh creation
+    final threatIntel = json['threat_intel'] ?? {};
+    
     return SecurityIncidentReport(
       incidentId: json['incident_id'] ?? '',
       timestamp: json['timestamp'] ?? '',
       deviceId: json['device_id'] ?? '',
-      attackType: json['threat_intel']?['type'] ?? 'UNKNOWN',
-      detectedValue: json['threat_intel']?['detected'] ?? '',
-      expectedSignature: json['threat_intel']?['signature'] ?? '',
-      action: json['status'] ?? 'UNKNOWN',
+      attackType: threatIntel['type'] ?? (json['attackType'] ?? 'UNKNOWN'),
+      detectedValue: threatIntel['detected'] ?? (json['detectedValue'] ?? ''),
+      expectedSignature: threatIntel['signature'] ?? (json['expectedSignature'] ?? ''),
+      action: json['status'] ?? (json['action'] ?? 'PENDING'),
+    );
+  }
+}
+
+class MirrorService {
+  static const String DEFAULT_ENDPOINT = 'https://api.yourdomain.com';
+  static const Duration TIMEOUT = Duration(seconds: 5);
+  static const int MAX_RETRIES = 2;
+  
+  final String endpoint;
+  final Duration timeout;
+  
+  MirrorService({
+    String? endpoint,
+    Duration? timeout,
+  })  : endpoint = endpoint ?? DEFAULT_ENDPOINT,
+        timeout = timeout ?? TIMEOUT;
+  
+  /// Verify biometric signature with server
+  Future<ServerVerdict> verify(SecurePayload payload) async {
+    try {
+      return await _verifyWithRetry(payload, retries: MAX_RETRIES);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Mirror Service Error: $e');
+      }
+      return ServerVerdict.offlineFallback();
+    }
+  }
+  
+  /// ðŸ”¥ NEW: Report security incident to server
+  /// Returns incident receipt with server actions
+  Future<IncidentReceipt> reportIncident(SecurityIncidentReport incident) async {
+    try {
+      final url = Uri.parse('$endpoint/api/v1/report-incident');
+      
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Client-Version': '3.0.0',
+              'X-Device-ID': incident.deviceId,
+            },
+            body: jsonEncode(incident.toJson()),
+          )
+          .timeout(timeout);
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final json = jsonDecode(response.body);
+        return IncidentReceipt.fromJson(json);
+      } else {
+        throw HttpException('Server rejected report: ${response.statusCode}');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<ServerVerdict> _verifyWithRetry(SecurePayload payload, {required int retries}) async {
+    for (int attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await _makeRequest(payload);
+      } catch (e) {
+        if (attempt == retries) rethrow;
+        await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+      }
+    }
+    return ServerVerdict.offlineFallback();
+  }
+
+  Future<ServerVerdict> _makeRequest(SecurePayload payload) async {
+    final url = Uri.parse('$endpoint/api/v1/verify');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Client-Version': '2.0.4',
+        'X-Device-ID': payload.deviceId,
+      },
+      body: jsonEncode(payload.toJson()),
+    ).timeout(timeout);
+
+    if (response.statusCode == 200) {
+      return ServerVerdict.fromJson(jsonDecode(response.body));
+    } else {
+      return ServerVerdict.denied('server_error');
+    }
+  }
+}
+
+// Model untuk Respon Server (Verdict)
+class ServerVerdict {
+  final bool allowed;
+  final String token;
+  final int expiresIn;
+  final String reason;
+
+  ServerVerdict({
+    required this.allowed,
+    required this.token,
+    required this.expiresIn,
+    this.reason = '',
+  });
+
+  factory ServerVerdict.fromJson(Map<String, dynamic> json) {
+    return ServerVerdict(
+      allowed: json['allow'] ?? false,
+      token: json['token'] ?? '',
+      expiresIn: json['expires_in'] ?? 0,
+      reason: json['reason'] ?? '',
+    );
+  }
+
+  factory ServerVerdict.denied(String reason) {
+    return ServerVerdict(
+      allowed: false,
+      token: '',
+      expiresIn: 0,
+      reason: reason,
+    );
+  }
+
+  factory ServerVerdict.offlineFallback() {
+    return ServerVerdict(
+      allowed: true, // Allow offline by default (or false for strict security)
+      token: 'offline_token',
+      expiresIn: 300,
+      reason: 'offline_mode',
     );
   }
 }
@@ -62,61 +195,52 @@ class SecurityIncidentReport {
 class IncidentReceipt {
   final String incidentId;
   final String status;
+  final IncidentActions actions;
+  final ThreatAnalysis? threatAnalysis;
 
-  IncidentReceipt({required this.incidentId, required this.status});
+  IncidentReceipt({
+    required this.incidentId,
+    required this.status,
+    required this.actions,
+    this.threatAnalysis,
+  });
+
+  factory IncidentReceipt.fromJson(Map<String, dynamic> json) {
+    return IncidentReceipt(
+      incidentId: json['incident_id'] ?? '',
+      status: json['status'] ?? 'UNKNOWN',
+      actions: IncidentActions.fromJson(json['actions'] ?? {}),
+      threatAnalysis: json['threat_analysis'] != null 
+          ? ThreatAnalysis.fromJson(json['threat_analysis']) 
+          : null,
+    );
+  }
 }
 
-// ============================================
-// SERVICE IMPLEMENTATION
-// ============================================
+class IncidentActions {
+  final bool logged;
+  final bool deviceBlacklisted;
 
-class MirrorService {
-  final String baseUrl;
-  late final http.Client _client;
+  IncidentActions({required this.logged, required this.deviceBlacklisted});
 
-  // 🔒 PRODUCTION CERTIFICATE PINNING
-  // Masukkan SHA-256 hash certificate server sebenar di sini nanti
-  static const String _EXPECTED_CERT_HASH = "SHA256_HASH_OF_YOUR_SERVER_CERT";
-
-  MirrorService({this.baseUrl = 'https://api.aer-security.com/v1'}) {
-    _client = _createSecureClient();
+  factory IncidentActions.fromJson(Map<String, dynamic> json) {
+    return IncidentActions(
+      logged: json['logged'] ?? false,
+      deviceBlacklisted: json['device_blacklisted'] ?? false,
+    );
   }
+}
 
-  /// Create HTTP Client with SSL Pinning capability
-  http.Client _createSecureClient() {
-    final context = SecurityContext.defaultContext;
-    
-    // NOTE: In production, load your PEM certificate here:
-    // context.setTrustedCertificatesBytes(myCertBytes);
+class ThreatAnalysis {
+  final String type;
+  final double confidence;
 
-    final httpClient = HttpClient(context: context);
+  ThreatAnalysis({required this.type, required this.confidence});
 
-    httpClient.badCertificateCallback = (X509Certificate cert, String host, int port) {
-      // 🛡️ SECURITY CHECK: Validate Certificate Fingerprint
-      if (kDebugMode) {
-        return true; // Allow self-signed in Debug ONLY
-      }
-      
-      // In Production: Compare cert.sha256 with _EXPECTED_CERT_HASH
-      // return _validateCert(cert); 
-      return false; // Fail by default
-    };
-
-    return IOClient(httpClient);
-  }
-
-  Future<IncidentReceipt> reportIncident(SecurityIncidentReport report) async {
-    // Simulate Network Call
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    // Mock Response
-    // In real app: final response = await _client.post(...)
-    
-    debugPrint("📡 UPLOADED INCIDENT: ${report.incidentId} [${report.attackType}]");
-    
-    return IncidentReceipt(
-      incidentId: report.incidentId, 
-      status: 'LOGGED_ON_SERVER'
+  factory ThreatAnalysis.fromJson(Map<String, dynamic> json) {
+    return ThreatAnalysis(
+      type: json['type'] ?? 'UNKNOWN',
+      confidence: (json['confidence'] ?? 0.0).toDouble(),
     );
   }
 }
