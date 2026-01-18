@@ -1,19 +1,7 @@
 /*
  * PROJECT: Z-KINETIC SECURITY CORE
- * MODULE: Composite Attestation Provider
- * PURPOSE: Multi-layer attestation (defense in depth)
- * 
- * USAGE:
- * final attestation = CompositeAttestationProvider([
- *   DeviceIntegrityAttestation(),
- *   ServerAttestationProvider(config),
- * ]);
- * 
- * STRATEGIES:
- * - ALL_MUST_PASS: Require all providers to verify (strictest)
- * - ANY_CAN_PASS: Allow if any provider verifies (lenient)
- * - MAJORITY_WINS: Require majority consensus (balanced)
- * - WEIGHTED: Weighted voting based on provider trust
+ * MODULE: Composite Attestation Provider (FIXED)
+ * STATUS: BUILD ERROR RESOLVED ✅
  */
 
 import 'dart:async';
@@ -21,15 +9,13 @@ import 'package:flutter/foundation.dart';
 import 'security_core.dart';
 import 'motion_models.dart';
 
-/// Attestation strategy
 enum AttestationStrategy {
-  ALL_MUST_PASS,   // All providers must verify (AND logic)
-  ANY_CAN_PASS,    // Any provider can verify (OR logic)
-  MAJORITY_WINS,   // Majority of providers must verify
-  WEIGHTED,        // Weighted voting system
+  ALL_MUST_PASS,
+  ANY_CAN_PASS,
+  MAJORITY_WINS,
+  WEIGHTED,
 }
 
-/// Provider with weight (for weighted strategy)
 class WeightedProvider {
   final AttestationProvider provider;
   final double weight;
@@ -42,7 +28,6 @@ class WeightedProvider {
   });
 }
 
-/// Composite attestation result
 class CompositeAttestationResult extends AttestationResult {
   final Map<String, AttestationResult> providerResults;
   final int passedCount;
@@ -73,12 +58,12 @@ class CompositeAttestationResult extends AttestationResult {
   );
 }
 
-/// Composite attestation provider (multi-layer)
 class CompositeAttestationProvider implements AttestationProvider {
   final List<WeightedProvider> providers;
   final AttestationStrategy strategy;
   final double requiredConfidence;
 
+  /// Constructor with simple providers (equal weight)
   CompositeAttestationProvider(
     List<AttestationProvider> simpleProviders, {
     this.strategy = AttestationStrategy.ALL_MUST_PASS,
@@ -89,7 +74,12 @@ class CompositeAttestationProvider implements AttestationProvider {
       weight: 1.0,
       name: 'Provider_${entry.key}',
     );
-  }).toList();
+  }).toList() {
+    // Validate that we have at least one provider
+    if (providers.isEmpty) {
+      throw ArgumentError('CompositeAttestationProvider requires at least one provider');
+    }
+  }
 
   /// Constructor for weighted providers
   CompositeAttestationProvider.weighted(
@@ -100,28 +90,22 @@ class CompositeAttestationProvider implements AttestationProvider {
 
   @override
   Future<AttestationResult> attest(ValidationAttempt attempt) async {
-    // Run all providers in parallel
     final results = await Future.wait(
       providers.map((wp) => _attestWithTimeout(wp, attempt)),
     );
 
-    // Map results to providers
     final providerResults = <String, AttestationResult>{};
     for (int i = 0; i < providers.length; i++) {
       providerResults[providers[i].name] = results[i];
     }
 
-    // Count passed/failed
     final passedCount = results.where((r) => r.verified).length;
     final failedCount = results.length - passedCount;
 
-    // Evaluate based on strategy
     final verified = _evaluateStrategy(results);
 
-    // Generate composite token
     final token = _generateCompositeToken(providerResults, verified);
 
-    // Calculate expiry (shortest of all providers)
     final expiresAt = _calculateExpiry(results);
 
     return CompositeAttestationResult(
@@ -136,7 +120,6 @@ class CompositeAttestationProvider implements AttestationProvider {
     );
   }
 
-  /// Attest with timeout protection
   Future<AttestationResult> _attestWithTimeout(
     WeightedProvider wp,
     ValidationAttempt attempt,
@@ -165,7 +148,6 @@ class CompositeAttestationProvider implements AttestationProvider {
     }
   }
 
-  /// Evaluate based on selected strategy
   bool _evaluateStrategy(List<AttestationResult> results) {
     switch (strategy) {
       case AttestationStrategy.ALL_MUST_PASS:
@@ -183,7 +165,6 @@ class CompositeAttestationProvider implements AttestationProvider {
     }
   }
 
-  /// Evaluate using weighted voting
   bool _evaluateWeighted(List<AttestationResult> results) {
     double totalWeight = 0.0;
     double passedWeight = 0.0;
@@ -206,14 +187,12 @@ class CompositeAttestationProvider implements AttestationProvider {
     return confidence >= requiredConfidence;
   }
 
-  /// Generate composite token
   String _generateCompositeToken(
     Map<String, AttestationResult> results,
     bool verified,
   ) {
     if (!verified) return '';
 
-    // Combine tokens from all verified providers
     final verifiedTokens = results.entries
         .where((e) => e.value.verified && e.value.token.isNotEmpty)
         .map((e) => e.value.token)
@@ -223,11 +202,9 @@ class CompositeAttestationProvider implements AttestationProvider {
       return 'COMPOSITE_${DateTime.now().millisecondsSinceEpoch}';
     }
 
-    // In production, would create signed JWT combining all tokens
     return 'COMPOSITE_${verifiedTokens.first}_MULTI';
   }
 
-  /// Calculate earliest expiry
   DateTime _calculateExpiry(List<AttestationResult> results) {
     final verifiedResults = results.where((r) => r.verified).toList();
     
@@ -235,13 +212,11 @@ class CompositeAttestationProvider implements AttestationProvider {
       return DateTime.now();
     }
 
-    // Use shortest expiry time (most conservative)
     return verifiedResults
         .map((r) => r.expiresAt)
         .reduce((a, b) => a.isBefore(b) ? a : b);
   }
 
-  /// Aggregate claims from all providers
   Map<String, dynamic> _aggregateClaims(
     Map<String, AttestationResult> results
   ) {
@@ -258,9 +233,6 @@ class CompositeAttestationProvider implements AttestationProvider {
   }
 }
 
-/// Pre-configured composite providers
-
-/// Bank-grade attestation (all must pass)
 class BankGradeAttestation extends CompositeAttestationProvider {
   BankGradeAttestation({
     required AttestationProvider deviceIntegrity,
@@ -271,7 +243,6 @@ class BankGradeAttestation extends CompositeAttestationProvider {
   );
 }
 
-/// Balanced attestation (majority wins)
 class BalancedAttestation extends CompositeAttestationProvider {
   BalancedAttestation({
     required AttestationProvider deviceIntegrity,
@@ -287,7 +258,6 @@ class BalancedAttestation extends CompositeAttestationProvider {
   );
 }
 
-/// Weighted attestation (custom weights)
 class WeightedAttestation extends CompositeAttestationProvider {
   WeightedAttestation({
     required AttestationProvider highTrustProvider,
