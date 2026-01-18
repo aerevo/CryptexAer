@@ -6,11 +6,8 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-// ✅ FIX 1: Import V2 components explicitly (hide V1)
+// ✅ IMPORT SECTION (buang duplicate)
 import 'cryptex_lock/cryptex_lock.dart';
-import 'cryptex_lock/src/device_integrity_attestation.dart';
-import 'cryptex_lock/src/server_attestation_provider.dart';
-import 'cryptex_lock/src/composite_attestation.dart';
 import 'cryptex_lock/src/device_integrity_attestation.dart';
 import 'cryptex_lock/src/server_attestation_provider.dart';
 import 'cryptex_lock/src/composite_attestation.dart';
@@ -185,11 +182,9 @@ class _LockScreenState extends State<LockScreen> {
     }
   }
 
-  // ✅ FIX 3: Proper CompositeAttestationProvider usage
   void _initializeController() {
-    // Create providers first
     final deviceProvider = DeviceIntegrityAttestation(
-      allowDebugMode: true,    // Set false untuk production
+      allowDebugMode: true,
       allowEmulators: false,
     );
 
@@ -200,15 +195,14 @@ class _LockScreenState extends State<LockScreen> {
       ),
     );
 
-    // ✅ Pass providers as List (required by constructor)
     final compositeProvider = CompositeAttestationProvider(
       [deviceProvider, serverProvider],
       strategy: AttestationStrategy.ALL_MUST_PASS,
     );
 
-    // ✅ Use V2Models.ClaConfig explicitly
+    // ✅ FIX: Guna ClaConfig lengkap
     _controller = ClaController(
-      ClaConfig(  // ✅ BETUL - Guna yang dari cla_models.dart
+      ClaConfig(
         secret: const [1, 7, 3, 9, 2],
         minShake: 0.4,
         thresholdAmount: 0.25,
@@ -218,8 +212,6 @@ class _LockScreenState extends State<LockScreen> {
         enableSensors: true,
         clientId: 'Z_KINETIC_PRO',
         clientSecret: 'secured_session_key',
-        
-        // ✅ Now properly configured
         attestationProvider: compositeProvider,
       ),
     );
@@ -249,9 +241,9 @@ class _LockScreenState extends State<LockScreen> {
         "user_state": "UNDER_THREAT",
         "action": "SILENT_ALARM_SENT",
         "biometrics": {
-            "confidence": _controller.liveConfidence,
-            "hand_tremor": _controller.motionEntropy,
-            "session_id": sessionData['session_id']
+          "confidence": _controller.liveConfidence,
+          "hand_tremor": _controller.motionEntropy,
+          "session_id": sessionData['session_id']
         }
       },
     );
@@ -509,5 +501,3 @@ class RealSuccessDashboard extends StatelessWidget {
     );
   }
 }
-
-
