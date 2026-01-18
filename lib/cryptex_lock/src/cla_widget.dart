@@ -1,7 +1,6 @@
-// 🎯 Z-KINETIC UI V11.1 (GRAY SCREEN FIX)
+// 🎯 Z-KINETIC UI V11.2 (V2 CONTROLLER COMPATIBLE)
 // Status: FIXED & OPTIMIZED ✅
-// Fix: Moved RepaintBoundary INSIDE Positioned.fill.
-// Features: 60 FPS, Haptics, Stress Test, Tutorial.
+// Fix: Import V2 controller instead of V1
 
 import 'dart:async';
 import 'dart:math';
@@ -10,7 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-import 'cla_controller.dart';
+// ✅ CRITICAL FIX: Import V2 controller
+import 'cla_controller_v2.dart'; // Changed from 'cla_controller.dart'
 import 'cla_models.dart';
 
 // ============================================
@@ -90,13 +90,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
   
-  // ValueNotifiers
   final ValueNotifier<double> _motionScoreNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
   final ValueNotifier<Offset> _accelNotifier = ValueNotifier(Offset.zero);
   
   double _patternScore = 0.0;
-  
   bool _showTutorial = true;
   Timer? _tutorialHideTimer;
   Timer? _touchDecayTimer;
@@ -109,7 +107,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   late AnimationController _scanController;
   late AnimationController _reticleController;
   
-  // Stress Test
   bool _isStressTesting = false;
   String _stressResult = "";
   
@@ -263,10 +260,18 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
-    _accelSub?.cancel(); _lockoutTimer?.cancel(); _wheelActiveTimer?.cancel(); _touchDecayTimer?.cancel(); _tutorialHideTimer?.cancel();
-    _pulseController.dispose(); _scanController.dispose(); _reticleController.dispose();
+    _accelSub?.cancel(); 
+    _lockoutTimer?.cancel(); 
+    _wheelActiveTimer?.cancel(); 
+    _touchDecayTimer?.cancel(); 
+    _tutorialHideTimer?.cancel();
+    _pulseController.dispose(); 
+    _scanController.dispose(); 
+    _reticleController.dispose();
     for (var c in _scrollControllers) c.dispose();
-    _motionScoreNotifier.dispose(); _touchScoreNotifier.dispose(); _accelNotifier.dispose();
+    _motionScoreNotifier.dispose(); 
+    _touchScoreNotifier.dispose(); 
+    _accelNotifier.dispose();
     super.dispose();
   }
 
@@ -284,7 +289,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // 🔥 FIX SINI: Positioned.fill DULU, baru RepaintBoundary
           Positioned.fill(
             child: RepaintBoundary(
               child: CustomPaint(painter: KineticGridPainter(color: activeColor)),
@@ -372,8 +376,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // --- HELPER METHODS & PAINTERS (Tiada Perubahan) ---
-  
   String _getStatusLabel(SecurityState state) {
     switch (state) {
       case SecurityState.LOCKED: return "BIOMETRIC SCAN STANDBY";
@@ -388,7 +390,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Widget _buildHUDHeader(Color color, String status) {
     return Stack(
       children: [
-        _buildHUDCorner(color, true, true), _buildHUDCorner(color, true, false),
+        _buildHUDCorner(color, true, true), 
+        _buildHUDCorner(color, true, false),
         Row(
           children: [
             Expanded(
@@ -511,14 +514,28 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
               if (isActive) Positioned.fill(child: AnimatedBuilder(animation: _scanController, builder: (context, child) => CustomPaint(painter: KineticScanLinePainter(color: color, progress: _scanController.value)))),
               ListWheelScrollView.useDelegate(
                 controller: _scrollControllers[index],
-                itemExtent: 48, perspective: 0.003, diameterRatio: 1.1,
+                itemExtent: 48, 
+                perspective: 0.003, 
+                diameterRatio: 1.1,
                 physics: const FixedExtentScrollPhysics(),
                 onSelectedItemChanged: (v) { 
                   widget.controller.updateWheel(index, v % 10); 
                   HapticFeedback.selectionClick();
                   _analyzeScrollPattern(); 
                 },
-                childDelegate: ListWheelChildBuilderDelegate(builder: (context, i) => Center(child: Text('${i % 10}', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, shadows: isActive ? [Shadow(color: color, blurRadius: 20)] : [])))),
+                childDelegate: ListWheelChildBuilderDelegate(
+                  builder: (context, i) => Center(
+                    child: Text(
+                      '${i % 10}', 
+                      style: TextStyle(
+                        color: Colors.white, 
+                        fontSize: 32, 
+                        fontWeight: FontWeight.w900, 
+                        shadows: isActive ? [Shadow(color: color, blurRadius: 20)] : []
+                      )
+                    )
+                  )
+                ),
               ),
             ],
           ),
@@ -540,19 +557,27 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       width: double.infinity,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), boxShadow: !isDisabled ? [BoxShadow(color: activeColor.withOpacity(0.3), blurRadius: 20)] : []),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12), 
+          boxShadow: !isDisabled ? [BoxShadow(color: activeColor.withOpacity(0.3), blurRadius: 20)] : []
+        ),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: isDisabled ? const Color(0xFF1A1A1A) : activeColor.withOpacity(0.2),
             foregroundColor: activeColor,
             padding: const EdgeInsets.symmetric(vertical: 20),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: isDisabled ? const Color(0xFF333333) : activeColor, width: 2)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12), 
+              side: BorderSide(color: isDisabled ? const Color(0xFF333333) : activeColor, width: 2)
+            ),
           ),
           onPressed: isDisabled ? null : () => widget.controller.validateAttempt(hasPhysicalMovement: true),
           child: Text(
             state == SecurityState.HARD_LOCK ? "LOCKED" : "INITIATE ACCESS",
             style: TextStyle(
-              fontWeight: FontWeight.w900, letterSpacing: 2.5, fontSize: 13,
+              fontWeight: FontWeight.w900, 
+              letterSpacing: 2.5, 
+              fontSize: 13,
               shadows: !isDisabled ? [Shadow(color: activeColor.withOpacity(0.9), blurRadius: 12)] : []
             ),
           ),
@@ -563,43 +588,128 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   Widget _buildHUDCorner(Color color, bool isTop, bool isLeft) {
     return Positioned(
-      top: isTop ? 0 : null, bottom: !isTop ? 0 : null, left: isLeft ? 0 : null, right: !isLeft ? 0 : null,
-      child: Container(width: 24, height: 24, decoration: BoxDecoration(border: Border(top: isTop ? BorderSide(color: color, width: 2) : BorderSide.none, left: isLeft ? BorderSide(color: color, width: 2) : BorderSide.none, right: !isLeft ? BorderSide(color: color, width: 2) : BorderSide.none, bottom: !isTop ? BorderSide(color: color, width: 2) : BorderSide.none))),
+      top: isTop ? 0 : null, 
+      bottom: !isTop ? 0 : null, 
+      left: isLeft ? 0 : null, 
+      right: !isLeft ? 0 : null,
+      child: Container(
+        width: 24, 
+        height: 24, 
+        decoration: BoxDecoration(
+          border: Border(
+            top: isTop ? BorderSide(color: color, width: 2) : BorderSide.none, 
+            left: isLeft ? BorderSide(color: color, width: 2) : BorderSide.none, 
+            right: !isLeft ? BorderSide(color: color, width: 2) : BorderSide.none, 
+            bottom: !isTop ? BorderSide(color: color, width: 2) : BorderSide.none
+          )
+        )
+      ),
     );
   }
 
   Widget _buildSensorBox(String label, double val, Color color, IconData icon) {
-    bool isMatch = val > 0.6; Color c = isMatch ? const Color(0xFF00FF88) : (val > 0.1 ? const Color(0xFFFF3366) : const Color(0xFF333333));
-    return Container(width: 55, height: 42, decoration: BoxDecoration(border: Border.all(color: c, width: 1.5), borderRadius: BorderRadius.circular(8), color: isMatch ? c.withOpacity(0.15) : Colors.transparent), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(isMatch ? Icons.check_circle : icon, size: 16, color: c), Text(label, style: TextStyle(fontSize: 7, color: c, fontWeight: FontWeight.w900))]));
+    bool isMatch = val > 0.6; 
+    Color c = isMatch ? const Color(0xFF00FF88) : (val > 0.1 ? const Color(0xFFFF3366) : const Color(0xFF333333));
+    return Container(
+      width: 55, 
+      height: 42, 
+      decoration: BoxDecoration(
+        border: Border.all(color: c, width: 1.5), 
+        borderRadius: BorderRadius.circular(8), 
+        color: isMatch ? c.withOpacity(0.15) : Colors.transparent
+      ), 
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center, 
+        children: [
+          Icon(isMatch ? Icons.check_circle : icon, size: 16, color: c), 
+          Text(label, style: TextStyle(fontSize: 7, color: c, fontWeight: FontWeight.w900))
+        ]
+      )
+    );
   }
 
   Widget _buildPatternBox(String label, double score, Color color) {
-    bool isMatch = score >= 0.5; Color c = isMatch ? const Color(0xFF00FF88) : (score > 0.1 ? const Color(0xFFFF3366) : const Color(0xFF333333));
-    return Container(width: 55, height: 42, decoration: BoxDecoration(border: Border.all(color: c, width: 1.5), borderRadius: BorderRadius.circular(8), color: isMatch ? c.withOpacity(0.15) : Colors.transparent), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(isMatch ? Icons.check_circle : Icons.timeline, size: 16, color: c), Text(label, style: TextStyle(fontSize: 7, color: c, fontWeight: FontWeight.w900))]));
+    bool isMatch = score >= 0.5; 
+    Color c = isMatch ? const Color(0xFF00FF88) : (score > 0.1 ? const Color(0xFFFF3366) : const Color(0xFF333333));
+    return Container(
+      width: 55, 
+      height: 42, 
+      decoration: BoxDecoration(
+        border: Border.all(color: c, width: 1.5), 
+        borderRadius: BorderRadius.circular(8), 
+        color: isMatch ? c.withOpacity(0.15) : Colors.transparent
+      ), 
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center, 
+        children: [
+          Icon(isMatch ? Icons.check_circle : Icons.timeline, size: 16, color: c), 
+          Text(label, style: TextStyle(fontSize: 7, color: c, fontWeight: FontWeight.w900))
+        ]
+      )
+    );
   }
 
   Widget _buildWarningBanner() {
-    return Container(margin: const EdgeInsets.only(top: 14), padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFFF3366).withOpacity(0.1), border: Border.all(color: const Color(0xFFFF3366)), borderRadius: BorderRadius.circular(8)), child: Row(children: [const Icon(Icons.error_outline, color: Color(0xFFFF3366), size: 18), const SizedBox(width: 10), Expanded(child: Text(widget.controller.threatMessage, style: const TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.w900)))]));
+    return Container(
+      margin: const EdgeInsets.only(top: 14), 
+      padding: const EdgeInsets.all(10), 
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF3366).withOpacity(0.1), 
+        border: Border.all(color: const Color(0xFFFF3366)), 
+        borderRadius: BorderRadius.circular(8)
+      ), 
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFFF3366), size: 18), 
+          const SizedBox(width: 10), 
+          Expanded(
+            child: Text(
+              widget.controller.threatMessage, 
+              style: const TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.w900)
+            )
+          )
+        ]
+      )
+    );
   }
 }
 
+// ============================================
+// PAINTERS
+// ============================================
+
 class KineticGridPainter extends CustomPainter {
-  final Color color; KineticGridPainter({required this.color});
+  final Color color; 
+  KineticGridPainter({required this.color});
+  
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()..color = color.withOpacity(0.04)..strokeWidth = 1;
-    for (double x = 0; x < size.width; x += 40) canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    for (double y = 0; y < size.height; y += 40) canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+    for (double x = 0; x < size.width; x += 40) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
+    }
+    for (double y = 0; y < size.height; y += 40) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+    }
   }
-  @override bool shouldRepaint(KineticGridPainter old) => old.color != color;
+  
+  @override 
+  bool shouldRepaint(KineticGridPainter old) => old.color != color;
 }
 
 class KineticPeripheralPainter extends CustomPainter {
-  final Color color; final String side;
+  final Color color; 
+  final String side;
   final double valX, valY;
   final SecurityState state;
 
-  KineticPeripheralPainter({required this.color, required this.side, required this.valX, required this.valY, required this.state});
+  KineticPeripheralPainter({
+    required this.color, 
+    required this.side, 
+    required this.valX, 
+    required this.valY, 
+    required this.state
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -627,47 +737,137 @@ class KineticPeripheralPainter extends CustomPainter {
 
       for (int i = 0; i < 12; i++) {
         double h = 6 + (valX.abs() * 2) + (i % 3);
-        canvas.drawLine(Offset(6.0 + (i*3), 60), Offset(6.0 + (i*3), 60 + h), Paint()..color = color.withOpacity(0.5)..strokeWidth = 1.2);
+        canvas.drawLine(
+          Offset(6.0 + (i * 3), 60),
+          Offset(6.0 + (i * 3), 60 + h),
+          Paint()
+            ..color = color.withOpacity(0.5)
+            ..strokeWidth = 1.2,
+        );
       }
       canvas.drawLine(const Offset(2, 10), const Offset(2, 130), p);
     }
   }
 
-  void _drawText(Canvas c, TextPainter tp, String s, double x, double y, double sz, Color col, bool b) {
-    tp.text = TextSpan(text: s, style: TextStyle(color: col, fontSize: sz, fontWeight: b ? FontWeight.bold : FontWeight.normal, fontFamily: 'Courier'));
-    tp.layout(); tp.paint(c, Offset(x, y));
+  void _drawText(
+    Canvas c,
+    TextPainter tp,
+    String s,
+    double x,
+    double y,
+    double sz,
+    Color col,
+    bool bold,
+  ) {
+    tp.text = TextSpan(
+      text: s,
+      style: TextStyle(
+        color: col,
+        fontSize: sz,
+        fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        fontFamily: 'Courier',
+      ),
+    );
+    tp.layout();
+    tp.paint(c, Offset(x, y));
   }
-  
-  @override 
-  bool shouldRepaint(KineticPeripheralPainter old) => 
-    old.valX != valX || old.valY != valY || old.state != state;
+
+  @override
+  bool shouldRepaint(KineticPeripheralPainter old) =>
+      old.valX != valX ||
+      old.valY != valY ||
+      old.state != state ||
+      old.color != color;
 }
+
+// ============================================
+// RETICLE PAINTER
+// ============================================
 
 class KineticReticlePainter extends CustomPainter {
-  final Color color; final double progress;
-  KineticReticlePainter({required this.color, required this.progress});
+  final Color color;
+  final double progress;
+
+  KineticReticlePainter({
+    required this.color,
+    required this.progress,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width/2, size.height/2);
-    final p = Paint()..color = color.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth = 2;
-    canvas.save(); canvas.translate(c.dx, c.dy); canvas.rotate(progress * 2 * pi); canvas.translate(-c.dx, -c.dy);
-    canvas.drawCircle(c, 22, p);
+    final center = Offset(size.width / 2, size.height / 2);
+    final p = Paint()
+      ..color = color.withOpacity(0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(progress * 2 * pi);
+    canvas.translate(-center.dx, -center.dy);
+
+    canvas.drawCircle(center, 22, p);
+
     for (int i = 0; i < 4; i++) {
       final a = i * pi / 2;
-      canvas.drawLine(Offset(c.dx + 18 * cos(a), c.dy + 18 * sin(a)), Offset(c.dx + 26 * cos(a), c.dy + 26 * sin(a)), p);
+      canvas.drawLine(
+        Offset(
+          center.dx + 18 * cos(a),
+          center.dy + 18 * sin(a),
+        ),
+        Offset(
+          center.dx + 26 * cos(a),
+          center.dy + 26 * sin(a),
+        ),
+        p,
+      );
     }
+
     canvas.restore();
   }
-  @override bool shouldRepaint(KineticReticlePainter old) => old.progress != progress;
+
+  @override
+  bool shouldRepaint(KineticReticlePainter old) =>
+      old.progress != progress || old.color != color;
 }
 
+// ============================================
+// SCAN LINE PAINTER
+// ============================================
+
 class KineticScanLinePainter extends CustomPainter {
-  final Color color; final double progress;
-  KineticScanLinePainter({required this.color, required this.progress});
+  final Color color;
+  final double progress;
+
+  KineticScanLinePainter({
+    required this.color,
+    required this.progress,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, color.withOpacity(0.6), Colors.transparent]).createShader(Rect.fromLTWH(0, size.height * progress - 2, size.width, 4));
-    canvas.drawRect(Rect.fromLTWH(0, size.height * progress - 2, size.width, 4), p);
+    final rect = Rect.fromLTWH(
+      0,
+      size.height * progress - 2,
+      size.width,
+      4,
+    );
+
+    final p = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.transparent,
+          color.withOpacity(0.6),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+
+    canvas.drawRect(rect, p);
   }
-  @override bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress;
+
+  @override
+  bool shouldRepaint(KineticScanLinePainter old) =>
+      old.progress != progress || old.color != color;
 }
