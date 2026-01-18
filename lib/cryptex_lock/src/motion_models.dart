@@ -1,8 +1,10 @@
-/*
+//*
  * PROJECT: Z-KINETIC SECURITY CORE
  * MODULE: Motion Models (Pure Dart - FIXED)
  * STATUS: BUILD ERROR RESOLVED ✅
  */
+
+import 'cla_models.dart'; // ✅ FIX: Import SecurityState enum
 
 /// Raw motion sensor reading
 class MotionEvent {
