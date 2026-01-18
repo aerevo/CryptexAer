@@ -1,14 +1,14 @@
-// 📦 Z-KINETIC MODELS (SYNCED V3.3)
-// Status: ATTESTATION PROVIDER SUPPORT ADDED ✅
-// Role: Define contracts clearly. Clean Architecture enforced.
+// lib/cryptex_lock/src/cla_models.dart
 
-import 'package:flutter/foundation.dart';
-
-// ✅ IMPORT: Need AttestationProvider interface
-// Adjust path if your security_core.dart is elsewhere
 import 'security_core.dart';
 
-enum SecurityState { LOCKED, VALIDATING, UNLOCKED, SOFT_LOCK, HARD_LOCK }
+enum SecurityState {
+  LOCKED,
+  VALIDATING,
+  UNLOCKED,
+  SOFT_LOCK,
+  HARD_LOCK,
+}
 
 class MotionEvent {
   final double magnitude;
@@ -24,14 +24,20 @@ class MotionEvent {
     this.deltaY = 0,
     this.deltaZ = 0,
   });
+}
 
-  Map<String, dynamic> toJson() => {
-    'm': magnitude.toStringAsFixed(4),
-    't': timestamp.toIso8601String(),
-    'dx': deltaX.toStringAsFixed(4),
-    'dy': deltaY.toStringAsFixed(4),
-    'dz': deltaZ.toStringAsFixed(4),
-  };
+class TouchEvent {
+  final DateTime timestamp;
+  final double pressure;
+  final double velocityX;
+  final double velocityY;
+
+  TouchEvent({
+    required this.timestamp,
+    required this.pressure,
+    required this.velocityX,
+    required this.velocityY,
+  });
 }
 
 class SecurityEngineConfig {
@@ -51,32 +57,23 @@ class SecurityEngineConfig {
 }
 
 class ClaConfig {
-  // A. Core Settings
   final List<int> secret;
+
   final Duration minSolveTime;
   final double minShake;
-  final double thresholdAmount; 
+  final double thresholdAmount;
   final int maxAttempts;
-  
-  // B. Cooldowns
+
   final Duration jamCooldown;
   final Duration softLockCooldown;
-  
-  // C. Feature Flags
+
   final bool enableSensors;
-  
-  // D. Identity
+
   final String clientId;
   final String clientSecret;
 
-  // E. SUB-CONFIGS
   final SecurityEngineConfig engineConfig;
-  
-  // ✅ ADDED: Attestation Provider Support
   final AttestationProvider? attestationProvider;
-  
-  // F. Bot Detection
-  final double botDetectionSensitivity;
 
   const ClaConfig({
     required this.secret,
@@ -90,7 +87,6 @@ class ClaConfig {
     this.clientId = 'default_client',
     this.clientSecret = '',
     this.engineConfig = const SecurityEngineConfig(),
-    this.botDetectionSensitivity = 1.0,
-    this.attestationProvider, // ✅ ADDED
+    this.attestationProvider,
   });
 }
