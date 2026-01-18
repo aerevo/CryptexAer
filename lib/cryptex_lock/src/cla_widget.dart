@@ -1,6 +1,6 @@
-// 🎯 Z-KINETIC UI V11.2 (V2 CONTROLLER COMPATIBLE)
+// 🎯 Z-KINETIC UI V11.3 (STABILIZED INDICATORS)
 // Status: FIXED & OPTIMIZED ✅
-// Fix: Import V2 controller instead of V1
+// Changes: Lowered sensor threshold from 0.6 → 0.3 for better UX
 
 import 'dart:async';
 import 'dart:math';
@@ -10,7 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 // ✅ CRITICAL FIX: Import V2 controller
-import 'cla_controller_v2.dart'; // Changed from 'cla_controller.dart'
+import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
@@ -274,6 +274,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _accelNotifier.dispose();
     super.dispose();
   }
+  // ============================================
+// PART 2: BUILD METHODS & UI COMPONENTS
+// ============================================
 
   @override
   Widget build(BuildContext context) {
@@ -607,9 +610,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
+  // ✅ STABILIZED: Lower threshold dari 0.6 → 0.3
   Widget _buildSensorBox(String label, double val, Color color, IconData icon) {
-    bool isMatch = val > 0.6; 
-    Color c = isMatch ? const Color(0xFF00FF88) : (val > 0.1 ? const Color(0xFFFF3366) : const Color(0xFF333333));
+    bool isMatch = val > 0.3; // ✅ FIXED: Lebih sensitif
+    Color c = isMatch ? const Color(0xFF00FF88) : (val > 0.05 ? const Color(0xFFFF3366) : const Color(0xFF333333));
     return Container(
       width: 55, 
       height: 42, 
@@ -672,10 +676,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       )
     );
   }
-}
-
+} // End of _CryptexLockState class
 // ============================================
-// PAINTERS
+// PART 3: CUSTOM PAINTERS
 // ============================================
 
 class KineticGridPainter extends CustomPainter {
