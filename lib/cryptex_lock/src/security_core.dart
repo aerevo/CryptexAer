@@ -2,12 +2,12 @@
  * PROJECT: Z-KINETIC SECURITY CORE V1.0
  * MODULE: Headless Security Orchestrator
  * DEPENDENCIES: ZERO Flutter, ZERO Platform Code
- * 
+ *
  * PURPOSE:
  * - Can run in Flutter apps
  * - Can run in pure Dart CLI
  * - Can run in backend validators
- * 
+ *
  * FEATURES:
  * - Replay immunity (timestamp + nonce validation)
  * - Attestation interface (pluggable)
@@ -20,6 +20,7 @@ import 'dart:math';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'motion_models.dart';
+import 'cla_models.dart';
 
 /// Configuration for security core
 class SecurityCoreConfig {
