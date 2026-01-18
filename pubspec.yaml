@@ -10,27 +10,21 @@ dependencies:
   flutter:
     sdk: flutter
 
-  device_info_plus: ^11.1.0   # Untuk Guard 1 (Check Emulator)
-  package_info_plus: ^8.1.0   # Untuk baca version app
-  http: ^1.2.0                # Untuk Guard 2 (Call Server)
-  # -------------------------------------------
-
-  # Core Security
+  # --- Security Guards & Core ---
+  device_info_plus: ^11.1.0
+  package_info_plus: ^8.1.0
+  http: ^1.2.0
   crypto: ^3.0.3
   flutter_secure_storage: ^9.0.0
   
-  # Device & Sensors
-  device_info_plus: ^9.0.0
+  # --- Sensors & Storage ---
   sensors_plus: ^3.0.0
   shared_preferences: ^2.2.0
   
-  # Networking
-  http: ^1.1.0
-  
-  # ✅ CRITICAL: Add these missing dependencies
-  sqflite: ^2.3.0      # For SQL incident storage
-  path: ^1.8.3         # For database path
-  uuid: ^4.0.0         # For unique device ID
+  # --- Database & Utilities ---
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  uuid: ^4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -39,4 +33,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
