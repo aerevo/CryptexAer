@@ -118,15 +118,6 @@ class BiometricSession {
   };
 }
 
-/// Security states
-enum SecurityState {
-  LOCKED,
-  VALIDATING,
-  UNLOCKED,
-  SOFT_LOCK,
-  HARD_LOCK,
-  ROOT_WARNING
-}
 
 /// Threat levels
 enum ThreatLevel {
