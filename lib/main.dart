@@ -7,11 +7,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 // ✅ FIX 1: Import V2 components explicitly (hide V1)
-import 'cryptex_lock/cryptex_lock.dart' hide ClaController, ClaConfig;
-
-// ✅ FIX 2: Import V2 Engine & Models
-import 'cryptex_lock/src/cla_controller_v2.dart';
-import 'cryptex_lock/src/cla_models.dart' as V2Models; // Alias to avoid conflict
+import 'cryptex_lock/cryptex_lock.dart';
+import 'cryptex_lock/src/device_integrity_attestation.dart';
+import 'cryptex_lock/src/server_attestation_provider.dart';
+import 'cryptex_lock/src/composite_attestation.dart';
 import 'cryptex_lock/src/device_integrity_attestation.dart';
 import 'cryptex_lock/src/server_attestation_provider.dart';
 import 'cryptex_lock/src/composite_attestation.dart';
@@ -510,4 +509,5 @@ class RealSuccessDashboard extends StatelessWidget {
     );
   }
 }
+
 
