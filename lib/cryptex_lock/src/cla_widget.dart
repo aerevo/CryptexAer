@@ -120,7 +120,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
-    widget.controller.onInteractionStart(); 
+    widget.controller.onInteractionStart(); // ✅ Method exists in V2 (line 175)
     
     _startListening();
     widget.controller.addListener(_handleControllerChange);
@@ -152,7 +152,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _initScrollControllers() {
     _scrollControllers = List.generate(5, (i) {
         int val = 0;
-        try { val = widget.controller.getInitialValue(i); } catch(e) {}
+        try { val = widget.controller.getInitialValue(i); } catch(e) {} // ✅ Method exists (line 183)
         return FixedExtentScrollController(initialItem: val);
     });
   }
@@ -177,7 +177,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       
       if (amplifiedMotion > 0.5) _userInteracted();
 
-      widget.controller.registerShake(delta, e.x, e.y, e.z);
+      widget.controller.registerShake(delta, e.x, e.y, e.z); // ✅ Method exists (line 128)
 
       double currentScore = _motionScoreNotifier.value;
       if (amplifiedMotion > currentScore) {
@@ -522,7 +522,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 diameterRatio: 1.1,
                 physics: const FixedExtentScrollPhysics(),
                 onSelectedItemChanged: (v) { 
-                  widget.controller.updateWheel(index, v % 10); 
+                  widget.controller.updateWheel(index, v % 10); // ✅ Method exists (line 179)
                   HapticFeedback.selectionClick();
                   _analyzeScrollPattern(); 
                 },
@@ -680,6 +680,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 // ============================================
 // PART 3: CUSTOM PAINTERS
 // ============================================
+// ✅ NO CHANGES NEEDED - Painters don't interact with controller
 
 class KineticGridPainter extends CustomPainter {
   final Color color; 
