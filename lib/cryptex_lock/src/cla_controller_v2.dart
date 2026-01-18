@@ -1,16 +1,15 @@
- // 🎮 Z-KINETIC CONTROLLER V2.1 (BUILD FIX)
-// Status: ALL ERRORS RESOLVED
+// Z-KINETIC CONTROLLER V2.1 (BUILD FIX)
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import 'cla_models.dart';
 import 'security_core.dart';
 import 'motion_models.dart';
 import 'behavioral_analyzer.dart';
 import 'adaptive_threshold_engine.dart';
+import 'cla_models.dart';
 
 /// Configuration for ClaController
 class ClaConfig {
