@@ -1,12 +1,7 @@
-// 🧠 SECURITY ENGINE V6.0 (ENTERPRISE READY)
-// Status: MAGIC NUMBERS ELIMINATED ✅
-// Changes from V5.1:
-// 1. Named constants for all weights
-// 2. Configurable thresholds via SecurityEngineConfig
-// 3. Better documentation
-// 4. Production-grade scoring
+// SECURITY ENGINE V6.0 (ENTERPRISE READY)
 
 import 'dart:math';
+import 'motion_models.dart';
 import 'cla_models.dart';
 
 enum ThreatLevel { SAFE, SUSPICIOUS, HIGH_RISK, CRITICAL }
