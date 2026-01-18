@@ -1,4 +1,5 @@
-// LOKASI: lib/cryptex_lock/src/motion_models.dart
+// 🛡️ Z-KINETIC MOTION MODELS V2.1
+// Status: COMPLETE ✅
 
 import 'dart:math';
 
@@ -32,13 +33,17 @@ class TouchEvent {
   final DateTime timestamp;
   final double pressure;
   final double x; 
-  final double y; 
+  final double y;
+  final double velocityX;
+  final double velocityY;
 
   TouchEvent({
     required this.timestamp,
     this.pressure = 0.5,
     this.x = 0.0,
     this.y = 0.0,
+    this.velocityX = 0.0,
+    this.velocityY = 0.0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -46,6 +51,8 @@ class TouchEvent {
     'p': pressure.toStringAsFixed(3),
     'x': x.toStringAsFixed(1),
     'y': y.toStringAsFixed(1),
+    'vx': velocityX.toStringAsFixed(2),
+    'vy': velocityY.toStringAsFixed(2),
   };
 }
 
@@ -106,7 +113,14 @@ class BiometricSession {
 
   Map<String, dynamic> toJson() => {
     'session_id': sessionId,
-    'stats': {'entropy': entropy, 'tremor': tremorScore},
+    'duration_ms': duration.inMilliseconds,
+    'motion_count': motionEvents.length,
+    'touch_count': touchEvents.length,
+    'stats': {
+      'entropy': entropy,
+      'tremor': tremorScore,
+      'typing_speed': typingSpeedScore,
+    }
   };
 }
 
@@ -127,6 +141,7 @@ class ValidationAttempt {
 
   Map<String, dynamic> toJson() => {
     'attempt_id': attemptId,
+    'timestamp': timestamp.toIso8601String(),
     'code_length': inputCode.length,
     'biometric_data': biometricData?.toJson(),
   };
@@ -136,7 +151,7 @@ class ValidationResult {
   final bool allowed;
   final String reason;
   final double confidence;
-  final ThreatLevel threatLevel; // WAJIB ADA
+  final ThreatLevel threatLevel;
   final Map<String, dynamic> metadata;
   final dynamic newState;
 
