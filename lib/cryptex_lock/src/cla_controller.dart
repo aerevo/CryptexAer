@@ -1,11 +1,4 @@
 // 🎮 Z-KINETIC CONTROLLER V12.0 (ENTERPRISE READY)
-// Status: ALL CRITICAL BUGS FIXED ✅
-// Fixes:
-// 1. Dynamic confidence calculations (no hardcoded values)
-// 2. registerTouchInteraction() method added
-// 3. Motion/Touch/Pattern scoring implemented
-// 4. Thread-safe state management
-// 5. Production-grade error handling
 
 import 'dart:async';
 import 'dart:math';
@@ -14,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'cla_models.dart';
+import 'motion_models.dart'; // ✅ ADD THIS
 import 'security_engine.dart';
 
 class ClaController extends ChangeNotifier with WidgetsBindingObserver {
