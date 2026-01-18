@@ -1,13 +1,20 @@
-// 🛡️ Z-KINETIC INTELLIGENCE HUB V7.1 (HYBRID SECURITY ACTIVE)
-// Status: BUILD ERRORS RESOLVED ✅
+// 🛡️ Z-KINETIC INTELLIGENCE HUB V7.2 (HYBRID SECURITY ACTIVE)
+// Status: V2 CONTROLLER INTEGRATED ✅
+// Changes:
+// 1. Switched to ClaControllerV2 explicitly
+// 2. Added Composite Attestation (Device + Server)
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-// ✅ IMPORT SECTION (buang duplicate)
-import 'cryptex_lock/cryptex_lock.dart';
+// ✅ FIX: Import barrel file tapi SEMBUNYIKAN (hide) Controller & Config lama
+// supaya tidak bergaduh dengan V2
+import 'cryptex_lock/cryptex_lock.dart' hide ClaController, ClaConfig;
+
+// ✅ IMPORT SECTION: V2 Controller & Security Providers
+import 'cryptex_lock/src/cla_controller_v2.dart'; 
 import 'cryptex_lock/src/device_integrity_attestation.dart';
 import 'cryptex_lock/src/server_attestation_provider.dart';
 import 'cryptex_lock/src/composite_attestation.dart';
@@ -154,6 +161,7 @@ class LockScreen extends StatefulWidget {
 }
 
 class _LockScreenState extends State<LockScreen> {
+  // ✅ Ini sekarang merujuk kepada V2 Controller
   late ClaController _controller;
   bool _isInitialized = false;
   bool _isCompromised = false;
@@ -182,6 +190,7 @@ class _LockScreenState extends State<LockScreen> {
     }
   }
 
+  // ✅ V2 INITIALIZATION LOGIC (Updated as requested)
   void _initializeController() {
     final deviceProvider = DeviceIntegrityAttestation(
       allowDebugMode: true,
@@ -200,7 +209,7 @@ class _LockScreenState extends State<LockScreen> {
       strategy: AttestationStrategy.ALL_MUST_PASS,
     );
 
-    // ✅ FIX: Guna ClaConfig lengkap
+    // ✅ USE V2 CONTROLLER (yang ada getSessionSnapshot)
     _controller = ClaController(
       ClaConfig(
         secret: const [1, 7, 3, 9, 2],
@@ -232,6 +241,7 @@ class _LockScreenState extends State<LockScreen> {
       deviceId = await DeviceFingerprint.getDeviceId();
     } catch (_) {}
 
+    // ✅ Method ini hanya wujud dalam V2 Controller
     final sessionData = _controller.getSessionSnapshot();
 
     await widget.incidentReporter?.report(
@@ -409,6 +419,7 @@ class _LockScreenState extends State<LockScreen> {
               _isCompromised ? _buildHackedNotice() : _buildSafeNotice(),
               const SizedBox(height: 50),
 
+              // Widget ini akan menggunakan Controller V2 secara automatik kerana jenis data _controller telah berubah
               CryptexLock(
                 controller: _controller,
                 onSuccess: _onSuccess,
