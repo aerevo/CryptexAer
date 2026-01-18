@@ -1,11 +1,12 @@
-// 📦 Z-KINETIC MODELS (SYNCED V3.2)
-// Status: CIRCULAR DEPENDENCY FIXED ✅
+// 📦 Z-KINETIC MODELS (SYNCED V3.3)
+// Status: ATTESTATION PROVIDER SUPPORT ADDED ✅
 // Role: Define contracts clearly. Clean Architecture enforced.
 
 import 'package:flutter/foundation.dart';
 
-// Note: Removed import to security_config.dart to prevent circular dependency crash.
-// The SecurityConfig reference in ClaConfig has been decoupled.
+// ✅ IMPORT: Need AttestationProvider interface
+// Adjust path if your security_core.dart is elsewhere
+import 'security_core.dart';
 
 enum SecurityState { LOCKED, VALIDATING, UNLOCKED, SOFT_LOCK, HARD_LOCK }
 
@@ -24,7 +25,6 @@ class MotionEvent {
     this.deltaZ = 0,
   });
 
-  // Helper untuk debugging/logging
   Map<String, dynamic> toJson() => {
     'm': magnitude.toStringAsFixed(4),
     't': timestamp.toIso8601String(),
@@ -70,9 +70,10 @@ class ClaConfig {
   final String clientSecret;
 
   // E. SUB-CONFIGS
-  // Removed direct strict typing to prevent circular dependency
-  // final SecurityConfig? securityConfig; 
-  final SecurityEngineConfig engineConfig;    
+  final SecurityEngineConfig engineConfig;
+  
+  // ✅ ADDED: Attestation Provider Support
+  final AttestationProvider? attestationProvider;
   
   // F. Bot Detection
   final double botDetectionSensitivity;
@@ -90,5 +91,6 @@ class ClaConfig {
     this.clientSecret = '',
     this.engineConfig = const SecurityEngineConfig(),
     this.botDetectionSensitivity = 1.0,
+    this.attestationProvider, // ✅ ADDED
   });
 }
