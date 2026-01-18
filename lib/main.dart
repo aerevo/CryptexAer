@@ -1,35 +1,29 @@
 // 🛡️ Z-KINETIC INTELLIGENCE HUB V7.1 (HYBRID SECURITY ACTIVE)
-// Status: INTEGRATED WITH V2 ENGINE ✅
-// Changes:
-// 1. Swapped Controller V1 -> V2
-// 2. Added Composite Attestation (Local + Server)
-// 3. Ready for Advanced Biometric Scoring
+// Status: BUILD ERRORS RESOLVED ✅
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-// ✅ FIX: Clean import via barrel file, TAPI kita sembunyikan Controller lama
-import 'cryptex_lock/cryptex_lock.dart' hide ClaController; 
+// ✅ FIX 1: Import V2 components explicitly (hide V1)
+import 'cryptex_lock/cryptex_lock.dart' hide ClaController, ClaConfig;
 
-// 🚀 IMPORT ENGINE BARU (V2) & GUARDS
+// ✅ FIX 2: Import V2 Engine & Models
 import 'cryptex_lock/src/cla_controller_v2.dart';
+import 'cryptex_lock/src/cla_models.dart' as V2Models; // Alias to avoid conflict
 import 'cryptex_lock/src/device_integrity_attestation.dart';
 import 'cryptex_lock/src/server_attestation_provider.dart';
 import 'cryptex_lock/src/composite_attestation.dart';
 
 void main() async {
-  // 1. Pastikan Flutter Binding dimulakan untuk plugin Native
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Kunci orientasi peranti (Security Best Practice)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // 3. BOOTLOADER: Inisialisasi Black Box (SQLite)
   try {
     await IncidentStorage.database;
     if (kDebugMode) print("🛡️ Francois: Black Box (SQL) Initialized.");
@@ -62,7 +56,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ==========================================
-// 1. BOOTLOADER (Tarik Data Dulu)
+// 1. BOOTLOADER
 // ==========================================
 class BootLoader extends StatefulWidget {
   const BootLoader({super.key});
@@ -79,7 +73,6 @@ class _BootLoaderState extends State<BootLoader> {
   }
 
   Future<void> _initializeSecureSession() async {
-    // 1. Tarik Data Transaksi dari Pipeline
     TransactionData data;
     try {
       data = await TransactionService.fetchCurrentTransaction();
@@ -91,7 +84,6 @@ class _BootLoaderState extends State<BootLoader> {
       );
     }
 
-    // 2. Setup Security Reporter & Policy
     const config = SecurityConfig(
       enableCertificatePinning: true,
       enableIncidentReporting: true,
@@ -104,7 +96,6 @@ class _BootLoaderState extends State<BootLoader> {
       config: config,
     );
 
-    // 3. Masuk ke LockScreen (Peralihan Mulus)
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -142,7 +133,7 @@ class _BootLoaderState extends State<BootLoader> {
 }
 
 // ==========================================
-// 2. LOCK SCREEN (UI Utama)
+// 2. LOCK SCREEN
 // ==========================================
 class LockScreen extends StatefulWidget {
   final String systemName;
@@ -171,8 +162,6 @@ class _LockScreenState extends State<LockScreen> {
   bool _isInitialized = false;
   bool _isCompromised = false;
   bool _userAcknowledgedThreat = false;
-
-  // 🔥 FAKE DASHBOARD STATE (Panic Mode UI)
   bool _showFakeDashboard = false;
 
   @override
@@ -197,11 +186,30 @@ class _LockScreenState extends State<LockScreen> {
     }
   }
 
-  // 🛡️ INI BAHAGIAN PALING PENTING: WIRING HYBRID SECURITY
+  // ✅ FIX 3: Proper CompositeAttestationProvider usage
   void _initializeController() {
+    // Create providers first
+    final deviceProvider = DeviceIntegrityAttestation(
+      allowDebugMode: true,    // Set false untuk production
+      allowEmulators: false,
+    );
+
+    final serverProvider = ServerAttestationProvider(
+      ServerAttestationConfig(
+        endpoint: 'https://api.z-kinetic.com/v1/unlock',
+        apiKey: 'ZK_BETA_KEY_2026',
+      ),
+    );
+
+    // ✅ Pass providers as List (required by constructor)
+    final compositeProvider = CompositeAttestationProvider(
+      [deviceProvider, serverProvider],
+      strategy: AttestationStrategy.ALL_MUST_PASS,
+    );
+
+    // ✅ Use V2Models.ClaConfig explicitly
     _controller = ClaController(
-      ClaConfig(
-        // 1. Setting Asal Tuan
+      V2Models.ClaConfig(
         secret: const [1, 7, 3, 9, 2],
         minShake: 0.4,
         thresholdAmount: 0.25,
@@ -212,25 +220,11 @@ class _LockScreenState extends State<LockScreen> {
         clientId: 'Z_KINETIC_PRO',
         clientSecret: 'secured_session_key',
         
-        // 2. ✅ HYBRID SECURITY (Local First -> Then Server)
-        attestationProvider: CompositeAttestationProvider(
-          
-          // Guard 1: Local (Percuma) - Check Emulator & Root
-          localProvider: DeviceIntegrityAttestation(
-            allowDebugMode: true,    // Ubah ke 'false' bila dah ready production!
-            allowEmulators: false,   // Block emulator
-          ),
-          
-          // Guard 2: Server (Bayar 0.06 sen) - Check Bil & Attack Pattern
-          serverProvider: ServerAttestationProvider(
-            ServerAttestationConfig(
-              endpoint: 'https://api.z-kinetic.com/v1/unlock', // TUKAR KE URL SERVER TUAN NANTI
-              apiKey: 'ZK_BETA_KEY_2026',
-            ),
-          ),
-        ),
+        // ✅ Now properly configured
+        attestationProvider: compositeProvider,
       ),
     );
+
     setState(() => _isInitialized = true);
   }
 
@@ -241,14 +235,12 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
-  // 🔥 SILENT ALARM LOGIC (Updated for V2 Forensics)
   Future<void> _triggerSilentPanic() async {
     String deviceId = "UNKNOWN";
     try {
       deviceId = await DeviceFingerprint.getDeviceId();
     } catch (_) {}
 
-    // 🕵️ SEDUT DATA FORENSIK DARI V2
     final sessionData = _controller.getSessionSnapshot();
 
     await widget.incidentReporter?.report(
@@ -313,7 +305,6 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   void _onSuccess() {
-    // 1. CHECK PANIC MODE DULU!
     if (_controller.isPanicMode) {
       _triggerSilentPanic();
       setState(() {
@@ -326,7 +317,6 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
 
-    // 2. Normal Flow
     if (_isCompromised && !_userAcknowledgedThreat) {
       setState(() => _userAcknowledgedThreat = true);
       _autoReportIncident();
@@ -374,7 +364,6 @@ class _LockScreenState extends State<LockScreen> {
   void _onFail() {
     HapticFeedback.heavyImpact();
     
-    // 🔥 UPDATE: Tunjuk reason sebenar dari Guard (cth: "ROOT_DETECTED" atau "BILL_OVERDUE")
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text("❌ ${_controller.threatMessage.isNotEmpty ? _controller.threatMessage : 'INVALID CODE'}"), 
@@ -394,7 +383,6 @@ class _LockScreenState extends State<LockScreen> {
   Widget build(BuildContext context) {
     if (!_isInitialized) return const Scaffold(backgroundColor: Colors.black);
 
-    // 🔥 JIKA PANIC MODE: Tunjuk Dashboard Palsu
     if (_showFakeDashboard) {
       return Scaffold(
         backgroundColor: Colors.black,
