@@ -1,10 +1,10 @@
-//*
+/*
  * PROJECT: Z-KINETIC SECURITY CORE
  * MODULE: Motion Models (Pure Dart - FIXED)
- * STATUS: BUILD ERROR RESOLVED ✅
+ * STATUS: BUILD ERROR RESOLVED
  */
 
-import 'cla_models.dart'; // ✅ FIX: Import SecurityState enum
+import 'cla_models.dart';
 
 /// Raw motion sensor reading
 class MotionEvent {
@@ -88,25 +88,25 @@ class BiometricSession {
 
   double get entropy {
     if (motionEvents.isEmpty) return 0.0;
-    
+
     final magnitudes = motionEvents.map((e) => e.magnitude).toList();
     final Map<int, int> distribution = {};
-    
+
     for (var mag in magnitudes) {
       int bucket = (mag * 10).round();
       distribution[bucket] = (distribution[bucket] ?? 0) + 1;
     }
-    
+
     double entropy = 0.0;
     int total = magnitudes.length;
-    
+
     distribution.forEach((_, count) {
       double probability = count / total;
       if (probability > 0) {
         entropy -= probability * (probability.toString().length / 10);
       }
     });
-    
+
     return entropy;
   }
 
