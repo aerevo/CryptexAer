@@ -209,7 +209,7 @@ class _LockScreenState extends State<LockScreen> {
 
     // ✅ Use V2Models.ClaConfig explicitly
     _controller = ClaController(
-      V2Models.ClaConfig(
+      ClaConfig(  // ✅ BETUL - Guna yang dari cla_models.dart
         secret: const [1, 7, 3, 9, 2],
         minShake: 0.4,
         thresholdAmount: 0.25,
@@ -510,3 +510,4 @@ class RealSuccessDashboard extends StatelessWidget {
     );
   }
 }
+
