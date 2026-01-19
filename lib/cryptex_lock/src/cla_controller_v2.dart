@@ -23,8 +23,8 @@ import 'cla_models.dart';
 import 'behavioral_analyzer.dart';
 import 'adaptive_threshold_engine.dart';
 
-// Legacy compatibility
-import 'cla_models.dart' as legacy;
+// ✅ Use shared models (no duplicate ClaConfig)
+import 'cla_models.dart';
 
 // ============================================
 // 🧠 TRUE AI ENGINE (Lightweight ML)
@@ -84,7 +84,7 @@ class AdaptiveLearningEngine {
     return max(3.0, _avgTouch * 0.5);
   }
   
-Map<String, dynamic> getProfile() => {
+  Map<String, dynamic> getProfile() => {
     'avg_motion': _avgMotion.toStringAsFixed(2),
     'avg_touch': _avgTouch.toStringAsFixed(2),
     'std_dev': _stdDevMotion.toStringAsFixed(2),
@@ -93,7 +93,9 @@ Map<String, dynamic> getProfile() => {
   };
 }
 
-// 🔧 ClaConfig dibuang untuk elakkan 'Duplicate Export' (Rujuk cla_models.dart)
+/// Configuration for ClaController
+/// NOTE: Now using shared ClaConfig from cla_models.dart
+/// This class is removed - import from cla_models.dart instead
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
@@ -108,7 +110,7 @@ class ClaController extends ChangeNotifier {
   late final AdaptiveThresholdEngine _adaptiveEngine;
 
   // State Variables
-  legacy.SecurityState _uiState = legacy.SecurityState.LOCKED;
+  SecurityState _uiState = SecurityState.LOCKED;
   List<int> currentValues = [0, 0, 0, 0, 0];
   String _currentSessionId = '';
   DateTime? _sessionStart;
@@ -138,7 +140,7 @@ class ClaController extends ChangeNotifier {
   // ============================================
   // GETTERS (V2 Compatible API)
   // ============================================
-  legacy.SecurityState get state => _uiState;
+  SecurityState get state => _uiState;
   int get failedAttempts => _core.failedAttempts;
   bool get isPanicMode => _isPanicMode;
   String get threatMessage => _threatMessage;
@@ -172,7 +174,7 @@ class ClaController extends ChangeNotifier {
   int getInitialValue(int index) => currentValues[index];
 
   void registerShake(double rawMag, double x, double y, double z) {
-    if (_isPaused || _uiState == legacy.SecurityState.UNLOCKED) return;
+    if (_isPaused || _uiState == SecurityState.UNLOCKED) return;
     
     final event = MotionEvent(
       magnitude: rawMag,
@@ -189,7 +191,7 @@ class ClaController extends ChangeNotifier {
   }
 
   void registerTouch({double pressure = 0.5, double vx = 0, double vy = 0}) {
-    if (_isPaused || _uiState == legacy.SecurityState.UNLOCKED) return;
+    if (_isPaused || _uiState == SecurityState.UNLOCKED) return;
 
     final event = TouchEvent(
       timestamp: DateTime.now(),
@@ -224,9 +226,9 @@ class ClaController extends ChangeNotifier {
   // ============================================
 
   Future<bool> validateAttempt({bool hasPhysicalMovement = true}) async {
-    if (_core.state == legacy.SecurityState.HARD_LOCK) return false;
+    if (_core.state == SecurityState.HARD_LOCK) return false;
 
-    _uiState = legacy.SecurityState.VALIDATING;
+    _uiState = SecurityState.VALIDATING;
     _threatMessage = "";
     notifyListeners();
 
@@ -241,13 +243,13 @@ class ClaController extends ChangeNotifier {
     
     if (config.enableSensors && 
         (motionScore < motionThreshold || touchScore < touchThreshold)) {
-      _uiState = legacy.SecurityState.SOFT_LOCK;
+      _uiState = SecurityState.SOFT_LOCK;
       _threatMessage = "INSUFFICIENT BIOMETRIC DATA (AI)";
       notifyListeners();
 
       Future.delayed(const Duration(seconds: 2), () {
-        if (_uiState == legacy.SecurityState.SOFT_LOCK) {
-          _uiState = legacy.SecurityState.LOCKED;
+        if (_uiState == SecurityState.SOFT_LOCK) {
+          _uiState = SecurityState.LOCKED;
           _threatMessage = "";
           notifyListeners();
         }
@@ -323,7 +325,7 @@ class ClaController extends ChangeNotifier {
     } else {
       _threatMessage = result.reason;
       if (result.reason == 'MAX_ATTEMPTS_EXCEEDED') {
-        _uiState = legacy.SecurityState.HARD_LOCK;
+        _uiState = SecurityState.HARD_LOCK;
       } else {
         _handleFailure();
       }
@@ -332,7 +334,7 @@ class ClaController extends ChangeNotifier {
   }
 
   void _handleSuccess({required bool panic, required double confidence}) {
-    _uiState = legacy.SecurityState.UNLOCKED;
+    _uiState = SecurityState.UNLOCKED;
     _isPanicMode = panic;
     _threatMessage = panic ? "SILENT ALARM ACTIVATED" : "";
     _confidenceNotifier.value = confidence;
@@ -343,10 +345,10 @@ class ClaController extends ChangeNotifier {
   }
 
   void _handleFailure() {
-    if (_core.state == legacy.SecurityState.HARD_LOCK) {
-      _uiState = legacy.SecurityState.HARD_LOCK;
+    if (_core.state == SecurityState.HARD_LOCK) {
+      _uiState = SecurityState.HARD_LOCK;
     } else {
-      _uiState = legacy.SecurityState.LOCKED;
+      _uiState = SecurityState.LOCKED;
     }
     
     _motionBuffer.clear();
@@ -403,7 +405,7 @@ class ClaController extends ChangeNotifier {
 
   void reset() {
     _core.reset();
-    _uiState = legacy.SecurityState.LOCKED;
+    _uiState = SecurityState.LOCKED;
     _isPanicMode = false;
     _threatMessage = "";
     _touchScoreNotifier.value = 0.0;
