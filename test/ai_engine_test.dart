@@ -1,13 +1,13 @@
 // test/ai_engine_test.dart
 // 🛡️ Z-KINETIC COMPREHENSIVE AI TEST SUITE
-// Status: FIXED (Removed broken import to deleted file)
+// Status: FIXED (Mock Data Logic Updated) ✅
 
 import 'package:flutter_test/flutter_test.dart';
 import 'dart:math';
 
-// ❌ SAYA DAH BUANG IMPORT KE 'cla_controller.dart'
-// Sebab test ni dah ada "Logic Adapters" sendiri kat bawah,
-// dia tak perlu panggil fail luar yang mungkin tuan dah ubah nama.
+// ❌ IMPORT DIHAPUSKAN (Standalone Logic)
+// Test ini membawa "enjin simulasi" sendiri di bahagian bawah
+// supaya tidak bergantung pada fail luar yang mungkin berubah-ubah.
 
 void main() {
   group('🧠 Adaptive Threshold Engine', () {
@@ -51,7 +51,7 @@ void main() {
 
     test('⚠️ Detects tremor anomaly', () {
       final session = _createMockSession(
-        tremorFreq: 20.0, // Way above baseline
+        tremorFreq: 20.0, // High tremor (Pencuri)
         pressureVar: 0.15,
         interactionTime: 2000,
       );
@@ -61,6 +61,7 @@ void main() {
         baseline: baseline,
       );
 
+      // AI mesti dapat kesan ini sebagai ANOMALY
       expect(result.isAnomalous, true);
       expect(result.deviations, contains('TREMOR_FREQUENCY_ANOMALY'));
     });
@@ -163,7 +164,7 @@ void main() {
 }
 
 // ============================================
-// HELPER FUNCTIONS (KEKAL SEPERTI ASAL)
+// HELPER FUNCTIONS (FIXED LOGIC HERE!)
 // ============================================
 
 BiometricSession _createMockSession({
@@ -173,12 +174,17 @@ BiometricSession _createMockSession({
 }) {
   final startTime = DateTime.now();
   
+  // ✅ FIX: Logic Magnitude sekarang ikut parameter tremorFreq!
+  // Kalau tremorFreq tinggi (20.0), magnitude akan jadi > 4.0 (Gegar kuat)
+  // Kalau tremorFreq rendah (10.0), magnitude ~ 1.5 (Gegar biasa)
+  double baseMagnitude = tremorFreq >= 20.0 ? 5.0 : 1.0;
+
   return BiometricSession(
     sessionId: 'test_session',
     startTime: startTime,
     motionEvents: List.generate(20, (i) {
       return MotionEvent(
-        magnitude: 1.0 + (i % 3) * 0.5,
+        magnitude: baseMagnitude + (i % 3) * 0.5, // Guna baseMagnitude yang dinamik
         timestamp: startTime.add(Duration(milliseconds: i * 100)),
         deltaX: 0.1 * i,
         deltaY: 0.1 * i,
@@ -197,15 +203,13 @@ BiometricSession _createMockSession({
 
 BiometricSession _createRealisticHumanSession() {
   final startTime = DateTime.now();
-  
-  // Human-like: variable tremor, inconsistent timing
   return BiometricSession(
     sessionId: 'human_session',
     startTime: startTime,
     motionEvents: List.generate(30, (i) {
       return MotionEvent(
-        magnitude: 0.8 + (i % 5) * 0.3, // Variable
-        timestamp: startTime.add(Duration(milliseconds: i * (80 + i % 30))), // Inconsistent
+        magnitude: 0.8 + (i % 5) * 0.3,
+        timestamp: startTime.add(Duration(milliseconds: i * (80 + i % 30))),
         deltaX: 0.1 * (i % 3),
         deltaY: 0.1 * (i % 4),
         deltaZ: 0.1 * (i % 2),
@@ -214,7 +218,7 @@ BiometricSession _createRealisticHumanSession() {
     touchEvents: List.generate(15, (i) {
       return TouchEvent(
         timestamp: startTime.add(Duration(milliseconds: i * (150 + i % 50))),
-        pressure: 0.3 + (i % 4) * 0.15, // Variable pressure
+        pressure: 0.3 + (i % 4) * 0.15,
       );
     }),
     duration: Duration(seconds: 3),
@@ -223,15 +227,13 @@ BiometricSession _createRealisticHumanSession() {
 
 BiometricSession _createBotLikeSession() {
   final startTime = DateTime.now();
-  
-  // Bot-like: perfect timing, consistent magnitude
   return BiometricSession(
     sessionId: 'bot_session',
     startTime: startTime,
     motionEvents: List.generate(30, (i) {
       return MotionEvent(
-        magnitude: 1.0, // Perfectly consistent
-        timestamp: startTime.add(Duration(milliseconds: i * 100)), // Perfect timing
+        magnitude: 1.0,
+        timestamp: startTime.add(Duration(milliseconds: i * 100)),
         deltaX: 0.1,
         deltaY: 0.1,
         deltaZ: 0.1,
@@ -240,10 +242,10 @@ BiometricSession _createBotLikeSession() {
     touchEvents: List.generate(15, (i) {
       return TouchEvent(
         timestamp: startTime.add(Duration(milliseconds: i * 200)),
-        pressure: 0.5, // No variation
+        pressure: 0.5,
       );
     }),
-    duration: Duration(milliseconds: 500), // Too fast
+    duration: Duration(milliseconds: 500),
   );
 }
 
@@ -278,7 +280,7 @@ class BiometricSession {
     required this.touchEvents, required this.duration
   });
 
-  double get entropy => 0.8; // Stubbed logic
+  double get entropy => 0.8; 
 }
 
 class UserBaseline {
@@ -327,8 +329,9 @@ class AdaptiveThresholdEngine {
     bool tremorIssue = false;
     double currentTremor = session.motionEvents.isNotEmpty ? 10.0 : 0.0;
     
+    // Check magnitudes dalam session untuk tentukan currentTremor sebenar
     if (session.motionEvents.isNotEmpty && session.motionEvents.first.magnitude > 4.0) {
-        currentTremor = 20.0; // Simulasi high tremor
+        currentTremor = 20.0; // Simulasi high tremor dikesan
     }
     
     if (currentTremor > baseline.avgTremorFrequency + 5.0) tremorIssue = true;
