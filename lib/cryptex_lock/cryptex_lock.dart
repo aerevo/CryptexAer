@@ -8,7 +8,7 @@
  * 
  * Instead of:
  * import 'package:your_app/cryptex_lock/src/cla_widget.dart';
- * import 'package:your_app/cryptex_lock/src/cla_controller.dart';
+ * import 'package:your_app/cryptex_lock/src/cla_controller_v2.dart';
  * etc...
  */
 
