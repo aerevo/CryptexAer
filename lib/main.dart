@@ -11,7 +11,7 @@ import 'package:flutter/foundation.dart';
 
 // ✅ FIX: Import barrel file tapi SEMBUNYIKAN (hide) Controller & Config lama
 // supaya tidak bergaduh dengan V2
-import 'cryptex_lock/cryptex_lock.dart' hide ClaController, ClaConfig;
+import 'cryptex_lock/cryptex_lock.dart' hide ClaController
 
 // ✅ IMPORT SECTION: V2 Controller & Security Providers
 import 'cryptex_lock/src/cla_controller_v2.dart'; 
@@ -512,3 +512,4 @@ class RealSuccessDashboard extends StatelessWidget {
     );
   }
 }
+
