@@ -84,7 +84,7 @@ class AdaptiveLearningEngine {
     return max(3.0, _avgTouch * 0.5);
   }
   
-  Map<String, dynamic> getProfile() => {
+Map<String, dynamic> getProfile() => {
     'avg_motion': _avgMotion.toStringAsFixed(2),
     'avg_touch': _avgTouch.toStringAsFixed(2),
     'std_dev': _stdDevMotion.toStringAsFixed(2),
@@ -93,49 +93,7 @@ class AdaptiveLearningEngine {
   };
 }
 
-/// Configuration for ClaController
-class ClaConfig {
-  final List<int> secret;
-  final Duration minSolveTime;
-  final double minShake;
-  final double thresholdAmount;
-  final int maxAttempts;
-  final Duration jamCooldown;
-  final Duration softLockCooldown;
-  final bool enableSensors;
-  final String clientId;
-  final String clientSecret;
-  final bool enforceReplayImmunity;
-  final Duration nonceValidityWindow;
-  final AttestationProvider? attestationProvider;
-
-  const ClaConfig({
-    required this.secret,
-    required this.minSolveTime,
-    required this.minShake,
-    required this.thresholdAmount,
-    this.maxAttempts = 3,
-    this.jamCooldown = const Duration(seconds: 30),
-    this.softLockCooldown = const Duration(seconds: 2),
-    this.enableSensors = true,
-    this.clientId = 'default_client',
-    this.clientSecret = '',
-    this.enforceReplayImmunity = true,
-    this.nonceValidityWindow = const Duration(seconds: 60),
-    this.attestationProvider,
-  });
-
-  SecurityCoreConfig toCoreConfig() {
-    return SecurityCoreConfig(
-      expectedCode: secret,
-      maxFailedAttempts: maxAttempts,
-      lockoutDuration: jamCooldown,
-      enforceReplayImmunity: enforceReplayImmunity,
-      nonceValidityWindow: nonceValidityWindow,
-      attestationProvider: attestationProvider,
-    );
-  }
-}
+// 🔧 ClaConfig dibuang untuk elakkan 'Duplicate Export' (Rujuk cla_models.dart)
 
 class ClaController extends ChangeNotifier {
   final ClaConfig config;
