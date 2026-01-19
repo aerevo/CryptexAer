@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'cryptex_lock/cryptex_lock.dart' hide ClaController;
 
 // ✅ IMPORT SECTION: V2 Controller & Security Providers
-import 'cryptex_lock/src/cla_controller.dart'; // Nama fail baru (bekas V2)
+import 'cryptex_lock/src/cla_controller_v2.dart'; // Nama fail baru
 import 'cryptex_lock/src/device_integrity_attestation.dart';
 import 'cryptex_lock/src/server_attestation_provider.dart';
 import 'cryptex_lock/src/composite_attestation.dart';
@@ -517,3 +517,4 @@ class RealSuccessDashboard extends StatelessWidget {
     );
   }
 }
+
