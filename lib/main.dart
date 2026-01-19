@@ -1,20 +1,16 @@
-// 🛡️ Z-KINETIC INTELLIGENCE HUB V7.2 (HYBRID SECURITY ACTIVE)
-// Status: V2 CONTROLLER INTEGRATED ✅
-// Changes:
-// 1. Switched to ClaControllerV2 explicitly
-// 2. Added Composite Attestation (Device + Server)
+// 🛡️ Z-KINETIC INTELLIGENCE HUB V7.3 (HARDENED SECURITY)
+// Status: V2 CONTROLLER INTEGRATED | SECURE ENV VARS ACTIVE ✅
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-// ✅ FIX: Import barrel file tapi SEMBUNYIKAN (hide) Controller & Config lama
-// supaya tidak bergaduh dengan V2
+// ✅ FIX: Import barrel file tapi SEMBUNYIKAN (hide) Controller lama
 import 'cryptex_lock/cryptex_lock.dart' hide ClaController;
 
 // ✅ IMPORT SECTION: V2 Controller & Security Providers
-import 'cryptex_lock/src/cla_controller_v2.dart'; 
+import 'cryptex_lock/src/cla_controller.dart'; // Nama fail baru (bekas V2)
 import 'cryptex_lock/src/device_integrity_attestation.dart';
 import 'cryptex_lock/src/server_attestation_provider.dart';
 import 'cryptex_lock/src/composite_attestation.dart';
@@ -161,7 +157,6 @@ class LockScreen extends StatefulWidget {
 }
 
 class _LockScreenState extends State<LockScreen> {
-  // ✅ Ini sekarang merujuk kepada V2 Controller
   late ClaController _controller;
   bool _isInitialized = false;
   bool _isCompromised = false;
@@ -190,17 +185,25 @@ class _LockScreenState extends State<LockScreen> {
     }
   }
 
-  // ✅ V2 INITIALIZATION LOGIC (Updated as requested)
+  // ✅ V2 INITIALIZATION LOGIC (SECURE ENV VARS)
   void _initializeController() {
     final deviceProvider = DeviceIntegrityAttestation(
-      allowDebugMode: true,
+      allowDebugMode: kDebugMode, // Benarkan debug hanya jika dalam mode debug
       allowEmulators: false,
     );
 
+    // 🔒 SECURITY HARDENING: Baca API Key dari Environment Variable
+    // Jika tiada (local dev), dia akan guna nilai default kosong/dummy
     final serverProvider = ServerAttestationProvider(
       ServerAttestationConfig(
-        endpoint: 'https://api.z-kinetic.com/v1/unlock',
-        apiKey: 'ZK_BETA_KEY_2026',
+        endpoint: const String.fromEnvironment(
+          'ZK_API_ENDPOINT', 
+          defaultValue: 'https://api.z-kinetic.com/v1/unlock'
+        ),
+        apiKey: const String.fromEnvironment(
+          'ZK_API_KEY', 
+          defaultValue: '' // Kosongkan default supaya developer kena set sendiri
+        ),
       ),
     );
 
@@ -209,7 +212,7 @@ class _LockScreenState extends State<LockScreen> {
       strategy: AttestationStrategy.ALL_MUST_PASS,
     );
 
-    // ✅ USE V2 CONTROLLER (yang ada getSessionSnapshot)
+    // 🔒 SECURITY HARDENING: Baca Client Secret dari Environment Variable
     _controller = ClaController(
       ClaConfig(
         secret: const [1, 7, 3, 9, 2],
@@ -220,7 +223,10 @@ class _LockScreenState extends State<LockScreen> {
         jamCooldown: const Duration(seconds: 10),
         enableSensors: true,
         clientId: 'Z_KINETIC_PRO',
-        clientSecret: 'secured_session_key',
+        clientSecret: const String.fromEnvironment(
+          'ZK_CLIENT_SECRET', 
+          defaultValue: 'DEV_MODE_UNSECURED'
+        ),
         attestationProvider: compositeProvider,
       ),
     );
@@ -241,7 +247,6 @@ class _LockScreenState extends State<LockScreen> {
       deviceId = await DeviceFingerprint.getDeviceId();
     } catch (_) {}
 
-    // ✅ Method ini hanya wujud dalam V2 Controller
     final sessionData = _controller.getSessionSnapshot();
 
     await widget.incidentReporter?.report(
@@ -419,7 +424,7 @@ class _LockScreenState extends State<LockScreen> {
               _isCompromised ? _buildHackedNotice() : _buildSafeNotice(),
               const SizedBox(height: 50),
 
-              // Widget ini akan menggunakan Controller V2 secara automatik kerana jenis data _controller telah berubah
+              // Widget ini akan menggunakan Controller V2 (yang dah di-rename jadi cla_controller.dart)
               CryptexLock(
                 controller: _controller,
                 onSuccess: _onSuccess,
@@ -478,9 +483,9 @@ class _LockScreenState extends State<LockScreen> {
       ),
       child: Column(children: [
         const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.report_problem, color: Colors.red, size: 24),
-          SizedBox(width: 10),
-          Text("INTEGRITY BREACH", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))
+          const Icon(Icons.report_problem, color: Colors.red, size: 24),
+          const SizedBox(width: 10),
+          const Text("INTEGRITY BREACH", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))
         ]),
         const SizedBox(height: 15),
         Text("Value '${widget.displayedAmount}' mismatch.", textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 12)),
@@ -512,5 +517,3 @@ class RealSuccessDashboard extends StatelessWidget {
     );
   }
 }
-
-
