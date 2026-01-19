@@ -16,7 +16,7 @@
 // CORE COMPONENTS
 // ============================================
 export 'src/cla_widget.dart';
-export 'src/cla_controller.dart';
+export 'src/cla_controller_v2.dart';
 export 'src/cla_models.dart';
 export 'src/security_engine.dart';
 
