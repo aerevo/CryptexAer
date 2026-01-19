@@ -1,7 +1,8 @@
 // lib/cryptex_lock/src/cla_models.dart
+// ✅ FIXED: Added toCoreConfig() method for V3 compatibility
 
 import 'security_core.dart';
-import 'motion_models.dart'; // Import models from here
+import 'motion_models.dart';
 
 enum SecurityState {
   LOCKED,
@@ -40,6 +41,10 @@ class ClaConfig {
   final String clientSecret;
   final SecurityEngineConfig engineConfig;
   final AttestationProvider? attestationProvider;
+  
+  // ✅ NEW: V3 compatibility parameters
+  final bool enforceReplayImmunity;
+  final Duration nonceValidityWindow;
 
   const ClaConfig({
     required this.secret,
@@ -54,5 +59,20 @@ class ClaConfig {
     this.clientSecret = '',
     this.engineConfig = const SecurityEngineConfig(),
     this.attestationProvider,
+    // ✅ NEW: Default values for V3
+    this.enforceReplayImmunity = true,
+    this.nonceValidityWindow = const Duration(seconds: 60),
   });
+  
+  // ✅ CRITICAL FIX: Add toCoreConfig() method for V3
+  SecurityCoreConfig toCoreConfig() {
+    return SecurityCoreConfig(
+      expectedCode: secret,
+      maxFailedAttempts: maxAttempts,
+      lockoutDuration: jamCooldown,
+      enforceReplayImmunity: enforceReplayImmunity,
+      nonceValidityWindow: nonceValidityWindow,
+      attestationProvider: attestationProvider,
+    );
+  }
 }
