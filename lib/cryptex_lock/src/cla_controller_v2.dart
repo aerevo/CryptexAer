@@ -18,6 +18,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'security_core.dart';
 import 'motion_models.dart';
 import 'cla_models.dart';
+import 'cla_constants.dart';
 
 // 🧠 AI BRAINS (kept from V2)
 import 'behavioral_analyzer.dart';
