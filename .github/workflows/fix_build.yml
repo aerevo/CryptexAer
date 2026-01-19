@@ -295,6 +295,9 @@ jobs:
           flutter doctor -v
           echo "✅ Validation complete"
 
+      - name: 🧠 Run AI Engine Tests
+        run: flutter test test/ai_engine_test.dart
+      
       - name: 🚀 Build Release APK
         run: |
           cd ../fresh_build
