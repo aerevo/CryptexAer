@@ -31,9 +31,11 @@ jobs:
 
       - name: 💾 Backup Essential Files
         run: |
-          echo "==> Backing up lib, pubspec.yaml, server, assets..."
+          echo "==> Backing up lib, TEST, pubspec.yaml, server, assets..."
           mkdir -p /tmp/cryptex_backup
           cp -r lib /tmp/cryptex_backup/
+          # 👇 INI YANG SAYA TERTINGGAL TADI (Wajib ada!)
+          cp -r test /tmp/cryptex_backup/
           cp pubspec.yaml /tmp/cryptex_backup/
           [ -d "server" ] && cp -r server /tmp/cryptex_backup/
           [ -d "assets" ] && cp -r assets /tmp/cryptex_backup/
@@ -53,7 +55,9 @@ jobs:
           echo "==> Restoring backed up files..."
           cd ../fresh_build
           rm -rf lib/
+          # 👇 KITA MASUKKAN BALIK FOLDER TEST KE RUMAH BARU
           cp -r /tmp/cryptex_backup/lib .
+          cp -r /tmp/cryptex_backup/test .
           cp /tmp/cryptex_backup/pubspec.yaml .
           [ -d "/tmp/cryptex_backup/server" ] && cp -r /tmp/cryptex_backup/server .
           [ -d "/tmp/cryptex_backup/assets" ] && cp -r /tmp/cryptex_backup/assets .
@@ -296,7 +300,16 @@ jobs:
           echo "✅ Validation complete"
 
       - name: 🧠 Run AI Engine Tests
-        run: flutter test test/ai_engine_test.dart
+        run: |
+          cd ../fresh_build
+          echo "==> Running Z-Kinetic AI Tests..."
+          if [ -d "test" ]; then
+             flutter test test/ai_engine_test.dart
+          else
+             echo "❌ CRITICAL: Test folder still missing in fresh_build!"
+             ls -R
+             exit 1
+          fi
       
       - name: 🚀 Build Release APK
         run: |
@@ -341,11 +354,11 @@ jobs:
           cd ../fresh_build
           echo ""
           echo "╔════════════════════════════════════════╗"
-          echo "║  ✅ CRYPTEX AER BUILD SUCCESSFUL ✅   ║"
+          echo "║   ✅ CRYPTEX AER BUILD SUCCESSFUL ✅   ║"
           echo "╠════════════════════════════════════════╣"
-          echo "║ Package: com.cryptex.cryptex_aer      ║"
+          echo "║ Package: com.cryptex.cryptex_aer       ║"
           APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)
           printf "║ Size: %-32s ║\n" "$APK_SIZE"
-          echo "║ Obfuscation: ENABLED                  ║"
+          echo "║ Obfuscation: ENABLED                   ║"
           echo "║ Security: Screenshot + Root Detection ║"
           echo "╚════════════════════════════════════════╝"
