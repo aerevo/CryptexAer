@@ -1,6 +1,5 @@
-// 🎮 Z-KINETIC CONTROLLER V3.2 (FIREBASE INTEGRATED)
-// Status: BLACK BOX AI ENABLED ✅
-// Changes: AI logic moved to Firebase, client collects data only
+// 🎮 Z-KINETIC CONTROLLER V3.2 (FIREBASE BLACK BOX)
+// Status: BUILD ERRORS FIXED ✅
 
 import 'dart:async';
 import 'dart:math';
@@ -13,10 +12,10 @@ import 'security_core.dart';
 import 'motion_models.dart';
 import 'cla_models.dart';
 
-// 🔥 FIREBASE BLACK BOX CLIENT (NEW!)
+// 🔥 FIREBASE BLACK BOX (FIXED PATHS!)
 import '../../services/firebase_blackbox_client.dart';
 import '../../models/blackbox_verdict.dart';
-import '../security/services/device_fingerprint.dart';
+import 'package:z_kinetic_pro/cryptex_lock/src/security/services/device_fingerprint.dart';
 
 extension ClaConfigV3Extension on ClaConfig {
   SecurityCoreConfig toCoreConfig() {
@@ -35,21 +34,16 @@ class ClaController extends ChangeNotifier {
   final ClaConfig config;
   late final SecurityCore _core;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
-
-  // 🔥 FIREBASE BLACK BOX CLIENT (REPLACES LOCAL AI!)
   final FirebaseBlackBoxClient _blackBox = FirebaseBlackBoxClient();
 
-  // State Variables
   SecurityState _uiState = SecurityState.LOCKED;
   List<int> currentValues = [0, 0, 0, 0, 0];
   String _currentSessionId = '';
   DateTime? _sessionStart;
 
-  // Data Buffers (COLLECT ONLY - no AI processing!)
   final List<MotionEvent> _motionBuffer = [];
   final List<TouchEvent> _touchBuffer = [];
 
-  // UI Notifiers
   final ValueNotifier<double> _confidenceNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _motionEntropyNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
@@ -57,7 +51,6 @@ class ClaController extends ChangeNotifier {
   String _threatMessage = "";
   bool _isPanicMode = false;
   bool _isPaused = false;
-
   Timer? _touchDecayTimer;
   bool _isDisposed = false;
 
@@ -66,27 +59,16 @@ class ClaController extends ChangeNotifier {
     _startNewSession();
   }
 
-  // ============================================
-  // GETTERS
-  // ============================================
   SecurityState get state => _uiState;
   int get failedAttempts => _core.failedAttempts;
   bool get isPanicMode => _isPanicMode;
   String get threatMessage => _threatMessage;
-
   ValueNotifier<double> get confidenceNotifier => _confidenceNotifier;
   ValueNotifier<double> get motionEntropyNotifier => _motionEntropyNotifier;
   ValueNotifier<double> get touchScoreNotifier => _touchScoreNotifier;
-
   double get liveConfidence => _confidenceNotifier.value;
   double get motionEntropy => _motionEntropyNotifier.value;
   int get remainingLockoutSeconds => _core.remainingLockoutSeconds;
-
-  // ❌ REMOVED: aiProfile (AI logic now on server)
-
-  // ============================================
-  // METHODS
-  // ============================================
 
   void onInteractionStart() {
     if (_isDisposed) return;
@@ -105,7 +87,6 @@ class ClaController extends ChangeNotifier {
 
   void registerShake(double rawMag, double x, double y, double z) {
     if (_isDisposed || _isPaused || _uiState == SecurityState.UNLOCKED) return;
-
     final event = MotionEvent(
       magnitude: rawMag,
       timestamp: DateTime.now(),
@@ -113,33 +94,26 @@ class ClaController extends ChangeNotifier {
       deltaY: y,
       deltaZ: z,
     );
-
     _motionBuffer.add(event);
     if (_motionBuffer.length > 50) _motionBuffer.removeAt(0);
-
     _motionEntropyNotifier.value = _calculateEntropy();
   }
 
   void registerTouch({double pressure = 0.5, double vx = 0, double vy = 0}) {
     if (_isDisposed || _isPaused || _uiState == SecurityState.UNLOCKED) return;
-
     final event = TouchEvent(
       timestamp: DateTime.now(),
       pressure: pressure,
       velocityX: vx,
       velocityY: vy,
     );
-
     _touchBuffer.add(event);
     if (_touchBuffer.length > 50) _touchBuffer.removeAt(0);
-
     _touchScoreNotifier.value = 1.0;
-
     _touchDecayTimer?.cancel();
     _touchDecayTimer = Timer(const Duration(milliseconds: 500), () {
       Future.delayed(const Duration(milliseconds: 100), _decayTouch);
     });
-
     notifyListeners();
   }
 
@@ -151,21 +125,14 @@ class ClaController extends ChangeNotifier {
       Future.delayed(const Duration(milliseconds: 100), _decayTouch);
     }
   }
-  // ============================================
-  // 🔥 FIREBASE BLACK BOX VALIDATION
-  // ============================================
-  
+
   Future<bool> validateAttempt({bool hasPhysicalMovement = true}) async {
     if (_isDisposed || _core.state == SecurityState.HARD_LOCK) return false;
-
     _uiState = SecurityState.VALIDATING;
     _threatMessage = "";
     notifyListeners();
 
     await Future.delayed(const Duration(milliseconds: 300));
-
-    // ❌ REMOVED: Local AI calculations
-    // ✅ NEW: Send data to Firebase Black Box!
 
     BiometricSession? bioSession;
     if (_motionBuffer.isNotEmpty || _touchBuffer.isNotEmpty) {
@@ -178,7 +145,6 @@ class ClaController extends ChangeNotifier {
       );
     }
 
-    // 🔥 CALL FIREBASE BLACK BOX AI
     try {
       final deviceId = await DeviceFingerprint.getDeviceId();
       final nonce = _generateNonce();
@@ -192,11 +158,9 @@ class ClaController extends ChangeNotifier {
         timestamp: timestamp,
       );
 
-      // Process verdict
       if (verdict.allowed) {
         final reversedCode = config.secret.reversed.toList();
         final isPanic = _listEquals(currentValues, reversedCode);
-
         _handleSuccess(panic: isPanic, confidence: verdict.confidence);
         return true;
       } else {
@@ -204,11 +168,8 @@ class ClaController extends ChangeNotifier {
         _handleFailure();
         return false;
       }
-
     } catch (e) {
-      if (kDebugMode) print('❌ Firebase Black Box error: $e');
-      
-      // Offline fallback (optional - based on security policy)
+      if (kDebugMode) print('❌ Firebase error: $e');
       _threatMessage = "Server unreachable";
       _handleFailure();
       return false;
@@ -217,26 +178,22 @@ class ClaController extends ChangeNotifier {
 
   void _handleSuccess({required bool panic, required double confidence}) {
     if (_isDisposed) return;
-
     _uiState = SecurityState.UNLOCKED;
     _isPanicMode = panic;
     _threatMessage = panic ? "SILENT ALARM ACTIVATED" : "";
     _confidenceNotifier.value = confidence;
     _isPaused = true;
-
     _storage.deleteAll();
     notifyListeners();
   }
 
   void _handleFailure() {
     if (_isDisposed) return;
-
     if (_core.state == SecurityState.HARD_LOCK) {
       _uiState = SecurityState.HARD_LOCK;
     } else {
       _uiState = SecurityState.LOCKED;
     }
-
     _motionBuffer.clear();
     _touchBuffer.clear();
     notifyListeners();
@@ -244,7 +201,6 @@ class ClaController extends ChangeNotifier {
 
   void _startNewSession() {
     if (_isDisposed) return;
-
     _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
     _sessionStart = DateTime.now();
     _motionBuffer.clear();
@@ -254,25 +210,20 @@ class ClaController extends ChangeNotifier {
 
   double _calculateEntropy() {
     if (_motionBuffer.isEmpty) return 0.0;
-
     final mags = _motionBuffer.map((e) => e.magnitude).toList();
     final Map<int, int> distribution = {};
-
     for (var mag in mags) {
       int bucket = (mag * 10).round();
       distribution[bucket] = (distribution[bucket] ?? 0) + 1;
     }
-
     double entropy = 0.0;
     int total = mags.length;
-
     distribution.forEach((_, count) {
       double probability = count / total;
       if (probability > 0) {
         entropy += probability * (1 - probability);
       }
     });
-
     return (entropy / 0.25).clamp(0.0, 1.0);
   }
 
@@ -286,7 +237,6 @@ class ClaController extends ChangeNotifier {
 
   void reset() {
     if (_isDisposed) return;
-
     _core.reset();
     _uiState = SecurityState.LOCKED;
     _isPanicMode = false;
@@ -317,19 +267,15 @@ class ClaController extends ChangeNotifier {
   void dispose() {
     if (_isDisposed) return;
     _isDisposed = true;
-
     _touchDecayTimer?.cancel();
     _motionBuffer.clear();
     _touchBuffer.clear();
     currentValues.clear();
-
     _confidenceNotifier.dispose();
     _motionEntropyNotifier.dispose();
     _touchScoreNotifier.dispose();
-
     _core.reset();
     _storage.deleteAll();
-
     super.dispose();
   }
 }
