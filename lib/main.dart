@@ -1,12 +1,12 @@
-// 🛡️ Z-KINETIC INTELLIGENCE HUB V3.2 (FIREBASE BLACK BOX)
-// Status: PRODUCTION READY WITH FIREBASE ✅
+// 🛡️ Z-KINETIC V3.2 (FIREBASE BLACK BOX)
+// Status: BUILD FIXED ✅
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-// 🔥 FIREBASE INITIALIZATION (NEW!)
+// 🔥 FIREBASE
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -18,16 +18,12 @@ import 'cryptex_lock/src/composite_attestation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 🔥 INITIALIZE FIREBASE
+  
   await Firebase.initializeApp();
   
-  // 🔥 ANONYMOUS AUTHENTICATION (Required for Cloud Functions)
   try {
-    final userCredential = await FirebaseAuth.instance.signInAnonymously();
-    if (kDebugMode) {
-      print('🔥 Firebase authenticated: ${userCredential.user?.uid}');
-    }
+    await FirebaseAuth.instance.signInAnonymously();
+    if (kDebugMode) print('🔥 Firebase authenticated');
   } catch (e) {
     if (kDebugMode) print('⚠️ Firebase auth error: $e');
   }
@@ -58,18 +54,11 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF000000),
         primaryColor: Colors.cyanAccent,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          elevation: 0,
-        ),
       ),
       home: const BootLoader(),
     );
   }
 }
-
-// REST OF THE CODE REMAINS THE SAME
-// (BootLoader, LockScreen, etc - no changes needed!)
 
 class BootLoader extends StatefulWidget {
   const BootLoader({super.key});
@@ -113,7 +102,7 @@ class _BootLoaderState extends State<BootLoader> {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => LockScreen(
-          systemName: "FIREBASE BLACK BOX SECURE",
+          systemName: "FIREBASE BLACK BOX",
           displayedAmount: data.amount,
           secureHash: data.securityHash,
           transactionId: data.transactionId,
@@ -134,10 +123,7 @@ class _BootLoaderState extends State<BootLoader> {
           children: [
             CircularProgressIndicator(color: Colors.cyanAccent),
             SizedBox(height: 20),
-            Text(
-              "INITIALIZING FIREBASE BLACK BOX...",
-              style: TextStyle(color: Colors.white54, letterSpacing: 2, fontSize: 10)
-            ),
+            Text("FIREBASE BLACK BOX...", style: TextStyle(color: Colors.white54)),
           ],
         ),
       ),
@@ -145,5 +131,140 @@ class _BootLoaderState extends State<BootLoader> {
   }
 }
 
-// NOTE: LockScreen and other widgets remain UNCHANGED
-// They automatically use the new FirebaseBlackBoxClient through ClaController
+// ============================================
+// LOCK SCREEN (UNCHANGED)
+// ============================================
+
+class LockScreen extends StatefulWidget {
+  final String systemName;
+  final String displayedAmount;
+  final String secureHash;
+  final String transactionId;
+  final IncidentReporter? incidentReporter;
+  final SecurityConfig securityConfig;
+
+  const LockScreen({
+    super.key,
+    required this.systemName,
+    required this.displayedAmount,
+    required this.secureHash,
+    required this.transactionId,
+    required this.securityConfig,
+    this.incidentReporter,
+  });
+
+  @override
+  State<LockScreen> createState() => _LockScreenState();
+}
+
+class _LockScreenState extends State<LockScreen> {
+  late ClaController _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeController();
+  }
+
+  void _initializeController() {
+    final deviceProvider = DeviceIntegrityAttestation(
+      allowDebugMode: kDebugMode,
+      allowEmulators: false,
+    );
+
+    final serverProvider = ServerAttestationProvider(
+      ServerAttestationConfig(
+        endpoint: const String.fromEnvironment(
+          'ZK_API_ENDPOINT',
+          defaultValue: 'https://api.z-kinetic.com/v1/unlock'
+        ),
+        apiKey: const String.fromEnvironment(
+          'ZK_API_KEY',
+          defaultValue: ''
+        ),
+      ),
+    );
+
+    final compositeProvider = CompositeAttestationProvider(
+      [deviceProvider, serverProvider],
+      strategy: AttestationStrategy.ALL_MUST_PASS,
+    );
+
+    _controller = ClaController(
+      ClaConfig(
+        secret: const [1, 7, 3, 9, 2],
+        minShake: 0.4,
+        thresholdAmount: 0.25,
+        minSolveTime: const Duration(milliseconds: 600),
+        maxAttempts: 5,
+        jamCooldown: const Duration(seconds: 10),
+        enableSensors: true,
+        clientId: 'Z_KINETIC_PRO',
+        clientSecret: const String.fromEnvironment(
+          'ZK_CLIENT_SECRET',
+          defaultValue: 'DEV_MODE_UNSECURED'
+        ),
+        attestationProvider: compositeProvider,
+      ),
+    );
+
+    setState(() => _isInitialized = true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    widget.incidentReporter?.dispose();
+    super.dispose();
+  }
+
+  void _onSuccess() {
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("🔓 ACCESS GRANTED"), backgroundColor: Colors.green)
+    );
+  }
+
+  void _onFail() {
+    HapticFeedback.heavyImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("❌ INVALID CODE"), backgroundColor: Colors.red)
+    );
+  }
+
+  void _onJammed() {
+    HapticFeedback.vibrate();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("⛔ SYSTEM HALTED"), backgroundColor: Colors.deepOrange)
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isInitialized) return const Scaffold(backgroundColor: Colors.black);
+
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(widget.systemName, style: const TextStyle(color: Colors.cyanAccent, fontSize: 10)),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CryptexLock(
+                controller: _controller,
+                onSuccess: _onSuccess,
+                onFail: _onFail,
+                onJammed: _onJammed,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
