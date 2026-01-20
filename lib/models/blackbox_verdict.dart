@@ -1,5 +1,5 @@
 // 🔥 BLACK BOX VERDICT MODELS
-// Type-safe response models for Firebase Cloud Functions
+// Location: lib/models/blackbox_verdict.dart
 
 class BlackBoxVerdict {
   final bool allowed;
@@ -38,17 +38,13 @@ class BlackBoxVerdict {
 
   factory BlackBoxVerdict.offlineFallback() {
     return BlackBoxVerdict(
-      allowed: true, // Or false for strict security
+      allowed: true,
       confidence: 0.5,
       verdict: 'OFFLINE_MODE',
       threatLevel: 'UNKNOWN',
-      reason: 'Server unreachable - using offline fallback',
+      reason: 'Server unreachable',
     );
   }
-
-  bool get isVerified => allowed && confidence > 0.7;
-  bool get isSuspicious => !allowed || confidence < 0.5;
-  bool get isCritical => threatLevel == 'CRITICAL' || threatLevel == 'HIGH';
 }
 
 class IncidentReceipt {
