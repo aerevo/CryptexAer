@@ -2,33 +2,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // User Baselines - Only accessible by authenticated users
+    // ✅ MODE DEVELOPMENT: Benarkan User (Anonymous) baca/tulis
     match /user_baselines/{deviceId} {
-      allow read: if request.auth != null && request.auth.uid == deviceId;
-      allow write: if request.auth != null && request.auth.uid == deviceId;
+      allow read, write: if request.auth != null;
     }
     
-    // Blacklisted Devices - Read-only for clients
     match /blacklisted_devices/{deviceId} {
       allow read: if request.auth != null;
-      allow write: if false; // Only server can write
     }
     
-    // Security Incidents - Write-only for clients
     match /security_incidents/{incidentId} {
-      allow read: if false; // Only server can read
       allow create: if request.auth != null;
     }
     
-    // Verification Logs - Server-only
     match /verification_logs/{logId} {
-      allow read, write: if false; // Only server functions
-    }
-    
-    // Threat Intelligence - Read-only for all
-    match /threat_intel/{threatId} {
-      allow read: if request.auth != null;
-      allow write: if false;
+      allow read, write: if false; 
     }
   }
 }
