@@ -32,7 +32,7 @@ dependencies:
   sensors_plus: ^4.0.0
   device_info_plus: ^9.0.0
   package_info_plus: ^5.0.0
-  vibration: ^1.8.4
+  vibration: ^2.0.1
   flutter_secure_storage: ^9.0.0
 
   # ----------------------------
@@ -58,3 +58,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
