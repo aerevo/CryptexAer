@@ -53,21 +53,21 @@ class DefaultFirebaseOptions {
   // 🤖 CONFIG UNTUK ANDROID
   // Buka Firebase Console > Project Settings > General > Your Apps (Android)
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'GANTI_DENGAN_API_KEY_ANDROID', // Contoh: AIzaSyDOCab...
-    appId: 'GANTI_DENGAN_APP_ID_ANDROID',   // Contoh: 1:123456789:android:abcdef...
-    messagingSenderId: 'GANTI_DENGAN_SENDER_ID', // Contoh: 123456789
-    projectId: 'z-kinetic-pro', // Pastikan ID projek tuan betul
-    storageBucket: 'z-kinetic-pro.appspot.com',
+    apiKey: 'AIzaSyA495TYtOEWdeBeNOyuSgsU0TsO3-_fy-E', // ✅ Key Universal Tuan
+    appId: '1:55621733629:android:ef51c1276ef226b0408294', // ✅ ID Android Tuan
+    messagingSenderId: '55621733629', // ✅ Project Number
+    projectId: 'z-kinetic', // ✅ ID Projek Sebenar
+    storageBucket: 'z-kinetic.appspot.com',
   );
 
   // 🍎 CONFIG UNTUK iOS
   // Buka Firebase Console > Project Settings > General > Your Apps (iOS)
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'GANTI_DENGAN_API_KEY_IOS',
-    appId: 'GANTI_DENGAN_APP_ID_IOS',
-    messagingSenderId: 'GANTI_DENGAN_SENDER_ID',
-    projectId: 'z-kinetic-pro',
-    storageBucket: 'z-kinetic-pro.appspot.com',
-    iosBundleId: 'com.aer.zkinetic', // Pastikan Bundle ID sama dengan projek Tuan
+    apiKey: 'AIzaSyA495TYtOEWdeBeNOyuSgsU0TsO3-_fy-E', // ✅ Key Universal Tuan
+    appId: '1:55621733629:ios:98c57a2922abf197408294', // ✅ ID iOS Tuan
+    messagingSenderId: '55621733629', // ✅ Project Number
+    projectId: 'z-kinetic', // ✅ ID Projek Sebenar
+    storageBucket: 'z-kinetic.appspot.com',
+    iosBundleId: 'com.aer.zkinetic', // ✅ Bundle ID Tuan
   );
 }
