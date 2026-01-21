@@ -1,17 +1,18 @@
-// 🏦 TRANSACTION SERVICE V2.0 (PRODUCTION READY)
-// Status: CRYPTO HASH ENABLED ✅
-// Features:
-// 1. Real SHA-256 Hashing
-// 2. Randomized Mock Data (Testing)
-// 3. Server Integration Ready
-// 4. Error Handling & Retry Logic
-// 5. Checksum Validation
+// 🏦 TRANSACTION SERVICE V2.1 (FIREBASE INTEGRATED)
+// Status: CONNECTED 🟢
+// Updates:
+// 1. Integrasi Firestore (Audit Trail & Blacklist Check)
+// 2. Real SHA-256 Hashing
+// 3. Firebase Auth Session Validation
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
-// import 'package:http/http.dart' as http; // Uncomment for server mode
+
+// 🔥 FIREBASE IMPORTS
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ============================================
 // TRANSACTION DATA MODEL
@@ -68,23 +69,66 @@ class TransactionData {
 // ============================================
 class TransactionService {
   // 🎛️ CONFIGURATION
-  static const bool useMockData = true; // Toggle: true = Mock | false = Server
-  static const String serverEndpoint = 'https://api.yourbank.com/secure/tx/current';
-  static const String apiKey = 'YOUR_API_KEY_HERE'; // Production: Load from env
+  static const bool useMockData = true; // Still true for Development
   static const Duration timeout = Duration(seconds: 10);
-  static const int maxRetries = 3;
   
-  // 🔐 SECRET SALT (PRODUCTION: Load from secure storage)
-  static const String _secretSalt = 'Z_KINETIC_PRO_2025_SECURE_SALT_XYZ';
+  // 🔐 SECRET SALT (In production, fetch this from Remote Config)
+  static const String _secretSalt = 'Z_KINETIC_PRO_FIREBASE_SALT_V2';
 
   // ============================================
   // MAIN ENTRY POINT
   // ============================================
   static Future<TransactionData> fetchCurrentTransaction() async {
+    // 🛡️ STEP 1: FIREBASE SECURITY CHECK
+    await _performSecurityCheck();
+
+    // 🛡️ STEP 2: FETCH DATA
     if (useMockData) {
       return _fetchMockTransaction();
     } else {
-      return _fetchFromServer();
+      return _fetchFromFirebase();
+    }
+  }
+
+  // ============================================
+  // 🛡️ FIREBASE SECURITY LAYER (NEW)
+  // ============================================
+  static Future<void> _performSecurityCheck() async {
+    final user = FirebaseAuth.instance.currentUser;
+    
+    // Pastikan user dah login (Anonymous pun takpe)
+    if (user == null) {
+      throw SecurityException('NO_ACTIVE_SESSION: User not logged in to Firebase');
+    }
+
+    try {
+      final db = FirebaseFirestore.instance;
+      
+      // 1. Semak Blacklist (Baca dari 'blacklisted_devices')
+      // Rule: allow read: if request.auth != null;
+      final blacklistDoc = await db.collection('blacklisted_devices').doc(user.uid).get();
+      
+      if (blacklistDoc.exists) {
+        // Jika device disenarai hitam, halang akses serta merta!
+        throw SecurityException('DEVICE_BLACKLISTED: Access Denied by HQ');
+      }
+
+      // 2. Cipta Audit Trail (Tulis ke 'security_incidents')
+      // Rule: allow create: if request.auth != null;
+      // Kita log bahawa user ini cuba akses transaksi.
+      await db.collection('security_incidents').add({
+        'type': 'transaction_request',
+        'uid': user.uid,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'authorized_mock_mode',
+        'description': 'User requested transaction data via Z-Kinetic App'
+      });
+
+    } catch (e) {
+      if (e is SecurityException) rethrow; // Jangan telan SecurityException
+      
+      // Kalau error lain (contoh: internet slow), kita log di console tapi benarkan proceed (fail-open for dev)
+      print('⚠️ Firebase Check Warning: $e'); 
     }
   }
 
@@ -128,68 +172,11 @@ class TransactionService {
   }
 
   // ============================================
-  // SERVER MODE (Production)
+  // FIREBASE DATA MODE (Future Implementation)
   // ============================================
-  static Future<TransactionData> _fetchFromServer({int retryCount = 0}) async {
-    try {
-      // Uncomment untuk production:
-      /*
-      final response = await http.get(
-        Uri.parse(serverEndpoint),
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-      ).timeout(timeout);
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        final data = TransactionData.fromJson(json);
-        
-        // Verify server-provided hash
-        final expectedHash = _generateSecureHash(
-          amount: data.amount,
-          txnId: data.transactionId,
-          timestamp: data.timestamp,
-        );
-        
-        if (data.securityHash != expectedHash) {
-          throw SecurityException('Hash mismatch from server!');
-        }
-        
-        // Verify checksum
-        if (!data.verifyIntegrity()) {
-          throw SecurityException('Checksum validation failed!');
-        }
-        
-        return data;
-      } else if (response.statusCode >= 500 && retryCount < maxRetries) {
-        // Server error - retry with exponential backoff
-        await Future.delayed(Duration(seconds: pow(2, retryCount).toInt()));
-        return _fetchFromServer(retryCount: retryCount + 1);
-      } else {
-        throw HttpException('Server error: ${response.statusCode}');
-      }
-      */
-
-      // Temporary fallback (remove untuk production):
-      throw UnimplementedError(
-        'Server mode not implemented. Set useMockData = true or implement HTTP calls.'
-      );
-
-    } catch (e) {
-      if (retryCount < maxRetries) {
-        await Future.delayed(Duration(seconds: pow(2, retryCount).toInt()));
-        return _fetchFromServer(retryCount: retryCount + 1);
-      }
-      
-      // Final fallback: Return error state
-      return TransactionData(
-        amount: 'ERROR',
-        securityHash: 'INVALID',
-        transactionId: 'ERR-${DateTime.now().millisecondsSinceEpoch}',
-      );
-    }
+  static Future<TransactionData> _fetchFromFirebase() async {
+    // Placeholder untuk bila kita simpan data transaksi sebenar dalam Firestore
+    throw UnimplementedError('Live Firebase data fetching not enabled yet.');
   }
 
   // ============================================
@@ -219,7 +206,7 @@ class TransactionService {
     final bytes = utf8.encode(hashInput);
     final digest = sha256.convert(bytes);
     
-    // Return first 32 characters (production boleh guna full 64)
+    // Return first 32 characters (uppercase)
     return digest.toString().substring(0, 32).toUpperCase();
   }
 
@@ -240,21 +227,6 @@ class TransactionService {
     );
 
     return data.securityHash == expectedHash;
-  }
-
-  // ============================================
-  // DEBUG HELPER (Development only)
-  // ============================================
-  static void debugPrintHash(TransactionData data) {
-    print('═══════════════════════════════════════');
-    print('📊 TRANSACTION DEBUG INFO');
-    print('═══════════════════════════════════════');
-    print('Amount:    ${data.amount}');
-    print('TXN ID:    ${data.transactionId}');
-    print('Hash:      ${data.securityHash}');
-    print('Checksum:  ${data.checksum}');
-    print('Valid:     ${validateTransaction(data)}');
-    print('═══════════════════════════════════════');
   }
 }
 
