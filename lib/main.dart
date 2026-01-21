@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 // 🔥 FIREBASE
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart'; // ✅ DITAMBAH: Kunci Pintu Utama
 
 import 'cryptex_lock/cryptex_lock.dart' hide ClaController;
 import 'cryptex_lock/src/cla_controller_v2.dart';
@@ -19,7 +20,10 @@ import 'cryptex_lock/src/composite_attestation.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await Firebase.initializeApp();
+  // ✅ DIKEMASKINI: Memuatkan konfigurasi dari firebase_options.dart
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   
   try {
     await FirebaseAuth.instance.signInAnonymously();
