@@ -1,6 +1,6 @@
-// 🎯 Z-KINETIC UI V11.3 (STABILIZED INDICATORS)
-// Status: FIXED & OPTIMIZED ✅
-// Changes: Lowered sensor threshold from 0.6 → 0.3 for better UX
+// 🎯 Z-KINETIC UI V11.3 (STABILIZED INDICATORS) + MATRIX RAIN + FORENSIC
+// Status: FULL INTEGRATION ✅
+// Location: lib/cryptex_lock/src/cla_widget.dart
 
 import 'dart:async';
 import 'dart:math';
@@ -9,9 +9,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-// ✅ CRITICAL FIX: Import V2 controller
 import 'cla_controller_v2.dart';
 import 'cla_models.dart';
+
+// ✅ NEW IMPORTS FOR MATRIX RAIN + FORENSIC DATA
+import 'matrix_rain_painter.dart';
+import 'forensic_data_painter.dart';
 
 // ============================================
 // 1. TUTORIAL OVERLAY
@@ -107,6 +110,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   late AnimationController _scanController;
   late AnimationController _reticleController;
   
+  // ✅ NEW: Matrix Rain variables
+  late MatrixRain _matrixRain;
+  late AnimationController _rainController;
+  
   bool _isStressTesting = false;
   String _stressResult = "";
   
@@ -120,7 +127,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
-    widget.controller.onInteractionStart(); // ✅ Method exists in V2 (line 175)
+    widget.controller.onInteractionStart();
     
     _startListening();
     widget.controller.addListener(_handleControllerChange);
@@ -128,6 +135,20 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _scanController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
     _reticleController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
+
+    // ✅ NEW: Matrix Rain initialization
+    _matrixRain = MatrixRain(columnCount: 4);
+    
+    _rainController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 50),
+    )..addListener(() {
+      if (!mounted) return;
+      _matrixRain.update();
+      setState(() {});
+    });
+    
+    _rainController.repeat();
 
     _tutorialHideTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) setState(() => _showTutorial = false);
@@ -152,7 +173,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _initScrollControllers() {
     _scrollControllers = List.generate(5, (i) {
         int val = 0;
-        try { val = widget.controller.getInitialValue(i); } catch(e) {} // ✅ Method exists (line 183)
+        try { val = widget.controller.getInitialValue(i); } catch(e) {}
         return FixedExtentScrollController(initialItem: val);
     });
   }
@@ -177,7 +198,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       
       if (amplifiedMotion > 0.5) _userInteracted();
 
-      widget.controller.registerShake(delta, e.x, e.y, e.z); // ✅ Method exists (line 128)
+      widget.controller.registerShake(delta, e.x, e.y, e.z);
 
       double currentScore = _motionScoreNotifier.value;
       if (amplifiedMotion > currentScore) {
@@ -268,14 +289,20 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _pulseController.dispose(); 
     _scanController.dispose(); 
     _reticleController.dispose();
+    
+    // ✅ NEW: Dispose rain controller
+    _rainController.dispose();
+    
     for (var c in _scrollControllers) c.dispose();
     _motionScoreNotifier.dispose(); 
     _touchScoreNotifier.dispose(); 
     _accelNotifier.dispose();
     super.dispose();
   }
+
   // ============================================
-// PART 2: BUILD METHODS & UI COMPONENTS
+// PART 2: BUILD METHODS & UI COMPONENTS (FULL)
+// SAMBUNGAN dari Part 1
 // ============================================
 
   @override
@@ -435,35 +462,102 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
+  // ============================================
+  // ✅ CRITICAL UPDATE: LEFT PANEL WITH MATRIX RAIN + FORENSIC
+  // ============================================
   Widget _buildInteractiveTumblerArea(Color color, SecurityState state) {
     return SizedBox(
       height: 140,
       child: Stack(
         children: [
+          // ✅ NEW: Left Panel - Matrix Rain + Forensic Data
           Positioned(
-            left: 0, top: 0, bottom: 0, 
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 45,
+              height: 140,
+              color: Colors.black,
+              child: Stack(
+                children: [
+                  // Matrix Rain Background
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: MatrixRainPainter(
+                        rain: _matrixRain,
+                        color: const Color(0xFF00FF00).withOpacity(0.25),
+                      ),
+                    ),
+                  ),
+                  
+                  // Forensic Data Overlay
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: ForensicDataPainter(
+                        color: const Color(0xFF00FF00),
+                        motionCount: widget.controller.motionBuffer.length,
+                        touchCount: widget.controller.touchBuffer.length,
+                        entropy: widget.controller.motionEntropy,
+                        confidence: widget.controller.liveConfidence,
+                      ),
+                    ),
+                  ),
+                  
+                  // Header Label
+                  Positioned(
+                    top: 10,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00FF00).withOpacity(0.15),
+                        border: Border.all(
+                          color: const Color(0xFF00FF00).withOpacity(0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'F0REN',
+                          style: TextStyle(
+                            color: Color(0xFF00FF00),
+                            fontSize: 7,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Courier',
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Right Panel - ORIGINAL (Kinetic Peripheral)
+          Positioned(
+            right: 0, 
+            top: 0, 
+            bottom: 0, 
             child: ValueListenableBuilder<Offset>(
               valueListenable: _accelNotifier,
               builder: (context, offset, _) => CustomPaint(
                 size: const Size(45, 140), 
                 painter: KineticPeripheralPainter(
-                  color: color, side: 'left', valX: offset.dx, valY: offset.dy, state: state,
+                  color: color, 
+                  side: 'right', 
+                  valX: offset.dx, 
+                  valY: offset.dy, 
+                  state: state,
                 )
               ),
             )
           ),
-          Positioned(
-            right: 0, top: 0, bottom: 0, 
-            child: ValueListenableBuilder<Offset>(
-              valueListenable: _accelNotifier,
-              builder: (context, offset, _) => CustomPaint(
-                size: const Size(45, 140), 
-                painter: KineticPeripheralPainter(
-                  color: color, side: 'right', valX: offset.dx, valY: offset.dy, state: state,
-                )
-              ),
-            )
-          ),
+          
+          // Center Tumblers - ORIGINAL (5 Wheels)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 55),
             child: NotificationListener<ScrollNotification>(
@@ -522,7 +616,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 diameterRatio: 1.1,
                 physics: const FixedExtentScrollPhysics(),
                 onSelectedItemChanged: (v) { 
-                  widget.controller.updateWheel(index, v % 10); // ✅ Method exists (line 179)
+                  widget.controller.updateWheel(index, v % 10);
                   HapticFeedback.selectionClick();
                   _analyzeScrollPattern(); 
                 },
@@ -553,6 +647,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       if (mounted) setState(() => _activeWheelIndex = null);
     });
   }
+
+  // ============================================
+// PART 3: HELPER WIDGETS + ALL CUSTOM PAINTERS (FULL)
+// SAMBUNGAN dari Part 2
+// ============================================
 
   Widget _buildAuthButton(Color activeColor, SecurityState state) {
     bool isDisabled = state == SecurityState.VALIDATING || state == SecurityState.HARD_LOCK;
@@ -610,9 +709,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // ✅ STABILIZED: Lower threshold dari 0.6 → 0.3
   Widget _buildSensorBox(String label, double val, Color color, IconData icon) {
-    bool isMatch = val > 0.3; // ✅ FIXED: Lebih sensitif
+    bool isMatch = val > 0.3;
     Color c = isMatch ? const Color(0xFF00FF88) : (val > 0.05 ? const Color(0xFFFF3366) : const Color(0xFF333333));
     return Container(
       width: 55, 
@@ -677,10 +775,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 } // End of _CryptexLockState class
+
 // ============================================
 // PART 3: CUSTOM PAINTERS
 // ============================================
-// ✅ NO CHANGES NEEDED - Painters don't interact with controller
 
 class KineticGridPainter extends CustomPainter {
   final Color color; 
