@@ -1,88 +1,104 @@
-// 🔥 FIREBASE BLACK BOX CLIENT
-// Location: lib/services/firebase_blackbox_client.dart
-// Status: PRODUCTION READY
+// File: lib/src/services/firebase_blackbox_client.dart
+// 🛡️ FIREBASE BLACK BOX CLIENT
+// Status: DEBUG MODE ENABLED 🐞
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
-import '../models/blackbox_verdict.dart';
-import '../cryptex_lock/src/motion_models.dart';
 
+// ✅ MODEL: BlackBoxVerdict (Diletakkan sekali untuk elak error import)
+class BlackBoxVerdict {
+  final bool allowed;
+  final String reason;
+  final Map<String, dynamic>? rawData;
+
+  BlackBoxVerdict({
+    required this.allowed,
+    required this.reason,
+    this.rawData,
+  });
+
+  factory BlackBoxVerdict.fromJson(dynamic json) {
+    if (json == null || json is! Map) {
+      return BlackBoxVerdict.offlineFallback();
+    }
+    return BlackBoxVerdict(
+      allowed: json['allowed'] == true,
+      reason: json['reason']?.toString() ?? 'UNKNOWN_RESPONSE',
+      rawData: Map<String, dynamic>.from(json),
+    );
+  }
+
+  factory BlackBoxVerdict.denied(String reason) {
+    return BlackBoxVerdict(allowed: false, reason: reason);
+  }
+
+  factory BlackBoxVerdict.offlineFallback() {
+    return BlackBoxVerdict(
+      allowed: false, 
+      reason: 'SYSTEM_OFFLINE'
+    );
+  }
+
+  @override
+  String toString() => 'Verdict(allowed: $allowed, reason: $reason)';
+}
+
+/// Client untuk berhubung dengan Google Cloud Functions
 class FirebaseBlackBoxClient {
+  // Pastikan region 'asia-southeast1' (Singapore)
   final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
-    region: 'asia-southeast1',
+    region: 'asia-southeast1'
   );
 
+  /// Menghantar data telemetri ke Cloud untuk dianalisis AI
   Future<BlackBoxVerdict> analyze({
     required String deviceId,
-    required BiometricSession biometric,
     required String sessionId,
-    required String nonce,
-    required int timestamp,
+    required Map<String, dynamic> telemetryData,
   }) async {
+    
+    // 🔥 [DEBUG] LOGS: Memantau status sambungan
+    if (kDebugMode) {
+      print('🔥 [DEBUG] Calling Firebase Function (analyzeBlackBox)...');
+      print('   Device ID: $deviceId');
+      print('   Session ID: $sessionId');
+    }
+    
     try {
       final result = await _functions
           .httpsCallable('analyzeBlackBox')
           .call({
             'deviceId': deviceId,
-            'biometric': _serializeBiometric(biometric),
             'sessionId': sessionId,
-            'nonce': nonce,
-            'timestamp': timestamp,
+            'telemetry': telemetryData,
+            'timestamp': DateTime.now().toIso8601String(),
           })
           .timeout(const Duration(seconds: 10));
-
+      
+      if (kDebugMode) {
+        print('✅ [DEBUG] Response: ${result.data}');
+      }
+      
       return BlackBoxVerdict.fromJson(result.data);
-
+      
     } on FirebaseFunctionsException catch (e) {
-      if (kDebugMode) print('🔥 Firebase error: ${e.code}');
+      if (kDebugMode) {
+        print('❌ [DEBUG] Firebase Function Error:');
+        print('   Code: ${e.code}');
+        print('   Message: ${e.message}');
+      }
+      
       if (e.code == 'unauthenticated') {
         return BlackBoxVerdict.denied('AUTH_REQUIRED');
       }
+      // Fail-Secure: Tolak akses jika ragu-ragu
       return BlackBoxVerdict.offlineFallback();
+      
     } catch (e) {
-      if (kDebugMode) print('❌ Error: $e');
+      if (kDebugMode) {
+        print('💥 [DEBUG] Unknown Connection Error: $e');
+      }
       return BlackBoxVerdict.offlineFallback();
     }
-  }
-
-  Future<IncidentReceipt> reportIncident({
-    required String deviceId,
-    required String incidentId,
-    required Map<String, dynamic> threatIntel,
-    Map<String, dynamic>? securityContext,
-  }) async {
-    try {
-      final result = await _functions
-          .httpsCallable('reportIncident')
-          .call({
-            'incidentId': incidentId,
-            'deviceId': deviceId,
-            'threatIntel': threatIntel,
-            'securityContext': securityContext ?? {},
-          });
-      return IncidentReceipt.fromJson(result.data);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Map<String, dynamic> _serializeBiometric(BiometricSession session) {
-    return {
-      'motion_events': session.motionEvents.map((e) => {
-        'm': e.magnitude,
-        't': e.timestamp.millisecondsSinceEpoch,
-        'dx': e.deltaX,
-        'dy': e.deltaY,
-        'dz': e.deltaZ,
-      }).toList(),
-      'touch_events': session.touchEvents.map((e) => {
-        't': e.timestamp.millisecondsSinceEpoch,
-        'p': e.pressure,
-        'vx': e.velocityX,
-        'vy': e.velocityY,
-      }).toList(),
-      'duration_ms': session.duration.inMilliseconds,
-      'session_id': session.sessionId,
-    };
   }
 }
