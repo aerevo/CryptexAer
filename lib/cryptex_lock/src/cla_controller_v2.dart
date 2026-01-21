@@ -1,5 +1,6 @@
 // 🎮 Z-KINETIC CONTROLLER V3.2 (FIREBASE BLACK BOX)
 // Status: BUILD ERRORS FIXED ✅
+// Auditor: Francois (Butler)
 
 import 'dart:async';
 import 'dart:math';
@@ -13,8 +14,8 @@ import 'motion_models.dart';
 import 'cla_models.dart';
 
 // 🔥 FIREBASE BLACK BOX (FIXED PATHS!)
-import 'package:z_kinetic_pro/services/firebase_blackbox_client.dart';
-import 'package:z_kinetic_pro/models/blackbox_verdict.dart';
+import 'package:z_kinetic_pro/services/firebase_blackbox_client.dart'; 
+// ✅ NOTA: BlackBoxVerdict kini sudah ada dalam fail di atas. Tidak perlu import berasingan.
 import 'package:z_kinetic_pro/cryptex_lock/src/security/services/device_fingerprint.dart';
 
 extension ClaConfigV3Extension on ClaConfig {
@@ -44,10 +45,9 @@ class ClaController extends ChangeNotifier {
   final List<MotionEvent> _motionBuffer = [];
   final List<TouchEvent> _touchBuffer = [];
 
-  // 👇 TAMBAH DI SINI 👇
+  // Getters untuk buffer
   List<MotionEvent> get motionBuffer => List.unmodifiable(_motionBuffer);
   List<TouchEvent> get touchBuffer => List.unmodifiable(_touchBuffer);
-  // 👆 TAMBAH DI SINI 👆
   
   final ValueNotifier<double> _confidenceNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _motionEntropyNotifier = ValueNotifier(0.0);
@@ -139,6 +139,7 @@ class ClaController extends ChangeNotifier {
 
     await Future.delayed(const Duration(milliseconds: 300));
 
+    // 🛡️ Memastikan BiometricSession dijana hanya jika ada data
     BiometricSession? bioSession;
     if (_motionBuffer.isNotEmpty || _touchBuffer.isNotEmpty) {
       bioSession = BiometricSession(
@@ -155,9 +156,11 @@ class ClaController extends ChangeNotifier {
       final nonce = _generateNonce();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
+      // Hantar data ke Firebase Black Box
+      // Jika bioSession null, kita hantar objek kosong (Empty Session) elak crash
       final verdict = await _blackBox.analyze(
         deviceId: deviceId,
-        biometric: bioSession!,
+        biometric: bioSession ?? BiometricSession.empty(id: _currentSessionId),
         sessionId: _currentSessionId,
         nonce: nonce,
         timestamp: timestamp,
@@ -169,13 +172,13 @@ class ClaController extends ChangeNotifier {
         _handleSuccess(panic: isPanic, confidence: verdict.confidence);
         return true;
       } else {
-        _threatMessage = verdict.reason ?? 'Verification failed';
+        _threatMessage = verdict.reason; 
         _handleFailure();
         return false;
       }
     } catch (e) {
       if (kDebugMode) print('❌ Firebase error: $e');
-      _threatMessage = "Server unreachable";
+      _threatMessage = "Security logic bypass detected";
       _handleFailure();
       return false;
     }
@@ -275,12 +278,10 @@ class ClaController extends ChangeNotifier {
     _touchDecayTimer?.cancel();
     _motionBuffer.clear();
     _touchBuffer.clear();
-    currentValues.clear();
     _confidenceNotifier.dispose();
     _motionEntropyNotifier.dispose();
     _touchScoreNotifier.dispose();
     _core.reset();
-    _storage.deleteAll();
     super.dispose();
   }
 }
