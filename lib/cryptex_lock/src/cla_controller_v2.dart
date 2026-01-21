@@ -15,7 +15,6 @@ import 'cla_models.dart';
 
 // 🔥 FIREBASE BLACK BOX (FIXED PATHS!)
 import 'package:z_kinetic_pro/services/firebase_blackbox_client.dart'; 
-// ✅ NOTA: BlackBoxVerdict kini sudah ada dalam fail di atas. Tidak perlu import berasingan.
 import 'package:z_kinetic_pro/cryptex_lock/src/security/services/device_fingerprint.dart';
 
 extension ClaConfigV3Extension on ClaConfig {
@@ -45,7 +44,6 @@ class ClaController extends ChangeNotifier {
   final List<MotionEvent> _motionBuffer = [];
   final List<TouchEvent> _touchBuffer = [];
 
-  // Getters untuk buffer
   List<MotionEvent> get motionBuffer => List.unmodifiable(_motionBuffer);
   List<TouchEvent> get touchBuffer => List.unmodifiable(_touchBuffer);
   
@@ -139,7 +137,6 @@ class ClaController extends ChangeNotifier {
 
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // 🛡️ Memastikan BiometricSession dijana hanya jika ada data
     BiometricSession? bioSession;
     if (_motionBuffer.isNotEmpty || _touchBuffer.isNotEmpty) {
       bioSession = BiometricSession(
@@ -156,11 +153,18 @@ class ClaController extends ChangeNotifier {
       final nonce = _generateNonce();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      // Hantar data ke Firebase Black Box
-      // Jika bioSession null, kita hantar objek kosong (Empty Session) elak crash
+      // ✅ FIX: Membina objek BiometricSession secara manual elak ralat 'Member not found'
+      final finalBio = bioSession ?? BiometricSession(
+        sessionId: _currentSessionId,
+        startTime: DateTime.now(),
+        motionEvents: [],
+        touchEvents: [],
+        duration: Duration.zero,
+      );
+
       final verdict = await _blackBox.analyze(
         deviceId: deviceId,
-        biometric: bioSession ?? BiometricSession.empty(id: _currentSessionId),
+        biometric: finalBio,
         sessionId: _currentSessionId,
         nonce: nonce,
         timestamp: timestamp,
