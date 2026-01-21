@@ -374,3 +374,4 @@ class CoordDrop {
     if (opacity < 0) opacity = 0;
   }
 }
+
