@@ -44,6 +44,11 @@ class ClaController extends ChangeNotifier {
   final List<MotionEvent> _motionBuffer = [];
   final List<TouchEvent> _touchBuffer = [];
 
+  // 👇 TAMBAH DI SINI 👇
+  List<MotionEvent> get motionBuffer => List.unmodifiable(_motionBuffer);
+  List<TouchEvent> get touchBuffer => List.unmodifiable(_touchBuffer);
+  // 👆 TAMBAH DI SINI 👆
+  
   final ValueNotifier<double> _confidenceNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _motionEntropyNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
