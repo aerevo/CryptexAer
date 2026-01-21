@@ -9,31 +9,47 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  uuid: ^4.0.0
-  
-  # 🔥 FIREBASE CORE (NEW!)
+
+  # ----------------------------
+  # 🔥 FIREBASE CORE
+  # ----------------------------
   firebase_core: ^2.24.2
   firebase_auth: ^4.16.0
   cloud_functions: ^4.6.0
   cloud_firestore: ^4.14.0
-  
-  # Sensors & Device Info
+
+  # ----------------------------
+  # 🛠 UTILITIES
+  # ----------------------------
+  uuid: ^4.0.0        # ✅ HANYA SATU KALI SAHAJA
+  crypto: ^3.0.3
+  intl: ^0.18.1
+  path: ^1.8.3
+
+  # ----------------------------
+  # 📱 SENSORS & HARDWARE
+  # ----------------------------
   sensors_plus: ^4.0.0
   device_info_plus: ^9.0.0
   package_info_plus: ^5.0.0
-  
-  # Security & Crypto
-  crypto: ^3.0.3
+  vibration: ^1.8.4
   flutter_secure_storage: ^9.0.0
-  shared_preferences: ^2.2.0
-  uuid: ^4.0.0
-  
-  # Database (Local fallback)
+
+  # ----------------------------
+  # 💾 DATABASE & STORAGE
+  # ----------------------------
   sqflite: ^2.3.0
-  path: ^1.8.3
-  
-  # HTTP (Legacy - can remove after migration)
+  shared_preferences: ^2.2.0
+
+  # ----------------------------
+  # 🌐 NETWORK (LEGACY)
+  # ----------------------------
   http: ^1.1.0
+
+  # ----------------------------
+  # 🎨 UI ASSETS
+  # ----------------------------
+  cupertino_icons: ^1.0.2
 
 dev_dependencies:
   flutter_test:
@@ -42,4 +58,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
