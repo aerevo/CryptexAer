@@ -13,8 +13,8 @@ import 'motion_models.dart';
 import 'cla_models.dart';
 
 // 🔥 FIREBASE BLACK BOX (FIXED PATHS!)
-import '../../services/firebase_blackbox_client.dart';
-import '../../models/blackbox_verdict.dart';
+import 'package:z_kinetic_pro/services/firebase_blackbox_client.dart';
+import 'package:z_kinetic_pro/models/blackbox_verdict.dart';
 import 'package:z_kinetic_pro/cryptex_lock/src/security/services/device_fingerprint.dart';
 
 extension ClaConfigV3Extension on ClaConfig {
