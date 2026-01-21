@@ -1,7 +1,7 @@
 // 🛡️ Z-KINETIC V3.2 (FIREBASE BLACK BOX CLIENT)
 // Location: lib/services/firebase_blackbox_client.dart
 // Status: REPAIR FIXED ✅ | PRODUCTION READY
-// Features: Debug Logs, Emulator Standby, Incident Reporting
+// Features: Debug Logs, Emulator Standby, Confidence Scoring
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
@@ -13,11 +13,13 @@ import '../cryptex_lock/src/motion_models.dart';
 class BlackBoxVerdict {
   final bool allowed;
   final String reason;
+  final double confidence; // ✅ DITAMBAH: Tahap keyakinan AI (0.0 - 1.0)
   final Map<String, dynamic>? rawData;
 
   BlackBoxVerdict({
     required this.allowed,
     required this.reason,
+    required this.confidence,
     this.rawData,
   });
 
@@ -25,26 +27,39 @@ class BlackBoxVerdict {
     if (json == null || json is! Map) {
       return BlackBoxVerdict.offlineFallback();
     }
+    
+    // Pastikan confidence diparsing sebagai double walaupun server bagi int
+    double confidenceValue = 0.0;
+    if (json['confidence'] != null) {
+      confidenceValue = (json['confidence'] as num).toDouble();
+    }
+
     return BlackBoxVerdict(
       allowed: json['allowed'] == true,
       reason: json['reason']?.toString() ?? 'UNKNOWN_RESPONSE',
+      confidence: confidenceValue,
       rawData: Map<String, dynamic>.from(json),
     );
   }
 
   factory BlackBoxVerdict.denied(String reason) {
-    return BlackBoxVerdict(allowed: false, reason: reason);
+    return BlackBoxVerdict(
+      allowed: false, 
+      reason: reason, 
+      confidence: 0.0
+    );
   }
 
   factory BlackBoxVerdict.offlineFallback() {
     return BlackBoxVerdict(
       allowed: false, 
-      reason: 'SYSTEM_OFFLINE'
+      reason: 'SYSTEM_OFFLINE',
+      confidence: 0.0
     );
   }
 
   @override
-  String toString() => 'Verdict(allowed: $allowed, reason: $reason)';
+  String toString() => 'Verdict(allowed: $allowed, reason: $reason, confidence: $confidence)';
 }
 
 // ============================================
@@ -87,7 +102,6 @@ class FirebaseBlackBoxClient {
   }
 
   /// Menghantar data telemetri ke Cloud untuk dianalisis AI
-  /// ✅ FIXED: Parameter 'biometric' diselaraskan dengan Controller
   Future<BlackBoxVerdict> analyze({
     required String deviceId,
     required BiometricSession biometric,
@@ -100,7 +114,6 @@ class FirebaseBlackBoxClient {
       print('🔥 [DEBUG] Calling Firebase Function (analyzeBlackBox)...');
       print('   Device ID: $deviceId');
       print('   Session ID: $sessionId');
-      print('   Nonce: $nonce');
     }
     
     try {
