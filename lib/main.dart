@@ -1,10 +1,11 @@
 // 🛡️ Z-KINETIC V3.2 (FIREBASE BLACK BOX)
-// Status: BUILD FIXED ✅
+// Status: MATRIX RAIN ADDED ✅
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'dart:math';  // BARU: Untuk random rain
 
 // 🔥 FIREBASE
 import 'package:firebase_core/firebase_core.dart';
@@ -132,7 +133,7 @@ class _BootLoaderState extends State<BootLoader> {
 }
 
 // ============================================
-// LOCK SCREEN (UNCHANGED)
+// LOCK SCREEN (WITH MATRIX RAIN HIJAU)
 // ============================================
 
 class LockScreen extends StatefulWidget {
@@ -157,14 +158,19 @@ class LockScreen extends StatefulWidget {
   State<LockScreen> createState() => _LockScreenState();
 }
 
-class _LockScreenState extends State<LockScreen> {
+class _LockScreenState extends State<LockScreen> with TickerProviderStateMixin {  // BARU: Untuk animation rain
   late ClaController _controller;
   bool _isInitialized = false;
+  late AnimationController _rainController;  // BARU: Controller rain
 
   @override
   void initState() {
     super.initState();
     _initializeController();
+
+    // BARU: Start animation rain slow
+    _rainController = AnimationController(vsync: this)..repeat(period: const Duration(milliseconds: 60));
+    _rainController.addListener(() => setState(() {}));
   }
 
   void _initializeController() {
@@ -214,6 +220,7 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   void dispose() {
+    _rainController.dispose();  // BARU: Dispose rain
     _controller.dispose();
     widget.incidentReporter?.dispose();
     super.dispose();
@@ -261,10 +268,109 @@ class _LockScreenState extends State<LockScreen> {
                 onFail: _onFail,
                 onJammed: _onJammed,
               ),
+
+              const SizedBox(height: 40),  // Space bawah roda
+
+              // === COORD + RAIN HIJAU BAWAH BELAH KIRI ===
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Stack(
+                  children: [
+                    Text(
+                      "Coord",
+                      style: TextStyle(
+                        color: Colors.cyan.withOpacity(0.8),
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        letterSpacing: 3,
+                      ),
+                    ),
+
+                    Positioned(
+                      top: 25,
+                      left: 0,
+                      child: SizedBox(
+                        width: 200,
+                        height: 150,
+                        child: CustomPaint(
+                          painter: CoordMatrixRainPainter(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+// === CLASS RAIN HIJAU MATRIX (belah kiri bawah Coord je) ===
+class CoordMatrixRainPainter extends CustomPainter {
+  final Random random = Random();
+  final List<CoordDrop> drops = [];
+
+  CoordMatrixRainPainter() {
+    for (int col = 0; col < 8; col++) {
+      drops.add(CoordDrop(column: col));
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var drop in drops) {
+      drop.update(size.height);
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: drop.char,
+          style: TextStyle(
+            color: Colors.greenAccent.withOpacity(drop.opacity),
+            fontSize: 13,
+            fontFamily: 'monospace',
+            shadows: [Shadow(color: Colors.green, blurRadius: 10)],
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+
+      double x = drop.column * 25;
+      textPainter.paint(canvas, Offset(x, drop.y));
+
+      if (drop.y > size.height) drop.reset();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class CoordDrop {
+  int column;
+  double y = -30;
+  double speed = 1.0 + Random().nextDouble() * 1.5;
+  double opacity = 1.0;
+  String char = '0';
+
+  final chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  CoordDrop({required this.column}) {
+    reset();
+  }
+
+  void reset() {
+    y = -30;
+    opacity = 1.0;
+    char = chars[Random().nextInt(chars.length)];
+  }
+
+  void update(double height) {
+    y += speed;
+    if (y > height / 2) opacity -= 0.02;
+    if (opacity < 0) opacity = 0;
   }
 }
