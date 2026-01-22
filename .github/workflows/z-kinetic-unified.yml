@@ -1,6 +1,6 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC GHOST PROTOCOL (FIREBASE ENABLED)
-# Status: PRODUCTION READY WITH FIREBASE ✅
+# 🛡️ Z-KINETIC GHOST PROTOCOL (FIREBASE ENABLED + SDK 36)
+# Status: PRODUCTION READY WITH CRASHLYTICS & NEW SDK ✅
 # Auditor: Francois (Butler)
 
 name: Z-KINETIC Firebase Pipeline
@@ -82,6 +82,24 @@ jobs:
              echo "✅ Assets restored"
           fi
 
+      - name: 🔥 Inject Firebase Crashlytics to Pubspec
+        run: |
+          cd ../fresh_build
+          echo "==> Checking pubspec.yaml for firebase_crashlytics..."
+          
+          # Double check: Kalau Tuan dah update pubspec.yaml manual, step ini akan skip.
+          # Kalau belum, dia akan inject. Backup plan yang bagus.
+          if ! grep -q "firebase_crashlytics:" pubspec.yaml; then
+            echo "⚠️ firebase_crashlytics NOT FOUND, injecting..."
+            sed -i '/firebase_core:/a\  firebase_crashlytics: ^3.4.9' pubspec.yaml
+            echo "✅ firebase_crashlytics injected"
+          else
+            echo "✅ firebase_crashlytics already exists"
+          fi
+          
+          echo "==> Current Firebase packages:"
+          grep -E "firebase_|cloud_" pubspec.yaml || echo "No Firebase packages found"
+
       - name: 🔥 Create Firebase Config Files
         run: |
           cd ../fresh_build
@@ -128,6 +146,7 @@ jobs:
           FIREBASEOPTS
           
           # 2. GOOGLE-SERVICES.JSON
+          # ⚠️ Pastikan package_name di sini sepadan dengan build.gradle di bawah
           mkdir -p android/app
           cat > android/app/google-services.json << 'GOOGLESERVICES'
           {
@@ -163,7 +182,7 @@ jobs:
           
           echo "✅ Firebase config files created"
 
-      - name: 🔧 Override build.gradle (Firebase Compatible)
+      - name: 🔧 Override build.gradle (Firebase Compatible SDK 36)
         run: |
           cd ../fresh_build
           cat > android/app/build.gradle << 'BUILDGRADLE'
@@ -194,7 +213,7 @@ jobs:
           
           android {
               namespace "com.cryptex.cryptex_aer"
-              compileSdk 34
+              compileSdk 36
               ndkVersion flutter.ndkVersion
               
               compileOptions {
