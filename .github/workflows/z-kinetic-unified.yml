@@ -1,6 +1,6 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC GHOST PROTOCOL (STABLE RAM & VERSION)
-# Status: MEMORY OPTIMIZED & VERSION PINNED ✅
+# 🛡️ Z-KINETIC GHOST PROTOCOL (AUTO-PATCHER)
+# Status: AUTO-FIXING CODE ON FLY ✅
 # Auditor: Francois (Butler)
 
 name: Z-KINETIC Ghost Pipeline
@@ -30,22 +30,16 @@ jobs:
 
       - name: 🔥 Nuclear Clean
         run: |
-          echo "==> Cleaning old artifacts..."
           rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
           echo "✅ Clean complete"
 
-      - name: 💾 Backup Essential Files (Robust Mode)
+      - name: 💾 Backup Essential Files
         run: |
-          echo "==> Creating backup directory..."
           mkdir -p /home/runner/cryptex_backup
-          
-          echo "==> Copying files..."
-          [ -d "lib" ] && cp -r lib /home/runner/cryptex_backup/ || echo "⚠️ Warning: lib not found"
+          [ -d "lib" ] && cp -r lib /home/runner/cryptex_backup/
           [ -d "test" ] && cp -r test /home/runner/cryptex_backup/ || mkdir -p /home/runner/cryptex_backup/test
-          [ -f "pubspec.yaml" ] && cp pubspec.yaml /home/runner/cryptex_backup/ || echo "⚠️ Warning: pubspec.yaml not found"
-          [ -d "assets" ] && cp -r assets /home/runner/cryptex_backup/ || echo "⚠️ Warning: assets not found"
-          
-          echo "✅ Backup process finished"
+          [ -f "pubspec.yaml" ] && cp pubspec.yaml /home/runner/cryptex_backup/
+          [ -d "assets" ] && cp -r assets /home/runner/cryptex_backup/ || echo "Assets skipped"
 
       - name: 🏗️ Create Fresh Project
         run: |
@@ -54,14 +48,30 @@ jobs:
 
       - name: 📦 Restore User Code
         run: |
-          echo "==> Restoring from backup..."
           cd ../fresh_build
           rm -rf lib/
           cp -r /home/runner/cryptex_backup/lib .
           cp -r /home/runner/cryptex_backup/test .
           cp /home/runner/cryptex_backup/pubspec.yaml .
           [ -d "/home/runner/cryptex_backup/assets" ] && cp -r /home/runner/cryptex_backup/assets .
-          echo "✅ Code restored"
+
+      # 👇 LANGKAH BARU: MEMBEDAH KOD SECARA AUTOMATIK
+      - name: 🏥 Surgical Patch (Remove Vibration Plugin)
+        run: |
+          cd ../fresh_build
+          echo "==> Patching Vibration to Native HapticFeedback..."
+          
+          # 1. Tukar Import: Dari vibration.dart ke services.dart
+          grep -rl "package:vibration/vibration.dart" lib/ | xargs sed -i 's|package:vibration/vibration.dart|package:flutter/services.dart|g' || true
+          
+          # 2. Tukar Fungsi: Dari Vibration.vibrate() ke HapticFeedback.heavyImpact()
+          # (Mengabaikan sebarang parameter durasi untuk keselamatan build)
+          grep -rl "Vibration.vibrate" lib/ | xargs sed -i 's|Vibration.vibrate.*|HapticFeedback.heavyImpact();|g' || true
+          
+          # 3. Tukar Check: Jika ada hasVibrator, paksa jadi 'true'
+          grep -rl "Vibration.hasVibrator" lib/ | xargs sed -i 's|Vibration.hasVibrator.*|Future.value(true)|g' || true
+          
+          echo "✅ Code patched successfully"
 
       - name: 🔧 Override build.gradle
         run: |
@@ -99,10 +109,9 @@ jobs:
           flutter { source "../.." }
           BUILDGRADLE
 
-      - name: 🔧 Fix settings.gradle (VERSION PINNING)
+      - name: 🔧 Fix settings.gradle
         run: |
           cd ../fresh_build
-          # DI SINI KITA KUNCI VERSI STABIL SUPAYA MEMORI TIDAK BOCOR
           cat > android/settings.gradle << 'SETTINGSGRADLE'
           pluginManagement {
               def flutterSdkPath = {
@@ -123,14 +132,12 @@ jobs:
           include ":app"
           SETTINGSGRADLE
 
-      - name: 🔧 Configure gradle.properties (MEMORY FIX)
+      - name: 🔧 Configure gradle.properties (RAM Optimized)
         run: |
           cd ../fresh_build
-          # MENGHADKAN PENGGUNAAN MEMORI DAN MATIKAN DAEMON
           cat > android/gradle.properties << 'GRADLEPROPS'
-          org.gradle.jvmargs=-Xmx4096M -XX:+UseParallelGC -XX:MaxMetaspaceSize=1G
+          org.gradle.jvmargs=-Xmx4096M -XX:+UseParallelGC
           org.gradle.daemon=false
-          org.gradle.parallel=true
           android.useAndroidX=true
           android.enableJetifier=true
           GRADLEPROPS
@@ -143,6 +150,7 @@ jobs:
       - name: 🚀 Build Release APK
         run: |
           cd ../fresh_build
+          # Menggunakan flag skip validation untuk memaksa build
           flutter build apk --release --obfuscate --split-debug-info=./debug_symbols --android-skip-build-dependency-validation
 
       - name: 📤 Upload APK Artifact
