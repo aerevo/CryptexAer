@@ -1,6 +1,6 @@
 # File: pubspec.yaml
 # 🛡️ Z-KINETIC FINAL SURGICAL BUILD
-# Status: VIBRATION REMOVED (NATIVE SWITCH) ✅
+# Status: CRASHLYTICS ADDED & VIBRATION REMOVED ✅
 
 name: z_kinetic_pro
 description: Military-grade biometric security suite
@@ -21,6 +21,7 @@ dependencies:
   cloud_firestore: ^4.15.8
   firebase_remote_config: ^4.3.3
   firebase_app_check: ^0.2.1+17
+  firebase_crashlytics: ^3.4.9  # ✅ DITAMBAH (Wajib untuk monitoring)
 
   # 🔐 UTILITIES
   uuid: ^4.0.0
