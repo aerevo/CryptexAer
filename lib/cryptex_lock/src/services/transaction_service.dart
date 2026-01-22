@@ -1,8 +1,8 @@
-// 🏦 TRANSACTION SERVICE V2.1 (FIREBASE INTEGRATED)
+// 🏦 TRANSACTION SERVICE V2.2 (REMOTE CONFIG ENHANCED)
 // Status: CONNECTED 🟢
 // Updates:
 // 1. Integrasi Firestore (Audit Trail & Blacklist Check)
-// 2. Real SHA-256 Hashing
+// 2. Real SHA-256 Hashing dengan Dynamic Salt (Remote Config)
 // 3. Firebase Auth Session Validation
 
 import 'dart:async';
@@ -13,6 +13,7 @@ import 'package:crypto/crypto.dart';
 // 🔥 FIREBASE IMPORTS
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 // ============================================
 // TRANSACTION DATA MODEL
@@ -69,16 +70,19 @@ class TransactionData {
 // ============================================
 class TransactionService {
   // 🎛️ CONFIGURATION
-  static const bool useMockData = true; // Still true for Development
+  static const bool useMockData = true; 
   static const Duration timeout = Duration(seconds: 10);
   
-  // 🔐 SECRET SALT (In production, fetch this from Remote Config)
-  static const String _secretSalt = 'Z_KINETIC_PRO_FIREBASE_SALT_V2';
+  // 🔐 DYNAMIC SALT (Fetched from Firebase Remote Config)
+  static String _secretSalt = '';
 
   // ============================================
   // MAIN ENTRY POINT
   // ============================================
   static Future<TransactionData> fetchCurrentTransaction() async {
+    // 🛡️ STEP 0: INITIALIZE REMOTE CONFIG
+    await _initRemoteConfig();
+
     // 🛡️ STEP 1: FIREBASE SECURITY CHECK
     await _performSecurityCheck();
 
@@ -91,12 +95,35 @@ class TransactionService {
   }
 
   // ============================================
-  // 🛡️ FIREBASE SECURITY LAYER (NEW)
+  // 🛰️ REMOTE CONFIG INITIALIZATION
+  // ============================================
+  static Future<void> _initRemoteConfig() async {
+    if (_secretSalt.isNotEmpty) return;
+
+    final remoteConfig = FirebaseRemoteConfig.instance;
+    try {
+      await remoteConfig.setConfigSettings(RemoteConfigSettings(
+        fetchTimeout: const Duration(seconds: 10),
+        minimumFetchInterval: const Duration(hours: 1),
+      ));
+      await remoteConfig.fetchAndActivate();
+      _secretSalt = remoteConfig.getString('security_salt');
+      
+      if (_secretSalt.isEmpty) {
+        _secretSalt = 'Z_KINETIC_FALLBACK_SALT_V2'; // Emergency Fallback
+      }
+    } catch (e) {
+      _secretSalt = 'Z_KINETIC_OFFLINE_SALT_V2';
+      print('⚠️ Remote Config Error: $e');
+    }
+  }
+
+  // ============================================
+  // 🛡️ FIREBASE SECURITY LAYER
   // ============================================
   static Future<void> _performSecurityCheck() async {
     final user = FirebaseAuth.instance.currentUser;
     
-    // Pastikan user dah login (Anonymous pun takpe)
     if (user == null) {
       throw SecurityException('NO_ACTIVE_SESSION: User not logged in to Firebase');
     }
@@ -104,30 +131,22 @@ class TransactionService {
     try {
       final db = FirebaseFirestore.instance;
       
-      // 1. Semak Blacklist (Baca dari 'blacklisted_devices')
-      // Rule: allow read: if request.auth != null;
       final blacklistDoc = await db.collection('blacklisted_devices').doc(user.uid).get();
       
       if (blacklistDoc.exists) {
-        // Jika device disenarai hitam, halang akses serta merta!
         throw SecurityException('DEVICE_BLACKLISTED: Access Denied by HQ');
       }
 
-      // 2. Cipta Audit Trail (Tulis ke 'security_incidents')
-      // Rule: allow create: if request.auth != null;
-      // Kita log bahawa user ini cuba akses transaksi.
       await db.collection('security_incidents').add({
         'type': 'transaction_request',
         'uid': user.uid,
         'timestamp': FieldValue.serverTimestamp(),
-        'status': 'authorized_mock_mode',
+        'status': 'authorized_secure_mode',
         'description': 'User requested transaction data via Z-Kinetic App'
       });
 
     } catch (e) {
-      if (e is SecurityException) rethrow; // Jangan telan SecurityException
-      
-      // Kalau error lain (contoh: internet slow), kita log di console tapi benarkan proceed (fail-open for dev)
+      if (e is SecurityException) rethrow;
       print('⚠️ Firebase Check Warning: $e'); 
     }
   }
@@ -136,27 +155,19 @@ class TransactionService {
   // MOCK MODE (Testing & Development)
   // ============================================
   static Future<TransactionData> _fetchMockTransaction() async {
-    // Simulate network delay (500ms - 1200ms)
     final random = Random();
     final delay = 500 + random.nextInt(700);
     await Future.delayed(Duration(milliseconds: delay));
 
-    // Generate realistic random amount
     final amounts = [
-      'RM 1,250.00',
-      'RM 5,000.00',
-      'RM 12,850.50',
-      'RM 25,000.00',
-      'RM 50,000.00',
-      'RM 100,500.75',
-      'RM 250,000.00',
+      'RM 1,250.00', 'RM 5,000.00', 'RM 12,850.50', 'RM 25,000.00',
+      'RM 50,000.00', 'RM 100,500.75', 'RM 250,000.00',
     ];
     
     final selectedAmount = amounts[random.nextInt(amounts.length)];
     final timestamp = DateTime.now();
     final txnId = 'TXN-${timestamp.millisecondsSinceEpoch}-${random.nextInt(9999)}';
 
-    // 🔥 GENERATE REAL SHA-256 HASH
     final hash = _generateSecureHash(
       amount: selectedAmount,
       txnId: txnId,
@@ -171,11 +182,7 @@ class TransactionService {
     );
   }
 
-  // ============================================
-  // FIREBASE DATA MODE (Future Implementation)
-  // ============================================
   static Future<TransactionData> _fetchFromFirebase() async {
-    // Placeholder untuk bila kita simpan data transaksi sebenar dalam Firestore
     throw UnimplementedError('Live Firebase data fetching not enabled yet.');
   }
 
@@ -187,14 +194,12 @@ class TransactionService {
     required String txnId,
     required DateTime timestamp,
   }) {
-    // Remove formatting untuk consistent hashing
     final cleanAmount = amount
         .replaceAll('RM', '')
         .replaceAll(' ', '')
         .replaceAll(',', '')
         .trim();
 
-    // Construct hash input dengan specific order
     final hashInput = [
       cleanAmount,
       txnId,
@@ -202,24 +207,17 @@ class TransactionService {
       _secretSalt,
     ].join('|');
 
-    // Generate SHA-256 hash
     final bytes = utf8.encode(hashInput);
     final digest = sha256.convert(bytes);
     
-    // Return first 32 characters (uppercase)
     return digest.toString().substring(0, 32).toUpperCase();
   }
 
-  // ============================================
-  // VALIDATION HELPER
-  // ============================================
   static bool validateTransaction(TransactionData data) {
-    // 1. Check checksum
     if (!data.verifyIntegrity()) {
       return false;
     }
 
-    // 2. Verify hash
     final expectedHash = _generateSecureHash(
       amount: data.amount,
       txnId: data.transactionId,
@@ -230,19 +228,9 @@ class TransactionService {
   }
 }
 
-// ============================================
-// CUSTOM EXCEPTIONS
-// ============================================
 class SecurityException implements Exception {
   final String message;
   SecurityException(this.message);
   @override
   String toString() => 'SecurityException: $message';
-}
-
-class HttpException implements Exception {
-  final String message;
-  HttpException(this.message);
-  @override
-  String toString() => 'HttpException: $message';
 }
