@@ -1,29 +1,21 @@
 {
-  "name": "z-kinetic-firebase-functions",
-  "version": "3.0.0",
-  "description": "Z-KINETIC Black Box AI Server (Firebase)",
-  "scripts": {
-    "lint": "eslint --ext .js,.ts .",
-    "build": "echo 'Build complete'",
-    "serve": "firebase emulators:start --only functions,firestore",
-    "shell": "firebase functions:shell",
-    "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
-  },
-  "engines": {
-    "node": "18"
-  },
-  "main": "index.js",
-  "dependencies": {
-    "firebase-admin": "^12.0.0",
-    "firebase-functions": "^4.5.0",
-    "lodash": "^4.17.21"
-  },
-  "devDependencies": {
-    "eslint": "^8.57.0",
-    "eslint-config-google": "^0.14.0",
-    "firebase-functions-test": "^3.1.0"
-  },
-  "private": true
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firestore-debug.log"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" install"
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
 }
