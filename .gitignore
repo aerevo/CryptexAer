@@ -18,3 +18,10 @@ ios/Pods/
 # OS
 .DS_Store
 Thumbs.db
+
+# 🛡️ Z-KINETIC ADDITIONAL PROTECTION
+.env
+.env.production
+functions/.env
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
