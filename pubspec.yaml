@@ -1,10 +1,9 @@
-t# File: pubspec.yaml
-# 🛡️ Z-KINETIC SECURITY SUITE - PRODUCTION BUILD (FINAL FIX)
-# Status: DEPENDENCIES SYNCHRONIZED ✅
-# Auditor: Francois (Butler)
+# File: pubspec.yaml
+# 🛡️ Z-KINETIC FINAL SURGICAL BUILD
+# Status: VIBRATION REMOVED (NATIVE SWITCH) ✅
 
 name: z_kinetic_pro
-description: Military-grade biometric security suite with Firebase Black Box AI
+description: Military-grade biometric security suite
 publish_to: 'none'
 version: 3.0.0+1
 
@@ -15,40 +14,39 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # 🔥 FIREBASE SUITE (Harmonized)
-  firebase_core: 2.27.0
-  firebase_auth: 4.15.3
-  cloud_firestore: 4.15.8
-  firebase_remote_config: 4.3.3
-  firebase_app_check: 0.2.1+17
-  cloud_functions: 4.6.0
-  firebase_crashlytics: 3.4.8
+  # 🔥 FIREBASE SUITE
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.16.0
+  cloud_functions: ^4.6.0
+  cloud_firestore: ^4.15.8
+  firebase_remote_config: ^4.3.3
+  firebase_app_check: ^0.2.1+17
 
-  # 🔐 CRYPTOGRAPHY & UTILITIES
-  uuid: 4.2.1
-  crypto: 3.0.3
-  intl: 0.18.1
-  encrypt: 5.0.3
-  http: 1.1.0
+  # 🔐 UTILITIES
+  uuid: ^4.0.0
+  crypto: ^3.0.3
+  intl: ^0.18.1
+  encrypt: ^5.0.3
 
-  # 📱 SENSORS & BIOMETRICS
-  sensors_plus: 4.0.2
-  device_info_plus: 9.1.0
-  package_info_plus: 5.0.1
-  vibration: ^1.9.0
-  flutter_secure_storage: 9.0.0
-  local_auth: 2.1.6
-  
-  # 💾 STORAGE & DATABASE (Component Fixed)
-  shared_preferences: 2.2.2 # ✅ DITAMBAH: Membaiki ralat build
-  sqflite: ^2.3.3+1
+  # 📱 SENSORS
+  sensors_plus: ^4.0.0
+  device_info_plus: ^9.0.0
+  package_info_plus: ^5.0.0
+  flutter_secure_storage: ^9.0.0
+  local_auth: ^2.1.6
+  http: ^1.1.0
+
+  # ⚠️ PLUGIN "VIBRATION" TELAH DIBUANG DARI SINI
+  # Kita guna HapticFeedback (Native)
+
+  # 💾 DATABASE
+  sqflite: ^2.3.3+1    # ✅ Versi Fix Registrar
+  shared_preferences: ^2.2.2 # ✅ Wajib ada
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: 3.0.1
+  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
-
-
