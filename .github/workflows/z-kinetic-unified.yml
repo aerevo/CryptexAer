@@ -1,6 +1,6 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC GHOST PROTOCOL (BULLETPROOF VERSION)
-# Status: REPAIRING BACKUP PATHS ✅
+# 🛡️ Z-KINETIC GHOST PROTOCOL (STABLE RAM & VERSION)
+# Status: MEMORY OPTIMIZED & VERSION PINNED ✅
 # Auditor: Francois (Butler)
 
 name: Z-KINETIC Ghost Pipeline
@@ -28,16 +28,9 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: 🔍 Debug Directory Structure
-        run: |
-          echo "Current Path: $(pwd)"
-          echo "Files in root:"
-          ls -F
-
       - name: 🔥 Nuclear Clean
         run: |
           echo "==> Cleaning old artifacts..."
-          # Menggunakan || true supaya jika fail tiada, robot tidak ralat
           rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
           echo "✅ Clean complete"
 
@@ -46,8 +39,7 @@ jobs:
           echo "==> Creating backup directory..."
           mkdir -p /home/runner/cryptex_backup
           
-          echo "==> Copying files if they exist..."
-          # Menyalin secara selamat: Jika folder wujud, baru salin.
+          echo "==> Copying files..."
           [ -d "lib" ] && cp -r lib /home/runner/cryptex_backup/ || echo "⚠️ Warning: lib not found"
           [ -d "test" ] && cp -r test /home/runner/cryptex_backup/ || mkdir -p /home/runner/cryptex_backup/test
           [ -f "pubspec.yaml" ] && cp pubspec.yaml /home/runner/cryptex_backup/ || echo "⚠️ Warning: pubspec.yaml not found"
@@ -69,7 +61,7 @@ jobs:
           cp -r /home/runner/cryptex_backup/test .
           cp /home/runner/cryptex_backup/pubspec.yaml .
           [ -d "/home/runner/cryptex_backup/assets" ] && cp -r /home/runner/cryptex_backup/assets .
-          echo "✅ Code restored to fresh_build"
+          echo "✅ Code restored"
 
       - name: 🔧 Override build.gradle
         run: |
@@ -107,9 +99,10 @@ jobs:
           flutter { source "../.." }
           BUILDGRADLE
 
-      - name: 🔧 Fix settings.gradle
+      - name: 🔧 Fix settings.gradle (VERSION PINNING)
         run: |
           cd ../fresh_build
+          # DI SINI KITA KUNCI VERSI STABIL SUPAYA MEMORI TIDAK BOCOR
           cat > android/settings.gradle << 'SETTINGSGRADLE'
           pluginManagement {
               def flutterSdkPath = {
@@ -124,16 +117,20 @@ jobs:
           }
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.6.0" apply false
-              id "org.jetbrains.kotlin.android" version "2.1.0" apply false
+              id "com.android.application" version "8.3.2" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.24" apply false
           }
           include ":app"
           SETTINGSGRADLE
 
-      - name: 🔧 Configure gradle.properties
+      - name: 🔧 Configure gradle.properties (MEMORY FIX)
         run: |
           cd ../fresh_build
+          # MENGHADKAN PENGGUNAAN MEMORI DAN MATIKAN DAEMON
           cat > android/gradle.properties << 'GRADLEPROPS'
+          org.gradle.jvmargs=-Xmx4096M -XX:+UseParallelGC -XX:MaxMetaspaceSize=1G
+          org.gradle.daemon=false
+          org.gradle.parallel=true
           android.useAndroidX=true
           android.enableJetifier=true
           GRADLEPROPS
