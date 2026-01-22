@@ -41,7 +41,7 @@ dependencies:
   
   # 💾 STORAGE & DATABASE (Component Fixed)
   shared_preferences: 2.2.2 # ✅ DITAMBAH: Membaiki ralat build
-  sqflite: 2.3.0
+  sqflite: ^2.3.3+1
 
 dev_dependencies:
   flutter_test:
@@ -50,3 +50,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
