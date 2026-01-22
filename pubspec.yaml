@@ -1,3 +1,5 @@
+# File: pubspec.yaml
+# 🛡️ Z-KINETIC SECURITY SUITE - STABLE BUILD
 name: z_kinetic_pro
 description: Military-grade biometric security suite with Firebase Black Box AI
 publish_to: 'none'
@@ -10,52 +12,35 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # ----------------------------
-  # 🔥 FIREBASE CORE
-  # ----------------------------
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.16.0
-  cloud_functions: ^4.6.0
-  cloud_firestore: ^4.14.0
-
-  # ----------------------------
-  # 🛠 UTILITIES
-  # ----------------------------
-  uuid: ^4.0.0        # ✅ HANYA SATU KALI SAHAJA
-  crypto: ^3.0.3
-  intl: ^0.18.1
-  path: ^1.8.3
-
-  # ----------------------------
-  # 📱 SENSORS & HARDWARE
-  # ----------------------------
-  sensors_plus: ^4.0.0
-  device_info_plus: ^9.0.0
-  package_info_plus: ^5.0.0
-  vibration: ^2.0.1
-  flutter_secure_storage: ^9.0.0
-
-  # ----------------------------
-  # 💾 DATABASE & STORAGE
-  # ----------------------------
-  sqflite: ^2.3.0
-  shared_preferences: ^2.2.0
-
-  # ----------------------------
-  # 🌐 NETWORK (LEGACY)
-  # ----------------------------
-  http: ^1.1.0
-
-  # ----------------------------
-  # 🎨 UI ASSETS
-  # ----------------------------
-  cupertino_icons: ^1.0.2
+  # 🔥 FIREBASE CORE & SECURITY (Version Pinned)
+  firebase_core: 2.24.2
+  firebase_auth: 4.15.3
+  cloud_firestore: 4.13.2
+  firebase_remote_config: 4.3.3
+  firebase_app_check: 0.2.1+7
+  cloud_functions: 4.6.0
+  
+  # 🔐 CRYPTOGRAPHY & UTILITIES
+  uuid: 4.2.1
+  crypto: 3.0.3
+  intl: 0.18.1
+  encrypt: 5.0.3
+  
+  # 📱 SENSORS & BIOMETRICS
+  sensors_plus: 4.0.2
+  device_info_plus: 9.1.0
+  vibration: 1.8.4
+  flutter_secure_storage: 9.0.0
+  local_auth: 2.1.6
+  
+  # 📊 MONITORING & PERFORMANCE
+  firebase_crashlytics: 3.4.8
+  sqflite: 2.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: 3.0.0
 
 flutter:
   uses-material-design: true
-
