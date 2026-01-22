@@ -143,7 +143,7 @@ jobs:
       - name: 🚀 Build Release APK
         run: |
           cd ../fresh_build
-          flutter build apk --release --obfuscate --split-debug-info=./debug_symbols
+          flutter build apk --release --obfuscate --split-debug-info=./debug_symbols --android-skip-build-dependency-validation
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
