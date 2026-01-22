@@ -1,6 +1,6 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC GHOST PROTOCOL (AUTO-PATCHER)
-# Status: AUTO-FIXING CODE ON FLY ✅
+# 🛡️ Z-KINETIC GHOST PROTOCOL (UNBREAKABLE RESTORE)
+# Status: ERROR HANDLED & SURGICAL PATCH READY ✅
 # Auditor: Francois (Butler)
 
 name: Z-KINETIC Ghost Pipeline
@@ -35,43 +35,69 @@ jobs:
 
       - name: 💾 Backup Essential Files
         run: |
-          mkdir -p /home/runner/cryptex_backup
-          [ -d "lib" ] && cp -r lib /home/runner/cryptex_backup/
-          [ -d "test" ] && cp -r test /home/runner/cryptex_backup/ || mkdir -p /home/runner/cryptex_backup/test
-          [ -f "pubspec.yaml" ] && cp pubspec.yaml /home/runner/cryptex_backup/
-          [ -d "assets" ] && cp -r assets /home/runner/cryptex_backup/ || echo "Assets skipped"
+          echo "==> Starting Backup..."
+          # Guna path relative yang lebih selamat
+          mkdir -p ../backup_temp
+          
+          # Salin LIB (Wajib)
+          if [ -d "lib" ]; then cp -r lib ../backup_temp/; else echo "❌ LIB MISSING IN ROOT"; exit 1; fi
+          
+          # Salin PUBSPEC (Wajib)
+          if [ -f "pubspec.yaml" ]; then cp pubspec.yaml ../backup_temp/; else echo "❌ PUBSPEC MISSING IN ROOT"; exit 1; fi
+          
+          # Salin TEST (Jika ada)
+          [ -d "test" ] && cp -r test ../backup_temp/ || echo "⚠️ Test folder skipped"
+          
+          # Salin ASSETS (Jika ada)
+          [ -d "assets" ] && cp -r assets ../backup_temp/ || echo "⚠️ Assets folder skipped"
+          
+          echo "✅ Backup secured in ../backup_temp"
 
       - name: 🏗️ Create Fresh Project
         run: |
           cd ..
           flutter create --platforms android --org com.cryptex --project-name cryptex_aer fresh_build
 
-      - name: 📦 Restore User Code
+      - name: 📦 Restore User Code (Safely)
         run: |
+          echo "==> Restoring Code..."
           cd ../fresh_build
+          
+          # 1. Restore Lib (Buang yang fresh, ganti dengan backup)
           rm -rf lib/
-          cp -r /home/runner/cryptex_backup/lib .
-          cp -r /home/runner/cryptex_backup/test .
-          cp /home/runner/cryptex_backup/pubspec.yaml .
-          [ -d "/home/runner/cryptex_backup/assets" ] && cp -r /home/runner/cryptex_backup/assets .
+          cp -r ../backup_temp/lib . || { echo "❌ Failed to restore LIB"; exit 1; }
+          
+          # 2. Restore Pubspec
+          cp ../backup_temp/pubspec.yaml . || { echo "❌ Failed to restore PUBSPEC"; exit 1; }
+          
+          # 3. Restore Test (Jika backup wujud)
+          if [ -d "../backup_temp/test" ]; then
+             rm -rf test/ # Buang test folder default
+             cp -r ../backup_temp/test .
+             echo "✅ Test restored"
+          else
+             echo "⚠️ No test backup found, skipping."
+          fi
+          
+          # 4. Restore Assets (Jika backup wujud)
+          if [ -d "../backup_temp/assets" ]; then
+             cp -r ../backup_temp/assets .
+             echo "✅ Assets restored"
+          else
+             echo "⚠️ No assets backup found, skipping."
+          fi
 
-      # 👇 LANGKAH BARU: MEMBEDAH KOD SECARA AUTOMATIK
-      - name: 🏥 Surgical Patch (Remove Vibration Plugin)
+      - name: 🏥 Surgical Patch (Auto-Fix Vibration)
         run: |
           cd ../fresh_build
-          echo "==> Patching Vibration to Native HapticFeedback..."
-          
-          # 1. Tukar Import: Dari vibration.dart ke services.dart
+          echo "==> Patching Code..."
+          # Tukar Import Vibration ke Services
           grep -rl "package:vibration/vibration.dart" lib/ | xargs sed -i 's|package:vibration/vibration.dart|package:flutter/services.dart|g' || true
-          
-          # 2. Tukar Fungsi: Dari Vibration.vibrate() ke HapticFeedback.heavyImpact()
-          # (Mengabaikan sebarang parameter durasi untuk keselamatan build)
+          # Tukar Fungsi Vibrate ke HapticFeedback
           grep -rl "Vibration.vibrate" lib/ | xargs sed -i 's|Vibration.vibrate.*|HapticFeedback.heavyImpact();|g' || true
-          
-          # 3. Tukar Check: Jika ada hasVibrator, paksa jadi 'true'
+          # Tukar Check HasVibrator
           grep -rl "Vibration.hasVibrator" lib/ | xargs sed -i 's|Vibration.hasVibrator.*|Future.value(true)|g' || true
-          
-          echo "✅ Code patched successfully"
+          echo "✅ Code patched"
 
       - name: 🔧 Override build.gradle
         run: |
@@ -150,7 +176,6 @@ jobs:
       - name: 🚀 Build Release APK
         run: |
           cd ../fresh_build
-          # Menggunakan flag skip validation untuk memaksa build
           flutter build apk --release --obfuscate --split-debug-info=./debug_symbols --android-skip-build-dependency-validation
 
       - name: 📤 Upload APK Artifact
