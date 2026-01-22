@@ -1,6 +1,7 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC GHOST PROTOCOL (APK ONLY)
-# Status: MOD JIMAT & PANTAS ✅
+# 🛡️ Z-KINETIC GHOST PROTOCOL (BULLETPROOF VERSION)
+# Status: REPAIRING BACKUP PATHS ✅
+# Auditor: Francois (Butler)
 
 name: Z-KINETIC Ghost Pipeline
 on:
@@ -27,19 +28,32 @@ jobs:
         with:
           channel: 'stable'
 
+      - name: 🔍 Debug Directory Structure
+        run: |
+          echo "Current Path: $(pwd)"
+          echo "Files in root:"
+          ls -F
+
       - name: 🔥 Nuclear Clean
         run: |
-          rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock
+          echo "==> Cleaning old artifacts..."
+          # Menggunakan || true supaya jika fail tiada, robot tidak ralat
+          rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
           echo "✅ Clean complete"
 
-      - name: 💾 Backup Essential Files
+      - name: 💾 Backup Essential Files (Robust Mode)
         run: |
-          mkdir -p /tmp/cryptex_backup
-          cp -r lib /tmp/cryptex_backup/
-          # Backup test folder jika wujud, jika tidak create dummy
-          if [ -d "test" ]; then cp -r test /tmp/cryptex_backup/; else mkdir -p /tmp/cryptex_backup/test; fi
-          cp pubspec.yaml /tmp/cryptex_backup/
-          [ -d "assets" ] && cp -r assets /tmp/cryptex_backup/
+          echo "==> Creating backup directory..."
+          mkdir -p /home/runner/cryptex_backup
+          
+          echo "==> Copying files if they exist..."
+          # Menyalin secara selamat: Jika folder wujud, baru salin.
+          [ -d "lib" ] && cp -r lib /home/runner/cryptex_backup/ || echo "⚠️ Warning: lib not found"
+          [ -d "test" ] && cp -r test /home/runner/cryptex_backup/ || mkdir -p /home/runner/cryptex_backup/test
+          [ -f "pubspec.yaml" ] && cp pubspec.yaml /home/runner/cryptex_backup/ || echo "⚠️ Warning: pubspec.yaml not found"
+          [ -d "assets" ] && cp -r assets /home/runner/cryptex_backup/ || echo "⚠️ Warning: assets not found"
+          
+          echo "✅ Backup process finished"
 
       - name: 🏗️ Create Fresh Project
         run: |
@@ -48,12 +62,14 @@ jobs:
 
       - name: 📦 Restore User Code
         run: |
+          echo "==> Restoring from backup..."
           cd ../fresh_build
           rm -rf lib/
-          cp -r /tmp/cryptex_backup/lib .
-          cp -r /tmp/cryptex_backup/test .
-          cp /tmp/cryptex_backup/pubspec.yaml .
-          [ -d "/tmp/cryptex_backup/assets" ] && cp -r /tmp/cryptex_backup/assets .
+          cp -r /home/runner/cryptex_backup/lib .
+          cp -r /home/runner/cryptex_backup/test .
+          cp /home/runner/cryptex_backup/pubspec.yaml .
+          [ -d "/home/runner/cryptex_backup/assets" ] && cp -r /home/runner/cryptex_backup/assets .
+          echo "✅ Code restored to fresh_build"
 
       - name: 🔧 Override build.gradle
         run: |
@@ -114,6 +130,14 @@ jobs:
           include ":app"
           SETTINGSGRADLE
 
+      - name: 🔧 Configure gradle.properties
+        run: |
+          cd ../fresh_build
+          cat > android/gradle.properties << 'GRADLEPROPS'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          GRADLEPROPS
+
       - name: 📦 Install Dependencies
         run: |
           cd ../fresh_build
@@ -123,12 +147,10 @@ jobs:
         run: |
           cd ../fresh_build
           flutter build apk --release --obfuscate --split-debug-info=./debug_symbols
-          mkdir -p ${{ github.workspace }}/release_output
-          cp build/app/outputs/flutter-apk/app-release.apk ${{ github.workspace }}/release_output/
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cryptex-aer-release
-          path: release_output/app-release.apk
+          path: ../fresh_build/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
