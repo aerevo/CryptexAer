@@ -1,4 +1,4 @@
-# File: .github/workflows/z-kinetic-unified.yml
+to# File: .github/workflows/z-kinetic-unified.yml
 # 🔥 Z-KINETIC GITHUB ACTIONS WORKFLOW (FIXED)
 # Status: PRODUCTION READY ✅
 # Fixes:
@@ -16,6 +16,11 @@ jobs:
   build-apk:
     name: 🔥 Full Firebase APK Build
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./CryptexAer 
+   
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
