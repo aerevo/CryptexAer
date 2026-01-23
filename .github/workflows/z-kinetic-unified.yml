@@ -1,8 +1,4 @@
-# File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC FINAL FAST BUILD (SDK 34)
-# Status: ONE FILE CONFIG - NO GRADLE EDITING NEEDED ✅
-
-name: Z-Kinetic Fast Build
+name: Z-Kinetic Final Fix
 on:
   workflow_dispatch:
   push:
@@ -10,7 +6,7 @@ on:
 
 jobs:
   build-apk:
-    name: 🛡️ Build APK (SDK 34 Fast)
+    name: 🛡️ Build APK (SDK 36)
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Repository
@@ -34,7 +30,6 @@ jobs:
 
       - name: 🏗️ Create Android Project
         run: |
-          # Robot cipta folder android di sini
           flutter create --platforms android --org com.aer --project-name zkinetic .
 
       - name: 🔥 Create Firebase Configs
@@ -79,9 +74,7 @@ jobs:
           }
           EOF
 
-      # 👇 INI BAHAGIAN PENTING: ROBOT AKAN TULIS FAIL GRADLE UNTUK TUAN
-      # KITA GUNA SDK 34 SUPAYA TAK PAYAH DOWNLOAD LAMA-LAMA
-      - name: 🔧 Inject build.gradle (SDK 34)
+      - name: 🔧 Inject build.gradle (SDK 36 No Minify)
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -93,14 +86,14 @@ jobs:
           }
           android {
               namespace = "com.aer.zkinetic"
-              compileSdk = 34
+              compileSdk = 36
               ndkVersion = flutter.ndkVersion
               compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = "17" }
               defaultConfig {
                   applicationId = "com.aer.zkinetic"
                   minSdk = 23
-                  targetSdk = 34
+                  targetSdk = 36
                   versionCode = 1
                   versionName = "1.0"
                   multiDexEnabled = true
@@ -108,6 +101,7 @@ jobs:
               buildTypes {
                   release {
                       signingConfig = signingConfigs.debug
+                      // 👇 KITA MATIKAN R8 SUPAYA TAK ADA ERROR LAMA
                       minifyEnabled = false
                       shrinkResources = false
                   }
@@ -120,6 +114,8 @@ jobs:
               implementation("com.google.firebase:firebase-crashlytics")
               implementation("com.google.firebase:firebase-auth")
               implementation("com.google.firebase:firebase-firestore")
+              // Tambah functions dependencies
+              implementation("com.google.firebase:firebase-functions")
               implementation("androidx.multidex:multidex:2.0.1")
           }
           EOF
@@ -148,7 +144,6 @@ jobs:
 
       - name: 🚀 Build APK
         run: |
-          # Kita buang verbose supaya log bersih
           flutter build apk --release
 
       - name: 📤 Upload APK
