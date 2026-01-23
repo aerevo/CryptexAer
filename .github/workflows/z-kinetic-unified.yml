@@ -1,6 +1,6 @@
 # File: .github/workflows/z-kinetic-unified.yml
 # 🛡️ Z-KINETIC INTELLIGENT PIPELINE
-# Status: SDK 35 UPGRADE + KTS CONFLICT FIX ✅
+# Status: FIXED OPTIONAL FOLDER CRASH ✅
 
 name: Z-KINETIC Production Build
 on:
@@ -44,10 +44,23 @@ jobs:
           echo "📂 Root: $PROJECT_ROOT"
 
           mkdir -p /tmp/backup_temp
-          if [ -d "$PROJECT_ROOT/lib" ]; then cp -r "$PROJECT_ROOT/lib" /tmp/backup_temp/; else echo "❌ Lib missing"; exit 1; fi
+          
+          # Backup lib (Wajib ada)
+          if [ -d "$PROJECT_ROOT/lib" ]; then 
+            cp -r "$PROJECT_ROOT/lib" /tmp/backup_temp/
+          else 
+            echo "❌ Lib missing in $PROJECT_ROOT"
+            exit 1
+          fi
+          
+          # Backup pubspec (Wajib ada)
           cp "$PUBSPEC_PATH" /tmp/backup_temp/
-          [ -d "$PROJECT_ROOT/test" ] && cp -r "$PROJECT_ROOT/test" /tmp/backup_temp/
-          [ -d "$PROJECT_ROOT/assets" ] && cp -r "$PROJECT_ROOT/assets" /tmp/backup_temp/
+
+          # Backup test/assets (PENTING: Tambah '|| true' supaya tak crash kalau folder tak wujud)
+          [ -d "$PROJECT_ROOT/test" ] && cp -r "$PROJECT_ROOT/test" /tmp/backup_temp/ || true
+          [ -d "$PROJECT_ROOT/assets" ] && cp -r "$PROJECT_ROOT/assets" /tmp/backup_temp/ || true
+          
+          echo "✅ Backup process secured."
 
       - name: 🔥 Nuclear Clean
         run: rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
@@ -56,8 +69,7 @@ jobs:
         run: |
           flutter create --platforms android --org com.aer --project-name zkinetic .
           
-          # 🔥 FIX PENTING: Padam fail .kts yang flutter create buat
-          # supaya tak bergaduh dengan fail .gradle kita nanti
+          # 🔥 FIX: Padam fail .kts yang flutter create buat
           rm -f android/app/build.gradle.kts
           rm -f android/build.gradle.kts
           rm -f android/settings.gradle.kts
@@ -69,8 +81,12 @@ jobs:
           rm -rf lib/
           cp -r /tmp/backup_temp/lib .
           cp /tmp/backup_temp/pubspec.yaml .
-          [ -d "/tmp/backup_temp/test" ] && cp -r /tmp/backup_temp/test .
-          [ -d "/tmp/backup_temp/assets" ] && cp -r /tmp/backup_temp/assets .
+          
+          # Restore jika ada dalam backup (Sekali lagi guna || true)
+          [ -d "/tmp/backup_temp/test" ] && cp -r /tmp/backup_temp/test . || true
+          [ -d "/tmp/backup_temp/assets" ] && cp -r /tmp/backup_temp/assets . || true
+          
+          echo "✅ Code Restored Successfully"
 
       - name: 🔥 Inject Firebase Crashlytics
         run: |
@@ -136,7 +152,7 @@ jobs:
           
           android {
             namespace "com.aer.zkinetic"
-            // 🔥 UPGRADE: Tukar 34 ke 35 untuk support plugin baru
+            // 🔥 UPGRADE: SDK 35
             compileSdk 35
             ndkVersion flutter.ndkVersion
             
@@ -149,7 +165,6 @@ jobs:
             defaultConfig {
               applicationId "com.aer.zkinetic"
               minSdk 23
-              // 🔥 UPGRADE: Tukar 34 ke 35
               targetSdk 35
               versionCode 1
               versionName "1.0"
@@ -287,7 +302,7 @@ jobs:
           body: |
             🔥 **Z-Kinetic Production Build**
             ✅ SDK 35 Compatible
-            ✅ Fixed .kts Conflict
+            ✅ Fixed Backup Crash
             ✅ Firebase & Crashlytics Integration
             🔒 Secure Obfuscation
           files: build/app/outputs/flutter-apk/app-release.apk
