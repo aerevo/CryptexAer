@@ -1,5 +1,5 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC INTELLIGENT PIPELINE - FULLY FIXED
+# 🛡️ Z-KINETIC INTELLIGENT PIPELINE - DEPENDENCY CONFLICT FIXED
 # Status: PRODUCTION READY ✅
 
 name: Z-KINETIC Production Build
@@ -88,16 +88,47 @@ jobs:
         run: |
           cp pubspec.yaml pubspec.yaml.bak
           
+          # Update Firebase packages to SDK 36 compatible versions
           sed -i 's/firebase_core:.*/firebase_core: ^4.0.0/' pubspec.yaml || true
           sed -i 's/firebase_auth:.*/firebase_auth: ^6.0.0/' pubspec.yaml || true
           sed -i 's/cloud_firestore:.*/cloud_firestore: ^6.0.0/' pubspec.yaml || true
           sed -i 's/firebase_crashlytics:.*/firebase_crashlytics: ^4.0.0/' pubspec.yaml || true
+          sed -i 's/firebase_storage:.*/firebase_storage: ^13.0.0/' pubspec.yaml || true
+          sed -i 's/firebase_messaging:.*/firebase_messaging: ^15.0.0/' pubspec.yaml || true
+          
+          # Update package_info_plus to v6 (compatible with Firebase 4.x)
+          sed -i 's/package_info_plus:.*/package_info_plus: ^6.0.0/' pubspec.yaml || true
           
           if ! grep -q "firebase_crashlytics:" pubspec.yaml; then
             sed -i '/firebase_core:/a\  firebase_crashlytics: ^4.0.0' pubspec.yaml
           fi
           
           echo "✅ Dependencies updated to SDK 36 compatible versions"
+
+      - name: 🔧 Fix Dependency Conflicts
+        run: |
+          echo "🔧 Resolving dependency conflicts..."
+          
+          # Ensure package_info_plus uses v6 (compatible with web ^1.0.0)
+          sed -i 's/package_info_plus:.*/package_info_plus: ^6.0.0/' pubspec.yaml || true
+          
+          # Add dependency overrides to force web ^1.0.0 compatibility
+          if ! grep -q "dependency_overrides:" pubspec.yaml; then
+            echo "" >> pubspec.yaml
+            echo "dependency_overrides:" >> pubspec.yaml
+            echo "  web: ^1.0.0" >> pubspec.yaml
+          else
+            # Update existing overrides
+            if ! grep -q "  web:" pubspec.yaml; then
+              sed -i '/dependency_overrides:/a\  web: ^1.0.0' pubspec.yaml
+            else
+              sed -i 's/  web:.*/  web: ^1.0.0/' pubspec.yaml
+            fi
+          fi
+          
+          echo "✅ Dependencies aligned for SDK 36 compatibility"
+          echo "📋 Updated pubspec.yaml preview:"
+          grep -A 25 "dependencies:" pubspec.yaml || true
 
       - name: 🔥 Create Firebase Config Files
         run: |
@@ -388,6 +419,7 @@ jobs:
             ✅ SDK 36 Fully Compatible
             ✅ Firebase & Crashlytics Integrated
             ✅ Multi-Architecture Support
+            ✅ Dependency Conflicts Resolved
             ✅ Optimized & Tested
             
             Build Number: ${{ github.run_number }}
