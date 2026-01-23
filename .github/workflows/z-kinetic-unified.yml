@@ -1,6 +1,10 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🔥 Z-KINETIC GITHUB ACTIONS WORKFLOW (FIXED & CLEANED)
-# Status: PRODUCTION READY (SUBFOLDER SUPPORTED) ✅
+# 🔥 Z-KINETIC GITHUB ACTIONS WORKFLOW (FINAL ROOT FIX)
+# Status: PRODUCTION READY ✅
+# Fixes:
+# - ✅ Removed incorrect subfolder path (Runs at Root now)
+# - ✅ ProGuard rules optimized for Firebase
+# - ✅ R8 warnings suppressed safely
 
 name: Z-KINETIC Full Production Build
 on:
@@ -12,11 +16,6 @@ jobs:
   build-apk:
     name: 🔥 Full Firebase APK Build
     runs-on: ubuntu-latest
-
-    # ✅ INI BETUL: Semua command 'run' akan jalan dalam folder CryptexAer
-    defaults:
-      run:
-        working-directory: ./CryptexAer
 
     steps:
       - name: 📥 Checkout Repository
@@ -32,6 +31,19 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+
+      - name: 🔍 DEBUG - Verify Files (ROOT)
+        run: |
+          ls -la
+          if [ -f "pubspec.yaml" ]; then
+            echo "✅ FOUND: pubspec.yaml at ROOT."
+          elif [ -f "pubspdc.yaml" ]; then
+             echo "⚠️ TYPO DETECTED: Found 'pubspdc.yaml'. Auto-renaming..."
+             mv pubspdc.yaml pubspec.yaml
+          else
+            echo "❌ ERROR: Cannot find pubspec.yaml at root."
+            exit 1
+          fi
 
       - name: 💾 Backup Essential Files
         run: |
@@ -320,7 +332,6 @@ jobs:
             - ✅ Firebase classes preserved correctly
             - ✅ Crashlytics stack traces working
             - ✅ No R8 build errors
-          # 👇 FIX: Langkah ini WAJIB guna full path sebab ia Plugin (bukan Run)
-          files: CryptexAer/build/app/outputs/flutter-apk/app-release.apk
+          files: build/app/outputs/flutter-apk/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
