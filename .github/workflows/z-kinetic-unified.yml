@@ -84,20 +84,39 @@ jobs:
           
           echo "✅ Code Restored Successfully"
 
-      - name: 🔄 Force Update Critical Dependencies
+      - name: 🔄 Smart Dependency Resolver
         run: |
+          echo "🔍 Analyzing pubspec.yaml..."
           cp pubspec.yaml pubspec.yaml.bak
           
-          sed -i 's/firebase_core:.*/firebase_core: ^4.0.0/' pubspec.yaml || true
-          sed -i 's/firebase_auth:.*/firebase_auth: ^6.0.0/' pubspec.yaml || true
-          sed -i 's/cloud_firestore:.*/cloud_firestore: ^6.0.0/' pubspec.yaml || true
-          sed -i 's/firebase_crashlytics:.*/firebase_crashlytics: ^4.0.0/' pubspec.yaml || true
-          
-          if ! grep -q "firebase_crashlytics:" pubspec.yaml; then
-            sed -i '/firebase_core:/a\  firebase_crashlytics: ^4.0.0' pubspec.yaml
+          # Fix package_info_plus (CRITICAL - must be 9.0.0+ for Firebase 4.x)
+          if grep -q "package_info_plus:" pubspec.yaml; then
+            sed -i 's/package_info_plus:.*/package_info_plus: ^9.0.0/' pubspec.yaml
           fi
           
-          echo "✅ Dependencies updated to SDK 36 compatible versions"
+          # Update Firebase to latest stable
+          sed -i 's/firebase_core:.*/firebase_core: ^4.4.0/' pubspec.yaml || true
+          sed -i 's/firebase_auth:.*/firebase_auth: ^6.1.0/' pubspec.yaml || true
+          sed -i 's/cloud_firestore:.*/cloud_firestore: ^6.1.0/' pubspec.yaml || true
+          sed -i 's/firebase_crashlytics:.*/firebase_crashlytics: ^4.0.7/' pubspec.yaml || true
+          sed -i 's/firebase_remote_config:.*/firebase_remote_config: ^6.1.0/' pubspec.yaml || true
+          sed -i 's/cloud_functions:.*/cloud_functions: ^6.0.0/' pubspec.yaml || true
+          
+          # Fix other common conflicts
+          sed -i 's/flutter_secure_storage:.*/flutter_secure_storage: ^10.0.0/' pubspec.yaml || true
+          sed -i 's/local_auth:.*/local_auth: ^3.0.0/' pubspec.yaml || true
+          sed -i 's/shared_preferences:.*/shared_preferences: ^2.5.0/' pubspec.yaml || true
+          sed -i 's/device_info_plus:.*/device_info_plus: ^12.0.0/' pubspec.yaml || true
+          sed -i 's/sensors_plus:.*/sensors_plus: ^7.0.0/' pubspec.yaml || true
+          
+          # Inject Firebase Crashlytics kalau belum ada
+          if ! grep -q "firebase_crashlytics:" pubspec.yaml; then
+            sed -i '/firebase_core:/a\  firebase_crashlytics: ^4.0.7' pubspec.yaml
+          fi
+          
+          echo "✅ Dependencies updated to compatible versions"
+          echo "📋 Updated pubspec.yaml:"
+          grep -A 50 "dependencies:" pubspec.yaml | head -60
 
       - name: 🔥 Create Firebase Config Files
         run: |
@@ -315,6 +334,11 @@ jobs:
           
           echo "✅ gradle.properties optimized"
 
+      - name: 🔧 Accept Android Licenses
+        run: |
+          yes | sdkmanager --licenses || true
+          echo "✅ Android licenses accepted"
+
       - name: 🔧 Fix Gradle Wrapper
         run: |
           cd android
@@ -324,16 +348,19 @@ jobs:
           chmod +x gradlew
           echo "✅ Gradle wrapper ready"
 
-      - name: 📦 Install Dependencies
+      - name: 📦 Install Dependencies with Auto-Upgrade
         run: |
           echo "🔍 Flutter Doctor Check..."
           flutter doctor -v
           
-          echo "📥 Getting dependencies..."
-          flutter pub get
+          echo "📥 Attempting to get dependencies..."
+          flutter pub get || {
+            echo "⚠️ Initial pub get failed, trying upgrade..."
+            flutter pub upgrade --major-versions
+          }
           
-          echo "✅ Dependencies installed"
-          flutter pub deps --style=compact | head -50
+          echo "✅ Dependencies resolved"
+          flutter pub deps --style=compact | head -60
 
       - name: 🧹 Pre-Build Clean
         run: |
@@ -363,8 +390,8 @@ jobs:
             echo "🔍 Searching for APK files..."
             find build -name "*.apk" -o -name "*.aab" || true
             echo ""
-            echo "📋 Last 150 lines of build log:"
-            tail -150 /tmp/build_full.log
+            echo "📋 Last 200 lines of build log:"
+            tail -200 /tmp/build_full.log
             exit 1
           fi
 
@@ -388,7 +415,7 @@ jobs:
             ✅ SDK 36 Fully Compatible
             ✅ Firebase & Crashlytics Integrated
             ✅ Multi-Architecture Support
-            ✅ Optimized & Tested
+            ✅ All Dependencies Resolved
             
             Build Number: ${{ github.run_number }}
             Commit: ${{ github.sha }}
