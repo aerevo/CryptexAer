@@ -1,6 +1,6 @@
 # File: .github/workflows/z-kinetic-unified.yml
 # 🛡️ Z-KINETIC INTELLIGENT PIPELINE
-# Status: FIXED OPTIONAL FOLDER CRASH ✅
+# Status: FORCED SDK 36 COMPATIBILITY ✅
 
 name: Z-KINETIC Production Build
 on:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-apk:
-    name: 🛡️ Smart Build (SDK 35)
+    name: 🛡️ Smart Build (SDK 36)
     runs-on: ubuntu-latest
 
     steps:
@@ -56,7 +56,7 @@ jobs:
           # Backup pubspec (Wajib ada)
           cp "$PUBSPEC_PATH" /tmp/backup_temp/
 
-          # Backup test/assets (PENTING: Tambah '|| true' supaya tak crash kalau folder tak wujud)
+          # Backup test/assets (PENTING: Guna || true supaya tak crash)
           [ -d "$PROJECT_ROOT/test" ] && cp -r "$PROJECT_ROOT/test" /tmp/backup_temp/ || true
           [ -d "$PROJECT_ROOT/assets" ] && cp -r "$PROJECT_ROOT/assets" /tmp/backup_temp/ || true
           
@@ -69,7 +69,7 @@ jobs:
         run: |
           flutter create --platforms android --org com.aer --project-name zkinetic .
           
-          # 🔥 FIX: Padam fail .kts yang flutter create buat
+          # 🔥 FIX: Padam fail .kts yang flutter create buat (elak conflict)
           rm -f android/app/build.gradle.kts
           rm -f android/build.gradle.kts
           rm -f android/settings.gradle.kts
@@ -82,7 +82,7 @@ jobs:
           cp -r /tmp/backup_temp/lib .
           cp /tmp/backup_temp/pubspec.yaml .
           
-          # Restore jika ada dalam backup (Sekali lagi guna || true)
+          # Restore jika ada dalam backup
           [ -d "/tmp/backup_temp/test" ] && cp -r /tmp/backup_temp/test . || true
           [ -d "/tmp/backup_temp/assets" ] && cp -r /tmp/backup_temp/assets . || true
           
@@ -139,7 +139,7 @@ jobs:
           }
           EOF
 
-      - name: 🔧 Override build.gradle (UPGRADED TO SDK 35)
+      - name: 🔧 Override build.gradle (FORCED SDK 36)
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -152,8 +152,8 @@ jobs:
           
           android {
             namespace "com.aer.zkinetic"
-            // 🔥 UPGRADE: SDK 35
-            compileSdk 35
+            // 🔥 CRITICAL UPGRADE: 36 (Required by plugins)
+            compileSdk 36
             ndkVersion flutter.ndkVersion
             
             compileOptions {
@@ -165,7 +165,8 @@ jobs:
             defaultConfig {
               applicationId "com.aer.zkinetic"
               minSdk 23
-              targetSdk 35
+              // 🔥 CRITICAL UPGRADE: 36
+              targetSdk 36
               versionCode 1
               versionName "1.0"
               multiDexEnabled true
@@ -292,6 +293,9 @@ jobs:
           if [ -f "$APK_PATH" ]; then
             echo "📦 APK Size: $(du -h $APK_PATH | cut -f1)"
             echo "🔐 SHA256: $(sha256sum $APK_PATH | cut -d' ' -f1)"
+          else
+            echo "❌ BUILD FAILED: APK not found at $APK_PATH"
+            exit 1
           fi
 
       - name: 📤 Create GitHub Release
@@ -301,7 +305,7 @@ jobs:
           name: Z-Kinetic v1.0.${{ github.run_number }}
           body: |
             🔥 **Z-Kinetic Production Build**
-            ✅ SDK 35 Compatible
+            ✅ SDK 36 Compatible (Forced)
             ✅ Fixed Backup Crash
             ✅ Firebase & Crashlytics Integration
             🔒 Secure Obfuscation
