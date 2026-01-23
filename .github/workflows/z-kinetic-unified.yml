@@ -1,8 +1,8 @@
-# File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC ULTIMATE FIX - ALL DEPENDENCY CONFLICTS RESOLVED
+# File: .github/workflows/z-kinetic-fixed.yml
+# 🛡️ Z-KINETIC FIXED - Resolves common build failures
 # Status: PRODUCTION READY ✅
 
-name: Z-KINETIC Production Build
+name: Z-Kinetic Fixed Build
 on:
   workflow_dispatch:
   push:
@@ -43,6 +43,7 @@ jobs:
           echo "✅ FOUND: $PUBSPEC_PATH"
           PROJECT_ROOT=$(dirname "$PUBSPEC_PATH")
           echo "📂 Root: $PROJECT_ROOT"
+          echo "PROJECT_ROOT=$PROJECT_ROOT" >> $GITHUB_ENV
 
           mkdir -p /tmp/backup_temp
           
@@ -54,11 +55,13 @@ jobs:
           fi
           
           cp "$PUBSPEC_PATH" /tmp/backup_temp/
+          echo "📋 Original pubspec.yaml:"
+          cat "$PUBSPEC_PATH"
 
           [ -d "$PROJECT_ROOT/test" ] && cp -r "$PROJECT_ROOT/test" /tmp/backup_temp/ || true
           [ -d "$PROJECT_ROOT/assets" ] && cp -r "$PROJECT_ROOT/assets" /tmp/backup_temp/ || true
           
-          echo "✅ Backup process secured."
+          echo "✅ Backup completed"
 
       - name: 🔥 Nuclear Clean
         run: rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
@@ -71,7 +74,7 @@ jobs:
           rm -f android/build.gradle.kts
           rm -f android/settings.gradle.kts
           
-          echo "✅ Project Skeleton Created & Cleaned"
+          echo "✅ Project Skeleton Created"
 
       - name: 📦 Restore User Code
         run: |
@@ -82,72 +85,117 @@ jobs:
           [ -d "/tmp/backup_temp/test" ] && cp -r /tmp/backup_temp/test . || true
           [ -d "/tmp/backup_temp/assets" ] && cp -r /tmp/backup_temp/assets . || true
           
-          echo "✅ Code Restored Successfully"
+          echo "✅ Code Restored"
 
-      - name: 🔄 AGGRESSIVE Firebase Update (SDK 36)
+      - name: 🔍 Analyze Existing Dependencies
+        id: analyze_deps
         run: |
-          cp pubspec.yaml pubspec.yaml.bak
+          echo "🔍 Analyzing current dependencies..."
           
-          echo "🔥 FORCE UPDATING ALL FIREBASE PACKAGES..."
+          # Check which Firebase packages are currently used
+          HAS_FIREBASE_CORE=$(grep -c "firebase_core:" pubspec.yaml || echo "0")
+          HAS_FIREBASE_AUTH=$(grep -c "firebase_auth:" pubspec.yaml || echo "0")
+          HAS_FIRESTORE=$(grep -c "cloud_firestore:" pubspec.yaml || echo "0")
+          HAS_CLOUD_FUNCTIONS=$(grep -c "cloud_functions:" pubspec.yaml || echo "0")
           
-          # Core Firebase packages (SDK 36 compatible)
-          sed -i 's/firebase_core:.*/firebase_core: ^4.0.0/' pubspec.yaml || true
-          sed -i 's/firebase_auth:.*/firebase_auth: ^6.0.0/' pubspec.yaml || true
-          sed -i 's/cloud_firestore:.*/cloud_firestore: ^6.0.0/' pubspec.yaml || true
-          sed -i 's/firebase_storage:.*/firebase_storage: ^13.0.0/' pubspec.yaml || true
-          sed -i 's/firebase_messaging:.*/firebase_messaging: ^15.0.0/' pubspec.yaml || true
-          sed -i 's/firebase_crashlytics:.*/firebase_crashlytics: ^4.0.0/' pubspec.yaml || true
-          sed -i 's/firebase_analytics:.*/firebase_analytics: ^11.0.0/' pubspec.yaml || true
-          sed -i 's/firebase_app_check:.*/firebase_app_check: ^0.3.0/' pubspec.yaml || true
-          sed -i 's/firebase_dynamic_links:.*/firebase_dynamic_links: ^6.0.0/' pubspec.yaml || true
+          echo "Dependencies found:"
+          echo "  firebase_core: $HAS_FIREBASE_CORE"
+          echo "  firebase_auth: $HAS_FIREBASE_AUTH"
+          echo "  cloud_firestore: $HAS_FIRESTORE"
+          echo "  cloud_functions: $HAS_CLOUD_FUNCTIONS"
           
-          # CRITICAL: Remove or update cloud_functions (incompatible with firebase_core 4.x)
-          # Option 1: Remove it completely
-          sed -i '/cloud_functions:/d' pubspec.yaml || true
-          
-          # Option 2: If you need cloud_functions, comment it out for now
-          # sed -i 's/^[[:space:]]*cloud_functions:/#  cloud_functions:/' pubspec.yaml || true
-          
-          # Update other packages
-          sed -i 's/package_info_plus:.*/package_info_plus: ^6.0.0/' pubspec.yaml || true
-          
-          if ! grep -q "firebase_crashlytics:" pubspec.yaml; then
-            sed -i '/firebase_core:/a\  firebase_crashlytics: ^4.0.0' pubspec.yaml
+          # Check if cloud_functions is used in code
+          if [ -d "lib" ]; then
+            USES_CLOUD_FUNCTIONS=$(grep -r "cloud_functions" lib/ || echo "")
+            if [ -n "$USES_CLOUD_FUNCTIONS" ]; then
+              echo "⚠️ WARNING: Code uses cloud_functions but it's incompatible with firebase_core 4.x"
+              echo "CLOUD_FUNCTIONS_IN_CODE=true" >> $GITHUB_ENV
+            else
+              echo "CLOUD_FUNCTIONS_IN_CODE=false" >> $GITHUB_ENV
+            fi
           fi
-          
-          echo "✅ All Firebase packages updated to SDK 36 versions"
 
-      - name: 🔧 ULTIMATE Dependency Override
+      - name: 📝 Create Compatible pubspec.yaml
         run: |
-          echo "🔧 Applying AGGRESSIVE dependency overrides..."
+          # Backup original
+          cp pubspec.yaml pubspec.yaml.original
           
-          # Remove existing dependency_overrides section if exists
-          sed -i '/^dependency_overrides:/,/^[a-z_]/{ /^dependency_overrides:/d; /^  /d; }' pubspec.yaml || true
-          
-          # Add comprehensive overrides at the end
-          cat >> pubspec.yaml << 'OVERRIDE_END'
+          # Create Python script to properly update pubspec.yaml
+          cat > update_pubspec.py << 'PYTHON_EOF'
+import re
+import sys
 
-# 🔥 AGGRESSIVE OVERRIDES FOR SDK 36 COMPATIBILITY
+def update_pubspec(filepath):
+    with open(filepath, 'r') as f:
+        content = f.read()
+    
+    # Define SDK 36 compatible versions
+    updates = {
+        'firebase_core': '^4.0.0',
+        'firebase_auth': '^6.0.0',
+        'cloud_firestore': '^6.0.0',
+        'firebase_storage': '^13.0.0',
+        'firebase_messaging': '^15.0.0',
+        'firebase_crashlytics': '^4.0.0',
+        'firebase_analytics': '^11.0.0',
+        'firebase_app_check': '^0.3.0',
+        'package_info_plus': '^6.0.0',
+    }
+    
+    # Remove cloud_functions if it exists (incompatible with firebase_core 4.x)
+    content = re.sub(r'^\s*cloud_functions:.*$', '', content, flags=re.MULTILINE)
+    
+    # Update existing packages
+    for package, version in updates.items():
+        # Match package with any version
+        pattern = f'({package}):\\s*[^\\n]+'
+        replacement = f'{package}: {version}'
+        content = re.sub(pattern, replacement, content)
+    
+    # Add firebase_crashlytics if not present and firebase_core exists
+    if 'firebase_core:' in content and 'firebase_crashlytics:' not in content:
+        content = re.sub(
+            r'(firebase_core:\s*\^4\.0\.0)',
+            r'\1\n  firebase_crashlytics: ^4.0.0',
+            content
+        )
+    
+    # Remove existing dependency_overrides section
+    content = re.sub(
+        r'\ndependency_overrides:.*?(?=\n[a-z_]|\Z)',
+        '',
+        content,
+        flags=re.DOTALL
+    )
+    
+    # Add clean dependency_overrides at the end
+    overrides = """
 dependency_overrides:
   firebase_core: ^4.0.0
   firebase_core_platform_interface: ^6.0.2
   firebase_core_web: ^3.0.0
   firebase_auth: ^6.0.0
   firebase_auth_platform_interface: ^8.0.0
-  firebase_auth_web: ^6.0.0
   cloud_firestore: ^6.0.0
   cloud_firestore_platform_interface: ^7.0.0
-  cloud_firestore_web: ^4.0.0
-  firebase_storage: ^13.0.0
-  firebase_storage_platform_interface: ^6.0.0
-  firebase_storage_web: ^4.0.0
   web: ^1.0.0
-  package_info_plus: ^6.0.0
-OVERRIDE_END
+"""
+    
+    content = content.rstrip() + '\n' + overrides
+    
+    with open(filepath, 'w') as f:
+        f.write(content)
+    
+    print("✅ pubspec.yaml updated successfully")
+
+if __name__ == '__main__':
+    update_pubspec('pubspec.yaml')
+PYTHON_EOF
           
-          echo "✅ Dependency overrides applied"
+          python3 update_pubspec.py
+          
           echo ""
-          echo "📋 Final pubspec.yaml preview:"
+          echo "📋 Updated pubspec.yaml:"
           cat pubspec.yaml
 
       - name: 🔥 Create Firebase Config Files
@@ -155,267 +203,291 @@ OVERRIDE_END
           mkdir -p lib android/app
           
           cat > lib/firebase_options.dart << 'EOFMARKER'
-          import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
-          import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-          class DefaultFirebaseOptions {
-            static FirebaseOptions get currentPlatform {
-              if (kIsWeb) throw UnsupportedError('Web not configured');
-              switch (defaultTargetPlatform) {
-                case TargetPlatform.android:
-                  return android;
-                case TargetPlatform.iOS:
-                  return ios;
-                default:
-                  throw UnsupportedError('Platform not supported');
-              }
-            }
+class DefaultFirebaseOptions {
+  static FirebaseOptions get currentPlatform {
+    if (kIsWeb) throw UnsupportedError('Web not configured');
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return android;
+      case TargetPlatform.iOS:
+        return ios;
+      default:
+        throw UnsupportedError('Platform not supported');
+    }
+  }
 
-            static const FirebaseOptions android = FirebaseOptions(
-              apiKey: 'AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w',
-              appId: '1:55621733629:android:ef51c1276ef226b0408294',
-              messagingSenderId: '55621733629',
-              projectId: 'z-kinetic',
-              storageBucket: 'z-kinetic.firebasestorage.app',
-            );
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w',
+    appId: '1:55621733629:android:ef51c1276ef226b0408294',
+    messagingSenderId: '55621733629',
+    projectId: 'z-kinetic',
+    storageBucket: 'z-kinetic.firebasestorage.app',
+  );
 
-            static const FirebaseOptions ios = FirebaseOptions(
-              apiKey: 'IOS_KEY',
-              appId: '1:55621733629:ios:98c57a2922abf197408294',
-              messagingSenderId: '55621733629',
-              projectId: 'z-kinetic',
-              storageBucket: 'z-kinetic.firebasestorage.app',
-              iosBundleId: 'com.aer.zkinetic',
-            );
-          }
-          EOFMARKER
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'IOS_KEY',
+    appId: '1:55621733629:ios:98c57a2922abf197408294',
+    messagingSenderId: '55621733629',
+    projectId: 'z-kinetic',
+    storageBucket: 'z-kinetic.firebasestorage.app',
+    iosBundleId: 'com.aer.zkinetic',
+  );
+}
+EOFMARKER
           
           cat > android/app/google-services.json << 'EOFMARKER'
-          {
-            "project_info": {
-              "project_number": "55621733629",
-              "project_id": "z-kinetic",
-              "storage_bucket": "z-kinetic.firebasestorage.app"
-            },
-            "client": [{
-              "client_info": {
-                "mobilesdk_app_id": "1:55621733629:android:ef51c1276ef226b0408294",
-                "android_client_info": {
-                  "package_name": "com.aer.zkinetic"
-                }
-              },
-              "api_key": [{
-                "current_key": "AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w"
-              }],
-              "services": {
-                "appinvite_service": {
-                  "other_platform_oauth_client": []
-                }
-              }
-            }],
-            "configuration_version": "1"
-          }
-          EOFMARKER
+{
+  "project_info": {
+    "project_number": "55621733629",
+    "project_id": "z-kinetic",
+    "storage_bucket": "z-kinetic.firebasestorage.app"
+  },
+  "client": [{
+    "client_info": {
+      "mobilesdk_app_id": "1:55621733629:android:ef51c1276ef226b0408294",
+      "android_client_info": {
+        "package_name": "com.aer.zkinetic"
+      }
+    },
+    "api_key": [{
+      "current_key": "AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w"
+    }],
+    "services": {
+      "appinvite_service": {
+        "other_platform_oauth_client": []
+      }
+    }
+  }],
+  "configuration_version": "1"
+}
+EOFMARKER
           
           echo "✅ Firebase configs created"
 
-      - name: 🔧 Override build.gradle
+      - name: 🔧 Configure Android Build Files
         run: |
+          # app/build.gradle
           cat > android/app/build.gradle << 'EOFMARKER'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
-              id "com.google.firebase.crashlytics"
-          }
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
+    id "com.google.firebase.crashlytics"
+}
 
-          android {
-              namespace = "com.aer.zkinetic"
-              compileSdk = 36
-              ndkVersion = flutter.ndkVersion
+android {
+    namespace = "com.aer.zkinetic"
+    compileSdk = 36
+    ndkVersion = flutter.ndkVersion
 
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
-              }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
 
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 
-              defaultConfig {
-                  applicationId = "com.aer.zkinetic"
-                  minSdk = 23
-                  targetSdk = 36
-                  versionCode = flutter.versionCode
-                  versionName = flutter.versionName
-                  multiDexEnabled = true
-              }
+    defaultConfig {
+        applicationId = "com.aer.zkinetic"
+        minSdk = 23
+        targetSdk = 36
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+        multiDexEnabled = true
+    }
 
-              buildTypes {
-                  release {
-                      signingConfig = signingConfigs.debug
-                      minifyEnabled = false
-                      shrinkResources = false
-                  }
-              }
-          }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.debug
+            minifyEnabled = false
+            shrinkResources = false
+        }
+    }
+}
 
-          flutter {
-              source = "../.."
-          }
+flutter {
+    source = "../.."
+}
 
-          dependencies {
-              implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-              implementation("com.google.firebase:firebase-analytics")
-              implementation("com.google.firebase:firebase-crashlytics")
-              implementation("com.google.firebase:firebase-auth")
-              implementation("com.google.firebase:firebase-firestore")
-              implementation("androidx.multidex:multidex:2.0.1")
-          }
-          EOFMARKER
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-crashlytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("androidx.multidex:multidex:2.0.1")
+}
+EOFMARKER
           
-          echo "✅ app/build.gradle configured"
-
-      - name: 🔧 Fix Project build.gradle
-        run: |
+          # Root build.gradle
           cat > android/build.gradle << 'EOFMARKER'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath("com.android.tools.build:gradle:8.1.4")
-                  classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.23")
-                  classpath("com.google.gms:google-services:4.4.2")
-                  classpath("com.google.firebase:firebase-crashlytics-gradle:3.0.2")
-              }
-          }
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.1.4")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.23")
+        classpath("com.google.gms:google-services:4.4.2")
+        classpath("com.google.firebase:firebase-crashlytics-gradle:3.0.2")
+    }
+}
 
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
 
-          rootProject.buildDir = "../build"
-          subprojects {
-              project.buildDir = "${rootProject.buildDir}/${project.name}"
-          }
-          subprojects {
-              project.evaluationDependsOn(":app")
-          }
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    project.evaluationDependsOn(":app")
+}
 
-          tasks.register("clean", Delete) {
-              delete rootProject.buildDir
-          }
-          EOFMARKER
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
+EOFMARKER
           
-          echo "✅ Root build.gradle fixed"
-
-      - name: 🔧 Fix settings.gradle
-        run: |
+          # settings.gradle
           cat > android/settings.gradle << 'EOFMARKER'
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }()
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
 
-              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
 
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.1.4" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.23" apply false
-              id "com.google.gms.google-services" version "4.4.2" apply false
-          }
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "8.1.4" apply false
+    id "org.jetbrains.kotlin.android" version "1.9.23" apply false
+    id "com.google.gms.google-services" version "4.4.2" apply false
+}
 
-          include ":app"
-          EOFMARKER
+include ":app"
+EOFMARKER
           
-          echo "✅ settings.gradle fixed"
-
-      - name: 🔧 Configure gradle.properties
-        run: |
+          # gradle.properties (OPTIMIZED)
           cat > android/gradle.properties << 'EOFMARKER'
-          org.gradle.jvmargs=-Xmx4096M -XX:MaxMetaspaceSize=1024m -XX:+UseParallelGC
-          org.gradle.daemon=false
-          org.gradle.parallel=true
-          org.gradle.caching=true
-          org.gradle.configureondemand=false
-          android.useAndroidX=true
-          android.enableJetifier=true
-          android.nonTransitiveRClass=false
-          android.defaults.buildfeatures.buildconfig=true
-          android.nonFinalResIds=false
-          EOFMARKER
+org.gradle.jvmargs=-Xmx4096M -XX:MaxMetaspaceSize=1024m -XX:+UseParallelGC
+org.gradle.parallel=true
+org.gradle.caching=true
+android.useAndroidX=true
+android.enableJetifier=true
+android.nonTransitiveRClass=false
+android.defaults.buildfeatures.buildconfig=true
+android.nonFinalResIds=false
+EOFMARKER
           
-          echo "✅ gradle.properties optimized"
+          echo "✅ Android build files configured"
 
-      - name: 🔧 Fix Gradle Wrapper
+      - name: 🔧 Setup Gradle Wrapper
         run: |
           cd android
           if [ ! -f "gradlew" ]; then
             gradle wrapper --gradle-version=8.0
           fi
           chmod +x gradlew
+          ./gradlew --version
           echo "✅ Gradle wrapper ready"
 
-      - name: 📦 Install Dependencies with Retry
+      - name: 📦 Install Dependencies (With Better Error Handling)
         run: |
           echo "🔍 Flutter Doctor Check..."
           flutter doctor -v
           
-          echo "📥 Getting dependencies (with retry)..."
-          for i in {1..3}; do
-            echo "Attempt $i/3..."
-            if flutter pub get; then
-              echo "✅ Dependencies installed successfully"
+          echo "📥 Attempting to get dependencies..."
+          
+          MAX_ATTEMPTS=3
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            echo "===================================="
+            echo "Attempt $i/$MAX_ATTEMPTS"
+            echo "===================================="
+            
+            if flutter pub get --verbose 2>&1 | tee /tmp/pub_get_$i.log; then
+              echo "✅ Dependencies installed successfully on attempt $i"
+              echo ""
+              echo "📋 Dependency tree (first 50 lines):"
               flutter pub deps --style=compact | head -50
               exit 0
             else
-              echo "⚠️ Attempt $i failed, retrying..."
-              flutter clean
-              rm -f pubspec.lock
-              sleep 2
+              EXIT_CODE=$?
+              echo "⚠️ Attempt $i failed with exit code $EXIT_CODE"
+              
+              # Check for specific errors
+              if grep -q "version solving failed" /tmp/pub_get_$i.log; then
+                echo "🔍 Version conflict detected. Showing conflict details:"
+                grep -A 10 "version solving failed" /tmp/pub_get_$i.log || true
+              fi
+              
+              if grep -q "cloud_functions" /tmp/pub_get_$i.log; then
+                echo "⚠️ cloud_functions issue detected - removing it completely"
+                sed -i '/cloud_functions/d' pubspec.yaml
+              fi
+              
+              if [ $i -lt $MAX_ATTEMPTS ]; then
+                echo "🔄 Cleaning and retrying..."
+                flutter clean
+                rm -f pubspec.lock
+                rm -rf .dart_tool
+                sleep 3
+              fi
             fi
           done
           
-          echo "❌ Failed after 3 attempts"
-          echo "📋 Showing pubspec.yaml for debugging:"
+          echo "❌ Failed to install dependencies after $MAX_ATTEMPTS attempts"
+          echo ""
+          echo "📋 Final pubspec.yaml:"
           cat pubspec.yaml
+          echo ""
+          echo "📋 Last error log:"
+          cat /tmp/pub_get_$MAX_ATTEMPTS.log
           exit 1
 
       - name: 🧹 Pre-Build Clean
         run: |
           flutter clean
           cd android && ./gradlew clean
-          echo "✅ Clean build environment"
+          echo "✅ Build environment cleaned"
 
       - name: 🚀 Build Release APK
         run: |
           echo "🔨 Starting build process..."
           echo "📊 Build Environment:"
-          echo "  - Flutter: $(flutter --version | head -1)"
-          echo "  - Java: $(java -version 2>&1 | head -1)"
+          flutter --version
+          java -version
           
-          flutter build apk --release --target-platform android-arm64,android-arm,android-x64 --verbose 2>&1 | tee /tmp/build_full.log
+          set -o pipefail
+          flutter build apk \
+            --release \
+            --target-platform android-arm64,android-arm,android-x64 \
+            --verbose \
+            2>&1 | tee /tmp/build_full.log
           
-          if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+          BUILD_EXIT_CODE=${PIPEFAIL[0]}
+          
+          if [ $BUILD_EXIT_CODE -eq 0 ] && [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
             echo "✅ BUILD SUCCESS"
             echo "📦 APK Details:"
             ls -lh build/app/outputs/flutter-apk/
@@ -424,12 +496,33 @@ OVERRIDE_END
             echo "  Size: $APK_SIZE"
             echo "  SHA256: $APK_SHA"
           else
-            echo "❌ BUILD FAILED"
-            echo "🔍 Searching for APK files..."
-            find build -name "*.apk" -o -name "*.aab" || true
+            echo "❌ BUILD FAILED (Exit code: $BUILD_EXIT_CODE)"
             echo ""
-            echo "📋 Last 150 lines of build log:"
-            tail -150 /tmp/build_full.log
+            echo "🔍 Searching for any APK files..."
+            find build -name "*.apk" -o -name "*.aab" 2>/dev/null || true
+            echo ""
+            echo "📋 Build error analysis:"
+            echo "===================================="
+            
+            # Check for common errors
+            if grep -q "Execution failed for task" /tmp/build_full.log; then
+              echo "Task execution failure detected:"
+              grep "Execution failed for task" /tmp/build_full.log
+            fi
+            
+            if grep -q "AAPT" /tmp/build_full.log; then
+              echo "AAPT error detected:"
+              grep -A 5 "AAPT" /tmp/build_full.log
+            fi
+            
+            if grep -q "java.lang" /tmp/build_full.log; then
+              echo "Java exception detected:"
+              grep -A 5 "java.lang" /tmp/build_full.log
+            fi
+            
+            echo ""
+            echo "📋 Last 200 lines of build log:"
+            tail -200 /tmp/build_full.log
             exit 1
           fi
 
@@ -437,9 +530,21 @@ OVERRIDE_END
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: z-kinetic-apk
+          name: z-kinetic-apk-${{ github.run_number }}
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+
+      - name: 📤 Upload Build Logs (On Failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-logs-${{ github.run_number }}
+          path: |
+            /tmp/build_full.log
+            /tmp/pub_get_*.log
+            pubspec.yaml
+            pubspec.yaml.original
+          retention-days: 7
 
       - name: 📤 Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -448,15 +553,15 @@ OVERRIDE_END
           tag_name: v1.0.${{ github.run_number }}
           name: Z-Kinetic v1.0.${{ github.run_number }}
           body: |
-            🔥 Z-Kinetic Production Build - ULTIMATE EDITION
+            🔥 Z-Kinetic Production Build - FIXED EDITION
             
-            ✅ SDK 36 Fully Compatible
-            ✅ Firebase & Crashlytics Integrated
-            ✅ All Dependency Conflicts RESOLVED
+            ✅ SDK 36 Compatible
+            ✅ Firebase Integrated (Without cloud_functions)
+            ✅ All Dependency Conflicts Resolved
+            ✅ Enhanced Error Detection
             ✅ Multi-Architecture Support
-            ✅ Optimized & Battle-Tested
             
-            Build Number: ${{ github.run_number }}
+            Build: #${{ github.run_number }}
             Commit: ${{ github.sha }}
             
             📥 Download APK below
@@ -469,13 +574,19 @@ OVERRIDE_END
       - name: 📊 Build Summary
         if: always()
         run: |
-          echo "## 📊 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Z-Kinetic Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
           if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
-            echo "✅ Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
-            echo "📦 APK Size: $(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)" >> $GITHUB_STEP_SUMMARY
-            echo "🏗️ Build Number: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Build Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| APK Size | $(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1) |" >> $GITHUB_STEP_SUMMARY
+            echo "| Build Number | ${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ Status: FAILED" >> $GITHUB_STEP_SUMMARY
-            echo "Check logs above for details" >> $GITHUB_STEP_SUMMARY
+            echo "### ❌ Build Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the uploaded build logs artifact for detailed error analysis." >> $GITHUB_STEP_SUMMARY
           fi
