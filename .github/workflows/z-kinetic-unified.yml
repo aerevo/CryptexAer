@@ -1,12 +1,8 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🔥 Z-KINETIC GITHUB ACTIONS WORKFLOW (FINAL ROOT FIX)
-# Status: PRODUCTION READY ✅
-# Fixes:
-# - ✅ Removed incorrect subfolder path (Runs at Root now)
-# - ✅ ProGuard rules optimized for Firebase
-# - ✅ R8 warnings suppressed safely
+# 🛡️ Z-KINETIC INTELLIGENT PIPELINE
+# Status: AUTO-LOCATE CODEBASE (SOLVES PATH ISSUES) ✅
 
-name: Z-KINETIC Full Production Build
+name: Z-KINETIC Production Build
 on:
   workflow_dispatch:
   push:
@@ -14,7 +10,7 @@ on:
 
 jobs:
   build-apk:
-    name: 🔥 Full Firebase APK Build
+    name: 🛡️ Smart Build
     runs-on: ubuntu-latest
 
     steps:
@@ -32,40 +28,64 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: 🔍 DEBUG - Verify Files (ROOT)
+      - name: 🕵️ Smart Auto-Locate & Backup
         run: |
-          ls -la
-          if [ -f "pubspec.yaml" ]; then
-            echo "✅ FOUND: pubspec.yaml at ROOT."
-          elif [ -f "pubspdc.yaml" ]; then
-             echo "⚠️ TYPO DETECTED: Found 'pubspdc.yaml'. Auto-renaming..."
-             mv pubspdc.yaml pubspec.yaml
-          else
-            echo "❌ ERROR: Cannot find pubspec.yaml at root."
+          echo "🔍 Searching for pubspec.yaml in repository..."
+          
+          # Cari fail pubspec.yaml di mana-mana sahaja
+          PUBSPEC_PATH=$(find . -name "pubspec.yaml" -not -path "*/.*" | head -n 1)
+          
+          if [ -z "$PUBSPEC_PATH" ]; then
+            echo "❌ CRITICAL: pubspec.yaml tidak dijumpai!"
+            echo "📂 Senarai fail untuk debug:"
+            find . -maxdepth 3
             exit 1
           fi
 
-      - name: 💾 Backup Essential Files
-        run: |
+          echo "✅ FOUND: $PUBSPEC_PATH"
+          PROJECT_ROOT=$(dirname "$PUBSPEC_PATH")
+          echo "📂 Project Source Location: $PROJECT_ROOT"
+
           mkdir -p /tmp/backup_temp
-          cp -r lib /tmp/backup_temp/
-          cp pubspec.yaml /tmp/backup_temp/
-          [ -d "test" ] && cp -r test /tmp/backup_temp/
-          [ -d "assets" ] && cp -r assets /tmp/backup_temp/
+          
+          # Backup lib dari lokasi sebenar
+          if [ -d "$PROJECT_ROOT/lib" ]; then
+             cp -r "$PROJECT_ROOT/lib" /tmp/backup_temp/
+             echo "✅ Lib backed up"
+          else
+             echo "❌ CRITICAL: Lib folder missing in $PROJECT_ROOT"
+             exit 1
+          fi
 
-      - name: 🔥 Nuclear Clean
-        run: rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
+          # Backup pubspec dari lokasi sebenar
+          cp "$PUBSPEC_PATH" /tmp/backup_temp/
+          echo "✅ Pubspec backed up"
+          
+          # Backup assets/test jika ada
+          [ -d "$PROJECT_ROOT/test" ] && cp -r "$PROJECT_ROOT/test" /tmp/backup_temp/ || echo "⚠️ Test skipped"
+          [ -d "$PROJECT_ROOT/assets" ] && cp -r "$PROJECT_ROOT/assets" /tmp/backup_temp/ || echo "⚠️ Assets skipped"
 
-      - name: 🏗️ Create Fresh Project
-        run: flutter create --platforms android --org com.aer --project-name zkinetic .
+      - name: 🔥 Nuclear Clean (Prepare Workspace)
+        run: |
+          # Padam semua fail di root runner untuk mula bersih
+          rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
+          echo "✅ Workspace Cleaned"
+
+      - name: 🏗️ Create Fresh Project Structure
+        run: |
+          # Bina semula struktur Android/iOS yang baru & valid di Root
+          flutter create --platforms android --org com.aer --project-name zkinetic .
+          echo "✅ Project Skeleton Created"
 
       - name: 📦 Restore User Code
         run: |
+          # Masukkan semula kod Tuan ke dalam badan baru ini
           rm -rf lib/
           cp -r /tmp/backup_temp/lib .
           cp /tmp/backup_temp/pubspec.yaml .
           [ -d "/tmp/backup_temp/test" ] && cp -r /tmp/backup_temp/test .
           [ -d "/tmp/backup_temp/assets" ] && cp -r /tmp/backup_temp/assets .
+          echo "✅ Code Restored Successfully"
 
       - name: 🔥 Inject Firebase Crashlytics
         run: |
@@ -73,10 +93,11 @@ jobs:
             sed -i '/firebase_core:/a\  firebase_crashlytics: ^3.4.9' pubspec.yaml
           fi
 
-      - name: 🔥 Create Firebase Config
+      - name: 🔥 Create Firebase Config Files (Updated with iOS)
         run: |
           mkdir -p lib android/app
           
+          # Generates firebase_options.dart with iOS Info
           cat > lib/firebase_options.dart << 'EOF'
           import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
           import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
@@ -107,6 +128,7 @@ jobs:
           }
           EOF
           
+          # Generates google-services.json for Android
           cat > android/app/google-services.json << 'EOF'
           {
             "project_info": { "project_number": "55621733629", "project_id": "z-kinetic", "storage_bucket": "z-kinetic.firebasestorage.app" },
@@ -171,14 +193,10 @@ jobs:
           }
           EOF
 
-      - name: 🔧 Add ProGuard Rules (✅ FIREBASE OPTIMIZED + FIXED)
+      - name: 🔧 Add ProGuard Rules (✅ FIREBASE OPTIMIZED)
         run: |
           cat > android/app/proguard-rules.pro << 'EOF'
-          # ============================================
-          # Z-KINETIC PROGUARD RULES (FIREBASE SAFE)
-          # ============================================
-          
-          # ✅ FIX: Specific Firebase rules (not wildcard)
+          # Z-KINETIC PROGUARD RULES
           -keep class com.google.firebase.auth.** { *; }
           -keep class com.google.firebase.firestore.** { *; }
           -keep class com.google.firebase.crashlytics.** { *; }
@@ -186,18 +204,15 @@ jobs:
           -keep class com.google.firebase.messaging.** { *; }
           -keep class com.google.firebase.iid.** { *; }
           
-          # ✅ FIX: Keep Firebase model classes
           -keepclassmembers class * {
             @com.google.firebase.firestore.PropertyName <fields>;
           }
           
-          # ✅ FIX: Keep Firebase internal classes
           -keep class com.google.android.gms.internal.** { *; }
           -keep class com.google.firebase.** { *; }
           -dontwarn com.google.firebase.**
           -dontwarn com.google.android.gms.**
           
-          # Flutter Core
           -keep class io.flutter.app.** { *; }
           -keep class io.flutter.plugin.** { *; }
           -keep class io.flutter.util.** { *; }
@@ -205,34 +220,28 @@ jobs:
           -keep class io.flutter.** { *; }
           -keep class io.flutter.plugins.** { *; }
           
-          # ✅ FIX: Suppress R8 warnings safely
           -dontwarn com.google.android.play.core.**
           -dontwarn io.flutter.embedding.engine.deferredcomponents.**
           -dontwarn org.conscrypt.**
           -dontwarn org.bouncycastle.**
           -dontwarn org.openjsse.**
           
-          # ✅ FIX: Keep app models (adjust package name if needed)
           -keep class com.aer.zkinetic.models.** { *; }
           
-          # Kotlin
           -keep class kotlin.** { *; }
           -keep class kotlinx.** { *; }
           -dontwarn kotlin.**
           -dontwarn kotlinx.**
           
-          # ✅ FIX: Keep enum values
           -keepclassmembers enum * {
             public static **[] values();
             public static ** valueOf(java.lang.String);
           }
           
-          # ✅ FIX: Keep Parcelable
           -keepclassmembers class * implements android.os.Parcelable {
             public static final ** CREATOR;
           }
           
-          # ✅ FIX: Keep serialization
           -keepclassmembers class * implements java.io.Serializable {
             static final long serialVersionUID;
             private static final java.io.ObjectStreamField[] serialPersistentFields;
@@ -314,24 +323,11 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: Z-Kinetic v1.0.${{ github.run_number }}
           body: |
-            🔥 **Production Build with Fixed ProGuard**
-            ✅ Firebase Auth + Firestore + Crashlytics
-            ✅ ProGuard rules optimized for Firebase
-            ✅ R8 warnings suppressed safely
-            🔒 Code Obfuscated + Minified
-            📦 Package: com.aer.zkinetic
-            
-            **Build Info:**
-            - Gradle: 8.1.4 (stable)
-            - Kotlin: 1.9.23
-            - compileSdk: 34
-            - minSdk: 23
-            - targetSdk: 34
-            
-            **Fixes Applied:**
-            - ✅ Firebase classes preserved correctly
-            - ✅ Crashlytics stack traces working
-            - ✅ No R8 build errors
+            🔥 **Z-Kinetic Production Build**
+            ✅ Auto-Locate Source Code
+            ✅ Firebase & Crashlytics Integration
+            ✅ ProGuard & R8 Fixed
+            🔒 Secure Obfuscation
           files: build/app/outputs/flutter-apk/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
