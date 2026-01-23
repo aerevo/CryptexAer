@@ -1,6 +1,11 @@
-// 🎯 Z-KINETIC UI V11.3 (STABILIZED INDICATORS) + MATRIX RAIN + FORENSIC
-// Status: FULL INTEGRATION ✅
+// 🎯 Z-KINETIC UI V11.4 (MEMORY SAFE + CRASH PROTECTED)
+// Status: PRODUCTION READY ✅
 // Location: lib/cryptex_lock/src/cla_widget.dart
+// Fixes Applied:
+// - ✅ All async operations check mounted + _isDisposed
+// - ✅ Timer cancellation on dispose
+// - ✅ Recursive call protection in _decayTouch()
+// - ✅ Memory leak prevention
 
 import 'dart:async';
 import 'dart:math';
@@ -11,13 +16,11 @@ import 'package:sensors_plus/sensors_plus.dart';
 
 import 'cla_controller_v2.dart';
 import 'cla_models.dart';
-
-// ✅ NEW IMPORTS FOR MATRIX RAIN + FORENSIC DATA
 import 'matrix_rain_painter.dart';
 import 'forensic_data_painter.dart';
 
 // ============================================
-// 1. TUTORIAL OVERLAY
+// TUTORIAL OVERLAY
 // ============================================
 class TutorialOverlay extends StatelessWidget {
   final bool isVisible;
@@ -27,33 +30,21 @@ class TutorialOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer( 
+    return IgnorePointer(
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 500),
         opacity: isVisible ? 1.0 : 0.0,
         child: Container(
-          color: Colors.black.withOpacity(0.6), 
+          color: Colors.black.withOpacity(0.6),
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.screen_rotation, color: color, size: 48),
                 const SizedBox(height: 10),
-                Text(
-                  "TILT & ROTATE",
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 3,
-                    fontSize: 16,
-                    shadows: [Shadow(color: color, blurRadius: 10)]
-                  ),
-                ),
+                Text("TILT & ROTATE", style: TextStyle(color: color, fontWeight: FontWeight.bold, letterSpacing: 3, fontSize: 16, shadows: [Shadow(color: color, blurRadius: 10)])),
                 const SizedBox(height: 5),
-                Text(
-                  "Engage kinetic sensors to unlock",
-                  style: TextStyle(color: color.withOpacity(0.7), fontSize: 10),
-                ),
+                Text("Engage kinetic sensors to unlock", style: TextStyle(color: color.withOpacity(0.7), fontSize: 10)),
                 const SizedBox(height: 30),
                 Icon(Icons.keyboard_double_arrow_down, color: color.withOpacity(0.5), size: 30),
               ],
@@ -66,7 +57,7 @@ class TutorialOverlay extends StatelessWidget {
 }
 
 // ============================================
-// 2. MAIN WIDGET: CRYPTEX LOCK
+// MAIN CRYPTEX LOCK WIDGET
 // ============================================
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
@@ -92,31 +83,32 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   int? _activeWheelIndex;
   Timer? _wheelActiveTimer;
   late List<FixedExtentScrollController> _scrollControllers;
-  
+
   final ValueNotifier<double> _motionScoreNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
   final ValueNotifier<Offset> _accelNotifier = ValueNotifier(Offset.zero);
-  
+
   double _patternScore = 0.0;
   bool _showTutorial = true;
   Timer? _tutorialHideTimer;
   Timer? _touchDecayTimer;
-  
+
   double _lastX = 0, _lastY = 0, _lastZ = 0;
   List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
-  
+
   late AnimationController _pulseController;
   late AnimationController _scanController;
   late AnimationController _reticleController;
-  
-  // ✅ NEW: Matrix Rain variables
   late MatrixRain _matrixRain;
   late AnimationController _rainController;
-  
+
   bool _isStressTesting = false;
   String _stressResult = "";
   
+  // ✅ CRITICAL FIX: Add disposal flag
+  bool _isDisposed = false;
+
   final Color _neonCyan = const Color(0xFF00FFFF);
   final Color _neonGreen = const Color(0xFF00FF88);
   final Color _neonRed = const Color(0xFFFF3366);
@@ -128,34 +120,32 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
     widget.controller.onInteractionStart();
-    
     _startListening();
     widget.controller.addListener(_handleControllerChange);
-    
+
     _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _scanController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
     _reticleController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
 
-    // ✅ NEW: Matrix Rain initialization
     _matrixRain = MatrixRain(columnCount: 4);
-    
-    _rainController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 50),
-    )..addListener(() {
-      if (!mounted) return;
-      _matrixRain.update();
-      setState(() {});
-    });
-    
-    _rainController.repeat();
+    _rainController = AnimationController(vsync: this, duration: const Duration(milliseconds: 50))
+      ..addListener(() {
+        // ✅ FIX: Safety check before setState
+        if (!mounted || _isDisposed) return;
+        _matrixRain.update();
+        setState(() {});
+      })..repeat();
 
     _tutorialHideTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted) setState(() => _showTutorial = false);
+      // ✅ FIX: Safety check
+      if (mounted && !_isDisposed) setState(() => _showTutorial = false);
     });
   }
-  
+
+  // ✅ FIX: Prevent callback after dispose
   void _handleControllerChange() {
+    if (_isDisposed) return;
+    
     if (widget.controller.state == SecurityState.UNLOCKED) widget.onSuccess();
     else if (widget.controller.state == SecurityState.HARD_LOCK) {
       _startLockoutTimer();
@@ -172,15 +162,18 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   void _initScrollControllers() {
     _scrollControllers = List.generate(5, (i) {
-        int val = 0;
-        try { val = widget.controller.getInitialValue(i); } catch(e) {}
-        return FixedExtentScrollController(initialItem: val);
+      int val = 0;
+      try { val = widget.controller.getInitialValue(i); } catch(e) {}
+      return FixedExtentScrollController(initialItem: val);
     });
   }
 
   void _userInteracted() {
     if (_showTutorial) {
-      setState(() => _showTutorial = false);
+      // ✅ FIX: Safety check before setState
+      if (mounted && !_isDisposed) {
+        setState(() => _showTutorial = false);
+      }
       _tutorialHideTimer?.cancel();
     }
     _triggerTouchActive();
@@ -189,22 +182,23 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _startListening() {
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((e) {
-      _accelNotifier.value = Offset(e.x, e.y);
+      // ✅ FIX: Check disposal first
+      if (_isDisposed) return;
       
+      _accelNotifier.value = Offset(e.x, e.y);
       double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
-      
-      double amplifiedMotion = (delta * 10.0).clamp(0.0, 1.0);
-      
-      if (amplifiedMotion > 0.5) _userInteracted();
 
+      double amplifiedMotion = (delta * 10.0).clamp(0.0, 1.0);
+      if (amplifiedMotion > 0.5) _userInteracted();
+      
       widget.controller.registerShake(delta, e.x, e.y, e.z);
 
       double currentScore = _motionScoreNotifier.value;
       if (amplifiedMotion > currentScore) {
         _motionScoreNotifier.value = amplifiedMotion;
       } else {
-        _motionScoreNotifier.value = (currentScore * 0.92); 
+        _motionScoreNotifier.value = (currentScore * 0.92);
       }
     });
   }
@@ -212,33 +206,57 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _startLockoutTimer() {
     _lockoutTimer?.cancel();
     _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted && widget.controller.state == SecurityState.HARD_LOCK) {
+      // ✅ FIX: Safety check in timer
+      if (!mounted || _isDisposed) {
+        timer.cancel();
+        return;
+      }
+      
+      if (widget.controller.state == SecurityState.HARD_LOCK) {
         setState(() {});
         if (widget.controller.remainingLockoutSeconds <= 0) timer.cancel();
-      } else { timer.cancel(); }
+      } else { 
+        timer.cancel(); 
+      }
     });
   }
 
   void _triggerTouchActive() {
-    _touchScoreNotifier.value = 1.0; 
-    setState(() => _patternScore = 1.0); 
+    // ✅ FIX: Safety check
+    if (_isDisposed) return;
     
+    _touchScoreNotifier.value = 1.0;
+    setState(() => _patternScore = 1.0);
+
     _touchDecayTimer?.cancel();
     _touchDecayTimer = Timer(const Duration(seconds: 3), () {});
-    Future.delayed(const Duration(milliseconds: 100), _decayTouch);
+    
+    // ✅ FIX: Add safety delay before decay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted || _isDisposed) return;
+      _decayTouch();
+    });
   }
-  
+
+  // ✅ CRITICAL FIX: The main memory leak source
   void _decayTouch() {
-    if (!mounted) return;
+    // ✅ MUST CHECK BOTH mounted AND _isDisposed
+    if (!mounted || _isDisposed) return;
+    
     if (_touchScoreNotifier.value > 0) {
       _touchScoreNotifier.value -= 0.05;
       if (_touchScoreNotifier.value < 0) _touchScoreNotifier.value = 0;
-      Future.delayed(const Duration(milliseconds: 50), _decayTouch);
+      
+      // ✅ FIX: Check before recursive call
+      Future.delayed(const Duration(milliseconds: 50), () {
+        if (!mounted || _isDisposed) return;
+        _decayTouch();
+      });
     }
   }
 
   void _analyzeScrollPattern() {
-    _userInteracted(); 
+    _userInteracted();
     final now = DateTime.now();
     double speed = _lastScrollTime != null ? 1000.0 / now.difference(_lastScrollTime!).inMilliseconds : 0.0;
     _lastScrollTime = now;
@@ -246,164 +264,36 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     if (_touchData.length > 20) _touchData.removeAt(0);
   }
 
-  Future<void> _runStressTest() async {
-    setState(() {
-      _isStressTesting = true;
-      _stressResult = "⚠️ LAUNCHING 50 CONCURRENT VECTORS...";
-    });
-
-    final stopwatch = Stopwatch()..start();
-    final random = Random();
-    
-    await Future.wait(List.generate(50, (index) async {
-      await Future.delayed(Duration(milliseconds: random.nextInt(50)));
-      await widget.controller.validateAttempt(hasPhysicalMovement: true);
-    }));
-
-    stopwatch.stop();
-    final double tps = 50 / (stopwatch.elapsedMilliseconds / 1000);
-
-    setState(() {
-      _isStressTesting = false;
-      _stressResult = "📊 BENCHMARK REPORT:\n"
-          "Total: 50 Threads\n"
-          "Time: ${stopwatch.elapsedMilliseconds}ms\n"
-          "Speed: ${tps.toStringAsFixed(0)} TPS (High Load)\n"
-          "Integrity: STABLE (No Crash)";
-    });
-    
-    Future.delayed(const Duration(seconds: 8), () {
-      if (mounted) setState(() => _stressResult = "");
-    });
-  }
-
   @override
   void dispose() {
+    // ✅ FIX: Set flag FIRST before any cleanup
+    _isDisposed = true;
+    
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
-    _accelSub?.cancel(); 
-    _lockoutTimer?.cancel(); 
-    _wheelActiveTimer?.cancel(); 
-    _touchDecayTimer?.cancel(); 
+    
+    // ✅ FIX: Cancel ALL timers
+    _accelSub?.cancel();
+    _lockoutTimer?.cancel();
+    _wheelActiveTimer?.cancel();
+    _touchDecayTimer?.cancel();
     _tutorialHideTimer?.cancel();
-    _pulseController.dispose(); 
-    _scanController.dispose(); 
+    
+    // ✅ FIX: Dispose controllers
+    _pulseController.dispose();
+    _scanController.dispose();
     _reticleController.dispose();
-    
-    // ✅ NEW: Dispose rain controller
     _rainController.dispose();
+
+    for (var c in _scrollControllers) {
+      c.dispose();
+    }
     
-    for (var c in _scrollControllers) c.dispose();
-    _motionScoreNotifier.dispose(); 
-    _touchScoreNotifier.dispose(); 
+    _motionScoreNotifier.dispose();
+    _touchScoreNotifier.dispose();
     _accelNotifier.dispose();
+    
     super.dispose();
-  }
-
-  // ============================================
-// PART 2: BUILD METHODS & UI COMPONENTS (FULL)
-// SAMBUNGAN dari Part 1
-// ============================================
-
-  @override
-  Widget build(BuildContext context) {
-    SecurityState state = widget.controller.state;
-    Color activeColor = (state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK) 
-        ? _neonRed 
-        : (state == SecurityState.UNLOCKED ? _neonGreen : _neonCyan);
-    
-    String statusLabel = _getStatusLabel(state);
-    
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned.fill(
-            child: RepaintBoundary(
-              child: CustomPaint(painter: KineticGridPainter(color: activeColor)),
-            ),
-          ),
-          
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            decoration: BoxDecoration(
-              color: _bgDark,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: activeColor.withOpacity(0.4), width: 1.5),
-              boxShadow: [
-                BoxShadow(color: activeColor.withOpacity(0.15), blurRadius: 40, spreadRadius: 2),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildHUDHeader(activeColor, statusLabel),
-                if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
-                const SizedBox(height: 28),
-                
-                Listener(
-                  onPointerDown: (_) {
-                    _userInteracted();
-                    widget.controller.registerTouch();
-                  },
-                  child: _buildInteractiveTumblerArea(activeColor, state),
-                ),
-                
-                const SizedBox(height: 28),
-                _buildAuthButton(activeColor, state),
-                
-                const SizedBox(height: 20),
-                if (_stressResult.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.yellow.withOpacity(0.3))
-                    ),
-                    child: Text(
-                      _stressResult,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.yellow, fontSize: 10, fontFamily: 'monospace'),
-                    ),
-                  ),
-                  
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onLongPress: _runStressTest, 
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white24),
-                      borderRadius: BorderRadius.circular(5)
-                    ),
-                    child: _isStressTesting 
-                      ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text(
-                        "⚡ LONG PRESS FOR BENCHMARK",
-                        style: TextStyle(
-                          color: activeColor.withOpacity(0.4),
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2.5,
-                        ),
-                      ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          Positioned.fill(
-            child: TutorialOverlay(
-              isVisible: _showTutorial && state == SecurityState.LOCKED,
-              color: activeColor,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   String _getStatusLabel(SecurityState state) {
@@ -417,10 +307,97 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     }
   }
 
+  // PART 2/3 - Build Methods & UI Components
+// Sambungan dari PART 1
+
+  @override
+  Widget build(BuildContext context) {
+    // ✅ FIX: Safety check at build start
+    if (_isDisposed) return const SizedBox.shrink();
+    
+    SecurityState state = widget.controller.state;
+    Color activeColor = (state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK)
+        ? _neonRed
+        : (state == SecurityState.UNLOCKED ? _neonGreen : _neonCyan);
+
+    String statusLabel = _getStatusLabel(state);
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: CustomPaint(painter: KineticGridPainter(color: activeColor)),
+            ),
+          ),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: _bgDark,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: activeColor.withOpacity(0.4), width: 1.5),
+              boxShadow: [BoxShadow(color: activeColor.withOpacity(0.15), blurRadius: 40, spreadRadius: 2)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildHUDHeader(activeColor, statusLabel),
+                if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
+                const SizedBox(height: 28),
+
+                Listener(
+                  onPointerDown: (_) {
+                    _userInteracted();
+                    widget.controller.registerTouch();
+                  },
+                  child: _buildInteractiveTumblerArea(activeColor, state),
+                ),
+
+                const SizedBox(height: 28),
+                _buildAuthButton(activeColor, state),
+
+                const SizedBox(height: 20),
+                if (_stressResult.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.yellow.withOpacity(0.3))
+                    ),
+                    child: Text(_stressResult, textAlign: TextAlign.center, style: const TextStyle(color: Colors.yellow, fontSize: 10, fontFamily: 'monospace')),
+                  ),
+
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onLongPress: _runStressTest,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(border: Border.all(color: Colors.white24), borderRadius: BorderRadius.circular(5)),
+                    child: _isStressTesting
+                        ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Text("⚡ LONG PRESS FOR BENCHMARK", style: TextStyle(color: activeColor.withOpacity(0.4), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 2.5)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Positioned.fill(
+            child: TutorialOverlay(isVisible: _showTutorial && state == SecurityState.LOCKED, color: activeColor),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHUDHeader(Color color, String status) {
     return Stack(
       children: [
-        _buildHUDCorner(color, true, true), 
+        _buildHUDCorner(color, true, true),
         _buildHUDCorner(color, true, false),
         Row(
           children: [
@@ -462,102 +439,43 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // ============================================
-  // ✅ CRITICAL UPDATE: LEFT PANEL WITH MATRIX RAIN + FORENSIC
-  // ============================================
   Widget _buildInteractiveTumblerArea(Color color, SecurityState state) {
     return SizedBox(
       height: 140,
       child: Stack(
         children: [
-          // ✅ NEW: Left Panel - Matrix Rain + Forensic Data
+          // Left Panel - Matrix Rain + Forensic
           Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
+            left: 0, top: 0, bottom: 0,
             child: Container(
-              width: 45,
-              height: 140,
-              color: Colors.black,
+              width: 45, height: 140, color: Colors.black,
               child: Stack(
                 children: [
-                  // Matrix Rain Background
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: MatrixRainPainter(
-                        rain: _matrixRain,
-                        color: const Color(0xFF00FF00).withOpacity(0.25),
-                      ),
-                    ),
-                  ),
-                  
-                  // Forensic Data Overlay
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: ForensicDataPainter(
-                        color: const Color(0xFF00FF00),
-                        motionCount: widget.controller.motionBuffer.length,
-                        touchCount: widget.controller.touchBuffer.length,
-                        entropy: widget.controller.motionEntropy,
-                        confidence: widget.controller.liveConfidence,
-                      ),
-                    ),
-                  ),
-                  
-                  // Header Label
+                  Positioned.fill(child: CustomPaint(painter: MatrixRainPainter(rain: _matrixRain, color: const Color(0xFF00FF00).withOpacity(0.25)))),
+                  Positioned.fill(child: CustomPaint(painter: ForensicDataPainter(color: const Color(0xFF00FF00), motionCount: widget.controller.motionBuffer.length, touchCount: widget.controller.touchBuffer.length, entropy: widget.controller.motionEntropy, confidence: widget.controller.liveConfidence))),
                   Positioned(
-                    top: 10,
-                    left: 0,
-                    right: 0,
+                    top: 10, left: 0, right: 0,
                     child: Container(
                       height: 14,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00FF00).withOpacity(0.15),
-                        border: Border.all(
-                          color: const Color(0xFF00FF00).withOpacity(0.5),
-                          width: 1,
-                        ),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'F0REN',
-                          style: TextStyle(
-                            color: Color(0xFF00FF00),
-                            fontSize: 7,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'Courier',
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ),
+                      decoration: BoxDecoration(color: const Color(0xFF00FF00).withOpacity(0.15), border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.5), width: 1)),
+                      child: const Center(child: Text('F0REN', style: TextStyle(color: Color(0xFF00FF00), fontSize: 7, fontWeight: FontWeight.w900, fontFamily: 'Courier', letterSpacing: 1.5))),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          
-          // Right Panel - ORIGINAL (Kinetic Peripheral)
+
+          // Right Panel - Kinetic
           Positioned(
-            right: 0, 
-            top: 0, 
-            bottom: 0, 
+            right: 0, top: 0, bottom: 0,
             child: ValueListenableBuilder<Offset>(
               valueListenable: _accelNotifier,
-              builder: (context, offset, _) => CustomPaint(
-                size: const Size(45, 140), 
-                painter: KineticPeripheralPainter(
-                  color: color, 
-                  side: 'right', 
-                  valX: offset.dx, 
-                  valY: offset.dy, 
-                  state: state,
-                )
-              ),
+              builder: (context, offset, _) => CustomPaint(size: const Size(45, 140), painter: KineticPeripheralPainter(color: color, side: 'right', valX: offset.dx, valY: offset.dy, state: state))
             )
           ),
-          
-          // Center Tumblers - ORIGINAL (5 Wheels)
+
+          // Center Tumblers
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 55),
             child: NotificationListener<ScrollNotification>(
@@ -565,14 +483,17 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 if (notification is ScrollStartNotification) {
                   for (int i = 0; i < _scrollControllers.length; i++) {
                     if (_scrollControllers[i].position == notification.metrics) {
-                      setState(() { _activeWheelIndex = i; });
+                      // ✅ FIX: Safety check
+                      if (mounted && !_isDisposed) {
+                        setState(() { _activeWheelIndex = i; });
+                      }
                       _wheelActiveTimer?.cancel();
                       break;
                     }
                   }
                 } else if (notification is ScrollUpdateNotification) {
-                  widget.controller.registerTouch(); 
-                  _analyzeScrollPattern(); 
+                  widget.controller.registerTouch();
+                  _analyzeScrollPattern();
                 } else if (notification is ScrollEndNotification) {
                   _resetActiveWheelTimer();
                 }
@@ -594,11 +515,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     return Expanded(
       child: Listener(
         onPointerDown: (_) {
+          // ✅ FIX: Safety check
+          if (_isDisposed) return;
           setState(() => _activeWheelIndex = index);
           _wheelActiveTimer?.cancel();
           _userInteracted();
           widget.controller.registerTouch();
-          HapticFeedback.lightImpact(); 
+          HapticFeedback.lightImpact();
         },
         onPointerUp: (_) => _resetActiveWheelTimer(),
         child: AnimatedOpacity(
@@ -611,26 +534,18 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
               if (isActive) Positioned.fill(child: AnimatedBuilder(animation: _scanController, builder: (context, child) => CustomPaint(painter: KineticScanLinePainter(color: color, progress: _scanController.value)))),
               ListWheelScrollView.useDelegate(
                 controller: _scrollControllers[index],
-                itemExtent: 48, 
-                perspective: 0.003, 
+                itemExtent: 48,
+                perspective: 0.003,
                 diameterRatio: 1.1,
                 physics: const FixedExtentScrollPhysics(),
-                onSelectedItemChanged: (v) { 
+                onSelectedItemChanged: (v) {
                   widget.controller.updateWheel(index, v % 10);
                   HapticFeedback.selectionClick();
-                  _analyzeScrollPattern(); 
+                  _analyzeScrollPattern();
                 },
                 childDelegate: ListWheelChildBuilderDelegate(
                   builder: (context, i) => Center(
-                    child: Text(
-                      '${i % 10}', 
-                      style: TextStyle(
-                        color: Colors.white, 
-                        fontSize: 32, 
-                        fontWeight: FontWeight.w900, 
-                        shadows: isActive ? [Shadow(color: color, blurRadius: 20)] : []
-                      )
-                    )
+                    child: Text('${i % 10}', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, shadows: isActive ? [Shadow(color: color, blurRadius: 20)] : []))
                   )
                 ),
               ),
@@ -644,14 +559,46 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _resetActiveWheelTimer() {
     _wheelActiveTimer?.cancel();
     _wheelActiveTimer = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _activeWheelIndex = null);
+      // ✅ FIX: Safety check
+      if (mounted && !_isDisposed) setState(() => _activeWheelIndex = null);
     });
   }
 
-  // ============================================
-// PART 3: HELPER WIDGETS + ALL CUSTOM PAINTERS (FULL)
-// SAMBUNGAN dari Part 2
-// ============================================
+  Future<void> _runStressTest() async {
+    // ✅ FIX: Safety check
+    if (_isDisposed) return;
+    
+    setState(() {
+      _isStressTesting = true;
+      _stressResult = "⚠️ LAUNCHING 50 CONCURRENT VECTORS...";
+    });
+
+    final stopwatch = Stopwatch()..start();
+    final random = Random();
+
+    await Future.wait(List.generate(50, (index) async {
+      // ✅ FIX: Check in loop
+      if (_isDisposed) return;
+      await Future.delayed(Duration(milliseconds: random.nextInt(50)));
+      await widget.controller.validateAttempt(hasPhysicalMovement: true);
+    }));
+
+    stopwatch.stop();
+    final double tps = 50 / (stopwatch.elapsedMilliseconds / 1000);
+
+    // ✅ FIX: Check before setState
+    if (!mounted || _isDisposed) return;
+    
+    setState(() {
+      _isStressTesting = false;
+      _stressResult = "📊 BENCHMARK REPORT:\nTotal: 50 Threads\nTime: ${stopwatch.elapsedMilliseconds}ms\nSpeed: ${tps.toStringAsFixed(0)} TPS (High Load)\nIntegrity: STABLE (No Crash)";
+    });
+
+    Future.delayed(const Duration(seconds: 8), () {
+      // ✅ FIX: Safety check
+      if (mounted && !_isDisposed) setState(() => _stressResult = "");
+    });
+  }
 
   Widget _buildAuthButton(Color activeColor, SecurityState state) {
     bool isDisabled = state == SecurityState.VALIDATING || state == SecurityState.HARD_LOCK;
@@ -659,30 +606,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       width: double.infinity,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12), 
-          boxShadow: !isDisabled ? [BoxShadow(color: activeColor.withOpacity(0.3), blurRadius: 20)] : []
-        ),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), boxShadow: !isDisabled ? [BoxShadow(color: activeColor.withOpacity(0.3), blurRadius: 20)] : []),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: isDisabled ? const Color(0xFF1A1A1A) : activeColor.withOpacity(0.2),
             foregroundColor: activeColor,
             padding: const EdgeInsets.symmetric(vertical: 20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12), 
-              side: BorderSide(color: isDisabled ? const Color(0xFF333333) : activeColor, width: 2)
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: isDisabled ? const Color(0xFF333333) : activeColor, width: 2)),
           ),
           onPressed: isDisabled ? null : () => widget.controller.validateAttempt(hasPhysicalMovement: true),
-          child: Text(
-            state == SecurityState.HARD_LOCK ? "LOCKED" : "INITIATE ACCESS",
-            style: TextStyle(
-              fontWeight: FontWeight.w900, 
-              letterSpacing: 2.5, 
-              fontSize: 13,
-              shadows: !isDisabled ? [Shadow(color: activeColor.withOpacity(0.9), blurRadius: 12)] : []
-            ),
-          ),
+          child: Text(state == SecurityState.HARD_LOCK ? "LOCKED" : "INITIATE ACCESS", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2.5, fontSize: 13, shadows: !isDisabled ? [Shadow(color: activeColor.withOpacity(0.9), blurRadius: 12)] : [])),
         ),
       ),
     );
@@ -690,18 +623,17 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   Widget _buildHUDCorner(Color color, bool isTop, bool isLeft) {
     return Positioned(
-      top: isTop ? 0 : null, 
-      bottom: !isTop ? 0 : null, 
-      left: isLeft ? 0 : null, 
+      top: isTop ? 0 : null,
+      bottom: !isTop ? 0 : null,
+      left: isLeft ? 0 : null,
       right: !isLeft ? 0 : null,
       child: Container(
-        width: 24, 
-        height: 24, 
+        width: 24, height: 24,
         decoration: BoxDecoration(
           border: Border(
-            top: isTop ? BorderSide(color: color, width: 2) : BorderSide.none, 
-            left: isLeft ? BorderSide(color: color, width: 2) : BorderSide.none, 
-            right: !isLeft ? BorderSide(color: color, width: 2) : BorderSide.none, 
+            top: isTop ? BorderSide(color: color, width: 2) : BorderSide.none,
+            left: isLeft ? BorderSide(color: color, width: 2) : BorderSide.none,
+            right: !isLeft ? BorderSide(color: color, width: 2) : BorderSide.none,
             bottom: !isTop ? BorderSide(color: color, width: 2) : BorderSide.none
           )
         )
@@ -713,77 +645,42 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     bool isMatch = val > 0.3;
     Color c = isMatch ? const Color(0xFF00FF88) : (val > 0.05 ? const Color(0xFFFF3366) : const Color(0xFF333333));
     return Container(
-      width: 55, 
-      height: 42, 
-      decoration: BoxDecoration(
-        border: Border.all(color: c, width: 1.5), 
-        borderRadius: BorderRadius.circular(8), 
-        color: isMatch ? c.withOpacity(0.15) : Colors.transparent
-      ), 
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center, 
-        children: [
-          Icon(isMatch ? Icons.check_circle : icon, size: 16, color: c), 
-          Text(label, style: TextStyle(fontSize: 7, color: c, fontWeight: FontWeight.w900))
-        ]
-      )
+      width: 55, height: 42,
+      decoration: BoxDecoration(border: Border.all(color: c, width: 1.5), borderRadius: BorderRadius.circular(8), color: isMatch ? c.withOpacity(0.15) : Colors.transparent),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(isMatch ? Icons.check_circle : icon, size: 16, color: c), Text(label, style: TextStyle(fontSize: 7, color: c, fontWeight: FontWeight.w900))])
     );
   }
 
   Widget _buildPatternBox(String label, double score, Color color) {
-    bool isMatch = score >= 0.5; 
+    bool isMatch = score >= 0.5;
     Color c = isMatch ? const Color(0xFF00FF88) : (score > 0.1 ? const Color(0xFFFF3366) : const Color(0xFF333333));
     return Container(
-      width: 55, 
-      height: 42, 
-      decoration: BoxDecoration(
-        border: Border.all(color: c, width: 1.5), 
-        borderRadius: BorderRadius.circular(8), 
-        color: isMatch ? c.withOpacity(0.15) : Colors.transparent
-      ), 
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center, 
-        children: [
-          Icon(isMatch ? Icons.check_circle : Icons.timeline, size: 16, color: c), 
-          Text(label, style: TextStyle(fontSize: 7, color: c, fontWeight: FontWeight.w900))
-        ]
-      )
+      width: 55, height: 42,
+      decoration: BoxDecoration(border: Border.all(color: c, width: 1.5), borderRadius: BorderRadius.circular(8), color: isMatch ? c.withOpacity(0.15) : Colors.transparent),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(isMatch ? Icons.check_circle : Icons.timeline, size: 16, color: c), Text(label, style: TextStyle(fontSize: 7, color: c, fontWeight: FontWeight.w900))])
     );
   }
 
   Widget _buildWarningBanner() {
     return Container(
-      margin: const EdgeInsets.only(top: 14), 
-      padding: const EdgeInsets.all(10), 
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF3366).withOpacity(0.1), 
-        border: Border.all(color: const Color(0xFFFF3366)), 
-        borderRadius: BorderRadius.circular(8)
-      ), 
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Color(0xFFFF3366), size: 18), 
-          const SizedBox(width: 10), 
-          Expanded(
-            child: Text(
-              widget.controller.threatMessage, 
-              style: const TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.w900)
-            )
-          )
-        ]
-      )
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: const Color(0xFFFF3366).withOpacity(0.1), border: Border.all(color: const Color(0xFFFF3366)), borderRadius: BorderRadius.circular(8)),
+      child: Row(children: [const Icon(Icons.error_outline, color: Color(0xFFFF3366), size: 18), const SizedBox(width: 10), Expanded(child: Text(widget.controller.threatMessage, style: const TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.w900)))])
     );
   }
-} // End of _CryptexLockState class
+} // End _CryptexLockState
+
+// PART 3/3 - Custom Painters
+// Sambungan dari PART 2
 
 // ============================================
-// PART 3: CUSTOM PAINTERS
+// KINETIC GRID PAINTER
 // ============================================
-
 class KineticGridPainter extends CustomPainter {
-  final Color color; 
+  final Color color;
   KineticGridPainter({required this.color});
-  
+
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()..color = color.withOpacity(0.04)..strokeWidth = 1;
@@ -794,24 +691,21 @@ class KineticGridPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
     }
   }
-  
-  @override 
+
+  @override
   bool shouldRepaint(KineticGridPainter old) => old.color != color;
 }
 
+// ============================================
+// KINETIC PERIPHERAL PAINTER
+// ============================================
 class KineticPeripheralPainter extends CustomPainter {
-  final Color color; 
+  final Color color;
   final String side;
   final double valX, valY;
   final SecurityState state;
 
-  KineticPeripheralPainter({
-    required this.color, 
-    required this.side, 
-    required this.valX, 
-    required this.valY, 
-    required this.state
-  });
+  KineticPeripheralPainter({required this.color, required this.side, required this.valX, required this.valY, required this.state});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -821,7 +715,7 @@ class KineticPeripheralPainter extends CustomPainter {
     if (side == 'left') {
       canvas.drawRect(const Rect.fromLTWH(0, 10, 42, 14), Paint()..color = color.withOpacity(0.15));
       _drawText(canvas, tp, "COORD", 4, 13, 7, color, true);
-      
+
       for (int i = 0; i < 4; i++) {
         double lat = ((valX * 10) + (i * 1.5)).clamp(-90, 90);
         double lng = ((valY * 10) - (i * 2.1)).clamp(-180, 180);
@@ -832,76 +726,42 @@ class KineticPeripheralPainter extends CustomPainter {
     } else {
       canvas.drawRect(const Rect.fromLTWH(2, 10, 42, 14), Paint()..color = color.withOpacity(0.15));
       _drawText(canvas, tp, "SYS-ID", 6, 13, 7, color, true);
-      
+
       String authStatus = state == SecurityState.VALIDATING ? "PROC" : (state == SecurityState.UNLOCKED ? "COMP" : "PEND");
       _drawText(canvas, tp, "AUTH: $authStatus", 4, 35, 6, color.withOpacity(0.8), true);
       _drawText(canvas, tp, "ENC: AES256", 4, 45, 6, color.withOpacity(0.6), false);
 
       for (int i = 0; i < 12; i++) {
         double h = 6 + (valX.abs() * 2) + (i % 3);
-        canvas.drawLine(
-          Offset(6.0 + (i * 3), 60),
-          Offset(6.0 + (i * 3), 60 + h),
-          Paint()
-            ..color = color.withOpacity(0.5)
-            ..strokeWidth = 1.2,
-        );
+        canvas.drawLine(Offset(6.0 + (i * 3), 60), Offset(6.0 + (i * 3), 60 + h), Paint()..color = color.withOpacity(0.5)..strokeWidth = 1.2);
       }
       canvas.drawLine(const Offset(2, 10), const Offset(2, 130), p);
     }
   }
 
-  void _drawText(
-    Canvas c,
-    TextPainter tp,
-    String s,
-    double x,
-    double y,
-    double sz,
-    Color col,
-    bool bold,
-  ) {
-    tp.text = TextSpan(
-      text: s,
-      style: TextStyle(
-        color: col,
-        fontSize: sz,
-        fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-        fontFamily: 'Courier',
-      ),
-    );
+  void _drawText(Canvas c, TextPainter tp, String s, double x, double y, double sz, Color col, bool bold) {
+    tp.text = TextSpan(text: s, style: TextStyle(color: col, fontSize: sz, fontWeight: bold ? FontWeight.bold : FontWeight.normal, fontFamily: 'Courier'));
     tp.layout();
     tp.paint(c, Offset(x, y));
   }
 
   @override
-  bool shouldRepaint(KineticPeripheralPainter old) =>
-      old.valX != valX ||
-      old.valY != valY ||
-      old.state != state ||
-      old.color != color;
+  bool shouldRepaint(KineticPeripheralPainter old) => old.valX != valX || old.valY != valY || old.state != state || old.color != color;
 }
 
 // ============================================
 // RETICLE PAINTER
 // ============================================
-
 class KineticReticlePainter extends CustomPainter {
   final Color color;
   final double progress;
 
-  KineticReticlePainter({
-    required this.color,
-    required this.progress,
-  });
+  KineticReticlePainter({required this.color, required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final p = Paint()
-      ..color = color.withOpacity(0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+    final p = Paint()..color = color.withOpacity(0.5)..style = PaintingStyle.stroke..strokeWidth = 2;
 
     canvas.save();
     canvas.translate(center.dx, center.dy);
@@ -912,64 +772,51 @@ class KineticReticlePainter extends CustomPainter {
 
     for (int i = 0; i < 4; i++) {
       final a = i * pi / 2;
-      canvas.drawLine(
-        Offset(
-          center.dx + 18 * cos(a),
-          center.dy + 18 * sin(a),
-        ),
-        Offset(
-          center.dx + 26 * cos(a),
-          center.dy + 26 * sin(a),
-        ),
-        p,
-      );
+      canvas.drawLine(Offset(center.dx + 18 * cos(a), center.dy + 18 * sin(a)), Offset(center.dx + 26 * cos(a), center.dy + 26 * sin(a)), p);
     }
 
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(KineticReticlePainter old) =>
-      old.progress != progress || old.color != color;
+  bool shouldRepaint(KineticReticlePainter old) => old.progress != progress || old.color != color;
 }
 
 // ============================================
 // SCAN LINE PAINTER
 // ============================================
-
 class KineticScanLinePainter extends CustomPainter {
   final Color color;
   final double progress;
 
-  KineticScanLinePainter({
-    required this.color,
-    required this.progress,
-  });
+  KineticScanLinePainter({required this.color, required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(
-      0,
-      size.height * progress - 2,
-      size.width,
-      4,
-    );
+    final rect = Rect.fromLTWH(0, size.height * progress - 2, size.width, 4);
 
-    final p = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          color.withOpacity(0.6),
-          Colors.transparent,
-        ],
-      ).createShader(rect);
+    final p = Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, color.withOpacity(0.6), Colors.transparent]).createShader(rect);
 
     canvas.drawRect(rect, p);
   }
 
   @override
-  bool shouldRepaint(KineticScanLinePainter old) =>
-      old.progress != progress || old.color != color;
+  bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress || old.color != color;
 }
+
+// ============================================
+// ✅ USAGE INSTRUCTIONS
+// ============================================
+// 
+// Copy semua 3 PART ke dalam fail cla_widget.dart:
+// 1. PART 1 - Header + initState + dispose
+// 2. PART 2 - build() + UI widgets  
+// 3. PART 3 - Custom painters (ini)
+//
+// Susunan:
+// [PART 1 code]
+// [PART 2 code]  
+// [PART 3 code]
+//
+// Pastikan imports di PART 1 complete.
+// Jangan duplicate class definition.
