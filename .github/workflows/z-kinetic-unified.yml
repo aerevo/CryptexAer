@@ -1,6 +1,6 @@
 # File: .github/workflows/z-kinetic-unified.yml
 # 🛡️ Z-KINETIC INTELLIGENT PIPELINE
-# Status: AUTO-LOCATE CODEBASE (SOLVES PATH ISSUES) ✅
+# Status: SDK 35 UPGRADE + KTS CONFLICT FIX ✅
 
 name: Z-KINETIC Production Build
 on:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-apk:
-    name: 🛡️ Smart Build
+    name: 🛡️ Smart Build (SDK 35)
     runs-on: ubuntu-latest
 
     steps:
@@ -30,62 +30,47 @@ jobs:
 
       - name: 🕵️ Smart Auto-Locate & Backup
         run: |
-          echo "🔍 Searching for pubspec.yaml in repository..."
-          
-          # Cari fail pubspec.yaml di mana-mana sahaja
+          echo "🔍 Searching for pubspec.yaml..."
           PUBSPEC_PATH=$(find . -name "pubspec.yaml" -not -path "*/.*" | head -n 1)
           
           if [ -z "$PUBSPEC_PATH" ]; then
-            echo "❌ CRITICAL: pubspec.yaml tidak dijumpai!"
-            echo "📂 Senarai fail untuk debug:"
+            echo "❌ CRITICAL: pubspec.yaml not found!"
             find . -maxdepth 3
             exit 1
           fi
 
           echo "✅ FOUND: $PUBSPEC_PATH"
           PROJECT_ROOT=$(dirname "$PUBSPEC_PATH")
-          echo "📂 Project Source Location: $PROJECT_ROOT"
+          echo "📂 Root: $PROJECT_ROOT"
 
           mkdir -p /tmp/backup_temp
-          
-          # Backup lib dari lokasi sebenar
-          if [ -d "$PROJECT_ROOT/lib" ]; then
-             cp -r "$PROJECT_ROOT/lib" /tmp/backup_temp/
-             echo "✅ Lib backed up"
-          else
-             echo "❌ CRITICAL: Lib folder missing in $PROJECT_ROOT"
-             exit 1
-          fi
-
-          # Backup pubspec dari lokasi sebenar
+          if [ -d "$PROJECT_ROOT/lib" ]; then cp -r "$PROJECT_ROOT/lib" /tmp/backup_temp/; else echo "❌ Lib missing"; exit 1; fi
           cp "$PUBSPEC_PATH" /tmp/backup_temp/
-          echo "✅ Pubspec backed up"
-          
-          # Backup assets/test jika ada
-          [ -d "$PROJECT_ROOT/test" ] && cp -r "$PROJECT_ROOT/test" /tmp/backup_temp/ || echo "⚠️ Test skipped"
-          [ -d "$PROJECT_ROOT/assets" ] && cp -r "$PROJECT_ROOT/assets" /tmp/backup_temp/ || echo "⚠️ Assets skipped"
+          [ -d "$PROJECT_ROOT/test" ] && cp -r "$PROJECT_ROOT/test" /tmp/backup_temp/
+          [ -d "$PROJECT_ROOT/assets" ] && cp -r "$PROJECT_ROOT/assets" /tmp/backup_temp/
 
-      - name: 🔥 Nuclear Clean (Prepare Workspace)
-        run: |
-          # Padam semua fail di root runner untuk mula bersih
-          rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
-          echo "✅ Workspace Cleaned"
+      - name: 🔥 Nuclear Clean
+        run: rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
 
       - name: 🏗️ Create Fresh Project Structure
         run: |
-          # Bina semula struktur Android/iOS yang baru & valid di Root
           flutter create --platforms android --org com.aer --project-name zkinetic .
-          echo "✅ Project Skeleton Created"
+          
+          # 🔥 FIX PENTING: Padam fail .kts yang flutter create buat
+          # supaya tak bergaduh dengan fail .gradle kita nanti
+          rm -f android/app/build.gradle.kts
+          rm -f android/build.gradle.kts
+          rm -f android/settings.gradle.kts
+          
+          echo "✅ Project Skeleton Created & Cleaned"
 
       - name: 📦 Restore User Code
         run: |
-          # Masukkan semula kod Tuan ke dalam badan baru ini
           rm -rf lib/
           cp -r /tmp/backup_temp/lib .
           cp /tmp/backup_temp/pubspec.yaml .
           [ -d "/tmp/backup_temp/test" ] && cp -r /tmp/backup_temp/test .
           [ -d "/tmp/backup_temp/assets" ] && cp -r /tmp/backup_temp/assets .
-          echo "✅ Code Restored Successfully"
 
       - name: 🔥 Inject Firebase Crashlytics
         run: |
@@ -93,11 +78,10 @@ jobs:
             sed -i '/firebase_core:/a\  firebase_crashlytics: ^3.4.9' pubspec.yaml
           fi
 
-      - name: 🔥 Create Firebase Config Files (Updated with iOS)
+      - name: 🔥 Create Firebase Config Files
         run: |
           mkdir -p lib android/app
           
-          # Generates firebase_options.dart with iOS Info
           cat > lib/firebase_options.dart << 'EOF'
           import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
           import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
@@ -128,7 +112,6 @@ jobs:
           }
           EOF
           
-          # Generates google-services.json for Android
           cat > android/app/google-services.json << 'EOF'
           {
             "project_info": { "project_number": "55621733629", "project_id": "z-kinetic", "storage_bucket": "z-kinetic.firebasestorage.app" },
@@ -140,7 +123,7 @@ jobs:
           }
           EOF
 
-      - name: 🔧 Override build.gradle (FULL FIREBASE + MINIFY)
+      - name: 🔧 Override build.gradle (UPGRADED TO SDK 35)
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -153,7 +136,8 @@ jobs:
           
           android {
             namespace "com.aer.zkinetic"
-            compileSdk 34
+            // 🔥 UPGRADE: Tukar 34 ke 35 untuk support plugin baru
+            compileSdk 35
             ndkVersion flutter.ndkVersion
             
             compileOptions {
@@ -165,7 +149,8 @@ jobs:
             defaultConfig {
               applicationId "com.aer.zkinetic"
               minSdk 23
-              targetSdk 34
+              // 🔥 UPGRADE: Tukar 34 ke 35
+              targetSdk 35
               versionCode 1
               versionName "1.0"
               multiDexEnabled true
@@ -193,63 +178,40 @@ jobs:
           }
           EOF
 
-      - name: 🔧 Add ProGuard Rules (✅ FIREBASE OPTIMIZED)
+      - name: 🔧 Add ProGuard Rules
         run: |
           cat > android/app/proguard-rules.pro << 'EOF'
-          # Z-KINETIC PROGUARD RULES
+          # FIREBASE & FLUTTER PROGUARD RULES
           -keep class com.google.firebase.auth.** { *; }
           -keep class com.google.firebase.firestore.** { *; }
           -keep class com.google.firebase.crashlytics.** { *; }
           -keep class com.google.firebase.functions.** { *; }
           -keep class com.google.firebase.messaging.** { *; }
           -keep class com.google.firebase.iid.** { *; }
-          
-          -keepclassmembers class * {
-            @com.google.firebase.firestore.PropertyName <fields>;
-          }
-          
+          -keepclassmembers class * { @com.google.firebase.firestore.PropertyName <fields>; }
           -keep class com.google.android.gms.internal.** { *; }
           -keep class com.google.firebase.** { *; }
           -dontwarn com.google.firebase.**
           -dontwarn com.google.android.gms.**
-          
           -keep class io.flutter.app.** { *; }
           -keep class io.flutter.plugin.** { *; }
           -keep class io.flutter.util.** { *; }
           -keep class io.flutter.view.** { *; }
           -keep class io.flutter.** { *; }
           -keep class io.flutter.plugins.** { *; }
-          
           -dontwarn com.google.android.play.core.**
           -dontwarn io.flutter.embedding.engine.deferredcomponents.**
           -dontwarn org.conscrypt.**
           -dontwarn org.bouncycastle.**
           -dontwarn org.openjsse.**
-          
           -keep class com.aer.zkinetic.models.** { *; }
-          
           -keep class kotlin.** { *; }
           -keep class kotlinx.** { *; }
           -dontwarn kotlin.**
           -dontwarn kotlinx.**
-          
-          -keepclassmembers enum * {
-            public static **[] values();
-            public static ** valueOf(java.lang.String);
-          }
-          
-          -keepclassmembers class * implements android.os.Parcelable {
-            public static final ** CREATOR;
-          }
-          
-          -keepclassmembers class * implements java.io.Serializable {
-            static final long serialVersionUID;
-            private static final java.io.ObjectStreamField[] serialPersistentFields;
-            private void writeObject(java.io.ObjectOutputStream);
-            private void readObject(java.io.ObjectInputStream);
-            java.lang.Object writeReplace();
-            java.lang.Object readResolve();
-          }
+          -keepclassmembers enum * { public static **[] values(); public static ** valueOf(java.lang.String); }
+          -keepclassmembers class * implements android.os.Parcelable { public static final ** CREATOR; }
+          -keepclassmembers class * implements java.io.Serializable { static final long serialVersionUID; private static final java.io.ObjectStreamField[] serialPersistentFields; private void writeObject(java.io.ObjectOutputStream); private void readObject(java.io.ObjectInputStream); java.lang.Object writeReplace(); java.lang.Object readResolve(); }
           EOF
 
       - name: 🔧 Fix Project build.gradle
@@ -290,7 +252,7 @@ jobs:
           include ":app"
           EOF
 
-      - name: 🔧 Configure gradle.properties (MEMORY OPTIMIZED)
+      - name: 🔧 Configure gradle.properties
         run: |
           cat > android/gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx5120M -XX:MaxMetaspaceSize=1024m -XX:+UseParallelGC
@@ -324,9 +286,9 @@ jobs:
           name: Z-Kinetic v1.0.${{ github.run_number }}
           body: |
             🔥 **Z-Kinetic Production Build**
-            ✅ Auto-Locate Source Code
+            ✅ SDK 35 Compatible
+            ✅ Fixed .kts Conflict
             ✅ Firebase & Crashlytics Integration
-            ✅ ProGuard & R8 Fixed
             🔒 Secure Obfuscation
           files: build/app/outputs/flutter-apk/app-release.apk
         env:
