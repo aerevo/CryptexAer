@@ -1,6 +1,6 @@
 # File: .github/workflows/z-kinetic-unified.yml
-# 🛡️ Z-KINETIC (VERBOSE + MEMORY FIX)
-# Status: DENGAN DEBUG LOGGING PENUH ✅
+# 🛡️ Z-KINETIC (EMERGENCY MODE - NO OBFUSCATE)
+# Status: SIMPLE BUILD UNTUK DEBUG ✅
 
 name: Z-KINETIC Firebase Pipeline
 on:
@@ -104,7 +104,7 @@ jobs:
           }
           GOOGLESERVICES
 
-      - name: 🔧 Override build.gradle (MEMORY OPTIMIZED)
+      - name: 🔧 Override build.gradle (MINIMAL CONFIG)
         run: |
           cat > android/app/build.gradle << 'BUILDGRADLE'
           plugins {
@@ -116,7 +116,7 @@ jobs:
           
           android {
               namespace "com.aer.zkinetic"
-              compileSdk 36
+              compileSdk 34
               ndkVersion flutter.ndkVersion
               
               compileOptions {
@@ -137,7 +137,6 @@ jobs:
               buildTypes {
                   release {
                       signingConfig signingConfigs.debug
-                      // 👇 DISABLE MINIFY DULU UNTUK DEBUG
                       minifyEnabled false
                       shrinkResources false
                   }
@@ -150,8 +149,6 @@ jobs:
               implementation platform('com.google.firebase:firebase-bom:32.7.0')
               implementation 'com.google.firebase:firebase-analytics'
               implementation 'com.google.firebase:firebase-crashlytics'
-              implementation 'com.google.firebase:firebase-auth'
-              implementation 'com.google.firebase:firebase-firestore'
               implementation 'androidx.multidex:multidex:2.0.1'
           }
           BUILDGRADLE
@@ -162,8 +159,8 @@ jobs:
           buildscript {
               repositories { google(); mavenCentral() }
               dependencies {
-                  classpath 'com.android.tools.build:gradle:8.7.3'
-                  classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0'
+                  classpath 'com.android.tools.build:gradle:8.1.4'
+                  classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.23'
                   classpath 'com.google.gms:google-services:4.4.0'
                   classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.9'
               }
@@ -187,20 +184,18 @@ jobs:
           }
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.7.3" apply false
-              id "org.jetbrains.kotlin.android" version "2.1.0" apply false
+              id "com.android.application" version "8.1.4" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.23" apply false
               id "com.google.gms.google-services" version "4.4.0" apply false
           }
           include ":app"
           SETTINGSGRADLE
 
-      - name: 🔧 Configure gradle.properties (INCREASED MEMORY)
+      - name: 🔧 Configure gradle.properties
         run: |
           cat > android/gradle.properties << 'GRADLEPROPS'
-          org.gradle.jvmargs=-Xmx6144M -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC
+          org.gradle.jvmargs=-Xmx4096M -XX:+UseParallelGC
           org.gradle.daemon=false
-          org.gradle.parallel=true
-          org.gradle.caching=true
           android.useAndroidX=true
           android.enableJetifier=true
           android.nonTransitiveRClass=false
@@ -211,50 +206,47 @@ jobs:
           flutter pub get
           echo "✅ Dependencies installed"
 
-      - name: 🔍 Verify Build Configuration
+      - name: 🚀 Build Release APK (NO OBFUSCATE)
         run: |
-          echo "📁 Checking build.gradle..."
-          cat android/app/build.gradle | grep -A 5 "buildTypes"
-          echo "📁 Checking gradle.properties..."
-          cat android/gradle.properties
-          echo "📁 Checking google-services.json..."
-          cat android/app/google-services.json | head -10
+          # Build tanpa obfuscate dulu
+          flutter build apk --release --verbose 2>&1 | tee build_log.txt
+          
+          echo "📁 Build complete, checking output..."
+          ls -la build/ || echo "No build dir"
+          ls -la build/app/ || echo "No app dir"
+          ls -la build/app/outputs/ || echo "No outputs dir"
+          ls -la build/app/outputs/flutter-apk/ || echo "No flutter-apk dir"
 
-      - name: 🚀 Build Release APK (WITH VERBOSE LOGGING)
-        run: |
-          # Tambah --verbose untuk debug
-          flutter build apk --release --verbose 2>&1 | tee build_log.txt || {
-            echo "❌ BUILD FAILED - Printing last 100 lines:"
-            tail -100 build_log.txt
-            exit 1
-          }
-
-      - name: 📤 Upload Build Log (If Failed)
-        if: failure()
+      - name: 📤 Upload Full Build Log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
+          name: full-build-log
           path: build_log.txt
           retention-days: 7
 
-      - name: 🔍 Verify APK Exists
+      - name: 🔍 Debug Gradle Direct
+        if: failure()
         run: |
-          echo "🔍 Looking for APK..."
-          find build -name "*.apk" -type f || echo "❌ NO APK FOUND"
+          echo "🔥 Trying direct Gradle build..."
+          cd android
+          ./gradlew assembleRelease --stacktrace --info 2>&1 | tee ../gradle_direct.txt || true
           
-          if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
-            echo "✅ APK FOUND!"
-            ls -lh build/app/outputs/flutter-apk/app-release.apk
-          else
-            echo "❌ APK NOT IN EXPECTED LOCATION"
-            echo "📁 Listing build directory:"
-            ls -R build/ || true
-            exit 1
-          fi
+      - name: 📤 Upload Gradle Log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-direct-log
+          path: gradle_direct.txt
+          retention-days: 7
 
-      - name: 📤 Upload APK Artifact
+      - name: 📤 Upload APK (If Exists)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cryptex-aer-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/apk/**/*.apk
           retention-days: 30
+          if-no-files-found: warn
