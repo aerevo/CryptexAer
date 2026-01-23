@@ -1,10 +1,6 @@
-to# File: .github/workflows/z-kinetic-unified.yml
-# 🔥 Z-KINETIC GITHUB ACTIONS WORKFLOW (FIXED)
-# Status: PRODUCTION READY ✅
-# Fixes:
-# - ✅ ProGuard rules optimized for Firebase
-# - ✅ R8 warnings suppressed safely
-# - ✅ Crashlytics compatibility ensured
+# File: .github/workflows/z-kinetic-unified.yml
+# 🔥 Z-KINETIC GITHUB ACTIONS WORKFLOW (FIXED & CLEANED)
+# Status: PRODUCTION READY (SUBFOLDER SUPPORTED) ✅
 
 name: Z-KINETIC Full Production Build
 on:
@@ -17,10 +13,11 @@ jobs:
     name: 🔥 Full Firebase APK Build
     runs-on: ubuntu-latest
 
+    # ✅ INI BETUL: Semua command 'run' akan jalan dalam folder CryptexAer
     defaults:
       run:
-        working-directory: ./CryptexAer 
-   
+        working-directory: ./CryptexAer
+
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
@@ -58,7 +55,7 @@ jobs:
           [ -d "/tmp/backup_temp/test" ] && cp -r /tmp/backup_temp/test .
           [ -d "/tmp/backup_temp/assets" ] && cp -r /tmp/backup_temp/assets .
 
-      - name: 🔥 Inject Firebase
+      - name: 🔥 Inject Firebase Crashlytics
         run: |
           if ! grep -q "firebase_crashlytics:" pubspec.yaml; then
             sed -i '/firebase_core:/a\  firebase_crashlytics: ^3.4.9' pubspec.yaml
@@ -88,8 +85,11 @@ jobs:
               storageBucket: 'z-kinetic.firebasestorage.app',
             );
             static const FirebaseOptions ios = FirebaseOptions(
-              apiKey: 'IOS_KEY', appId: 'IOS_ID', messagingSenderId: '55621733629',
-              projectId: 'z-kinetic', storageBucket: 'z-kinetic.firebasestorage.app',
+              apiKey: 'IOS_KEY', 
+              appId: '1:55621733629:ios:98c57a2922abf197408294',
+              messagingSenderId: '55621733629',
+              projectId: 'z-kinetic', 
+              storageBucket: 'z-kinetic.firebasestorage.app',
               iosBundleId: 'com.aer.zkinetic'
             );
           }
@@ -320,6 +320,7 @@ jobs:
             - ✅ Firebase classes preserved correctly
             - ✅ Crashlytics stack traces working
             - ✅ No R8 build errors
-          files: build/app/outputs/flutter-apk/app-release.apk
+          # 👇 FIX: Langkah ini WAJIB guna full path sebab ia Plugin (bukan Run)
+          files: CryptexAer/build/app/outputs/flutter-apk/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
