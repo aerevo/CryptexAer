@@ -1,4 +1,8 @@
-name: Z-Kinetic Direct Build
+# File: .github/workflows/z-kinetic-unified.yml
+# 🛡️ Z-KINETIC FINAL FAST BUILD (SDK 34)
+# Status: ONE FILE CONFIG - NO GRADLE EDITING NEEDED ✅
+
+name: Z-Kinetic Fast Build
 on:
   workflow_dispatch:
   push:
@@ -6,7 +10,7 @@ on:
 
 jobs:
   build-apk:
-    name: 🛡️ Build APK (Direct)
+    name: 🛡️ Build APK (SDK 34 Fast)
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Repository
@@ -28,16 +32,16 @@ jobs:
         run: |
           rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
 
-      - name: 🏗️ Recreate Android Project
+      - name: 🏗️ Create Android Project
         run: |
-          # Create fresh android folder dengan package name BETUL
+          # Robot cipta folder android di sini
           flutter create --platforms android --org com.aer --project-name zkinetic .
 
-      - name: 🔥 Create Firebase Config Files
+      - name: 🔥 Create Firebase Configs
         run: |
           mkdir -p lib android/app
           
-          # 1. FIREBASE OPTIONS (Dummy untuk build lepas)
+          # 1. DUMMY FIREBASE OPTIONS
           cat > lib/firebase_options.dart << 'EOF'
           import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
           import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
@@ -75,7 +79,9 @@ jobs:
           }
           EOF
 
-      - name: 🔧 Override build.gradle (SDK 36 + Firebase)
+      # 👇 INI BAHAGIAN PENTING: ROBOT AKAN TULIS FAIL GRADLE UNTUK TUAN
+      # KITA GUNA SDK 34 SUPAYA TAK PAYAH DOWNLOAD LAMA-LAMA
+      - name: 🔧 Inject build.gradle (SDK 34)
         run: |
           cat > android/app/build.gradle << 'EOF'
           plugins {
@@ -87,14 +93,14 @@ jobs:
           }
           android {
               namespace = "com.aer.zkinetic"
-              compileSdk = 36
+              compileSdk = 34
               ndkVersion = flutter.ndkVersion
               compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = "17" }
               defaultConfig {
                   applicationId = "com.aer.zkinetic"
                   minSdk = 23
-                  targetSdk = 36
+                  targetSdk = 34
                   versionCode = 1
                   versionName = "1.0"
                   multiDexEnabled = true
@@ -118,7 +124,7 @@ jobs:
           }
           EOF
 
-      - name: 🔧 Fix Project build.gradle
+      - name: 🔧 Inject Project build.gradle
         run: |
           cat > android/build.gradle << 'EOF'
           buildscript {
@@ -142,7 +148,8 @@ jobs:
 
       - name: 🚀 Build APK
         run: |
-          flutter build apk --release --verbose
+          # Kita buang verbose supaya log bersih
+          flutter build apk --release
 
       - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
