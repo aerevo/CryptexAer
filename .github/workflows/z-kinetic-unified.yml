@@ -88,13 +88,16 @@ jobs:
         run: |
           cp pubspec.yaml pubspec.yaml.bak
           
-          # Update Firebase packages to SDK 36 compatible versions
+          # Update ALL Firebase packages to SDK 36 compatible versions
           sed -i 's/firebase_core:.*/firebase_core: ^4.0.0/' pubspec.yaml || true
           sed -i 's/firebase_auth:.*/firebase_auth: ^6.0.0/' pubspec.yaml || true
           sed -i 's/cloud_firestore:.*/cloud_firestore: ^6.0.0/' pubspec.yaml || true
           sed -i 's/firebase_crashlytics:.*/firebase_crashlytics: ^4.0.0/' pubspec.yaml || true
           sed -i 's/firebase_storage:.*/firebase_storage: ^13.0.0/' pubspec.yaml || true
           sed -i 's/firebase_messaging:.*/firebase_messaging: ^15.0.0/' pubspec.yaml || true
+          sed -i 's/firebase_app_check:.*/firebase_app_check: ^0.3.0/' pubspec.yaml || true
+          sed -i 's/firebase_analytics:.*/firebase_analytics: ^11.0.0/' pubspec.yaml || true
+          sed -i 's/firebase_dynamic_links:.*/firebase_dynamic_links: ^6.0.0/' pubspec.yaml || true
           
           # Update package_info_plus to v6 (compatible with Firebase 4.x)
           sed -i 's/package_info_plus:.*/package_info_plus: ^6.0.0/' pubspec.yaml || true
@@ -112,11 +115,15 @@ jobs:
           # Ensure package_info_plus uses v6 (compatible with web ^1.0.0)
           sed -i 's/package_info_plus:.*/package_info_plus: ^6.0.0/' pubspec.yaml || true
           
-          # Add dependency overrides to force web ^1.0.0 compatibility
+          # Update firebase_app_check to v0.3.0+ (SDK 36 compatible)
+          sed -i 's/firebase_app_check:.*/firebase_app_check: ^0.3.0/' pubspec.yaml || true
+          
+          # Add dependency overrides to force compatible versions
           if ! grep -q "dependency_overrides:" pubspec.yaml; then
             echo "" >> pubspec.yaml
             echo "dependency_overrides:" >> pubspec.yaml
             echo "  web: ^1.0.0" >> pubspec.yaml
+            echo "  firebase_core_platform_interface: ^6.0.2" >> pubspec.yaml
           else
             # Update existing overrides
             if ! grep -q "  web:" pubspec.yaml; then
@@ -124,11 +131,19 @@ jobs:
             else
               sed -i 's/  web:.*/  web: ^1.0.0/' pubspec.yaml
             fi
+            if ! grep -q "  firebase_core_platform_interface:" pubspec.yaml; then
+              sed -i '/dependency_overrides:/a\  firebase_core_platform_interface: ^6.0.2' pubspec.yaml
+            else
+              sed -i 's/  firebase_core_platform_interface:.*/  firebase_core_platform_interface: ^6.0.2/' pubspec.yaml
+            fi
           fi
           
           echo "✅ Dependencies aligned for SDK 36 compatibility"
           echo "📋 Updated pubspec.yaml preview:"
-          grep -A 25 "dependencies:" pubspec.yaml || true
+          grep -A 30 "dependencies:" pubspec.yaml || true
+          echo ""
+          echo "📋 Dependency Overrides:"
+          grep -A 10 "dependency_overrides:" pubspec.yaml || true
 
       - name: 🔥 Create Firebase Config Files
         run: |
