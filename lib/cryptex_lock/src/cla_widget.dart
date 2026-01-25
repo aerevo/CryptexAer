@@ -1,11 +1,11 @@
-// 🎯 Z-KINETIC UI V11.4 (MEMORY SAFE + CRASH PROTECTED)
-// Status: PRODUCTION READY ✅
+// ðŸŽ¯ Z-KINETIC UI V11.4 (MEMORY SAFE + CRASH PROTECTED)
+// Status: PRODUCTION READY âœ…
 // Location: lib/cryptex_lock/src/cla_widget.dart
 // Fixes Applied:
-// - ✅ All async operations check mounted + _isDisposed
-// - ✅ Timer cancellation on dispose
-// - ✅ Recursive call protection in _decayTouch()
-// - ✅ Memory leak prevention
+// - âœ… All async operations check mounted + _isDisposed
+// - âœ… Timer cancellation on dispose
+// - âœ… Recursive call protection in _decayTouch()
+// - âœ… Memory leak prevention
 
 import 'dart:async';
 import 'dart:math';
@@ -106,7 +106,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   bool _isStressTesting = false;
   String _stressResult = "";
   
-  // ✅ CRITICAL FIX: Add disposal flag
+  // âœ… CRITICAL FIX: Add disposal flag
   bool _isDisposed = false;
 
   final Color _neonCyan = const Color(0xFF00FFFF);
@@ -123,6 +123,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _startListening();
     widget.controller.addListener(_handleControllerChange);
 
+    widget.controller.shouldRandomizeWheels.addListener(_onRandomizeTrigger);
     _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _scanController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
     _reticleController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
@@ -130,19 +131,19 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _matrixRain = MatrixRain(columnCount: 4);
     _rainController = AnimationController(vsync: this, duration: const Duration(milliseconds: 50))
       ..addListener(() {
-        // ✅ FIX: Safety check before setState
+        // âœ… FIX: Safety check before setState
         if (!mounted || _isDisposed) return;
         _matrixRain.update();
         setState(() {});
       })..repeat();
 
     _tutorialHideTimer = Timer(const Duration(seconds: 5), () {
-      // ✅ FIX: Safety check
+      // âœ… FIX: Safety check
       if (mounted && !_isDisposed) setState(() => _showTutorial = false);
     });
   }
 
-  // ✅ FIX: Prevent callback after dispose
+  // âœ… FIX: Prevent callback after dispose
   void _handleControllerChange() {
     if (_isDisposed) return;
     
@@ -170,7 +171,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   void _userInteracted() {
     if (_showTutorial) {
-      // ✅ FIX: Safety check before setState
+      // âœ… FIX: Safety check before setState
       if (mounted && !_isDisposed) {
         setState(() => _showTutorial = false);
       }
@@ -182,7 +183,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _startListening() {
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((e) {
-      // ✅ FIX: Check disposal first
+      // âœ… FIX: Check disposal first
       if (_isDisposed) return;
       
       _accelNotifier.value = Offset(e.x, e.y);
@@ -206,7 +207,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _startLockoutTimer() {
     _lockoutTimer?.cancel();
     _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      // ✅ FIX: Safety check in timer
+      // âœ… FIX: Safety check in timer
       if (!mounted || _isDisposed) {
         timer.cancel();
         return;
@@ -222,7 +223,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   }
 
   void _triggerTouchActive() {
-    // ✅ FIX: Safety check
+    // âœ… FIX: Safety check
     if (_isDisposed) return;
     
     _touchScoreNotifier.value = 1.0;
@@ -231,23 +232,23 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _touchDecayTimer?.cancel();
     _touchDecayTimer = Timer(const Duration(seconds: 3), () {});
     
-    // ✅ FIX: Add safety delay before decay
+    // âœ… FIX: Add safety delay before decay
     Future.delayed(const Duration(milliseconds: 100), () {
       if (!mounted || _isDisposed) return;
       _decayTouch();
     });
   }
 
-  // ✅ CRITICAL FIX: The main memory leak source
+  // âœ… CRITICAL FIX: The main memory leak source
   void _decayTouch() {
-    // ✅ MUST CHECK BOTH mounted AND _isDisposed
+    // âœ… MUST CHECK BOTH mounted AND _isDisposed
     if (!mounted || _isDisposed) return;
     
     if (_touchScoreNotifier.value > 0) {
       _touchScoreNotifier.value -= 0.05;
       if (_touchScoreNotifier.value < 0) _touchScoreNotifier.value = 0;
       
-      // ✅ FIX: Check before recursive call
+      // âœ… FIX: Check before recursive call
       Future.delayed(const Duration(milliseconds: 50), () {
         if (!mounted || _isDisposed) return;
         _decayTouch();
@@ -263,23 +264,47 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _touchData.add({'timestamp': now, 'speed': speed, 'pressure': 0.5, 'wheelIndex': _activeWheelIndex ?? 0});
     if (_touchData.length > 20) _touchData.removeAt(0);
   }
+  
+  void _onRandomizeTrigger() {
+    if (!mounted || _isDisposed) return;
+    _randomizeWheels();
+  }
+
+  void _randomizeWheels() {
+    if (_isDisposed) return;
+    final random = Random();
+    
+    for (int i = 0; i < _scrollControllers.length; i++) {
+      // Putar ke nombor rawak (0-9)
+      final randomValue = random.nextInt(10);
+      
+      // Animasi laju sedikit untuk efek "terkejut"
+      _scrollControllers[i].animateToItem(
+        randomValue,
+        duration: Duration(milliseconds: 500 + random.nextInt(300)),
+        curve: Curves.easeOutBack,
+      );
+    }
+    HapticFeedback.heavyImpact(); // Gegar kuat
+  }
 
   @override
   void dispose() {
-    // ✅ FIX: Set flag FIRST before any cleanup
+    // âœ… FIX: Set flag FIRST before any cleanup
     _isDisposed = true;
     
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
+    widget.controller.shouldRandomizeWheels.removeListener(_onRandomizeTrigger);
     
-    // ✅ FIX: Cancel ALL timers
+    // âœ… FIX: Cancel ALL timers
     _accelSub?.cancel();
     _lockoutTimer?.cancel();
     _wheelActiveTimer?.cancel();
     _touchDecayTimer?.cancel();
     _tutorialHideTimer?.cancel();
     
-    // ✅ FIX: Dispose controllers
+    // âœ… FIX: Dispose controllers
     _pulseController.dispose();
     _scanController.dispose();
     _reticleController.dispose();
@@ -312,7 +337,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   @override
   Widget build(BuildContext context) {
-    // ✅ FIX: Safety check at build start
+    // âœ… FIX: Safety check at build start
     if (_isDisposed) return const SizedBox.shrink();
     
     SecurityState state = widget.controller.state;
@@ -379,7 +404,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                     decoration: BoxDecoration(border: Border.all(color: Colors.white24), borderRadius: BorderRadius.circular(5)),
                     child: _isStressTesting
                         ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text("⚡ LONG PRESS FOR BENCHMARK", style: TextStyle(color: activeColor.withOpacity(0.4), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 2.5)),
+                        : Text("âš¡ LONG PRESS FOR BENCHMARK", style: TextStyle(color: activeColor.withOpacity(0.4), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 2.5)),
                   ),
                 ),
               ],
@@ -483,7 +508,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 if (notification is ScrollStartNotification) {
                   for (int i = 0; i < _scrollControllers.length; i++) {
                     if (_scrollControllers[i].position == notification.metrics) {
-                      // ✅ FIX: Safety check
+                      // âœ… FIX: Safety check
                       if (mounted && !_isDisposed) {
                         setState(() { _activeWheelIndex = i; });
                       }
@@ -515,7 +540,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     return Expanded(
       child: Listener(
         onPointerDown: (_) {
-          // ✅ FIX: Safety check
+          // âœ… FIX: Safety check
           if (_isDisposed) return;
           setState(() => _activeWheelIndex = index);
           _wheelActiveTimer?.cancel();
@@ -559,25 +584,25 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _resetActiveWheelTimer() {
     _wheelActiveTimer?.cancel();
     _wheelActiveTimer = Timer(const Duration(milliseconds: 300), () {
-      // ✅ FIX: Safety check
+      // âœ… FIX: Safety check
       if (mounted && !_isDisposed) setState(() => _activeWheelIndex = null);
     });
   }
 
   Future<void> _runStressTest() async {
-    // ✅ FIX: Safety check
+    // âœ… FIX: Safety check
     if (_isDisposed) return;
     
     setState(() {
       _isStressTesting = true;
-      _stressResult = "⚠️ LAUNCHING 50 CONCURRENT VECTORS...";
+      _stressResult = "âš ï¸ LAUNCHING 50 CONCURRENT VECTORS...";
     });
 
     final stopwatch = Stopwatch()..start();
     final random = Random();
 
     await Future.wait(List.generate(50, (index) async {
-      // ✅ FIX: Check in loop
+      // âœ… FIX: Check in loop
       if (_isDisposed) return;
       await Future.delayed(Duration(milliseconds: random.nextInt(50)));
       await widget.controller.validateAttempt(hasPhysicalMovement: true);
@@ -586,16 +611,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     stopwatch.stop();
     final double tps = 50 / (stopwatch.elapsedMilliseconds / 1000);
 
-    // ✅ FIX: Check before setState
+    // âœ… FIX: Check before setState
     if (!mounted || _isDisposed) return;
     
     setState(() {
       _isStressTesting = false;
-      _stressResult = "📊 BENCHMARK REPORT:\nTotal: 50 Threads\nTime: ${stopwatch.elapsedMilliseconds}ms\nSpeed: ${tps.toStringAsFixed(0)} TPS (High Load)\nIntegrity: STABLE (No Crash)";
+      _stressResult = "ðŸ“Š BENCHMARK REPORT:\nTotal: 50 Threads\nTime: ${stopwatch.elapsedMilliseconds}ms\nSpeed: ${tps.toStringAsFixed(0)} TPS (High Load)\nIntegrity: STABLE (No Crash)";
     });
 
     Future.delayed(const Duration(seconds: 8), () {
-      // ✅ FIX: Safety check
+      // âœ… FIX: Safety check
       if (mounted && !_isDisposed) setState(() => _stressResult = "");
     });
   }
@@ -719,8 +744,8 @@ class KineticPeripheralPainter extends CustomPainter {
       for (int i = 0; i < 4; i++) {
         double lat = ((valX * 10) + (i * 1.5)).clamp(-90, 90);
         double lng = ((valY * 10) - (i * 2.1)).clamp(-180, 180);
-        _drawText(canvas, tp, "${lat.toStringAsFixed(2)}°", 2, 35.0 + (i*24), 6, color.withOpacity(0.6), false);
-        _drawText(canvas, tp, "${lng.toStringAsFixed(2)}°", 2, 45.0 + (i*24), 6, color.withOpacity(0.6), false);
+        _drawText(canvas, tp, "${lat.toStringAsFixed(2)}Â°", 2, 35.0 + (i*24), 6, color.withOpacity(0.6), false);
+        _drawText(canvas, tp, "${lng.toStringAsFixed(2)}Â°", 2, 45.0 + (i*24), 6, color.withOpacity(0.6), false);
       }
       canvas.drawLine(const Offset(42, 10), const Offset(42, 130), p);
     } else {
@@ -805,7 +830,7 @@ class KineticScanLinePainter extends CustomPainter {
 }
 
 // ============================================
-// ✅ USAGE INSTRUCTIONS
+// âœ… USAGE INSTRUCTIONS
 // ============================================
 // 
 // Copy semua 3 PART ke dalam fail cla_widget.dart:
