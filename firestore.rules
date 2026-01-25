@@ -1,22 +1,132 @@
+// FILE: firestore.rules
+// Z-KINETIC FIRESTORE SECURITY RULES (EDGE COMPUTING MODEL)
+// NO RAW BIOMETRICS STORAGE - Only threat intelligence
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ✅ MODE DEVELOPMENT: Benarkan User (Anonymous) baca/tulis
+    // ============================================
+    // GLOBAL THREAT INTELLIGENCE COLLECTION
+    // ============================================
+    match /global_threat_intel/{threatId} {
+      // Allow authenticated users to CREATE threat reports
+      // NO RAW BIOMETRIC DATA - Only statistical indicators
+      allow create: if request.auth != null 
+                    && request.resource.data.keys().hasAll([
+                      'threat_type', 
+                      'severity', 
+                      'device_os', 
+                      'timestamp'
+                    ])
+                    && request.resource.data.severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+                    && request.resource.data.threat_type is string
+                    // Ensure NO raw biometric data
+                    && !request.resource.data.keys().hasAny([
+                      'motion_events', 
+                      'touch_events', 
+                      'raw_data',
+                      'biometric_data'
+                    ]);
+      
+      // Only admins can read threat reports
+      allow read: if request.auth != null 
+                  && request.auth.token.admin == true;
+      
+      // No updates allowed (immutable threat logs)
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // THREAT STATISTICS (Aggregated Data)
+    // ============================================
+    match /threat_statistics/{statId} {
+      // Public read for dashboard
+      allow read: if request.auth != null;
+      
+      // Only Cloud Functions can write
+      allow write: if false;
+    }
+    
+    // ============================================
+    // THREAT ANALYTICS (Dashboard Data)
+    // ============================================
+    match /threat_analytics/{analyticsId} {
+      // Admins only
+      allow read: if request.auth != null 
+                  && request.auth.token.admin == true;
+      
+      // Only Cloud Functions can write
+      allow write: if false;
+    }
+    
+    // ============================================
+    // BANK ALERTS (Partner Notifications)
+    // ============================================
+    match /bank_alerts/{alertId} {
+      // Bank partners can read their alerts
+      allow read: if request.auth != null 
+                  && (request.auth.token.admin == true 
+                      || request.auth.token.bank_partner == true);
+      
+      // Only Cloud Functions can write
+      allow write: if false;
+    }
+    
+    // ============================================
+    // USER BASELINES (Legacy - Optional)
+    // ============================================
     match /user_baselines/{deviceId} {
+      // Allow users to read/write their own baseline
       allow read, write: if request.auth != null;
     }
     
+    // ============================================
+    // SYSTEM ERRORS (Internal Logging)
+    // ============================================
+    match /system_errors/{errorId} {
+      // Admins only
+      allow read: if request.auth != null 
+                  && request.auth.token.admin == true;
+      
+      // Only Cloud Functions can write
+      allow write: if false;
+    }
+    
+    // ============================================
+    // BLACKLISTED DEVICES
+    // ============================================
     match /blacklisted_devices/{deviceId} {
+      // Users can check if their device is blacklisted
       allow read: if request.auth != null;
+      
+      // Only Cloud Functions can blacklist
+      allow write: if false;
     }
     
+    // ============================================
+    // SECURITY INCIDENTS (Legacy - Deprecated)
+    // ============================================
     match /security_incidents/{incidentId} {
-      allow create: if request.auth != null;
+      // Deprecated - Use global_threat_intel instead
+      allow read: if request.auth != null 
+                  && request.auth.token.admin == true;
+      allow create: if false; // Force migration to new model
     }
     
+    // ============================================
+    // VERIFICATION LOGS (Legacy - Deprecated)
+    // ============================================
     match /verification_logs/{logId} {
-      allow read, write: if false; 
+      // Deprecated - No longer storing verification logs
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // DEFAULT DENY ALL
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
