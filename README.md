@@ -1,694 +1,413 @@
-<invoke name="artifacts">
-<parameter name="command">create</parameter>
-<parameter name="type">text/markdown</parameter>
-<parameter name="id">z-kinetic-readme</parameter>
-<parameter name="title">README.md - Z-KINETIC Documentation</parameter>
-<parameter name="content"># 🛡️ Z-KINETIC INTELLIGENCE HUB V7.2
+# Z-KINETIC EDGE COMPUTING REFACTOR
 
-[![Security](https://img.shields.io/badge/security-MILITARY__GRADE-red)]()
-[![Platform](https://img.shields.io/badge/platform-Flutter%203.x-blue)]()
-[![Server](https://img.shields.io/badge/server-Node.js%2016%2B-green)]()
-[![License](https://img.shields.io/badge/license-PROPRIETARY-black)]()
+## 🎯 PIVOT: Privacy-First Threat Intelligence
 
-> **Next-Generation Transaction Security Suite**  
-> *Detects Bots. Blocks MITM Attacks. Validates Data Integrity.*
+**Business Model**: Waze for Cyber Threats  
+**Privacy Guarantee**: Raw biometric data NEVER leaves the device
 
 ---
 
-## 📋 Table of Contents
+## ✅ WHAT CHANGED
 
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Architecture](#-architecture)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [Usage](#-usage)
-- [Security Model](#-security-model)
-- [API Documentation](#-api-documentation)
-- [Troubleshooting](#-troubleshooting)
-- [Contributing](#-contributing)
-
----
-
-## 🌟 Overview
-
-Z-KINETIC is **not** a traditional biometric lock. It's an **intelligence engine** that validates:
-
-1. **User authenticity** (human vs bot detection)
-2. **Transaction integrity** (MITM attack detection)
-3. **Behavioral patterns** (account takeover prevention)
-
-### Real-World Use Case
-
+### **BEFORE (Old Model)**
 ```
-🏦 Banking App Scenario:
-├─ User tries to transfer RM 50,000
-├─ MITM attacker changes to RM 500,000
-├─ Z-KINETIC detects hash mismatch
-├─ Warns user + logs incident
-└─ Transaction blocked/flagged
+Phone → Raw Biometrics → Firebase → AI Analysis → Verdict
+❌ Privacy Risk: Raw touch/motion data uploaded
+❌ Bandwidth: Heavy data transfer
+❌ Latency: Round-trip to server
+```
+
+### **AFTER (Edge Computing)**
+```
+Phone → [AI Analysis LOCAL] → Threat Detected? → Firebase (Metadata Only)
+✅ Privacy: Only threat indicators uploaded
+✅ Speed: Local analysis (no network delay)
+✅ Efficiency: Minimal data transfer
 ```
 
 ---
 
-## ✨ Key Features
+## 📦 FILES MODIFIED
 
-### 🤖 **Bot Detection**
-- Analyzes motion sensor data (tremor patterns)
-- Detects auto-clickers and ADB automation
-- Real-time behavioral fingerprinting
+### **1. lib/cryptex_lock/src/behavioral_analyzer.dart**
+**Changes:**
+- ✅ All analysis now happens ON-DEVICE
+- ✅ Added `_reportThreat()` method
+- ✅ Only uploads threat metadata (NO raw biometrics)
+- ✅ Uploads to `global_threat_intel` collection
 
-### 🔐 **MITM Protection**
-- Zero-knowledge proof validation
-- SHA-256 hash verification
-- Nonce-based replay immunity
-
-### 🧠 **AI Learning**
-- Adapts to user behavior over time
-- Z-score anomaly detection
-- Personalized security thresholds
-
-### 📊 **Incident Reporting**
-- Local forensic logging (SQLite)
-- Server-side threat intelligence
-- Automatic blacklisting
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│          FLUTTER APP (Client)                   │
-├─────────────────────────────────────────────────┤
-│  UI Layer                                       │
-│  ├─ CryptexLock Widget (cla_widget.dart)       │
-│  └─ Lock Screen UI                             │
-├─────────────────────────────────────────────────┤
-│  Controller Layer                               │
-│  ├─ ClaController V2 (cla_controller_v2.dart)  │
-│  │  ├─ Adaptive AI Engine ✨ NEW              │
-│  │  ├─ Motion/Touch Buffers                    │
-│  │  └─ State Management                        │
-│  └─ Transaction Service                        │
-├─────────────────────────────────────────────────┤
-│  Security Core (Headless)                       │
-│  ├─ Behavioral Analyzer                        │
-│  ├─ Adaptive Threshold Engine                  │
-│  ├─ Replay Tracker                             │
-│  └─ Attestation Providers                      │
-├─────────────────────────────────────────────────┤
-│  Data Layer                                     │
-│  ├─ Incident Storage (SQLite)                  │
-│  ├─ Device Fingerprint                         │
-│  └─ Secure Storage                             │
-└─────────────────────────────────────────────────┘
-                    ▼ HTTPS ▼
-┌─────────────────────────────────────────────────┐
-│       NODE.JS SERVER (Mirror Service)           │
-├─────────────────────────────────────────────────┤
-│  ├─ Biometric Validator                        │
-│  ├─ Threat Analyzer ✨ NEW                     │
-│  ├─ Device Blacklist Manager                   │
-│  └─ Rate Limiter (Adaptive)                    │
-└─────────────────────────────────────────────────┘
-```
-
-### Key Components
-
-| Component | Purpose | Location |
-|-----------|---------|----------|
-| **ClaController V2** | Main orchestrator with AI | `lib/cryptex_lock/src/cla_controller_v2.dart` |
-| **Security Core** | Headless validation engine | `lib/cryptex_lock/src/security_core.dart` |
-| **Behavioral Analyzer** | Bot detection | `lib/cryptex_lock/src/behavioral_analyzer.dart` |
-| **Adaptive Engine** | User learning | `lib/cryptex_lock/src/adaptive_threshold_engine.dart` |
-| **Mirror Server** | Backend validation | `server/server.js` |
-
----
-
-## 📦 Installation
-
-### Prerequisites
-
-```bash
-# Flutter SDK
-flutter --version  # >= 3.0.0
-
-# Node.js (for server)
-node --version     # >= 16.0.0
-npm --version      # >= 8.0.0
-```
-
----
-
-### Client Setup (Flutter)
-
-#### 1. Clone Repository
-```bash
-git clone https://github.com/your-org/z-kinetic.git
-cd z-kinetic
-```
-
-#### 2. Install Dependencies
-```bash
-flutter pub get
-```
-
-#### 3. Configure App
-Edit `lib/main.dart`:
-
-```dart
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize incident storage
-  await IncidentStorage.database;
-  
-  runApp(const MyApp());
+**What Gets Uploaded:**
+```json
+{
+  "threat_type": "MECHANICAL_RHYTHM",
+  "severity": "HIGH",
+  "device_os": "Android 36",
+  "device_type": "Android",
+  "app_version": "1.0.0",
+  "timestamp": "2026-01-24T10:30:00Z",
+  "indicators": {
+    "bot_probability": 85,
+    "human_likelihood": 15,
+    "anomaly_score": 78,
+    "suspicious_count": 3
+  },
+  "region": "ASIA_SOUTHEAST"
 }
 ```
 
-#### 4. Run App
-```bash
-# Development
-flutter run
+**What is NOT Uploaded:**
+- ❌ Raw touch events
+- ❌ Raw motion events
+- ❌ Timestamps
+- ❌ Pressure values
+- ❌ Velocity data
+- ❌ Any PII (Personally Identifiable Information)
 
-# Production build
-flutter build apk --release
-flutter build ios --release
+---
+
+### **2. functions/index.js (Cloud Functions)**
+**Changes:**
+- ✅ Removed old `analyzeBlackBox` function (no longer needed)
+- ✅ Added `processThreatIntel` trigger
+- ✅ Added `alertBankPartners()` function
+- ✅ Added `getThreatStats()` callable function
+- ✅ Added `getThreatHeatmap()` for analytics
+- ✅ Added `cleanupOldThreats()` scheduled function
+
+**New Trigger:**
+```javascript
+exports.processThreatIntel = functions
+  .firestore
+  .document('global_threat_intel/{threatId}')
+  .onCreate(async (snap, context) => {
+    // Process new threat
+    // Alert bank partners if HIGH/CRITICAL
+    // Update global statistics
+  });
 ```
 
 ---
 
-### Server Setup (Node.js)
+### **3. firestore.rules**
+**Changes:**
+- ✅ Added `global_threat_intel` collection rules
+- ✅ Enforces: NO raw biometric data in uploads
+- ✅ Validates: Only required fields (threat_type, severity, etc.)
+- ✅ Security: Users can CREATE, Admins can READ
+- ✅ Immutable: No updates/deletes (audit trail)
 
-#### 1. Navigate to Server
-```bash
-cd server
+**Validation Rules:**
+```javascript
+allow create: if request.resource.data.keys().hasAll([
+  'threat_type', 
+  'severity', 
+  'device_os', 
+  'timestamp'
+])
+// Ensure NO raw biometric data
+&& !request.resource.data.keys().hasAny([
+  'motion_events', 
+  'touch_events', 
+  'raw_data',
+  'biometric_data'
+]);
 ```
 
-#### 2. Install Dependencies
+---
+
+## 🚀 DEPLOYMENT STEPS
+
+### **Step 1: Update Flutter Code**
 ```bash
+# Copy the new behavioral_analyzer.dart
+cp behavioral_analyzer.dart lib/cryptex_lock/src/
+
+# No pubspec.yaml changes needed (uses existing packages)
+```
+
+### **Step 2: Deploy Cloud Functions**
+```bash
+cd functions
 npm install
+firebase deploy --only functions
 ```
 
-#### 3. Configure Environment
+### **Step 3: Update Firestore Rules**
 ```bash
-cp .env.example .env
-nano .env
+firebase deploy --only firestore:rules
 ```
 
-**🚨 CRITICAL: Change these secrets!**
-
+### **Step 4: Create Firestore Indexes**
 ```bash
-# Generate new JWT secret
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Paste result in .env
-JWT_SECRET=<your_generated_secret>
-HMAC_SECRET=<another_generated_secret>
+# Navigate to Firebase Console
+# Firestore → Indexes → Composite
+# Create index:
+# Collection: global_threat_intel
+# Fields: severity (Ascending), timestamp (Descending)
 ```
 
-#### 4. Start Server
+### **Step 5: Test the System**
 ```bash
-# Development
-npm run dev
+# Run the app
+flutter run --release
 
-# Production
-npm start
+# Trigger a bot-like interaction (fast taps, no motion)
+# Check Firestore Console → global_threat_intel
+# Should see threat report appear (NO raw biometrics)
 ```
 
-#### 5. Verify Health
-```bash
-curl http://localhost:3000/health
+---
+
+## 📊 FIRESTORE COLLECTIONS
+
+### **global_threat_intel** (NEW)
+```
+Document ID: Auto-generated
+Fields:
+  - threat_type: String (MECHANICAL_RHYTHM, NO_TREMOR_DETECTED, etc.)
+  - severity: String (CRITICAL, HIGH, MEDIUM, LOW)
+  - device_os: String (Android 36, iOS 17, etc.)
+  - device_type: String (Android, iOS)
+  - app_version: String (1.0.0)
+  - timestamp: Timestamp
+  - indicators: Map
+    - bot_probability: Number (0-100)
+    - human_likelihood: Number (0-100)
+    - anomaly_score: Number (0-100)
+    - suspicious_count: Number
+  - region: String (ASIA_SOUTHEAST, etc.)
 ```
 
-Expected response:
+### **threat_statistics** (NEW)
+```
+Document ID: global
+Fields:
+  - total_threats: Number
+  - by_severity: Map
+    - CRITICAL: Number
+    - HIGH: Number
+    - MEDIUM: Number
+  - by_type: Map
+    - MECHANICAL_RHYTHM: Number
+    - NO_TREMOR_DETECTED: Number
+    - etc...
+  - last_updated: Timestamp
+```
+
+### **bank_alerts** (NEW)
+```
+Document ID: Auto-generated
+Fields:
+  - alert_id: String
+  - threat_id: String (Reference to global_threat_intel)
+  - severity: String
+  - threat_type: String
+  - region: String
+  - timestamp: Timestamp
+  - message: String
+```
+
+---
+
+## 🔒 PRIVACY GUARANTEES
+
+### **What We Collect:**
+✅ Threat type (e.g., "MECHANICAL_RHYTHM")  
+✅ Severity level (CRITICAL/HIGH/MEDIUM/LOW)  
+✅ Device OS (e.g., "Android 36")  
+✅ Statistical indicators (bot_probability: 85%)  
+✅ Geographic region (ASIA_SOUTHEAST)  
+
+### **What We DON'T Collect:**
+❌ Raw touch events  
+❌ Raw motion events  
+❌ Exact timestamps  
+❌ Device IDs (anonymized)  
+❌ User IDs  
+❌ IP addresses (handled by Firebase)  
+❌ Any PII  
+
+### **Compliance:**
+- ✅ GDPR Compliant (no personal data)
+- ✅ PDPA Malaysia Compliant
+- ✅ Apple Privacy Guidelines
+- ✅ Google Play Data Safety Requirements
+
+---
+
+## 🏦 BANK PARTNER INTEGRATION
+
+### **Alert Flow:**
+```
+HIGH Threat Detected → Cloud Function → alertBankPartners()
+                                            ↓
+                                    Store in bank_alerts
+                                            ↓
+                                    [Future: HTTP POST to Bank API]
+```
+
+### **Bank API Payload (Future):**
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2025-01-21T10:30:00.000Z",
-  "version": "3.0.0"
+  "alert_id": "ALERT_1737712800000",
+  "threat_id": "abc123",
+  "severity": "HIGH",
+  "threat_type": "MECHANICAL_RHYTHM",
+  "region": "ASIA_SOUTHEAST",
+  "timestamp": "2026-01-24T10:30:00Z",
+  "message": "HIGH SEVERITY THREAT DETECTED: MECHANICAL_RHYTHM"
 }
 ```
 
----
-
-## ⚙️ Configuration
-
-### Client Configuration
-
-**File:** `lib/main.dart`
-
-```dart
-final config = SecurityConfig(
-  // Core Settings
-  enableBiometrics: true,
-  maxAttempts: 5,
-  lockoutDuration: const Duration(seconds: 30),
-  
-  // Server Integration
-  enableServerValidation: true,
-  serverEndpoint: "https://api.yourdomain.com",
-  allowOfflineFallback: true,
-  
-  // Incident Reporting
-  enableIncidentReporting: true,
-  autoReportCriticalThreats: true,
-  retryFailedReports: true,
-);
-```
-
-### Server Configuration
-
-**File:** `server/.env`
-
-```bash
-# Server
-NODE_ENV=production
-PORT=3000
-
-# Security
-JWT_SECRET=<64-char-hex-string>
-HMAC_SECRET=<64-char-hex-string>
-
-# Biometric Thresholds
-MIN_ENTROPY=0.5
-MIN_TREMOR_HZ=7.5
-MAX_TREMOR_HZ=13.5
-MIN_CONFIDENCE_SCORE=0.85
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000  # 15 minutes
-RATE_LIMIT_MAX_REQUESTS=5
-```
+### **Integration Steps (For Banks):**
+1. Provide REST API endpoint
+2. Generate API key
+3. Update `alertBankPartners()` function
+4. Uncomment HTTP POST code
+5. Test with sandbox environment
 
 ---
 
-## 🚀 Usage
+## 📈 ANALYTICS DASHBOARD
 
-### Basic Integration
+### **Available Endpoints:**
 
-```dart
-import 'package:your_app/cryptex_lock/cryptex_lock.dart';
+#### **1. Get Global Stats**
+```javascript
+const getThreatStats = firebase.functions().httpsCallable('getThreatStats');
+const stats = await getThreatStats();
 
-class LoginScreen extends StatefulWidget {
-  @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends State<LoginScreen> {
-  late ClaController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    
-    // Initialize controller
-    _controller = ClaController(
-      ClaConfig(
-        secret: [1, 7, 3, 9, 2],  // Your PIN
-        enableSensors: true,
-        maxAttempts: 5,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: CryptexLock(
-        controller: _controller,
-        onSuccess: _handleSuccess,
-        onFail: _handleFailure,
-        onJammed: _handleLockout,
-      ),
-    );
-  }
-
-  void _handleSuccess() {
-    if (_controller.isPanicMode) {
-      // Silent alarm triggered
-      _sendSilentAlert();
-    }
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => DashboardScreen()),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-}
-```
-
----
-
-### Advanced: Custom Attestation
-
-```dart
-// Create custom device attestation
-final deviceProvider = DeviceIntegrityAttestation(
-  allowDebugMode: false,
-  allowEmulators: false,
-  strictMode: true,
-);
-
-// Create server attestation
-final serverProvider = ServerAttestationProvider(
-  ServerAttestationConfig(
-    endpoint: 'https://api.yourdomain.com/v1/unlock',
-    apiKey: 'YOUR_API_KEY',
-  ),
-);
-
-// Combine both (composite attestation)
-final compositeProvider = CompositeAttestationProvider(
-  [deviceProvider, serverProvider],
-  strategy: AttestationStrategy.ALL_MUST_PASS,
-);
-
-// Use in config
-final controller = ClaController(
-  ClaConfig(
-    secret: [1, 7, 3, 9, 2],
-    attestationProvider: compositeProvider,
-  ),
-);
-```
-
----
-
-## 🔒 Security Model
-
-### Threat Detection Layers
-
-```
-┌─────────────────────────────────────┐
-│  Layer 1: Motion Biometrics         │
-│  ├─ Tremor frequency (8-12 Hz)      │
-│  ├─ Micro-movements                 │
-│  └─ Acceleration patterns           │
-├─────────────────────────────────────┤
-│  Layer 2: Touch Dynamics            │
-│  ├─ Pressure variance               │
-│  ├─ Velocity profiles               │
-│  └─ Hesitation patterns             │
-├─────────────────────────────────────┤
-│  Layer 3: Temporal Analysis         │
-│  ├─ Interaction timing              │
-│  ├─ Speed consistency               │
-│  └─ Pause distribution              │
-├─────────────────────────────────────┤
-│  Layer 4: AI Anomaly Detection      │
-│  ├─ Z-score analysis (3σ)           │
-│  ├─ Behavioral baseline             │
-│  └─ Adaptive thresholds             │
-├─────────────────────────────────────┤
-│  Layer 5: Zero-Knowledge Proof      │
-│  ├─ SHA-256 hash validation         │
-│  ├─ Nonce-based replay immunity     │
-│  └─ Server attestation              │
-└─────────────────────────────────────┘
-```
-
-### Attack Resistance
-
-| Attack Type | Detection Method | Mitigation |
-|-------------|------------------|------------|
-| **Auto-clicker** | Perfect timing detection | Blocked (no tremor) |
-| **ADB Automation** | Constant pressure variance | Flagged as bot |
-| **MITM Attack** | Hash mismatch | Transaction blocked |
-| **Replay Attack** | Nonce validation | Request rejected |
-| **Account Takeover** | Behavioral drift | Anomaly alert |
-| **Overlay Phishing** | Value manipulation detection | User warning |
-
----
-
-## 📡 API Documentation
-
-### Client-to-Server Flow
-
-```
-Client                          Server
-  │                               │
-  ├─── POST /api/v1/verify ──────>│
-  │    {                          │
-  │      device_id,               │
-  │      biometric: {...},        │
-  │      zk_proof,                │
-  │      nonce,                   │
-  │      timestamp                │
-  │    }                          │
-  │                               │
-  │<─── 200 OK ───────────────────┤
-       {                          │
-         allow: true,             │
-         token: "...",            │
-         confidence: 0.92         │
-       }                          │
-```
-
-### Endpoints
-
-#### `POST /api/v1/verify`
-Validate biometric attempt.
-
-**Request:**
-```json
+// Returns:
 {
-  "device_id": "DEVICE_abc123",
-  "app_signature": "hash_value",
-  "nonce": "unique_nonce",
-  "timestamp": 1705843200000,
-  "biometric": {
-    "entropy": 0.85,
-    "tremor_hz": 10.2,
-    "frequency_variance": 0.15,
-    "average_magnitude": 1.8,
-    "unique_gesture_count": 7,
-    "interaction_time_ms": 2300
+  total_threats: 1234,
+  by_severity: {
+    CRITICAL: 45,
+    HIGH: 123,
+    MEDIUM: 890
   },
-  "zk_proof": "sha256_hash",
-  "motion_signature": "hash"
+  by_type: {
+    MECHANICAL_RHYTHM: 567,
+    NO_TREMOR_DETECTED: 234,
+    ...
+  }
 }
 ```
 
-**Response (Success):**
-```json
+#### **2. Get Threat Heatmap**
+```javascript
+const getHeatmap = firebase.functions().httpsCallable('getThreatHeatmap');
+const heatmap = await getHeatmap({ timeRange: '24h' });
+
+// Returns:
 {
-  "allow": true,
-  "token": "jwt_token_here",
-  "expires_in": 30,
-  "confidence": 0.92
-}
-```
-
-**Response (Failed):**
-```json
-{
-  "allow": false,
-  "reason": "low_entropy_pattern",
-  "confidence": 0.35
-}
-```
-
----
-
-#### `POST /api/v1/report-incident`
-Report security incident.
-
-**Request:**
-```json
-{
-  "incident_id": "INC-1705843200000",
-  "timestamp": "2025-01-21T10:30:00Z",
-  "device_id": "DEVICE_abc123",
-  "threat_intel": {
-    "type": "MITM_AMOUNT_MANIPULATION",
-    "original_val": "RM 50,000.00",
-    "manipulated_val": "RM 500,000.00"
-  },
-  "action": "TRANSACTION_BLOCKED"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "incident_id": "INC-1705843200000",
-  "severity": "CRITICAL",
-  "actions_taken": {
-    "logged": true,
-    "device_blacklisted": true,
-    "ip_restricted": true
+  timeRange: '24h',
+  total_threats: 156,
+  data: {
+    ASIA_SOUTHEAST: {
+      total: 89,
+      by_severity: { CRITICAL: 12, HIGH: 34, MEDIUM: 43 },
+      by_type: { MECHANICAL_RHYTHM: 45, ... }
+    },
+    ...
   }
 }
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 🧪 TESTING
 
-### Common Issues
+### **Test Case 1: Normal Human Behavior**
+```
+Action: Normal unlock (shake phone + tap wheels)
+Expected: No threat report
+Check: Firestore global_threat_intel should be empty
+```
 
-#### ❌ "INSUFFICIENT BIOMETRIC DATA"
+### **Test Case 2: Bot Behavior**
+```
+Action: Fast taps, no motion, perfect rhythm
+Expected: Threat report created
+Check: Firestore global_threat_intel should have 1 document
+  - threat_type: "MECHANICAL_RHYTHM" or "INHUMAN_SPEED"
+  - severity: "HIGH"
+  - indicators.bot_probability: > 60
+```
 
-**Cause:** Phone is stationary or user interaction too brief.
-
-**Fix:**
-```dart
-// Lower threshold in development
-const config = ClaConfig(
-  minShake: 0.3,  // Lower from default 0.4
-  thresholdAmount: 0.2,  // Lower from 0.25
-);
+### **Test Case 3: Bank Alert**
+```
+Action: Trigger 3+ HIGH threats in 10 minutes
+Expected: Bank alert created
+Check: Firestore bank_alerts should have 1 document
 ```
 
 ---
 
-#### ❌ "Device Blacklisted"
+## 🐛 TROUBLESHOOTING
 
-**Cause:** Multiple failed attempts or critical security incident.
+### **Problem: Threats not being uploaded**
+**Solution:**
+1. Check Firebase Auth (user must be authenticated)
+2. Check Firestore rules (allow create for authenticated users)
+3. Check console logs for errors
+4. Verify `global_threat_intel` collection exists
 
-**Fix (Development):**
-```bash
-# Server console
-curl -X POST http://localhost:3000/admin/unblock-device \
-  -H "Content-Type: application/json" \
-  -d '{"device_id": "DEVICE_abc123"}'
+### **Problem: Cloud Function not triggering**
+**Solution:**
+1. Check Cloud Functions logs: `firebase functions:log`
+2. Verify function deployed: `firebase functions:list`
+3. Check Firestore trigger path: `global_threat_intel/{threatId}`
+4. Test manually: Create document in Firestore Console
+
+### **Problem: Privacy violation (raw data uploaded)**
+**Solution:**
+1. Check Firestore rules (should reject if motion_events present)
+2. Review behavioral_analyzer.dart `_reportThreat()` method
+3. Verify only `threatData` map is uploaded (no session data)
+
+---
+
+## 📝 MIGRATION NOTES
+
+### **For Existing Users:**
+- ✅ No action required (backward compatible)
+- ✅ Old `user_baselines` still work (optional)
+- ✅ New threat reporting happens automatically
+- ✅ No data loss (old logs preserved)
+
+### **Deprecated Collections:**
+- `security_incidents` → Use `global_threat_intel`
+- `verification_logs` → No longer needed (local analysis)
+
+### **Cleanup (Optional):**
+```javascript
+// Delete old verification logs (save storage costs)
+firebase firestore:delete verification_logs --recursive
 ```
 
 ---
 
-#### ❌ Server Connection Failed
+## 🎉 BENEFITS
 
-**Fix:**
-```dart
-// Enable offline fallback
-const config = SecurityConfig(
-  allowOfflineFallback: true,
-);
-```
+### **For Users:**
+✅ **Privacy**: Raw biometrics stay on device  
+✅ **Speed**: Instant local analysis (no network delay)  
+✅ **Offline**: Works without internet (verification only)  
 
-Check server:
-```bash
-# View server logs
-npm run logs:view
+### **For Business:**
+✅ **Compliance**: GDPR/PDPA ready  
+✅ **Scalability**: Reduced server load  
+✅ **Cost**: Lower Firebase usage (minimal writes)  
 
-# Check server status
-curl http://localhost:3000/health
-```
+### **For Banks:**
+✅ **Real-time Alerts**: Instant threat notifications  
+✅ **Analytics**: Global threat heatmap  
+✅ **Zero PII**: No liability for user data  
 
 ---
 
-### Debug Mode
+## 📞 SUPPORT
 
-Enable verbose logging:
-
-```dart
-// Client
-import 'package:flutter/foundation.dart';
-
-if (kDebugMode) {
-  print('🧠 AI Profile: ${controller.aiProfile}');
-  print('📊 Session: ${controller.getSessionSnapshot()}');
-}
-```
-
-```bash
-# Server
-LOG_LEVEL=debug npm run dev
-```
-
----
-
-## 📊 Performance Benchmarks
-
-```bash
-flutter test test/performance_benchmark_test.dart
-```
-
-**Expected Results:**
-```
-Core Validation:        < 5ms avg
-Behavioral Analysis:    < 20ms avg
-Anomaly Detection:      < 10ms avg
-Total Validation:       < 50ms P95
-Throughput:             > 100 attempts/sec
-```
-
----
-
-## 🧪 Testing
-
-```bash
-# Unit tests
-flutter test
-
-# Integration tests
-flutter test integration_test/
-
-# Coverage report
-flutter test --coverage
-genhtml coverage/lcov.info -o coverage/html
-```
-
----
-
-## 🤝 Contributing
-
-### Development Workflow
-
-1. Fork repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Run tests: `flutter test`
-4. Commit: `git commit -m 'Add amazing feature'`
-5. Push: `git push origin feature/amazing-feature`
-6. Open Pull Request
-
-### Code Standards
-
-- **Dart:** Follow [Effective Dart](https://dart.dev/guides/language/effective-dart)
-- **JavaScript:** ESLint configuration included
-- **Comments:** Document all public APIs
-- **Tests:** Minimum 80% coverage for new code
-
----
-
-## 📄 License
-
-**PROPRIETARY** - All rights reserved.
-
-Contact: [your-email@domain.com](mailto:your-email@domain.com)
-
----
-
-## 🙏 Credits
-
-Built with:
-- Flutter (Google)
-- Express.js
-- Winston (Logging)
-- SQLite
-
-Security research references:
-- OWASP Mobile Security Testing Guide
-- NIST Biometric Standards
-- IEEE Behavioral Biometrics Papers
-
----
-
-## 📞 Support
-
-- 📧 Email: support@yourdomain.com
-- 💬 Discord: [Join Server](https://discord.gg/yourserver)
-- 📚 Wiki: [GitHub Wiki](https://github.com/your-org/z-kinetic/wiki)
-
----
-
-**Made with ❤️ by ZyaMina Tech**</parameter>
+**Questions?** Contact Captain Aer  
+**Documentation**: https://docs.z-kinetic.com  
+**GitHub**: https://github.com/z-kinetic/edge-computing
