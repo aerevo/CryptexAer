@@ -1,5 +1,13 @@
-// 📂 lib/cryptex_lock/src/motion_models.dart
-import 'cla_models.dart';
+// 📂 lib/cryptex_lock/src/motion_models.dart (FIXED ✅)
+import 'dart:math';
+
+// ✅ ENUM THREAT LEVEL (Tambahan Baru)
+enum ThreatLevel {
+  SAFE,
+  SUSPICIOUS,
+  HIGH_RISK,
+  CRITICAL
+}
 
 // ✅ ALIAS: Supaya kod lama yang panggil 'MotionData' tak error
 typedef MotionData = MotionEvent;
@@ -47,7 +55,7 @@ class TouchEvent {
     this.velocityX = 0,
     this.velocityY = 0,
   });
-  
+
   Map<String, dynamic> toJson() => {
     'p': pressure.toStringAsFixed(3),
     't': timestamp.millisecondsSinceEpoch,
@@ -58,7 +66,35 @@ class TouchEvent {
   };
 }
 
-/// ✅ CRITICAL: Object ini yang hilang tadi!
+/// ✅ CRITICAL: BiometricSession (Tambahan Baru)
+class BiometricSession {
+  final String sessionId;
+  final DateTime startTime;
+  final List<MotionEvent> motionEvents;
+  final List<TouchEvent> touchEvents;
+  final Duration duration;
+  final double entropy;
+
+  BiometricSession({
+    required this.sessionId,
+    required this.startTime,
+    required this.motionEvents,
+    required this.touchEvents,
+    required this.duration,
+    this.entropy = 0.0,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'start_time': startTime.toIso8601String(),
+    'motion_count': motionEvents.length,
+    'touch_count': touchEvents.length,
+    'duration_ms': duration.inMilliseconds,
+    'entropy': entropy,
+  };
+}
+
+/// ✅ CRITICAL: ValidationAttempt
 class ValidationAttempt {
   final String attemptId;
   final List<int> inputCode;
@@ -94,7 +130,7 @@ class BiometricData {
   };
 }
 
-/// ✅ CRITICAL: Validation Result
+/// ✅ CRITICAL: Validation Result (FIXED)
 class ValidationResult {
   final bool allowed;
   final SecurityState newState;
@@ -122,7 +158,11 @@ class ValidationResult {
     );
   }
 
-  factory ValidationResult.denied({required String reason, required ThreatLevel threatLevel, double confidence = 0.0}) {
+  factory ValidationResult.denied({
+    required String reason, 
+    required ThreatLevel threatLevel, 
+    double confidence = 0.0
+  }) {
     return ValidationResult(
       allowed: false,
       newState: SecurityState.SOFT_LOCK,
@@ -131,4 +171,13 @@ class ValidationResult {
       confidence: confidence,
     );
   }
+}
+
+// ✅ Import SecurityState dari cla_models
+enum SecurityState {
+  LOCKED,
+  VALIDATING,
+  UNLOCKED,
+  SOFT_LOCK,
+  HARD_LOCK,
 }
