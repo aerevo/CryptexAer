@@ -1,8 +1,4 @@
-/*
- * PROJECT: Z-KINETIC SECURITY CORE
- * MODULE: Server-Side Attestation Provider (FIXED)
- * STATUS: BUILD ERROR RESOLVED ✅
- */
+// lib/cryptex_lock/src/server_attestation_provider.dart (FIXED ✅)
 
 import 'dart:async';
 import 'dart:convert';
@@ -12,26 +8,26 @@ import 'package:crypto/crypto.dart';
 import 'security_core.dart';
 import 'motion_models.dart';
 
-// Device fingerprint helper (embedded - no external dependency)
+// Device fingerprint helper (embedded)
 class _DeviceFingerprint {
   static String _cachedDeviceId = '';
   static String _cachedSecret = '';
 
   static Future<String> getDeviceId() async {
     if (_cachedDeviceId.isNotEmpty) return _cachedDeviceId;
-    
+
     _cachedDeviceId = 'DEVICE_${DateTime.now().millisecondsSinceEpoch}';
     return _cachedDeviceId;
   }
 
   static Future<String> getDeviceSecret() async {
     if (_cachedSecret.isNotEmpty) return _cachedSecret;
-    
+
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final input = 'SECRET_$timestamp';
     final bytes = utf8.encode(input);
     final digest = sha256.convert(bytes);
-    
+
     _cachedSecret = digest.toString();
     return _cachedSecret;
   }
@@ -57,7 +53,7 @@ class ServerAttestationConfig {
 
 class ServerAttestationProvider implements AttestationProvider {
   final ServerAttestationConfig config;
-  
+
   DateTime? _lastRequest;
   int _requestCount = 0;
   static const int _maxRequestsPerMinute = 10;
@@ -75,11 +71,11 @@ class ServerAttestationProvider implements AttestationProvider {
       return await _attestWithRetry(attempt);
     } catch (e) {
       if (kDebugMode) print('❌ Server attestation failed: $e');
-      
+
       if (config.enableFallback) {
         return _useFallback(attempt);
       }
-      
+
       return AttestationResult(
         verified: false,
         token: '',
@@ -91,21 +87,21 @@ class ServerAttestationProvider implements AttestationProvider {
 
   Future<AttestationResult> _attestWithRetry(ValidationAttempt attempt) async {
     int retries = 0;
-    
+
     while (retries <= config.maxRetries) {
       try {
         return await _makeAttestationRequest(attempt);
       } catch (e) {
         retries++;
-        
+
         if (retries > config.maxRetries) {
           rethrow;
         }
-        
+
         await Future.delayed(Duration(milliseconds: 500 * retries));
       }
     }
-    
+
     throw Exception('Max retries exceeded');
   }
 
@@ -155,9 +151,10 @@ class ServerAttestationProvider implements AttestationProvider {
       deviceSecret,
     );
 
+    // ✅ FIXED: Cek type sebelum summarize
     final bioSummary = attempt.biometricData != null
-        ? _summarizeBiometric(attempt.biometricData!)
-        : null;
+      ? _summarizeBiometricData(attempt.biometricData!)
+      : null;
 
     return {
       'attempt_id': attempt.attemptId,
@@ -181,13 +178,12 @@ class ServerAttestationProvider implements AttestationProvider {
     return digest.toString();
   }
 
-  Map<String, dynamic> _summarizeBiometric(BiometricSession session) {
+  // ✅ FIXED: Terima BiometricData (bukan BiometricSession)
+  Map<String, dynamic> _summarizeBiometricData(BiometricData data) {
     return {
-      'entropy': session.entropy.toStringAsFixed(4),
-      'motion_count': session.motionEvents.length,
-      'touch_count': session.touchEvents.length,
-      'duration_ms': session.duration.inMilliseconds,
-      'session_id': session.sessionId,
+      'entropy': data.entropy.toStringAsFixed(4),
+      'motion_count': data.motionEvents.length,
+      'touch_count': data.touchEvents.length,
     };
   }
 
@@ -226,9 +222,9 @@ class ServerAttestationProvider implements AttestationProvider {
 
   void _trackRequest() {
     final now = DateTime.now();
-    
-    if (_lastRequest == null || 
-        now.difference(_lastRequest!) > const Duration(minutes: 1)) {
+
+    if (_lastRequest == null ||
+      now.difference(_lastRequest!) > const Duration(minutes: 1)) {
       _requestCount = 1;
       _lastRequest = now;
     } else {
@@ -238,14 +234,14 @@ class ServerAttestationProvider implements AttestationProvider {
 
   bool _isRateLimited() {
     if (_lastRequest == null) return false;
-    
+
     final elapsed = DateTime.now().difference(_lastRequest!);
-    
+
     if (elapsed > const Duration(minutes: 1)) {
       _requestCount = 0;
       return false;
     }
-    
+
     return _requestCount >= _maxRequestsPerMinute;
   }
 }
@@ -253,7 +249,7 @@ class ServerAttestationProvider implements AttestationProvider {
 class RateLimitException implements Exception {
   final String message;
   RateLimitException(this.message);
-  
+
   @override
   String toString() => 'RateLimitException: $message';
 }
@@ -261,7 +257,7 @@ class RateLimitException implements Exception {
 class ServerException implements Exception {
   final String message;
   ServerException(this.message);
-  
+
   @override
   String toString() => 'ServerException: $message';
 }
