@@ -1,122 +1,133 @@
-// FILE: lib/cryptex_lock/src/motion_models.dart
-// STATUS: HYBRID BRIDGE (Supports V1 & V3) ✅
+// 📂 lib/cryptex_lock/src/motion_models.dart
+import 'cla_models.dart';
 
-import 'dart:math';
-import 'dart:ui';
-import 'cla_models.dart'; // Pastikan ini wujud
+// ✅ ALIAS: Supaya kod lama yang panggil 'MotionData' tak error
+typedef MotionData = MotionEvent;
+typedef TouchData = TouchEvent;
 
-// ==========================================
-// 1. MODERN TYPES (Untuk Controller V3)
-// ==========================================
-
-class TouchData {
+/// Raw motion sensor reading
+class MotionEvent {
+  final double magnitude;
   final DateTime timestamp;
-  final double pressure;
-  final Offset position;
+  final double deltaX;
+  final double deltaY;
+  final double deltaZ;
 
-  TouchData({
+  MotionEvent({
+    required this.magnitude,
     required this.timestamp,
-    required this.pressure,
-    required this.position,
+    this.deltaX = 0,
+    this.deltaY = 0,
+    this.deltaZ = 0,
   });
+
+  Map<String, dynamic> toJson() => {
+    'm': magnitude.toStringAsFixed(4),
+    't': timestamp.millisecondsSinceEpoch,
+    'dx': deltaX.toStringAsFixed(4),
+    'dy': deltaY.toStringAsFixed(4),
+    'dz': deltaZ.toStringAsFixed(4),
+  };
 }
 
-class MotionData {
+/// Raw touch sensor reading
+class TouchEvent {
+  final double pressure;
+  final DateTime timestamp;
   final double x;
   final double y;
-  final double z;
-  final DateTime timestamp;
+  final double velocityX;
+  final double velocityY;
 
-  MotionData({
+  TouchEvent({
+    required this.pressure,
+    required this.timestamp,
     required this.x,
     required this.y,
-    required this.z,
+    this.velocityX = 0,
+    this.velocityY = 0,
+  });
+  
+  Map<String, dynamic> toJson() => {
+    'p': pressure.toStringAsFixed(3),
+    't': timestamp.millisecondsSinceEpoch,
+    'x': x.toStringAsFixed(1),
+    'y': y.toStringAsFixed(1),
+    'vx': velocityX.toStringAsFixed(2),
+    'vy': velocityY.toStringAsFixed(2),
+  };
+}
+
+/// ✅ CRITICAL: Object ini yang hilang tadi!
+class ValidationAttempt {
+  final String attemptId;
+  final List<int> inputCode;
+  final BiometricData? biometricData;
+  final bool hasPhysicalMovement;
+  final DateTime timestamp;
+
+  ValidationAttempt({
+    required this.attemptId,
+    required this.inputCode,
+    this.biometricData,
+    this.hasPhysicalMovement = false,
     required this.timestamp,
   });
-
-  // Compatibility getter for Legacy engines
-  double get magnitude => sqrt(x*x + y*y + z*z);
 }
 
-// ==========================================
-// 2. LEGACY COMPATIBILITY (Untuk Security Core Lama)
-// ==========================================
-
-// Alias: Kalau ada fail minta 'MotionEvent', bagi dia 'MotionData'
-typedef MotionEvent = MotionData; 
-
-class ValidationAttempt {
-  final List<int> input;
-  final DateTime timestamp;
-  
-  ValidationAttempt(this.input, {DateTime? timestamp}) 
-      : timestamp = timestamp ?? DateTime.now();
-}
-
-class BiometricSession {
-  final String sessionId;
-  final List<MotionData> motionEvents;
-  final List<TouchData> touchEvents;
-  final Duration duration;
+/// ✅ CRITICAL: Biometric Data Wrapper
+class BiometricData {
+  final List<MotionEvent> motionEvents;
+  final List<TouchEvent> touchEvents;
   final double entropy;
 
-  BiometricSession({
-    required this.sessionId,
+  BiometricData({
     required this.motionEvents,
     required this.touchEvents,
-    required this.duration,
-    required this.entropy,
+    this.entropy = 0.0,
   });
+
+  Map<String, dynamic> toJson() => {
+    'motion_count': motionEvents.length,
+    'touch_count': touchEvents.length,
+    'entropy': entropy,
+  };
 }
 
-// ==========================================
-// 3. HYBRID RESULT (Faham Semua Bahasa)
-// ==========================================
-
+/// ✅ CRITICAL: Validation Result
 class ValidationResult {
-  final bool isValid;
-  final bool isPanic;
-  final String? message;
-  
-  // Legacy fields
+  final bool allowed;
   final SecurityState newState;
-  final dynamic threatLevel;
+  final ThreatLevel threatLevel;
+  final String reason;
   final double confidence;
+  final Map<String, dynamic> metadata;
 
   ValidationResult({
-    required this.isValid,
-    this.isPanic = false,
-    this.message,
-    this.newState = SecurityState.LOCKED,
-    this.threatLevel,
-    this.confidence = 0.0,
+    required this.allowed,
+    required this.newState,
+    required this.threatLevel,
+    required this.reason,
+    required this.confidence,
+    this.metadata = const {},
   });
 
-  // Getter supaya kod lama yang cari '.allowed' tak crash
-  bool get allowed => isValid;
-
-  // Factory untuk kod lama
-  factory ValidationResult.denied({
-    required String reason, 
-    dynamic threatLevel,
-    double confidence = 0.0
-  }) {
+  factory ValidationResult.success({required double confidence, bool isPanicMode = false}) {
     return ValidationResult(
-      isValid: false,
-      message: reason,
-      newState: SecurityState.LOCKED,
+      allowed: true,
+      newState: SecurityState.UNLOCKED,
+      threatLevel: ThreatLevel.SAFE,
+      reason: isPanicMode ? 'PANIC_MODE' : 'VERIFIED',
       confidence: confidence,
     );
   }
 
-  factory ValidationResult.success({
-    double confidence = 1.0, 
-    bool isPanicMode = false
-  }) {
+  factory ValidationResult.denied({required String reason, required ThreatLevel threatLevel, double confidence = 0.0}) {
     return ValidationResult(
-      isValid: true,
-      isPanic: isPanicMode,
-      newState: SecurityState.UNLOCKED,
+      allowed: false,
+      newState: SecurityState.SOFT_LOCK,
+      threatLevel: threatLevel,
+      reason: reason,
       confidence: confidence,
     );
   }
