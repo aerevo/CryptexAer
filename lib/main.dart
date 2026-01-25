@@ -1,7 +1,6 @@
-// File: lib/main.dart
+// File: lib/main.dart (FIXED ✅)
 // 🛡️ Z-KINETIC V3.3 (FINAL INTEGRATION)
-// Status: PRODUCTION READY ✅
-// Update: Wired Panic Mode & Fake Bank Screen
+// Status: PRODUCTION READY
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -13,7 +12,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'firebase_options.dart'; 
+import 'firebase_options.dart';
 
 // 🔐 Z-KINETIC INTERNAL MODULES
 import 'cryptex_lock/cryptex_lock.dart' hide ClaController;
@@ -21,16 +20,15 @@ import 'cryptex_lock/src/cla_controller_v2.dart';
 import 'cryptex_lock/src/device_integrity_attestation.dart';
 import 'cryptex_lock/src/server_attestation_provider.dart';
 import 'cryptex_lock/src/composite_attestation.dart';
+import 'cryptex_lock/src/cla_models.dart';
 
 // 🏦 FAKE BANK SCREEN (Panic Mode Destination)
-// Pastikan fail ini wujud di folder lib/screens/
-import 'screens/fake_bank_screen.dart'; 
+import 'screens/fake_bank_screen.dart';
 
 void main() async {
-  // Membungkus seluruh aplikasi dalam zon kawalan ralat
   runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    
+
     // 1. Inisialisasi Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -64,7 +62,7 @@ class ZKineticApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0A0A), // Deep Black
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
         primaryColor: Colors.cyanAccent,
         useMaterial3: true,
       ),
@@ -81,8 +79,7 @@ class LockScreen extends StatefulWidget {
   State<LockScreen> createState() => _LockScreenState();
 }
 
-// 📂 lib/main.dart (BAHAGIAN _LockScreenState SAHAJA)
-
+// ✅ FIXED: Complete _LockScreenState
 class _LockScreenState extends State<LockScreen> {
   late ClaController _controller;
   bool _isInitialized = false;
@@ -98,35 +95,35 @@ class _LockScreenState extends State<LockScreen> {
     final config = ClaConfig(
       secret: [1, 2, 3, 4, 5],
       maxAttempts: 3,
-      jamCooldown: 30,
-      apiEndpoint: "https://api.z-kinetic.com/verify",
-      apiKey: "zk_live_xxx",
-      // ✅ FIX: Tambah parameter wajib ini
-      minSolveTime: 500, 
+      jamCooldown: const Duration(seconds: 30),
+      minSolveTime: const Duration(milliseconds: 500),
+      minShake: 2.0,
+      thresholdAmount: 5.0,
     );
 
     // 2. Setup Attestation
-    // ✅ FIX: Masukkan config ke dalam constructor
-    final serverAttest = ServerAttestationProvider(config); 
-    
     final deviceAttest = DeviceIntegrityAttestation();
     
-    // ✅ FIX: CompositeAttestation (Pastikan import betul)
-    final compositeAttest = CompositeAttestation(
-      providers: [deviceAttest, serverAttest],
-      threshold: 0.85,
+    final serverConfig = ServerAttestationConfig(
+      endpoint: "https://api.z-kinetic.com/verify",
+      apiKey: "zk_live_xxx",
+    );
+    final serverAttest = ServerAttestationProvider(serverConfig);
+
+    // ✅ FIXED: CompositeAttestationProvider (bukan CompositeAttestation)
+    final compositeAttest = CompositeAttestationProvider(
+      [deviceAttest, serverAttest],
+      strategy: AttestationStrategy.WEIGHTED,
+      requiredConfidence: 0.85,
     );
 
     // 3. Setup Controller
     _controller = ClaController(
-      config: config,
-      attestationProvider: compositeAttest,
+      config: config.copyWith(attestationProvider: compositeAttest),
     );
 
     setState(() => _isInitialized = true);
   }
-  // ... (baki kod sama)
-}
 
   @override
   void dispose() {
@@ -140,11 +137,10 @@ class _LockScreenState extends State<LockScreen> {
 
     // Check for Panic Mode trigger
     if (_controller.isPanicMode) {
-      // Navigate to Fake Bank Screen
       Navigator.push(context, MaterialPageRoute(
-        builder: (_) => const FakeBankScreen() 
+        builder: (_) => const FakeBankScreen()
       ));
-      return; // Stop here, don't show success message
+      return;
     }
 
     // Normal Success
@@ -159,13 +155,10 @@ class _LockScreenState extends State<LockScreen> {
 
   void _onFail() {
     HapticFeedback.heavyImpact();
-    
-    // Note: The random wheel spin animation is triggered automatically 
-    // by the widget listening to the controller
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("❌ INVALID CODE"), 
+        content: Text("❌ INVALID CODE"),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       )
@@ -176,7 +169,7 @@ class _LockScreenState extends State<LockScreen> {
     HapticFeedback.vibrate();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("⛔ SYSTEM HALTED"), 
+        content: Text("⛔ SYSTEM HALTED"),
         backgroundColor: Colors.deepOrange,
         behavior: SnackBarBehavior.floating,
       )
@@ -185,7 +178,9 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized) return const Scaffold(backgroundColor: Colors.black);
+    if (!_isInitialized) {
+      return const Scaffold(backgroundColor: Colors.black);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -193,9 +188,9 @@ class _LockScreenState extends State<LockScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          widget.systemName, 
+          widget.systemName,
           style: const TextStyle(
-            color: Colors.cyanAccent, 
+            color: Colors.cyanAccent,
             fontSize: 10,
             letterSpacing: 2,
             fontWeight: FontWeight.w600,
@@ -215,8 +210,8 @@ class _LockScreenState extends State<LockScreen> {
                 onJammed: _onJammed,
               ),
               const SizedBox(height: 40),
-              
-              // Optional: Visualize Biometric Score (for demo/debugging)
+
+              // Optional: Visualize Biometric Score
               ValueListenableBuilder<double>(
                 valueListenable: _controller.touchScore,
                 builder: (context, score, _) {
@@ -238,4 +233,3 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 }
-
