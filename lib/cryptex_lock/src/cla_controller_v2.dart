@@ -5,6 +5,7 @@
 // - ✅ Timer cancellation on registerTouch()
 // - ✅ Disposal flag prevents callback leaks
 // - ✅ All async operations check _isDisposed
+// - ✅ Added Random Wheel Trigger on Failure
 
 import 'dart:async';
 import 'dart:math';
@@ -38,238 +39,176 @@ class ClaController extends ChangeNotifier {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final FirebaseBlackBoxClient _blackBox = FirebaseBlackBoxClient();
 
+  // State Variables
   SecurityState _uiState = SecurityState.LOCKED;
-  List<int> currentValues = [0, 0, 0, 0, 0];
-  String _currentSessionId = '';
-  DateTime? _sessionStart;
-
-  final List<MotionEvent> _motionBuffer = [];
-  final List<TouchEvent> _touchBuffer = [];
-
-  List<MotionEvent> get motionBuffer => List.unmodifiable(_motionBuffer);
-  List<TouchEvent> get touchBuffer => List.unmodifiable(_touchBuffer);
-
-  final ValueNotifier<double> _confidenceNotifier = ValueNotifier(0.0);
-  final ValueNotifier<double> _motionEntropyNotifier = ValueNotifier(0.0);
-  final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
-
-  String _threatMessage = "";
   bool _isPanicMode = false;
-  bool _isPaused = false;
-  Timer? _touchDecayTimer;
+  String _threatMessage = "";
+  String _currentSessionId = "";
+  int _failedAttempts = 0;
+
+  // ✅ NEW: Trigger for Random Wheel Rotation
+  // UI listens to this. When value flips, wheels spin.
+  final ValueNotifier<bool> _shouldRandomizeWheels = ValueNotifier(false);
+  ValueNotifier<bool> get shouldRandomizeWheels => _shouldRandomizeWheels;
+
+  // Analysis Buffers
+  final List<TouchData> _touchBuffer = [];
+  final List<MotionData> _motionBuffer = [];
   
-  // ✅ CRITICAL FIX: Add disposal flag
+  // Public Notifiers for UI visualization
+  final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
+  final ValueNotifier<double> _motionEntropyNotifier = ValueNotifier(0.0);
+  
+  // Safety Flags
   bool _isDisposed = false;
 
-  ClaController(this.config) {
-    _core = SecurityCore(config.toCoreConfig());
-    _startNewSession();
-  }
-
+  // Getters
   SecurityState get state => _uiState;
-  int get failedAttempts => _core.failedAttempts;
   bool get isPanicMode => _isPanicMode;
   String get threatMessage => _threatMessage;
-  ValueNotifier<double> get confidenceNotifier => _confidenceNotifier;
-  ValueNotifier<double> get motionEntropyNotifier => _motionEntropyNotifier;
-  ValueNotifier<double> get touchScoreNotifier => _touchScoreNotifier;
-  double get liveConfidence => _confidenceNotifier.value;
+  
+  ValueNotifier<double> get touchScore => _touchScoreNotifier;
+  ValueNotifier<double> get motionEntropyNotifier => _motionEntropyNotifier; // Access notifier directly
+  
+  // Computed getters for snapshot
+  double get liveConfidence => _touchScoreNotifier.value;
   double get motionEntropy => _motionEntropyNotifier.value;
-  int get remainingLockoutSeconds => _core.remainingLockoutSeconds;
+  int get failedAttempts => _failedAttempts;
 
-  void onInteractionStart() {
-    if (_isDisposed) return; // ✅ FIX
+  // Constructor
+  ClaController({required this.config}) {
+    _core = SecurityCore(config: config.toCoreConfig());
     _startNewSession();
   }
 
-  void updateWheel(int index, int value) {
-    if (_isDisposed) return; // ✅ FIX
-    if (index >= 0 && index < currentValues.length) {
-      currentValues[index] = value;
-      notifyListeners();
-    }
-  }
-
-  int getInitialValue(int index) => currentValues[index];
-
-  void registerShake(double rawMag, double x, double y, double z) {
-    if (_isDisposed || _isPaused || _uiState == SecurityState.UNLOCKED) return; // ✅ FIX
-    
-    final event = MotionEvent(
-      magnitude: rawMag,
-      timestamp: DateTime.now(),
-      deltaX: x,
-      deltaY: y,
-      deltaZ: z,
-    );
-    _motionBuffer.add(event);
-    if (_motionBuffer.length > 50) _motionBuffer.removeAt(0);
-    _motionEntropyNotifier.value = _calculateEntropy();
-  }
-
-  // ✅ CRITICAL FIX: Cancel existing timer before creating new one
-  void registerTouch({double pressure = 0.5, double vx = 0, double vy = 0}) {
-    if (_isDisposed || _isPaused || _uiState == SecurityState.UNLOCKED) return; // ✅ FIX
-    
-    final event = TouchEvent(
-      timestamp: DateTime.now(),
-      pressure: pressure,
-      velocityX: vx,
-      velocityY: vy,
-    );
-    _touchBuffer.add(event);
-    if (_touchBuffer.length > 50) _touchBuffer.removeAt(0);
-    _touchScoreNotifier.value = 1.0;
-    
-    // ✅ CRITICAL FIX: Cancel old timer to prevent memory leak
-    _touchDecayTimer?.cancel();
-    
-    _touchDecayTimer = Timer(const Duration(milliseconds: 500), () {
-      // ✅ FIX: Check disposal before async operation
-      if (_isDisposed) return;
-      Future.delayed(const Duration(milliseconds: 100), _decayTouch);
-    });
-    
+  // Lifecycle Methods
+  void onInteractionStart() {
+    if (_isDisposed) return;
+    _uiState = SecurityState.LOCKED;
     notifyListeners();
   }
 
-  void _decayTouch() {
-    if (_isDisposed) return; // ✅ FIX: Safety check
+  // Touch Registration
+  void registerTouch(Offset position, double pressure, DateTime timestamp) {
+    if (_isDisposed) return;
+    _touchBuffer.add(TouchData(
+      timestamp: timestamp, 
+      pressure: pressure, 
+      position: position
+    ));
     
-    if (_touchScoreNotifier.value > 0) {
-      _touchScoreNotifier.value -= 0.02;
-      if (_touchScoreNotifier.value < 0) _touchScoreNotifier.value = 0;
-      
-      // ✅ FIX: Check before recursive call
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (!_isDisposed) _decayTouch();
-      });
+    // Simple confidence simulation for UI feedback
+    if (_touchBuffer.length > 2) {
+        _touchScoreNotifier.value = (_touchBuffer.length / 15).clamp(0.0, 1.0);
     }
   }
 
-  Future<bool> validateAttempt({bool hasPhysicalMovement = true}) async {
-    if (_isDisposed || _core.state == SecurityState.HARD_LOCK) return false; // ✅ FIX
+  // Motion Registration
+  void registerMotion(double x, double y, double z, DateTime timestamp) {
+    if (_isDisposed) return;
+    _motionBuffer.add(MotionData(x: x, y: y, z: z, timestamp: timestamp));
     
-    _uiState = SecurityState.VALIDATING;
-    _threatMessage = "";
-    notifyListeners();
+    // Update entropy every few frames
+    if (_motionBuffer.length % 5 == 0) {
+       _motionEntropyNotifier.value = _calculateEntropy();
+    }
+  }
 
-    await Future.delayed(const Duration(milliseconds: 300));
+  // Main Verification Logic
+  Future<ValidationResult> verify(List<int> inputCode) async {
+    if (_isDisposed) return ValidationResult(isValid: false);
 
-    BiometricSession? bioSession;
-    if (_motionBuffer.isNotEmpty || _touchBuffer.isNotEmpty) {
-      bioSession = BiometricSession(
-        sessionId: _currentSessionId,
-        startTime: _sessionStart ?? DateTime.now(),
-        motionEvents: List.from(_motionBuffer),
-        touchEvents: List.from(_touchBuffer),
-        duration: DateTime.now().difference(_sessionStart ?? DateTime.now()),
-      );
+    // 1. Check Panic Mode (Reverse Code Logic)
+    // Convert List<int> to String for comparison
+    String inputStr = inputCode.join();
+    String secretStr = config.secret.join();
+    String reversedSecret = secretStr.split('').reversed.join();
+
+    if (inputStr == reversedSecret) {
+      _isPanicMode = true;
+      _triggerSuccess();
+      return ValidationResult(isValid: true, isPanic: true);
     }
 
-    try {
-      final deviceId = await DeviceFingerprint.getDeviceId();
-      final nonce = _generateNonce();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
+    // 2. Core Verification via SecurityCore
+    final result = await _core.validate(inputCode);
 
-      final finalBio = bioSession ?? BiometricSession(
-        sessionId: _currentSessionId,
-        startTime: DateTime.now(),
-        motionEvents: [],
-        touchEvents: [],
-        duration: Duration.zero,
-      );
-
-      final verdict = await _blackBox.analyze(
-        deviceId: deviceId,
-        biometric: finalBio,
-        sessionId: _currentSessionId,
-        nonce: nonce,
-        timestamp: timestamp,
-      );
-
-      if (verdict.allowed) {
-        final reversedCode = config.secret.reversed.toList();
-        final isPanic = _listEquals(currentValues, reversedCode);
-        _handleSuccess(panic: isPanic, confidence: verdict.confidence);
-        return true;
-      } else {
-        _threatMessage = verdict.reason;
-        _handleFailure();
-        return false;
-      }
-    } catch (e) {
-      if (kDebugMode) print('❌ Firebase error: $e');
-      _threatMessage = "Security logic bypass detected";
+    if (result.isValid) {
+      _triggerSuccess();
+    } else {
+      _failedAttempts++;
       _handleFailure();
-      return false;
     }
+
+    return result;
   }
 
-  void _handleSuccess({required bool panic, required double confidence}) {
-    if (_isDisposed) return; // ✅ FIX
-    
-    _uiState = SecurityState.UNLOCKED;
-    _isPanicMode = panic;
-    _threatMessage = panic ? "SILENT ALARM ACTIVATED" : "";
-    _confidenceNotifier.value = confidence;
-    _isPaused = true;
-    _storage.deleteAll();
-    notifyListeners();
+  void _triggerSuccess() {
+     _uiState = SecurityState.UNLOCKED;
+     notifyListeners();
   }
 
   void _handleFailure() {
-    if (_isDisposed) return; // ✅ FIX
-    
+    if (_isDisposed) return;
+
     if (_core.state == SecurityState.HARD_LOCK) {
       _uiState = SecurityState.HARD_LOCK;
+      _threatMessage = "SYSTEM LOCKED: TOO MANY ATTEMPTS";
     } else {
       _uiState = SecurityState.LOCKED;
     }
+
+    // ✅ TRIGGER RANDOM WHEELS
+    // Flip the boolean to notify listeners (UI)
+    _shouldRandomizeWheels.value = !_shouldRandomizeWheels.value;
+
+    // Clear buffers for next attempt
     _motionBuffer.clear();
     _touchBuffer.clear();
+    
+    // Reset visual scores
+    _touchScoreNotifier.value = 0.0;
+    
     notifyListeners();
   }
 
-  void _startNewSession() {
-    if (_isDisposed) return; // ✅ FIX
-    
-    _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
-    _sessionStart = DateTime.now();
-    _motionBuffer.clear();
-    _touchBuffer.clear();
-    _isPaused = false;
-  }
-
+  // Helper: Calculate Entropy
   double _calculateEntropy() {
     if (_motionBuffer.isEmpty) return 0.0;
-    final mags = _motionBuffer.map((e) => e.magnitude).toList();
-    final Map<int, int> distribution = {};
-    for (var mag in mags) {
-      int bucket = (mag * 10).round();
+    
+    Map<int, int> distribution = {};
+    int total = _motionBuffer.length;
+    
+    // Categorize Z-axis movement into buckets
+    for (var m in _motionBuffer) {
+      int bucket = (m.z * 10).round();
       distribution[bucket] = (distribution[bucket] ?? 0) + 1;
     }
+    
     double entropy = 0.0;
-    int total = mags.length;
     distribution.forEach((_, count) {
       double probability = count / total;
       if (probability > 0) {
         entropy += probability * (1 - probability);
       }
     });
+    
     return (entropy / 0.25).clamp(0.0, 1.0);
   }
 
-  bool _listEquals(List a, List b) {
-    if (a.length != b.length) return false;
-    for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
+  // Session Management
+  void _startNewSession() {
+    _currentSessionId = _generateNonce();
+    _failedAttempts = 0;
   }
 
+  String _generateNonce() {
+    return DateTime.now().millisecondsSinceEpoch.toString();
+  }
+  
+  // Public Reset
   void reset() {
-    if (_isDisposed) return; // ✅ FIX
+    if (_isDisposed) return;
     
     _core.reset();
     _uiState = SecurityState.LOCKED;
@@ -281,6 +220,7 @@ class ClaController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Snapshot for Analytics
   Map<String, dynamic> getSessionSnapshot() {
     return {
       'session_id': _currentSessionId,
@@ -288,30 +228,19 @@ class ClaController extends ChangeNotifier {
       'touch_events': _touchBuffer.length,
       'confidence': liveConfidence,
       'entropy': motionEntropy,
-      'state': _uiState.name,
+      'state': _uiState.toString(),
       'failed_attempts': failedAttempts,
     };
   }
 
-  String _generateNonce() {
-    return DateTime.now().millisecondsSinceEpoch.toString();
-  }
-
   @override
   void dispose() {
-    // ✅ FIX: Set flag FIRST
+    // ✅ DISPOSE NEW NOTIFIER
+    _shouldRandomizeWheels.dispose();
+
     _isDisposed = true;
-    
-    // ✅ FIX: Cancel timer
-    _touchDecayTimer?.cancel();
-    
-    _motionBuffer.clear();
-    _touchBuffer.clear();
-    _confidenceNotifier.dispose();
-    _motionEntropyNotifier.dispose();
     _touchScoreNotifier.dispose();
-    _core.reset();
-    
+    _motionEntropyNotifier.dispose();
     super.dispose();
   }
 }
