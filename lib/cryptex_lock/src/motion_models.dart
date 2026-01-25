@@ -1,10 +1,14 @@
 // FILE: lib/cryptex_lock/src/motion_models.dart
-// STATUS: COMPATIBLE WITH CONTROLLER V3 ✅
+// STATUS: HYBRID BRIDGE (Supports V1 & V3) ✅
 
-import 'dart:ui'; // Penting: Untuk guna 'Offset'
+import 'dart:math';
+import 'dart:ui';
+import 'cla_models.dart'; // Pastikan ini wujud
 
-/// 1. Data Sentuhan (Touch)
-/// Controller V3 panggil ini 'TouchData', bukan 'TouchEvent'
+// ==========================================
+// 1. MODERN TYPES (Untuk Controller V3)
+// ==========================================
+
 class TouchData {
   final DateTime timestamp;
   final double pressure;
@@ -17,8 +21,6 @@ class TouchData {
   });
 }
 
-/// 2. Data Gerakan (Motion)
-/// Controller V3 panggil ini 'MotionData', bukan 'MotionEvent'
 class MotionData {
   final double x;
   final double y;
@@ -31,28 +33,91 @@ class MotionData {
     required this.z,
     required this.timestamp,
   });
+
+  // Compatibility getter for Legacy engines
+  double get magnitude => sqrt(x*x + y*y + z*z);
 }
 
-/// 3. Keputusan Validasi
-/// Controller V3 cari 'isValid' & 'isPanic', bukan 'allowed'
+// ==========================================
+// 2. LEGACY COMPATIBILITY (Untuk Security Core Lama)
+// ==========================================
+
+// Alias: Kalau ada fail minta 'MotionEvent', bagi dia 'MotionData'
+typedef MotionEvent = MotionData; 
+
+class ValidationAttempt {
+  final List<int> input;
+  final DateTime timestamp;
+  
+  ValidationAttempt(this.input, {DateTime? timestamp}) 
+      : timestamp = timestamp ?? DateTime.now();
+}
+
+class BiometricSession {
+  final String sessionId;
+  final List<MotionData> motionEvents;
+  final List<TouchData> touchEvents;
+  final Duration duration;
+  final double entropy;
+
+  BiometricSession({
+    required this.sessionId,
+    required this.motionEvents,
+    required this.touchEvents,
+    required this.duration,
+    required this.entropy,
+  });
+}
+
+// ==========================================
+// 3. HYBRID RESULT (Faham Semua Bahasa)
+// ==========================================
+
 class ValidationResult {
   final bool isValid;
   final bool isPanic;
   final String? message;
+  
+  // Legacy fields
+  final SecurityState newState;
+  final dynamic threatLevel;
+  final double confidence;
 
   ValidationResult({
     required this.isValid,
-    this.isPanic = false, // Default false
+    this.isPanic = false,
     this.message,
+    this.newState = SecurityState.LOCKED,
+    this.threatLevel,
+    this.confidence = 0.0,
   });
-}
 
-// --- KELAS TAMBAHAN (BACKUP) ---
-// Jika ada fail lama yang masih guna nama ini, kita biarkan di bawah
-// supaya tak error. Tapi Controller V3 akan guna yang di atas.
+  // Getter supaya kod lama yang cari '.allowed' tak crash
+  bool get allowed => isValid;
 
-class BiometricSession {
-  final String sessionId;
-  // ... (Simplification for compatibility if needed)
-  BiometricSession({required this.sessionId});
+  // Factory untuk kod lama
+  factory ValidationResult.denied({
+    required String reason, 
+    dynamic threatLevel,
+    double confidence = 0.0
+  }) {
+    return ValidationResult(
+      isValid: false,
+      message: reason,
+      newState: SecurityState.LOCKED,
+      confidence: confidence,
+    );
+  }
+
+  factory ValidationResult.success({
+    double confidence = 1.0, 
+    bool isPanicMode = false
+  }) {
+    return ValidationResult(
+      isValid: true,
+      isPanic: isPanicMode,
+      newState: SecurityState.UNLOCKED,
+      confidence: confidence,
+    );
+  }
 }
