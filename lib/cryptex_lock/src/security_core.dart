@@ -1,24 +1,13 @@
 /*
- * PROJECT: Z-KINETIC SECURITY CORE V1.0
+ * PROJECT: Z-KINETIC SECURITY CORE V1.1
  * MODULE: Headless Security Orchestrator
  * DEPENDENCIES: ZERO Flutter, ZERO Platform Code
- *
- * PURPOSE:
- * - Can run in Flutter apps
- * - Can run in pure Dart CLI
- * - Can run in backend validators
- *
- * FEATURES:
- * - Replay immunity (timestamp + nonce validation)
- * - Attestation interface (pluggable)
- * - Panic mode detection
- * - Bot detection
- * - Threat analysis
+ * STATUS: SYNCED WITH MOTION_MODELS ✅
  */
 
 import 'dart:math';
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
+// import 'package:crypto/crypto.dart'; // ❌ Dibuang (Tak perlu)
 import 'motion_models.dart';
 import 'cla_models.dart';
 
@@ -164,6 +153,7 @@ class SecurityCore {
       return ValidationResult.denied(
         reason: 'SYSTEM_LOCKED',
         threatLevel: ThreatLevel.HIGH_RISK,
+        confidence: 0.0,
       );
     }
 
@@ -182,6 +172,7 @@ class SecurityCore {
         return ValidationResult.denied(
           reason: 'ATTESTATION_FAILED',
           threatLevel: ThreatLevel.CRITICAL,
+          confidence: 0.0,
         );
       }
     }
@@ -204,6 +195,7 @@ class SecurityCore {
       return ValidationResult.denied(
         reason: 'NO_BIOMETRIC_DATA',
         threatLevel: ThreatLevel.SUSPICIOUS,
+        confidence: 0.0,
       );
     }
 
@@ -223,9 +215,11 @@ class SecurityCore {
       return ValidationResult.denied(
         reason: 'REPLAY_DETECTED',
         threatLevel: ThreatLevel.CRITICAL,
+        confidence: 0.0,
       );
     }
 
+    // Temporary success result just to pass the check (not final result)
     return ValidationResult(
       allowed: true,
       newState: _state,
@@ -252,10 +246,11 @@ class SecurityCore {
   }
 
   /// Validate biometric data
-  ValidationResult _validateBiometric(BiometricSession session) {
-    final entropy = session.entropy;
-    final motionCount = session.motionEvents.length;
-    final touchCount = session.touchEvents.length;
+  // ✅ PEMBETULAN: Tukar BiometricSession -> BiometricData
+  ValidationResult _validateBiometric(BiometricData data) {
+    final entropy = data.entropy;
+    final motionCount = data.motionEvents.length;
+    final touchCount = data.touchEvents.length;
 
     // Bot detection: too perfect or too fast
     if (entropy < config.minEntropy && touchCount < 3) {
@@ -326,6 +321,7 @@ class SecurityCore {
       return ValidationResult.denied(
         reason: 'MAX_ATTEMPTS_EXCEEDED',
         threatLevel: ThreatLevel.HIGH_RISK,
+        confidence: 0.0,
       );
     }
 
@@ -334,6 +330,7 @@ class SecurityCore {
     return ValidationResult.denied(
       reason: 'INVALID_CODE',
       threatLevel: ThreatLevel.SUSPICIOUS,
+      confidence: 0.0,
     );
   }
 
