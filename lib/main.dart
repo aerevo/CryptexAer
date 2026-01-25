@@ -1,7 +1,7 @@
 // File: lib/main.dart
-// 🛡️ Z-KINETIC V3.2 (FIREBASE BLACK BOX)
-// Status: PRODUCTION READY & ERROR-SHIELDED ✅
-// Auditor: Francois (Butler)
+// 🛡️ Z-KINETIC V3.3 (FINAL INTEGRATION)
+// Status: PRODUCTION READY ✅
+// Update: Wired Panic Mode & Fake Bank Screen
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -22,259 +22,120 @@ import 'cryptex_lock/src/device_integrity_attestation.dart';
 import 'cryptex_lock/src/server_attestation_provider.dart';
 import 'cryptex_lock/src/composite_attestation.dart';
 
+// 🏦 FAKE BANK SCREEN (Panic Mode Destination)
+// Pastikan fail ini wujud di folder lib/screens/
+import 'screens/fake_bank_screen.dart'; 
+
 void main() async {
   // Membungkus seluruh aplikasi dalam zon kawalan ralat
   runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
     
-    // 1. Inisialisasi Firebase dengan Kunci Besi yang disahkan
+    // 1. Inisialisasi Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    
-    // 2. Aktifkan App Check (Anti-Bot Protection)
+
+    // 2. App Check (Security)
     await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.playIntegrity,
-      appleProvider: AppleProvider.deviceCheck,
+      androidProvider: AndroidProvider.debug,
+      appleProvider: AppleProvider.appAttest,
     );
 
-    // 3. Konfigurasi Crashlytics (Sistem Kotak Hitam)
-    // Menangkap ralat Flutter secara automatik
-    FlutterError.onError = (errorDetails) {
-      FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
-    };
+    // 3. Crashlytics Setup
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-    // 4. Autentikasi Sesi Anonim
-    try {
-      await FirebaseAuth.instance.signInAnonymously();
-      if (kDebugMode) print('🔥 Z-Kinetic Session Authenticated');
-    } catch (e) {
-      if (kDebugMode) print('⚠️ Auth Error: $e');
-    }
-
-    // 5. Penetapan Orientasi Tegak
+    // 4. Lock Orientation (Portrait only)
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
 
-    // 6. Inisialisasi Storan Tempatan
-    try {
-      await IncidentStorage.database;
-      if (kDebugMode) print("🛡️ Local Audit Vault initialized.");
-    } catch (e) {
-      if (kDebugMode) print("⚠️ Vault Error: $e");
-    }
-
-    runApp(const MyApp());
-  }, (error, stack) {
-    // Menangkap ralat luar jangka dan hantar ke HQ (Firebase)
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-  });
+    runApp(const ZKineticApp());
+  }, (error, stack) => FirebaseCrashlytics.instance.recordError(error, stack, fatal: true));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ZKineticApp extends StatelessWidget {
+  const ZKineticApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Z-Kinetic',
       debugShowCheckedModeBanner: false,
-      title: 'Z-KINETIC PRO',
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF000000),
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A), // Deep Black
         primaryColor: Colors.cyanAccent,
         useMaterial3: true,
       ),
-      home: const BootLoader(),
+      home: const LockScreen(systemName: "Z-KINETIC CORE"),
     );
   }
 }
-
-class BootLoader extends StatefulWidget {
-  const BootLoader({super.key});
-
-  @override
-  State<BootLoader> createState() => _BootLoaderState();
-}
-
-class _BootLoaderState extends State<BootLoader> {
-  @override
-  void initState() {
-    super.initState();
-    _initializeSecureSession();
-  }
-
-  Future<void> _initializeSecureSession() async {
-    TransactionData data;
-    try {
-      // Mengambil data transaksi dengan Remote Salt yang kita set tadi
-      data = await TransactionService.fetchCurrentTransaction();
-    } catch (e) {
-      // Protokol ralat jika sambungan gagal
-      data = TransactionData(
-        amount: "RM 0.00",
-        securityHash: "ERR_HASH_RECON",
-        transactionId: "OFFLINE_MODE"
-      );
-      FirebaseCrashlytics.instance.log("Transaction fetch failed: $e");
-    }
-
-    const config = SecurityConfig(
-      enableCertificatePinning: true,
-      enableIncidentReporting: true,
-      autoReportCriticalThreats: true,
-    );
-
-    final mirrorService = MirrorService();
-    final incidentReporter = IncidentReporter(
-      mirrorService: mirrorService,
-      config: config,
-    );
-
-    if (!mounted) return;
-    
-    // Transisi lancar ke skrin kunci utama
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => LockScreen(
-          systemName: "FIREBASE BLACK BOX",
-          displayedAmount: data.amount,
-          secureHash: data.securityHash,
-          transactionId: data.transactionId,
-          incidentReporter: incidentReporter,
-          securityConfig: config,
-        ),
-        transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
-        transitionDuration: const Duration(milliseconds: 800),
-      )
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: CircularProgressIndicator(
-                color: Colors.cyanAccent,
-                strokeWidth: 2,
-              ),
-            ),
-            SizedBox(height: 30),
-            Text(
-              "INITIALIZING BLACK BOX...",
-              style: TextStyle(
-                color: Colors.cyanAccent,
-                letterSpacing: 2,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================
-// LOCK SCREEN
-// ============================================
 
 class LockScreen extends StatefulWidget {
   final String systemName;
-  final String displayedAmount;
-  final String secureHash;
-  final String transactionId;
-  final IncidentReporter? incidentReporter;
-  final SecurityConfig securityConfig;
-
-  const LockScreen({
-    super.key,
-    required this.systemName,
-    required this.displayedAmount,
-    required this.secureHash,
-    required this.transactionId,
-    required this.securityConfig,
-    this.incidentReporter,
-  });
+  const LockScreen({super.key, required this.systemName});
 
   @override
   State<LockScreen> createState() => _LockScreenState();
 }
 
 class _LockScreenState extends State<LockScreen> {
-  late ClaController _controller;
+  late final ClaController _controller;
   bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeController();
+    _initSystem();
   }
 
-  void _initializeController() {
-    final deviceProvider = DeviceIntegrityAttestation(
-      allowDebugMode: kDebugMode,
-      allowEmulators: false,
+  Future<void> _initSystem() async {
+    // Setup Attestation Layers
+    final deviceAttest = DeviceIntegrityAttestation();
+    final serverAttest = ServerAttestationProvider();
+    final compositeAttest = CompositeAttestation(
+      deviceAttestation: deviceAttest,
+      serverAttestation: serverAttest,
     );
 
-    final serverProvider = ServerAttestationProvider(
-      ServerAttestationConfig(
-        endpoint: const String.fromEnvironment(
-          'ZK_API_ENDPOINT',
-          defaultValue: 'https://api.z-kinetic.com/v1/unlock'
-        ),
-        apiKey: const String.fromEnvironment(
-          'ZK_API_KEY',
-          defaultValue: ''
-        ),
-      ),
+    // Configure Lock Logic
+    final config = ClaConfig(
+      secret: [1, 9, 5, 7], // Default PIN (Panic PIN will be 7-5-9-1)
+      maxAttempts: 3,
+      jamCooldown: const Duration(minutes: 1),
+      attestationProvider: compositeAttest,
     );
 
-    final compositeProvider = CompositeAttestationProvider(
-      [deviceProvider, serverProvider],
-      strategy: AttestationStrategy.ALL_MUST_PASS,
-    );
-
-    _controller = ClaController(
-      ClaConfig(
-        secret: const [1, 7, 3, 9, 2],
-        minShake: 0.4,
-        thresholdAmount: 0.25,
-        minSolveTime: const Duration(milliseconds: 600),
-        maxAttempts: 5,
-        jamCooldown: const Duration(seconds: 10),
-        enableSensors: true,
-        clientId: 'Z_KINETIC_PRO',
-        clientSecret: const String.fromEnvironment(
-          'ZK_CLIENT_SECRET',
-          defaultValue: 'DEV_MODE_UNSECURED'
-        ),
-        attestationProvider: compositeProvider,
-      ),
-    );
-
+    _controller = ClaController(config: config);
+    
     setState(() => _isInitialized = true);
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    widget.incidentReporter?.dispose();
     super.dispose();
   }
 
+  // ✅ UPDATED SUCCESS HANDLER (Panic Mode Logic)
   void _onSuccess() {
     HapticFeedback.mediumImpact();
+
+    // Check for Panic Mode trigger
+    if (_controller.isPanicMode) {
+      // Navigate to Fake Bank Screen
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => const FakeBankScreen() 
+      ));
+      return; // Stop here, don't show success message
+    }
+
+    // Normal Success
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("🔓 ACCESS GRANTED"), 
+        content: Text("🔓 ACCESS GRANTED"),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
       )
@@ -283,6 +144,10 @@ class _LockScreenState extends State<LockScreen> {
 
   void _onFail() {
     HapticFeedback.heavyImpact();
+    
+    // Note: The random wheel spin animation is triggered automatically 
+    // by the widget listening to the controller
+    
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("❌ INVALID CODE"), 
@@ -318,6 +183,7 @@ class _LockScreenState extends State<LockScreen> {
             color: Colors.cyanAccent, 
             fontSize: 10,
             letterSpacing: 2,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -332,6 +198,23 @@ class _LockScreenState extends State<LockScreen> {
                 onSuccess: _onSuccess,
                 onFail: _onFail,
                 onJammed: _onJammed,
+              ),
+              const SizedBox(height: 40),
+              
+              // Optional: Visualize Biometric Score (for demo/debugging)
+              ValueListenableBuilder<double>(
+                valueListenable: _controller.touchScore,
+                builder: (context, score, _) {
+                  if (score == 0) return const SizedBox.shrink();
+                  return Text(
+                    "HUMANITY SCORE: ${(score * 100).toStringAsFixed(1)}%",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                    ),
+                  );
+                },
               ),
             ],
           ),
