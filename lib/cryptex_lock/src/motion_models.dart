@@ -1,5 +1,6 @@
 // 📂 lib/cryptex_lock/src/motion_models.dart (FIXED ✅)
 import 'dart:math';
+import 'cla_models.dart'; // ✅ Import SecurityState dari sini
 
 // ✅ ENUM THREAT LEVEL (Tambahan Baru)
 enum ThreatLevel {
@@ -173,11 +174,5 @@ class ValidationResult {
   }
 }
 
-// ✅ Import SecurityState dari cla_models
-enum SecurityState {
-  LOCKED,
-  VALIDATING,
-  UNLOCKED,
-  SOFT_LOCK,
-  HARD_LOCK,
-}
+// ✅ SecurityState sekarang HANYA wujud di cla_models.dart
+// Jangan duplicate di sini!
