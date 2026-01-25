@@ -1,8 +1,4 @@
-/*
- * PROJECT: Z-KINETIC SECURITY CORE
- * MODULE: Composite Attestation Provider (FIXED)
- * STATUS: BUILD ERROR RESOLVED ✅
- */
+// lib/cryptex_lock/src/composite_attestation.dart (FIXED ✅)
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -58,6 +54,7 @@ class CompositeAttestationResult extends AttestationResult {
   );
 }
 
+// ✅ FIXED: Class name (bukan 'CompositeAttestation')
 class CompositeAttestationProvider implements AttestationProvider {
   final List<WeightedProvider> providers;
   final AttestationStrategy strategy;
@@ -75,7 +72,6 @@ class CompositeAttestationProvider implements AttestationProvider {
       name: 'Provider_${entry.key}',
     );
   }).toList() {
-    // Validate that we have at least one provider
     if (providers.isEmpty) {
       throw ArgumentError('CompositeAttestationProvider requires at least one provider');
     }
@@ -172,14 +168,14 @@ class CompositeAttestationProvider implements AttestationProvider {
     for (int i = 0; i < results.length; i++) {
       final weight = providers[i].weight;
       totalWeight += weight;
-      
+
       if (results[i].verified) {
         passedWeight += weight;
       }
     }
 
     final confidence = totalWeight > 0 ? passedWeight / totalWeight : 0.0;
-    
+
     if (kDebugMode) {
       print('🔍 Weighted confidence: ${(confidence * 100).toStringAsFixed(1)}%');
     }
@@ -194,9 +190,9 @@ class CompositeAttestationProvider implements AttestationProvider {
     if (!verified) return '';
 
     final verifiedTokens = results.entries
-        .where((e) => e.value.verified && e.value.token.isNotEmpty)
-        .map((e) => e.value.token)
-        .toList();
+      .where((e) => e.value.verified && e.value.token.isNotEmpty)
+      .map((e) => e.value.token)
+      .toList();
 
     if (verifiedTokens.isEmpty) {
       return 'COMPOSITE_${DateTime.now().millisecondsSinceEpoch}';
@@ -207,14 +203,14 @@ class CompositeAttestationProvider implements AttestationProvider {
 
   DateTime _calculateExpiry(List<AttestationResult> results) {
     final verifiedResults = results.where((r) => r.verified).toList();
-    
+
     if (verifiedResults.isEmpty) {
       return DateTime.now();
     }
 
     return verifiedResults
-        .map((r) => r.expiresAt)
-        .reduce((a, b) => a.isBefore(b) ? a : b);
+      .map((r) => r.expiresAt)
+      .reduce((a, b) => a.isBefore(b) ? a : b);
   }
 
   Map<String, dynamic> _aggregateClaims(
@@ -231,59 +227,4 @@ class CompositeAttestationProvider implements AttestationProvider {
 
     return aggregated;
   }
-}
-
-class BankGradeAttestation extends CompositeAttestationProvider {
-  BankGradeAttestation({
-    required AttestationProvider deviceIntegrity,
-    required AttestationProvider serverAttestation,
-  }) : super(
-    [deviceIntegrity, serverAttestation],
-    strategy: AttestationStrategy.ALL_MUST_PASS,
-  );
-}
-
-class BalancedAttestation extends CompositeAttestationProvider {
-  BalancedAttestation({
-    required AttestationProvider deviceIntegrity,
-    required AttestationProvider serverAttestation,
-    AttestationProvider? additionalProvider,
-  }) : super(
-    [
-      deviceIntegrity,
-      serverAttestation,
-      if (additionalProvider != null) additionalProvider,
-    ],
-    strategy: AttestationStrategy.MAJORITY_WINS,
-  );
-}
-
-class WeightedAttestation extends CompositeAttestationProvider {
-  WeightedAttestation({
-    required AttestationProvider highTrustProvider,
-    required AttestationProvider mediumTrustProvider,
-    AttestationProvider? lowTrustProvider,
-    double requiredConfidence = 0.7,
-  }) : super.weighted(
-    [
-      WeightedProvider(
-        provider: highTrustProvider,
-        weight: 0.6,
-        name: 'HighTrust',
-      ),
-      WeightedProvider(
-        provider: mediumTrustProvider,
-        weight: 0.3,
-        name: 'MediumTrust',
-      ),
-      if (lowTrustProvider != null)
-        WeightedProvider(
-          provider: lowTrustProvider,
-          weight: 0.1,
-          name: 'LowTrust',
-        ),
-    ],
-    strategy: AttestationStrategy.WEIGHTED,
-    requiredConfidence: requiredConfidence,
-  );
 }
