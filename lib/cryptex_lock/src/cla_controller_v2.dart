@@ -77,7 +77,7 @@ class ClaController extends ChangeNotifier {
 
   // Constructor
   ClaController({required this.config}) {
-    _core = SecurityCore(config: config.toCoreConfig());
+    _core = SecurityCore(config.toCoreConfig());
     _startNewSession();
   }
 
