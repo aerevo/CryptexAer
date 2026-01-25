@@ -131,7 +131,7 @@ class ClaController extends ChangeNotifier {
     }
 
     // 2. Core Verification via SecurityCore
-    final result = await _core.validate(inputCode);
+    final result = await _core.validate(ValidationAttempt(inputCode));
 
     if (result.isValid) {
       _triggerSuccess();
