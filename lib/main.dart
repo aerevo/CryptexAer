@@ -81,37 +81,52 @@ class LockScreen extends StatefulWidget {
   State<LockScreen> createState() => _LockScreenState();
 }
 
+// 📂 lib/main.dart (BAHAGIAN _LockScreenState SAHAJA)
+
 class _LockScreenState extends State<LockScreen> {
-  late final ClaController _controller;
+  late ClaController _controller;
   bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _initSystem();
+    _initializeSystem();
   }
 
-  Future<void> _initSystem() async {
-    // Setup Attestation Layers
-    final deviceAttest = DeviceIntegrityAttestation();
-    final serverAttest = ServerAttestationProvider();
-    final compositeAttest = CompositeAttestation(
-      deviceAttestation: deviceAttest,
-      serverAttestation: serverAttest,
+  Future<void> _initializeSystem() async {
+    // 1. Setup Config
+    final config = ClaConfig(
+      secret: [1, 2, 3, 4, 5],
+      maxAttempts: 3,
+      jamCooldown: 30,
+      apiEndpoint: "https://api.z-kinetic.com/verify",
+      apiKey: "zk_live_xxx",
+      // ✅ FIX: Tambah parameter wajib ini
+      minSolveTime: 500, 
     );
 
-    // Configure Lock Logic
-    final config = ClaConfig(
-      secret: [1, 9, 5, 7], // Default PIN (Panic PIN will be 7-5-9-1)
-      maxAttempts: 3,
-      jamCooldown: const Duration(minutes: 1),
+    // 2. Setup Attestation
+    // ✅ FIX: Masukkan config ke dalam constructor
+    final serverAttest = ServerAttestationProvider(config); 
+    
+    final deviceAttest = DeviceIntegrityAttestation();
+    
+    // ✅ FIX: CompositeAttestation (Pastikan import betul)
+    final compositeAttest = CompositeAttestation(
+      providers: [deviceAttest, serverAttest],
+      threshold: 0.85,
+    );
+
+    // 3. Setup Controller
+    _controller = ClaController(
+      config: config,
       attestationProvider: compositeAttest,
     );
 
-    _controller = ClaController(config: config);
-    
     setState(() => _isInitialized = true);
   }
+  // ... (baki kod sama)
+}
 
   @override
   void dispose() {
@@ -223,3 +238,4 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 }
+
