@@ -1,5 +1,4 @@
-// lib/cryptex_lock/src/cla_models.dart
-// ✅ FIXED: Added toCoreConfig() method for V3 compatibility
+// lib/cryptex_lock/src/cla_models.dart (FIXED ✅)
 
 import 'security_core.dart';
 import 'motion_models.dart';
@@ -41,8 +40,8 @@ class ClaConfig {
   final String clientSecret;
   final SecurityEngineConfig engineConfig;
   final AttestationProvider? attestationProvider;
-  
-  // ✅ NEW: V3 compatibility parameters
+
+  // ✅ V3 compatibility parameters
   final bool enforceReplayImmunity;
   final Duration nonceValidityWindow;
 
@@ -59,12 +58,11 @@ class ClaConfig {
     this.clientSecret = '',
     this.engineConfig = const SecurityEngineConfig(),
     this.attestationProvider,
-    // ✅ NEW: Default values for V3
     this.enforceReplayImmunity = true,
     this.nonceValidityWindow = const Duration(seconds: 60),
   });
-  
-  // ✅ CRITICAL FIX: Add toCoreConfig() method for V3
+
+  // ✅ CRITICAL: toCoreConfig() method for V3
   SecurityCoreConfig toCoreConfig() {
     return SecurityCoreConfig(
       expectedCode: secret,
@@ -73,6 +71,41 @@ class ClaConfig {
       enforceReplayImmunity: enforceReplayImmunity,
       nonceValidityWindow: nonceValidityWindow,
       attestationProvider: attestationProvider,
+    );
+  }
+
+  // ✅ FIXED: copyWith method
+  ClaConfig copyWith({
+    List<int>? secret,
+    Duration? minSolveTime,
+    double? minShake,
+    double? thresholdAmount,
+    int? maxAttempts,
+    Duration? jamCooldown,
+    Duration? softLockCooldown,
+    bool? enableSensors,
+    String? clientId,
+    String? clientSecret,
+    SecurityEngineConfig? engineConfig,
+    AttestationProvider? attestationProvider,
+    bool? enforceReplayImmunity,
+    Duration? nonceValidityWindow,
+  }) {
+    return ClaConfig(
+      secret: secret ?? this.secret,
+      minSolveTime: minSolveTime ?? this.minSolveTime,
+      minShake: minShake ?? this.minShake,
+      thresholdAmount: thresholdAmount ?? this.thresholdAmount,
+      maxAttempts: maxAttempts ?? this.maxAttempts,
+      jamCooldown: jamCooldown ?? this.jamCooldown,
+      softLockCooldown: softLockCooldown ?? this.softLockCooldown,
+      enableSensors: enableSensors ?? this.enableSensors,
+      clientId: clientId ?? this.clientId,
+      clientSecret: clientSecret ?? this.clientSecret,
+      engineConfig: engineConfig ?? this.engineConfig,
+      attestationProvider: attestationProvider ?? this.attestationProvider,
+      enforceReplayImmunity: enforceReplayImmunity ?? this.enforceReplayImmunity,
+      nonceValidityWindow: nonceValidityWindow ?? this.nonceValidityWindow,
     );
   }
 }
