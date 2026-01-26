@@ -1,113 +1,170 @@
-// matrix_rain_painter.dart
-// Create: lib/cryptex_lock/src/matrix_rain_painter.dart
+// 📂 LOCATION: lib/cryptex_lock/src/matrix_rain_painter.dart
+// ✅ VERSION: V2.1 (FORENSIC DATA STREAM - DIGITS ONLY + PHOSPHOR GREEN)
 
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 // ============================================
-// MATRIX RAIN MODEL
+// MATRIX RAIN ENGINE & MODEL
 // ============================================
-class MatrixColumn {
-  double y;
-  double speed;
-  List<String> chars;
-  
-  MatrixColumn({
-    required this.y,
-    required this.speed,
-    required this.chars,
-  });
-}
-
 class MatrixRain {
   final int columnCount;
-  final List<MatrixColumn> columns = [];
   final Random _random = Random();
+  List<MatrixStream>? _streams;
   
-  static const String _chars = '01アイウエオカキクケコサシスセソタチツテト';
-  
-  MatrixRain({required this.columnCount}) {
-    for (int i = 0; i < columnCount; i++) {
-      columns.add(_createColumn());
+  // 🔥 FORENSIC MODE: HANYA NOMBOR (Nampak macam data bank/server)
+  static const String _chars = '0123456789'; 
+
+  MatrixRain({required this.columnCount});
+
+  void update(Size size) {
+    // Initialize streams if screen size changes or first run
+    if (_streams == null || _streams!.isEmpty || _streams!.length != (size.width / 15).floor()) {
+      _respawnStreams(size);
+    }
+
+    // Update setiap titisan hujan
+    for (var stream in _streams!) {
+      stream.update(size.height, _chars, _random);
     }
   }
-  
-  MatrixColumn _createColumn() {
-    return MatrixColumn(
-      y: _random.nextDouble() * 140,
-      speed: 1.5 + _random.nextDouble() * 2.5,
-      chars: List.generate(
-        8 + _random.nextInt(5),
-        (_) => _chars[_random.nextInt(_chars.length)],
-      ),
-    );
+
+  void _respawnStreams(Size size) {
+    final double colWidth = 14.0; // Lebar lajur (Rapat sikit untuk data padat)
+    final int cols = (size.width / colWidth).ceil();
+    
+    _streams = List.generate(cols, (i) {
+      return MatrixStream(
+        x: i * colWidth,
+        y: _random.nextDouble() * -1000, 
+        speed: 4 + _random.nextDouble() * 8, // Laju sikit macam data transfer
+        length: 8 + _random.nextInt(20), // Ekor panjang sikit
+        chars: List.generate(20, (_) => _getRandomChar()),
+        fontSize: 11 + _random.nextDouble() * 4, 
+      );
+    });
   }
-  
-  void update() {
-    for (var col in columns) {
-      col.y += col.speed;
-      
-      if (col.y > 160) {
-        col.y = -20;
-        col.speed = 1.5 + _random.nextDouble() * 2.5;
-        col.chars = List.generate(
-          8 + _random.nextInt(5),
-          (_) => _chars[_random.nextInt(_chars.length)],
-        );
-      }
+
+  String _getRandomChar() => _chars[_random.nextInt(_chars.length)];
+}
+
+// ============================================
+// INDIVIDUAL STREAM LOGIC
+// ============================================
+class MatrixStream {
+  double x;
+  double y;
+  double speed;
+  int length;
+  List<String> chars;
+  double fontSize;
+  int _tick = 0;
+
+  MatrixStream({
+    required this.x, 
+    required this.y, 
+    required this.speed, 
+    required this.length,
+    required this.chars,
+    required this.fontSize,
+  });
+
+  void update(double height, String charSet, Random random) {
+    y += speed;
+    _tick++;
+
+    // Reset bila jatuh bawah skrin
+    if (y > height + (length * fontSize)) {
+      y = random.nextDouble() * -500;
+      speed = 4 + random.nextDouble() * 8;
+      length = 8 + random.nextInt(20);
+      chars = List.generate(length + 5, (_) => charSet[random.nextInt(charSet.length)]);
+    }
+
+    // 🔥 GLITCH EFFECT: Tukar nombor dalam ekor (Data scrambling)
+    // Tukar lebih kerap (setiap 3 frame) supaya nampak "busy"
+    if (_tick % 3 == 0) {
+      int indexToChange = random.nextInt(chars.length);
+      chars[indexToChange] = charSet[random.nextInt(charSet.length)];
     }
   }
 }
 
 // ============================================
-// MATRIX RAIN PAINTER
+// THE PAINTER (RENDER ENGINE)
 // ============================================
 class MatrixRainPainter extends CustomPainter {
   final MatrixRain rain;
-  final Color color;
-  
-  MatrixRainPainter({
-    required this.rain,
-    required this.color,
-  });
-  
+  final Color color; 
+
+  MatrixRainPainter({required this.rain, required this.color});
+
   @override
   void paint(Canvas canvas, Size size) {
-    final columnWidth = size.width / rain.columnCount;
-    
-    for (int i = 0; i < rain.columns.length; i++) {
-      final col = rain.columns[i];
-      final x = i * columnWidth + columnWidth / 2;
-      
-      for (int j = 0; j < col.chars.length; j++) {
-        final charY = col.y - (j * 10);
+    rain.update(size);
+
+    // ✅ WARNA MOVIE: PHOSPHOR GREEN
+    // Hex: #00FF41 (Ini warna rasmi terminal hijau lama)
+    final Color phosphorGreen = const Color(0xFF00FF41);
+
+    final headStyle = TextStyle(
+      color: Colors.white.withOpacity(0.9), // Kepala Putih (Highlight)
+      fontSize: 14,
+      fontWeight: FontWeight.w900,
+      shadows: [
+        Shadow(color: phosphorGreen, blurRadius: 10), // Glow hijau di sekeliling putih
+      ], 
+      fontFamily: 'monospace', 
+    );
+
+    final tailBaseStyle = TextStyle(
+      color: phosphorGreen, 
+      fontSize: 14,
+      fontFamily: 'monospace',
+      fontWeight: FontWeight.w500,
+    );
+
+    for (var stream in rain._streams ?? []) {
+      // Optimization: Skip luar skrin
+      if (stream.y < -100 || stream.y > size.height + 500) continue;
+
+      for (int i = 0; i < stream.length; i++) {
+        double charY = stream.y - (i * stream.fontSize);
         
-        if (charY < 0 || charY > size.height) continue;
+        if (charY > size.height || charY < -20) continue;
+
+        bool isHead = (i == 0);
         
-        final opacity = j == 0 ? 0.9 : (1.0 - (j / col.chars.length)) * 0.6;
+        // 🔥 TRAIL EFFECT: Pudar lebih cepat di hujung
+        double opacity = (1.0 - (i / stream.length)).clamp(0.0, 1.0);
         
+        // Jadikan ekor sedikit telus supaya tak serabut sangat
+        opacity = opacity * 0.8; 
+
+        if (opacity < 0.05) continue; 
+
+        final textSpan = TextSpan(
+          text: stream.chars[i % stream.chars.length],
+          style: isHead 
+              ? headStyle.copyWith(fontSize: stream.fontSize) 
+              : tailBaseStyle.copyWith(
+                  fontSize: stream.fontSize, 
+                  color: phosphorGreen.withOpacity(opacity)
+                ),
+        );
+
         final textPainter = TextPainter(
-          text: TextSpan(
-            text: col.chars[j],
-            style: TextStyle(
-              color: color.withOpacity(opacity),
-              fontSize: 8,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Courier',
-            ),
-          ),
+          text: textSpan,
           textDirection: TextDirection.ltr,
         );
-        
+
         textPainter.layout();
-        textPainter.paint(
-          canvas,
-          Offset(x - textPainter.width / 2, charY),
-        );
+        textPainter.paint(canvas, Offset(stream.x, charY));
       }
     }
   }
-  
+
   @override
-  bool shouldRepaint(MatrixRainPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
