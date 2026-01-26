@@ -1,4 +1,4 @@
-// 🎯 Z-KINETIC UI V12.0 (GOLD MASTER + METALLIC TEXTURE)
+// 🎯 Z-KINETIC UI V12.1 (EMBOSSED NUMBERS UPGRADE)
 // Status: PRODUCTION READY ✅
 // Location: lib/cryptex_lock/src/cla_widget.dart
 // New Features:
@@ -7,6 +7,9 @@
 // - ✅ ImageShader dengan TileMode.repeated
 // - ✅ Seamless Texture Tiling
 // - ✅ Enhanced 3D Depth Effect
+// - 🔥 EMBOSSED NUMBERS (Raised from metal surface)
+// - 🔥 Brushed Metal Texture with directional scratches
+// - 🔥 Rim Lighting & Enhanced Contrast
 
 import 'dart:async';
 import 'dart:math';
@@ -107,10 +110,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   bool _isStressTesting = false;
   String _stressResult = "";
   
-  // ✅ Flag for disposal safety
   bool _isDisposed = false;
 
-  // 🔥 NEW: Metal texture cache
+  // 🔥 Metal texture cache
   ui.Image? _metalTexture;
   bool _textureLoading = true;
 
@@ -119,7 +121,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   final Color _neonRed = const Color(0xFFFF3366);
   final Color _bgDark = const Color(0xFF0A0A0A);
 
-  // ✅ HELPER: Baca nombor semasa dari roda
   List<int> get _currentCode {
     if (_scrollControllers.isEmpty) return [0, 0, 0, 0, 0];
     return _scrollControllers.map((c) => c.hasClients ? c.selectedItem % 10 : 0).toList();
@@ -130,7 +131,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
-    _loadMetalTexture(); // 🔥 Load texture
+    _loadMetalTexture();
     widget.controller.onInteractionStart();
     _startListening();
     widget.controller.addListener(_handleControllerChange);
@@ -153,7 +154,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     });
   }
 
-  // 🔥 NEW: Load metal texture dari assets
   Future<void> _loadMetalTexture() async {
     try {
       final ByteData data = await rootBundle.load('assets/metal_wheel.png');
@@ -331,7 +331,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _touchScoreNotifier.dispose();
     _accelNotifier.dispose();
     
-    // 🔥 NEW: Dispose metal texture
     _metalTexture?.dispose();
     
     super.dispose();
@@ -347,6 +346,15 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       default: return "INITIALIZING...";
     }
   }
+
+  // ============================================
+  // 🔥 PART 1 ENDS HERE - Continue to Part 2
+  // ============================================
+
+  // ============================================
+// 🔥 PART 2/3: BUILD METHODS & UI COMPONENTS
+// ============================================
+// (Sambungan dari Part 1)
 
   @override
   Widget build(BuildContext context) {
@@ -524,7 +532,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             )
           ),
 
-          // 🔥 Center Tumblers - DENGAN METAL TEXTURE
+          // 🔥 Center Tumblers - WITH EMBOSSED NUMBERS
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 55),
             child: NotificationListener<ScrollNotification>(
@@ -557,7 +565,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // 🔥 NEW: Metallic Wheel dengan Metal Texture + 3D Effects
+  // 🔥 METALLIC WHEEL WITH EMBOSSED NUMBERS
   Widget _buildMetallicWheel(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
     
@@ -593,7 +601,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 ),
               ),
               
-              // Reticle & Scan Line (hanya jika active)
+              // Reticle & Scan Line
               if (isActive) Positioned.fill(
                 child: AnimatedBuilder(
                   animation: _reticleController, 
@@ -611,7 +619,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 )
               ),
               
-              // Number Wheel
+              // 🔥 NUMBER WHEEL WITH EMBOSSED EFFECT
               ListWheelScrollView.useDelegate(
                 controller: _scrollControllers[index],
                 itemExtent: 48,
@@ -624,21 +632,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 },
                 childDelegate: ListWheelChildBuilderDelegate(
                   builder: (context, i) => Center(
-                    child: Text(
-                      '${i % 10}', 
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        shadows: isActive 
-                          ? [Shadow(color: color, blurRadius: 20)]
-                          : [
-                              const Shadow(offset: Offset(0, 2), blurRadius: 4, color: Colors.black38),
-                              const Shadow(offset: Offset(0, -1), blurRadius: 2, color: Colors.white24),
-                            ]
-                      )
+                    child: _buildEmbossedNumber(
+                      '${i % 10}',
+                      isActive: isActive,
+                      activeColor: color,
                     ),
-                  )
+                  ),
                 ),
               ),
             ],
@@ -646,6 +645,65 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         ),
       ),
     );
+  }
+
+  // 🔥 NEW: EMBOSSED NUMBER BUILDER
+  Widget _buildEmbossedNumber(String digit, {required bool isActive, required Color activeColor}) {
+    if (isActive) {
+      // Active State: Glowing embossed with gradient
+      return ShaderMask(
+        shaderCallback: (bounds) => LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            activeColor,
+            activeColor.withOpacity(0.8),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(bounds),
+        child: Text(
+          digit,
+          style: TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w900,
+            foreground: Paint()
+              ..style = PaintingStyle.fill
+              ..color = Colors.white,
+            shadows: [
+              Shadow(offset: const Offset(2.5, 2.5), blurRadius: 4, color: Colors.black.withOpacity(0.9)),
+              Shadow(offset: const Offset(-1.5, -1.5), blurRadius: 3, color: Colors.white.withOpacity(0.6)),
+              Shadow(offset: Offset.zero, blurRadius: 20, color: activeColor),
+              Shadow(offset: Offset.zero, blurRadius: 10, color: activeColor),
+            ],
+          ),
+        ),
+      );
+    } else {
+      // Inactive: Light metallic embossed on dark metal
+      return Text(
+        digit,
+        style: TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.w900,
+          foreground: Paint()
+            ..shader = const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFE8E8E8),
+                Color(0xFFC0C0C0),
+                Color(0xFFB0B0B0),
+              ],
+            ).createShader(const Rect.fromLTWH(0, 0, 200, 100)),
+          shadows: [
+            Shadow(offset: const Offset(2, 2), blurRadius: 3, color: Colors.black.withOpacity(0.8)),
+            Shadow(offset: const Offset(-1, -1), blurRadius: 2, color: Colors.white.withOpacity(0.4)),
+            Shadow(offset: const Offset(1, 1), blurRadius: 6, color: Colors.black.withOpacity(0.5)),
+          ],
+        ),
+      );
+    }
   }
 
   void _resetActiveWheelTimer() {
@@ -762,7 +820,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 }
 
 // ============================================
-// 🔥 METALLIC CYLINDER PAINTER (NEW)
+// 🔥 PART 2 ENDS - Continue to Part 3
+// ============================================
+
+// ============================================
+// 🔥 PART 3/3: CUSTOM PAINTERS
+// ============================================
+// (Sambungan dari Part 2)
+
+// ============================================
+// 🔥 UPGRADED METALLIC CYLINDER PAINTER
 // ============================================
 class MetallicCylinderPainter extends CustomPainter {
   final ui.Image? metalTexture;
@@ -779,7 +846,7 @@ class MetallicCylinderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
 
-    // 🔥 STEP 1: Draw Metal Texture (Seamless Tiling)
+    // 🔥 STEP 1: Metal Texture Base
     if (metalTexture != null) {
       final texturePaint = Paint()
         ..shader = ImageShader(
@@ -790,106 +857,126 @@ class MetallicCylinderPainter extends CustomPainter {
         );
       canvas.drawRect(rect, texturePaint);
     } else {
-      // Fallback: Plain metallic gradient
+      // Fallback: Darker metallic (kontras dengan light numbers)
       final fallbackPaint = Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFFD0D0D0),
-            Color(0xFFA8A8A8),
-            Color(0xFFC0C0C0),
-            Color(0xFFB8B8B8),
+            Color(0xFF6A6A6A),
+            Color(0xFF4A4A4A),
+            Color(0xFF585858),
+            Color(0xFF505050),
           ],
         ).createShader(rect);
       canvas.drawRect(rect, fallbackPaint);
     }
 
-    // 🔥 STEP 2: Cylindrical 3D Gradient Overlay
+    // 🔥 STEP 2: Brushed Metal Scratches (Directional)
+    final brushPaint = Paint()
+      ..color = Colors.white.withOpacity(0.08)
+      ..strokeWidth = 0.8
+      ..blendMode = BlendMode.overlay;
+    
+    final random = Random(42); // Consistent seed
+    for (int i = 0; i < 40; i++) {
+      double x = random.nextDouble() * size.width;
+      double offset = (random.nextDouble() - 0.5) * 8;
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + offset, size.height),
+        brushPaint,
+      );
+    }
+
+    // 🔥 STEP 3: Cylindrical 3D Gradient
     final cylinderGradient = Paint()
       ..shader = RadialGradient(
-        center: const Alignment(-0.3, 0.0),
-        radius: 1.2,
+        center: const Alignment(-0.4, 0.0),
+        radius: 1.3,
         colors: [
-          Colors.white.withOpacity(0.4),
+          Colors.white.withOpacity(0.3),
           Colors.transparent,
-          Colors.black.withOpacity(0.3),
+          Colors.black.withOpacity(0.4),
         ],
         stops: const [0.0, 0.5, 1.0],
       ).createShader(rect);
     canvas.drawRect(rect, cylinderGradient);
 
-    // 🔥 STEP 3: Specular Highlight (Top-Left)
-    final specularPaint = Paint()
+    // 🔥 STEP 4: Rim Lighting (Edge Glow)
+    final rimPaint = Paint()
       ..shader = LinearGradient(
-        begin: Alignment.topLeft,
+        begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          Colors.white.withOpacity(0.25),
+          isActive ? activeColor.withOpacity(0.3) : Colors.white.withOpacity(0.2),
           Colors.transparent,
+          Colors.transparent,
+          isActive ? activeColor.withOpacity(0.3) : Colors.white.withOpacity(0.2),
         ],
-      ).createShader(Rect.fromLTWH(0, 0, size.width * 0.6, size.height * 0.3));
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width * 0.6, size.height * 0.3), specularPaint);
+        stops: const [0.0, 0.1, 0.9, 1.0],
+      ).createShader(rect);
+    canvas.drawRect(rect, rimPaint);
 
-    // 🔥 STEP 4: Ambient Occlusion (Edges)
+    // 🔥 STEP 5: Ambient Occlusion (Dark Edges)
     final shadowPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          Colors.black.withOpacity(0.3),
+          Colors.black.withOpacity(0.4),
           Colors.transparent,
           Colors.transparent,
-          Colors.black.withOpacity(0.3),
+          Colors.black.withOpacity(0.4),
         ],
         stops: const [0.0, 0.15, 0.85, 1.0],
       ).createShader(rect);
     canvas.drawRect(rect, shadowPaint);
 
-    // 🔥 STEP 5: Active Glow Effect
+    // 🔥 STEP 6: Active State Glow
     if (isActive) {
       final glowPaint = Paint()
         ..shader = RadialGradient(
           center: Alignment.center,
-          radius: 0.8,
+          radius: 0.9,
           colors: [
-            activeColor.withOpacity(0.2),
-            activeColor.withOpacity(0.05),
+            activeColor.withOpacity(0.25),
+            activeColor.withOpacity(0.08),
             Colors.transparent,
           ],
         ).createShader(rect);
       canvas.drawRect(rect, glowPaint);
 
-      // Active Border Glow
+      // Active Border Pulse
       final borderPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
+        ..strokeWidth = 2.5
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            activeColor.withOpacity(0.6),
-            activeColor.withOpacity(0.2),
-            activeColor.withOpacity(0.6),
+            activeColor.withOpacity(0.7),
+            activeColor.withOpacity(0.3),
+            activeColor.withOpacity(0.7),
           ],
         ).createShader(rect);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(24)),
+        RRect.fromRectAndRadius(rect.deflate(1.5), const Radius.circular(24)),
         borderPaint,
       );
     }
 
-    // 🔥 STEP 6: Subtle Scanlines (Metal Texture Detail)
-    final scanlinePaint = Paint()
-      ..color = Colors.white.withOpacity(0.02)
-      ..strokeWidth = 1;
-    for (double y = 0; y < size.height; y += 2) {
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        scanlinePaint,
-      );
-    }
+    // 🔥 STEP 7: Vignette
+    final vignettePaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 1.2,
+        colors: [
+          Colors.transparent,
+          Colors.black.withOpacity(0.3),
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, vignettePaint);
   }
 
   @override
@@ -1029,3 +1116,7 @@ class KineticScanLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(KineticScanLinePainter old) => old.progress != progress || old.color != color;
 }
+
+// ============================================
+// 🔥 END OF FILE - V12.1 COMPLETE
+// ============================================
