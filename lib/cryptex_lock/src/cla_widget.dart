@@ -909,7 +909,7 @@ class MountingBracketPainter extends CustomPainter {
     ];
 
     for (var x in boltPositions) {
-      final boltY = isTop ? size.height - 4 : 4;
+      final double boltY = isTop ? size.height - 4 : 4.0;
       
       // Bolt shadow
       canvas.drawCircle(Offset(x + 0.5, boltY + 0.5), 2.5, Paint()..color = Colors.black.withOpacity(0.5));
