@@ -148,7 +148,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _rainController = AnimationController(vsync: this, duration: const Duration(milliseconds: 50))
       ..addListener(() {
         if (!mounted || _isDisposed) return;
-        _matrixRain.update();
+        // dipadam
         setState(() {});
       })..repeat();
 
