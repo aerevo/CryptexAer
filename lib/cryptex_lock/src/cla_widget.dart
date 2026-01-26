@@ -1,14 +1,16 @@
-// 🎯 Z-KINETIC UI V11.5 (GOLD MASTER)
+// 🎯 Z-KINETIC UI V12.0 (GOLD MASTER + METALLIC TEXTURE)
 // Status: PRODUCTION READY ✅
 // Location: lib/cryptex_lock/src/cla_widget.dart
-// Fixes Applied:
-// - ✅ Syntax Errors Resolved
-// - ✅ Logic '_currentCode' Fixed
-// - ✅ Memory Safe & Crash Protected
+// New Features:
+// - ✅ Metal Wheel Texture Integration (metal_wheel.png)
+// - ✅ Realistic Cylindrical Gradient Overlay
+// - ✅ ImageShader dengan TileMode.repeated
+// - ✅ Seamless Texture Tiling
+// - ✅ Enhanced 3D Depth Effect
 
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -108,14 +110,18 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   // ✅ Flag for disposal safety
   bool _isDisposed = false;
 
+  // 🔥 NEW: Metal texture cache
+  ui.Image? _metalTexture;
+  bool _textureLoading = true;
+
   final Color _neonCyan = const Color(0xFF00FFFF);
   final Color _neonGreen = const Color(0xFF00FF88);
   final Color _neonRed = const Color(0xFFFF3366);
   final Color _bgDark = const Color(0xFF0A0A0A);
 
-  // ✅ HELPER: Baca nombor semasa dari roda (Diletakkan DALAM class)
+  // ✅ HELPER: Baca nombor semasa dari roda
   List<int> get _currentCode {
-    if (_scrollControllers.isEmpty) return [0, 0, 0, 0];
+    if (_scrollControllers.isEmpty) return [0, 0, 0, 0, 0];
     return _scrollControllers.map((c) => c.hasClients ? c.selectedItem % 10 : 0).toList();
   }
 
@@ -124,6 +130,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initScrollControllers();
+    _loadMetalTexture(); // 🔥 Load texture
     widget.controller.onInteractionStart();
     _startListening();
     widget.controller.addListener(_handleControllerChange);
@@ -144,6 +151,26 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _tutorialHideTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && !_isDisposed) setState(() => _showTutorial = false);
     });
+  }
+
+  // 🔥 NEW: Load metal texture dari assets
+  Future<void> _loadMetalTexture() async {
+    try {
+      final ByteData data = await rootBundle.load('assets/metal_wheel.png');
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final frame = await codec.getNextFrame();
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _metalTexture = frame.image;
+          _textureLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ Metal texture load failed: $e');
+      if (mounted && !_isDisposed) {
+        setState(() => _textureLoading = false);
+      }
+    }
   }
 
   void _handleControllerChange() {
@@ -304,6 +331,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _touchScoreNotifier.dispose();
     _accelNotifier.dispose();
     
+    // 🔥 NEW: Dispose metal texture
+    _metalTexture?.dispose();
+    
     super.dispose();
   }
 
@@ -358,7 +388,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 Listener(
                   onPointerDown: (_) {
                     _userInteracted();
-                    // Use Offset.zero if details not available in this context, or pass from event
                     widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
                   },
                   child: _buildInteractiveTumblerArea(activeColor, state),
@@ -461,7 +490,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 children: [
                   Positioned.fill(child: CustomPaint(painter: MatrixRainPainter(rain: _matrixRain, color: const Color(0xFF00FF00).withOpacity(0.25)))),
                   
-                  // ✅ FIXED SYNTAX & LOGIC
                   Positioned.fill(
                     child: CustomPaint(
                       painter: ForensicDataPainter(
@@ -496,7 +524,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             )
           ),
 
-          // Center Tumblers
+          // 🔥 Center Tumblers - DENGAN METAL TEXTURE
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 55),
             child: NotificationListener<ScrollNotification>(
@@ -512,7 +540,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                     }
                   }
                 } else if (notification is ScrollUpdateNotification) {
-                   // widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now()); 
                   _analyzeScrollPattern();
                 } else if (notification is ScrollEndNotification) {
                   _resetActiveWheelTimer();
@@ -521,7 +548,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
               },
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(5, (index) => _buildHolographicWheel(index, color)),
+                children: List.generate(5, (index) => _buildMetallicWheel(index, color)),
               ),
             ),
           )
@@ -530,8 +557,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  Widget _buildHolographicWheel(int index, Color color) {
+  // 🔥 NEW: Metallic Wheel dengan Metal Texture + 3D Effects
+  Widget _buildMetallicWheel(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
+    
     return Expanded(
       child: Listener(
         onPointerDown: (_) {
@@ -539,7 +568,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           setState(() => _activeWheelIndex = index);
           _wheelActiveTimer?.cancel();
           _userInteracted();
-          // Use Offset.zero if details not strictly needed for this trigger
           widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
           HapticFeedback.lightImpact();
         },
@@ -550,8 +578,40 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           child: Stack(
             alignment: Alignment.center,
             children: [
-              if (isActive) Positioned.fill(child: AnimatedBuilder(animation: _reticleController, builder: (context, child) => CustomPaint(painter: KineticReticlePainter(color: color, progress: _reticleController.value)))),
-              if (isActive) Positioned.fill(child: AnimatedBuilder(animation: _scanController, builder: (context, child) => CustomPaint(painter: KineticScanLinePainter(color: color, progress: _scanController.value)))),
+              // 🔥 Metal Cylinder Background
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(25),
+                  child: CustomPaint(
+                    painter: MetallicCylinderPainter(
+                      metalTexture: _metalTexture,
+                      isActive: isActive,
+                      activeColor: color,
+                    ),
+                    size: const Size(50, 140),
+                  ),
+                ),
+              ),
+              
+              // Reticle & Scan Line (hanya jika active)
+              if (isActive) Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _reticleController, 
+                  builder: (context, child) => CustomPaint(
+                    painter: KineticReticlePainter(color: color, progress: _reticleController.value)
+                  )
+                )
+              ),
+              if (isActive) Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _scanController, 
+                  builder: (context, child) => CustomPaint(
+                    painter: KineticScanLinePainter(color: color, progress: _scanController.value)
+                  )
+                )
+              ),
+              
+              // Number Wheel
               ListWheelScrollView.useDelegate(
                 controller: _scrollControllers[index],
                 itemExtent: 48,
@@ -564,7 +624,20 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 },
                 childDelegate: ListWheelChildBuilderDelegate(
                   builder: (context, i) => Center(
-                    child: Text('${i % 10}', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, shadows: isActive ? [Shadow(color: color, blurRadius: 20)] : []))
+                    child: Text(
+                      '${i % 10}', 
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        shadows: isActive 
+                          ? [Shadow(color: color, blurRadius: 20)]
+                          : [
+                              const Shadow(offset: Offset(0, 2), blurRadius: 4, color: Colors.black38),
+                              const Shadow(offset: Offset(0, -1), blurRadius: 2, color: Colors.white24),
+                            ]
+                      )
+                    ),
                   )
                 ),
               ),
@@ -596,7 +669,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     await Future.wait(List.generate(50, (index) async {
       if (_isDisposed) return;
       await Future.delayed(Duration(milliseconds: random.nextInt(50)));
-      // ✅ FIX: Use _currentCode
       await widget.controller.verify(_currentCode);
     }));
 
@@ -631,7 +703,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           ),
           onPressed: isDisabled ? null : () async {
             HapticFeedback.mediumImpact();
-            // ✅ FIX: Use _currentCode and verify()
             await widget.controller.verify(_currentCode);
           },
           child: Text(state == SecurityState.HARD_LOCK ? "LOCKED" : "INITIATE ACCESS", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2.5, fontSize: 13, shadows: !isDisabled ? [Shadow(color: activeColor.withOpacity(0.9), blurRadius: 12)] : [])),
@@ -687,6 +758,145 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       decoration: BoxDecoration(color: const Color(0xFFFF3366).withOpacity(0.1), border: Border.all(color: const Color(0xFFFF3366)), borderRadius: BorderRadius.circular(8)),
       child: Row(children: [const Icon(Icons.error_outline, color: Color(0xFFFF3366), size: 18), const SizedBox(width: 10), Expanded(child: Text(widget.controller.threatMessage, style: const TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.w900)))])
     );
+  }
+}
+
+// ============================================
+// 🔥 METALLIC CYLINDER PAINTER (NEW)
+// ============================================
+class MetallicCylinderPainter extends CustomPainter {
+  final ui.Image? metalTexture;
+  final bool isActive;
+  final Color activeColor;
+
+  MetallicCylinderPainter({
+    required this.metalTexture,
+    required this.isActive,
+    required this.activeColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+
+    // 🔥 STEP 1: Draw Metal Texture (Seamless Tiling)
+    if (metalTexture != null) {
+      final texturePaint = Paint()
+        ..shader = ImageShader(
+          metalTexture!,
+          TileMode.repeated,
+          TileMode.repeated,
+          Matrix4.identity().storage,
+        );
+      canvas.drawRect(rect, texturePaint);
+    } else {
+      // Fallback: Plain metallic gradient
+      final fallbackPaint = Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFD0D0D0),
+            Color(0xFFA8A8A8),
+            Color(0xFFC0C0C0),
+            Color(0xFFB8B8B8),
+          ],
+        ).createShader(rect);
+      canvas.drawRect(rect, fallbackPaint);
+    }
+
+    // 🔥 STEP 2: Cylindrical 3D Gradient Overlay
+    final cylinderGradient = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.3, 0.0),
+        radius: 1.2,
+        colors: [
+          Colors.white.withOpacity(0.4),
+          Colors.transparent,
+          Colors.black.withOpacity(0.3),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(rect);
+    canvas.drawRect(rect, cylinderGradient);
+
+    // 🔥 STEP 3: Specular Highlight (Top-Left)
+    final specularPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.centerRight,
+        colors: [
+          Colors.white.withOpacity(0.25),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width * 0.6, size.height * 0.3));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width * 0.6, size.height * 0.3), specularPaint);
+
+    // 🔥 STEP 4: Ambient Occlusion (Edges)
+    final shadowPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          Colors.black.withOpacity(0.3),
+          Colors.transparent,
+          Colors.transparent,
+          Colors.black.withOpacity(0.3),
+        ],
+        stops: const [0.0, 0.15, 0.85, 1.0],
+      ).createShader(rect);
+    canvas.drawRect(rect, shadowPaint);
+
+    // 🔥 STEP 5: Active Glow Effect
+    if (isActive) {
+      final glowPaint = Paint()
+        ..shader = RadialGradient(
+          center: Alignment.center,
+          radius: 0.8,
+          colors: [
+            activeColor.withOpacity(0.2),
+            activeColor.withOpacity(0.05),
+            Colors.transparent,
+          ],
+        ).createShader(rect);
+      canvas.drawRect(rect, glowPaint);
+
+      // Active Border Glow
+      final borderPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            activeColor.withOpacity(0.6),
+            activeColor.withOpacity(0.2),
+            activeColor.withOpacity(0.6),
+          ],
+        ).createShader(rect);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(24)),
+        borderPaint,
+      );
+    }
+
+    // 🔥 STEP 6: Subtle Scanlines (Metal Texture Detail)
+    final scanlinePaint = Paint()
+      ..color = Colors.white.withOpacity(0.02)
+      ..strokeWidth = 1;
+    for (double y = 0; y < size.height; y += 2) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        scanlinePaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(MetallicCylinderPainter oldDelegate) {
+    return oldDelegate.metalTexture != metalTexture ||
+        oldDelegate.isActive != isActive ||
+        oldDelegate.activeColor != activeColor;
   }
 }
 
