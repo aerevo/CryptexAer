@@ -1,15 +1,18 @@
-// 🎯 Z-KINETIC UI V12.1 (EMBOSSED NUMBERS UPGRADE)
+// 🎯 Z-KINETIC UI V12.2 (REALISTIC METAL UPGRADE)
 // Status: PRODUCTION READY ✅
 // Location: lib/cryptex_lock/src/cla_widget.dart
-// New Features:
-// - ✅ Metal Wheel Texture Integration (metal_wheel.png)
-// - ✅ Realistic Cylindrical Gradient Overlay
-// - ✅ ImageShader dengan TileMode.repeated
-// - ✅ Seamless Texture Tiling
-// - ✅ Enhanced 3D Depth Effect
-// - 🔥 EMBOSSED NUMBERS (Raised from metal surface)
-// - 🔥 Brushed Metal Texture with directional scratches
-// - 🔥 Rim Lighting & Enhanced Contrast
+// 
+// 🔥 CHANGELOG V12.2:
+// - ✅ Reduced itemExtent: 48→32 (4-5 digits visible, less empty space)
+// - ✅ Removed eye-burning neon glow on active wheels
+// - ✅ Added subtle steel specular reflection instead
+// - ✅ Added TOP & BOTTOM mounting brackets/sockets
+// - ✅ Enhanced industrial cryptex housing design
+// - ✅ Grounded effect with depth shadows
+//
+// ==============================================================
+// 📋 PART 1/3: IMPORTS, MODELS & STATE MANAGEMENT
+// ==============================================================
 
 import 'dart:async';
 import 'dart:math';
@@ -347,14 +350,14 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     }
   }
 
-  // ============================================
-  // 🔥 PART 1 ENDS HERE - Continue to Part 2
-  // ============================================
-
-  // ============================================
-// 🔥 PART 2/3: BUILD METHODS & UI COMPONENTS
 // ============================================
-// (Sambungan dari Part 1)
+// 🔥 PART 1 ENDS - CONTINUE TO PART 2
+// ============================================
+
+  // ==============================================================
+// 📋 PART 2/3: BUILD METHODS & UI COMPONENTS
+// ==============================================================
+// (Sambungan dari Part 1 - paste after _getStatusLabel method)
 
   @override
   Widget build(BuildContext context) {
@@ -486,12 +489,30 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   Widget _buildInteractiveTumblerArea(Color color, SecurityState state) {
     return SizedBox(
-      height: 140,
+      height: 170, // 🔥 Increased to accommodate brackets
       child: Stack(
         children: [
+          // 🔥 TOP MOUNTING BRACKET
+          Positioned(
+            left: 55, right: 55, top: 0,
+            child: CustomPaint(
+              size: const Size(double.infinity, 12),
+              painter: MountingBracketPainter(isTop: true, color: color),
+            ),
+          ),
+
+          // 🔥 BOTTOM MOUNTING BRACKET
+          Positioned(
+            left: 55, right: 55, bottom: 0,
+            child: CustomPaint(
+              size: const Size(double.infinity, 12),
+              painter: MountingBracketPainter(isTop: false, color: color),
+            ),
+          ),
+
           // Left Panel - Matrix Rain + Forensic
           Positioned(
-            left: 0, top: 0, bottom: 0,
+            left: 0, top: 15, bottom: 15,
             child: Container(
               width: 45, height: 140, color: Colors.black,
               child: Stack(
@@ -525,16 +546,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
           // Right Panel - Kinetic
           Positioned(
-            right: 0, top: 0, bottom: 0,
+            right: 0, top: 15, bottom: 15,
             child: ValueListenableBuilder<Offset>(
               valueListenable: _accelNotifier,
               builder: (context, offset, _) => CustomPaint(size: const Size(45, 140), painter: KineticPeripheralPainter(color: color, side: 'right', valX: offset.dx, valY: offset.dy, state: state))
             )
           ),
 
-          // 🔥 Center Tumblers - WITH EMBOSSED NUMBERS
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 55),
+          // 🔥 Center Tumblers - COMPACT VERSION
+          Positioned(
+            left: 55, right: 55, top: 15, bottom: 15,
             child: NotificationListener<ScrollNotification>(
               onNotification: (notification) {
                 if (notification is ScrollStartNotification) {
@@ -565,7 +586,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // 🔥 METALLIC WHEEL WITH EMBOSSED NUMBERS
+  // 🔥 COMPACT METALLIC WHEEL (itemExtent reduced to 32)
   Widget _buildMetallicWheel(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
     
@@ -601,7 +622,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 ),
               ),
               
-              // Reticle & Scan Line
+              // Reticle & Scan Line (only when active)
               if (isActive) Positioned.fill(
                 child: AnimatedBuilder(
                   animation: _reticleController, 
@@ -619,10 +640,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 )
               ),
               
-              // 🔥 NUMBER WHEEL WITH EMBOSSED EFFECT
+              // 🔥 COMPACT NUMBER WHEEL (4-5 digits visible)
               ListWheelScrollView.useDelegate(
                 controller: _scrollControllers[index],
-                itemExtent: 48,
+                itemExtent: 32, // 🔥 REDUCED from 48 to 32
                 perspective: 0.003,
                 diameterRatio: 1.1,
                 physics: const FixedExtentScrollPhysics(),
@@ -647,34 +668,34 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // 🔥 NEW: EMBOSSED NUMBER BUILDER
+  // 🔥 SUBTLE EMBOSSED NUMBER (no eye-burning glow)
   Widget _buildEmbossedNumber(String digit, {required bool isActive, required Color activeColor}) {
     if (isActive) {
-      // Active State: Glowing embossed with gradient
+      // 🔥 Active State: Subtle steel reflection, NO neon glow
       return ShaderMask(
         shaderCallback: (bounds) => LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white,
-            activeColor,
-            activeColor.withOpacity(0.8),
+            Colors.white.withOpacity(0.9),
+            const Color(0xFFDDDDDD),
+            const Color(0xFFBBBBBB),
           ],
           stops: const [0.0, 0.5, 1.0],
         ).createShader(bounds),
         child: Text(
           digit,
           style: TextStyle(
-            fontSize: 36,
+            fontSize: 30, // 🔥 Slightly smaller for compact wheel
             fontWeight: FontWeight.w900,
             foreground: Paint()
               ..style = PaintingStyle.fill
               ..color = Colors.white,
             shadows: [
-              Shadow(offset: const Offset(2.5, 2.5), blurRadius: 4, color: Colors.black.withOpacity(0.9)),
-              Shadow(offset: const Offset(-1.5, -1.5), blurRadius: 3, color: Colors.white.withOpacity(0.6)),
-              Shadow(offset: Offset.zero, blurRadius: 20, color: activeColor),
-              Shadow(offset: Offset.zero, blurRadius: 10, color: activeColor),
+              Shadow(offset: const Offset(2, 2), blurRadius: 3, color: Colors.black.withOpacity(0.8)),
+              Shadow(offset: const Offset(-1, -1), blurRadius: 2, color: Colors.white.withOpacity(0.5)),
+              // 🔥 REMOVED eye-burning neon glow
+              Shadow(offset: Offset.zero, blurRadius: 8, color: activeColor.withOpacity(0.2)), // Subtle hint only
             ],
           ),
         ),
@@ -684,7 +705,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       return Text(
         digit,
         style: TextStyle(
-          fontSize: 32,
+          fontSize: 28, // 🔥 Proportional reduction
           fontWeight: FontWeight.w900,
           foreground: Paint()
             ..shader = const LinearGradient(
@@ -699,7 +720,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           shadows: [
             Shadow(offset: const Offset(2, 2), blurRadius: 3, color: Colors.black.withOpacity(0.8)),
             Shadow(offset: const Offset(-1, -1), blurRadius: 2, color: Colors.white.withOpacity(0.4)),
-            Shadow(offset: const Offset(1, 1), blurRadius: 6, color: Colors.black.withOpacity(0.5)),
           ],
         ),
       );
@@ -820,16 +840,145 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 }
 
 // ============================================
-// 🔥 PART 2 ENDS - Continue to Part 3
+// 🔥 PART 2 ENDS - CONTINUE TO PART 3
 // ============================================
 
+// ==============================================================
+// 📋 PART 3/3: CUSTOM PAINTERS (FINAL)
+// ==============================================================
+// (Sambungan dari Part 2 - paste after _buildWarningBanner method)
+
 // ============================================
-// 🔥 PART 3/3: CUSTOM PAINTERS
+// 🔥 NEW: MOUNTING BRACKET PAINTER
 // ============================================
-// (Sambungan dari Part 2)
+class MountingBracketPainter extends CustomPainter {
+  final bool isTop;
+  final Color color;
+
+  MountingBracketPainter({required this.isTop, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.fill
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF555555),
+          const Color(0xFF333333),
+          const Color(0xFF222222),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    // Main bracket body
+    final path = Path();
+    if (isTop) {
+      path.moveTo(0, size.height);
+      path.lineTo(0, 3);
+      path.lineTo(3, 0);
+      path.lineTo(size.width - 3, 0);
+      path.lineTo(size.width, 3);
+      path.lineTo(size.width, size.height);
+    } else {
+      path.moveTo(0, 0);
+      path.lineTo(0, size.height - 3);
+      path.lineTo(3, size.height);
+      path.lineTo(size.width - 3, size.height);
+      path.lineTo(size.width, size.height - 3);
+      path.lineTo(size.width, 0);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+
+    // 🔥 Bolts/Rivets
+    final boltPaint = Paint()
+      ..color = const Color(0xFF1A1A1A)
+      ..style = PaintingStyle.fill;
+    
+    final boltHighlight = Paint()
+      ..color = Colors.white.withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+
+    final boltPositions = [
+      size.width * 0.15,
+      size.width * 0.35,
+      size.width * 0.5,
+      size.width * 0.65,
+      size.width * 0.85,
+    ];
+
+    for (var x in boltPositions) {
+      final boltY = isTop ? size.height - 4 : 4;
+      
+      // Bolt shadow
+      canvas.drawCircle(Offset(x + 0.5, boltY + 0.5), 2.5, Paint()..color = Colors.black.withOpacity(0.5));
+      
+      // Bolt body
+      canvas.drawCircle(Offset(x, boltY), 2.5, boltPaint);
+      
+      // Bolt highlight
+      canvas.drawCircle(Offset(x - 0.8, boltY - 0.8), 1.2, boltHighlight);
+      
+      // Bolt cross (Phillips head)
+      final crossPaint = Paint()
+        ..color = Colors.black.withOpacity(0.8)
+        ..strokeWidth = 0.6
+        ..strokeCap = StrokeCap.round;
+      
+      canvas.drawLine(Offset(x - 1.2, boltY), Offset(x + 1.2, boltY), crossPaint);
+      canvas.drawLine(Offset(x, boltY - 1.2), Offset(x, boltY + 1.2), crossPaint);
+    }
+
+    // 🔥 Edge lighting
+    final edgePaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          color.withOpacity(0.2),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    canvas.drawPath(path, edgePaint);
+
+    // 🔥 Depth shadow
+    final shadowPath = Path();
+    if (isTop) {
+      shadowPath.moveTo(0, size.height);
+      shadowPath.lineTo(size.width, size.height);
+      shadowPath.lineTo(size.width, size.height - 2);
+      shadowPath.lineTo(0, size.height - 2);
+    } else {
+      shadowPath.moveTo(0, 0);
+      shadowPath.lineTo(size.width, 0);
+      shadowPath.lineTo(size.width, 2);
+      shadowPath.lineTo(0, 2);
+    }
+    shadowPath.close();
+
+    final shadowPaint = Paint()
+      ..shader = LinearGradient(
+        begin: isTop ? Alignment.bottomCenter : Alignment.topCenter,
+        end: isTop ? Alignment.topCenter : Alignment.bottomCenter,
+        colors: [
+          Colors.black.withOpacity(0.6),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    canvas.drawPath(shadowPath, shadowPaint);
+  }
+
+  @override
+  bool shouldRepaint(MountingBracketPainter oldDelegate) =>
+      oldDelegate.isTop != isTop || oldDelegate.color != color;
+}
 
 // ============================================
 // 🔥 UPGRADED METALLIC CYLINDER PAINTER
+// (No eye-burning glow, subtle steel reflection only)
 // ============================================
 class MetallicCylinderPainter extends CustomPainter {
   final ui.Image? metalTexture;
@@ -857,7 +1006,7 @@ class MetallicCylinderPainter extends CustomPainter {
         );
       canvas.drawRect(rect, texturePaint);
     } else {
-      // Fallback: Darker metallic (kontras dengan light numbers)
+      // Fallback: Darker metallic
       final fallbackPaint = Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
@@ -872,13 +1021,13 @@ class MetallicCylinderPainter extends CustomPainter {
       canvas.drawRect(rect, fallbackPaint);
     }
 
-    // 🔥 STEP 2: Brushed Metal Scratches (Directional)
+    // 🔥 STEP 2: Brushed Metal Scratches
     final brushPaint = Paint()
       ..color = Colors.white.withOpacity(0.08)
       ..strokeWidth = 0.8
       ..blendMode = BlendMode.overlay;
     
-    final random = Random(42); // Consistent seed
+    final random = Random(42);
     for (int i = 0; i < 40; i++) {
       double x = random.nextDouble() * size.width;
       double offset = (random.nextDouble() - 0.5) * 8;
@@ -903,22 +1052,26 @@ class MetallicCylinderPainter extends CustomPainter {
       ).createShader(rect);
     canvas.drawRect(rect, cylinderGradient);
 
-    // 🔥 STEP 4: Rim Lighting (Edge Glow)
+    // 🔥 STEP 4: Subtle Rim Lighting (NO eye-burning glow)
     final rimPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          isActive ? activeColor.withOpacity(0.3) : Colors.white.withOpacity(0.2),
+          isActive 
+            ? Colors.white.withOpacity(0.25) // 🔥 SUBTLE steel reflection
+            : Colors.white.withOpacity(0.15),
           Colors.transparent,
           Colors.transparent,
-          isActive ? activeColor.withOpacity(0.3) : Colors.white.withOpacity(0.2),
+          isActive 
+            ? Colors.white.withOpacity(0.25) 
+            : Colors.white.withOpacity(0.15),
         ],
         stops: const [0.0, 0.1, 0.9, 1.0],
       ).createShader(rect);
     canvas.drawRect(rect, rimPaint);
 
-    // 🔥 STEP 5: Ambient Occlusion (Dark Edges)
+    // 🔥 STEP 5: Ambient Occlusion
     final shadowPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.centerLeft,
@@ -933,35 +1086,35 @@ class MetallicCylinderPainter extends CustomPainter {
       ).createShader(rect);
     canvas.drawRect(rect, shadowPaint);
 
-    // 🔥 STEP 6: Active State Glow
+    // 🔥 STEP 6: Active State - SUBTLE glow only
     if (isActive) {
       final glowPaint = Paint()
         ..shader = RadialGradient(
           center: Alignment.center,
           radius: 0.9,
           colors: [
-            activeColor.withOpacity(0.25),
-            activeColor.withOpacity(0.08),
+            activeColor.withOpacity(0.1), // 🔥 REDUCED from 0.25 to 0.1
+            activeColor.withOpacity(0.03), // 🔥 REDUCED from 0.08 to 0.03
             Colors.transparent,
           ],
         ).createShader(rect);
       canvas.drawRect(rect, glowPaint);
 
-      // Active Border Pulse
+      // Active Border - subtle
       final borderPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
+        ..strokeWidth = 1.5 // 🔥 REDUCED from 2.5 to 1.5
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            activeColor.withOpacity(0.7),
-            activeColor.withOpacity(0.3),
-            activeColor.withOpacity(0.7),
+            activeColor.withOpacity(0.4), // 🔥 REDUCED from 0.7
+            activeColor.withOpacity(0.2), // 🔥 REDUCED from 0.3
+            activeColor.withOpacity(0.4),
           ],
         ).createShader(rect);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(rect.deflate(1.5), const Radius.circular(24)),
+        RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(24)),
         borderPaint,
       );
     }
@@ -1118,5 +1271,17 @@ class KineticScanLinePainter extends CustomPainter {
 }
 
 // ============================================
-// 🔥 END OF FILE - V12.1 COMPLETE
+// 🔥 END OF FILE - V12.2 COMPLETE
 // ============================================
+// 
+// 📦 INSTALLATION INSTRUCTIONS:
+// 1. Copy Part 1 content → cla_widget.dart (replace all)
+// 2. Append Part 2 content after _getStatusLabel method
+// 3. Append Part 3 content after _buildWarningBanner method
+// 
+// ✅ FIXED ISSUES:
+// - ✅ Compact wheels (4-5 digits visible, less empty space)
+// - ✅ Subtle steel reflection (no eye-burning glow)
+// - ✅ Industrial mounting brackets (grounded, realistic)
+// 
+// 🚀 READY FOR DEPLOYMENT
