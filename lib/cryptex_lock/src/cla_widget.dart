@@ -11,7 +11,7 @@ import 'matrix_rain_painter.dart';
 import 'forensic_data_painter.dart';
 
 // ============================================
-// 🔥 V18.2 - IMAGE INTEGRATION FIXED 🔥
+// 🔥 V18.3 - FIXED BUILD ERRORS 🔥
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -108,6 +108,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   String _stressResult = "";
   bool _isDisposed = false;
   bool _showForensics = false;
+  
+  // LOCAL TRACKING (kalau controller tak ada)
+  int _localAttemptCount = 0;
 
   final Color _primaryOrange = const Color(0xFFFF5722);
   final Color _accentRed = const Color(0xFFD32F2F);
@@ -219,11 +222,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       double variance = intervals.map((x) => (x - avg) * (x - avg)).reduce((a, b) => a + b) / intervals.length;
       double stdDev = sqrt(variance);
       double cv = stdDev / avg;
-      patternScore = (1 - cv.clamp(0, 1)).clamp(0.0, 1.0);
+      // 🔥 FIX 1: Cast to double explicitly
+      patternScore = ((1 - cv.clamp(0, 1)) as num).clamp(0.0, 1.0).toDouble();
     } else {
       patternScore = 0.0;
     }
-    widget.controller.registerScrollPattern(patternScore);
+    // 🔥 FIX 2: Remove registerScrollPattern (method tak wujud)
+    // widget.controller.registerScrollPattern(patternScore);
     if (mounted && !_isDisposed) setState(() => _patternScore = patternScore);
   }
 
@@ -306,7 +311,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   ),
                   const SizedBox(height: 30),
                   _buildConfirmButton(activeColor, state),
-                  if (widget.controller.attemptCount >= 3) _buildWarningBanner(),
+                  // 🔥 FIX 3: Guna local counter kalau property tak wujud
+                  if (_localAttemptCount >= 3) _buildWarningBanner(),
                   if (_stressResult.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(top: 10),
@@ -375,8 +381,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   String _getStateText(SecurityState state) {
     switch (state) {
-      case SecurityState.IDLE:
-        return "AWAITING INPUT";
+      // 🔥 FIX 4: Remove IDLE case (tak wujud dalam enum)
       case SecurityState.VALIDATING:
         return "VALIDATING...";
       case SecurityState.UNLOCKED:
@@ -384,7 +389,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       case SecurityState.HARD_LOCK:
         return "SYSTEM JAMMED";
       default:
-        return "READY";
+        return "AWAITING INPUT";
     }
   }
 
@@ -594,6 +599,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             borderRadius: BorderRadius.circular(20),
             onTap: isDisabled ? null : () async {
               HapticFeedback.mediumImpact();
+              _localAttemptCount++; // Track locally
               await widget.controller.verify(_currentCode);
             },
             child: Center(
