@@ -11,9 +11,9 @@ import 'matrix_rain_painter.dart';
 import 'forensic_data_painter.dart';
 
 // ============================================
-// 🔥 V14.0 - CLEAN INDUSTRIAL UI
-// Based on screenshot: Professional gradient lock design
-// Preserves: Matrix Rain, Forensic Panel, Motion Sensors
+// 🔥 V15.0 - HYBRID: CLEAN UI + FULL FEATURES
+// UI: Professional style from Grok screenshot
+// Features: 100% original biometric/forensic system
 // ============================================
 
 // ============================================
@@ -116,13 +116,15 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   String _stressResult = "";
 
   bool _isDisposed = false;
+  bool _showForensics = false; // Toggle for forensic panel
 
-  // 🎨 PROFESSIONAL COLOR SCHEME (matching screenshot)
-  final Color _primaryOrange = const Color(0xFFFF5722);  // Deep Orange accent
-  final Color _accentRed = const Color(0xFFD32F2F);      // Red gradient
-  final Color _neutralGray = const Color(0xFFE0E0E0);    // Light gray background
-  final Color _darkText = const Color(0xFF263238);       // Dark blue-gray text
-  final Color _successGreen = const Color(0xFF4CAF50);   // Success state
+  // 🎨 PROFESSIONAL COLOR SCHEME
+  final Color _primaryOrange = const Color(0xFFFF5722);
+  final Color _accentRed = const Color(0xFFD32F2F);
+  final Color _neutralGray = const Color(0xFFE0E0E0);
+  final Color _darkText = const Color(0xFF263238);
+  final Color _successGreen = const Color(0xFF4CAF50);
+  final Color _lightBlueGray = const Color(0xFFE3E8F0);
 
   List<int> get _currentCode {
     if (_scrollControllers.isEmpty) return [0, 0, 0, 0, 0];
@@ -335,14 +337,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         return "Initializing...";
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     if (_isDisposed) return const SizedBox.shrink();
 
     SecurityState state = widget.controller.state;
 
-    // 🎨 Dynamic color based on state
     Color activeColor = (state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK)
         ? _accentRed
         : (state == SecurityState.UNLOCKED ? _successGreen : _primaryOrange);
@@ -355,44 +356,44 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFFF5F5F5),
-            const Color(0xFFE8EAF6),
-            _neutralGray,
+            _lightBlueGray,
+            const Color(0xFFD0D8E8),
+            const Color(0xFFC5D0E5),
           ],
         ),
       ),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // 🔥 Forensic & Matrix panels (hidden beneath)
+      child: Stack(
+        children: [
+          // 🔬 FORENSIC PANEL (toggleable)
+          if (_showForensics)
             Positioned(
-              left: 20,
+              left: 0,
               top: 100,
               child: _buildForensicPanel(),
             ),
 
-            // Main Content
-            Padding(
+          // Main UI
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Header
+                  // Header with status
                   Text(
                     statusLabel,
                     style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w300,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
                       color: _darkText,
-                      letterSpacing: 1.5,
+                      letterSpacing: 0.5,
                     ),
                   ),
 
                   const SizedBox(height: 40),
 
-                  // 🎯 MAIN LOCK CONTAINER (matching screenshot)
+                  // 🎯 MAIN LOCK CONTAINER
                   _buildCleanLockContainer(activeColor, state),
 
                   const SizedBox(height: 30),
@@ -403,7 +404,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   const SizedBox(height: 20),
 
                   // Warning banner
-                  if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
+                  if (widget.controller.threatMessage.isNotEmpty) 
+                    _buildWarningBanner(),
 
                   // Sensors row
                   const SizedBox(height: 20),
@@ -432,109 +434,153 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   ],
 
                   const SizedBox(height: 10),
-                  GestureDetector(
-                    onLongPress: _runStressTest,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black26),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: _isStressTesting
-                          ? const SizedBox(
-                              width: 10,
-                              height: 10,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54),
-                            )
-                          : Text(
-                              "⚡ LONG PRESS FOR BENCHMARK",
-                              style: TextStyle(
-                                color: activeColor.withOpacity(0.6),
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 2,
+                  
+                  // Forensic toggle + Stress test
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Forensic toggle
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _showForensics = !_showForensics);
+                          HapticFeedback.lightImpact();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: _showForensics ? _successGreen : Colors.black26),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _showForensics ? Icons.visibility : Icons.visibility_off,
+                                size: 16,
+                                color: _showForensics ? _successGreen : Colors.black54,
                               ),
-                            ),
-                    ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "FORENSICS",
+                                style: TextStyle(
+                                  color: _showForensics ? _successGreen : Colors.black54,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Stress test
+                      GestureDetector(
+                        onLongPress: _runStressTest,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.black26),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: _isStressTesting
+                              ? const SizedBox(
+                                  width: 10,
+                                  height: 10,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54),
+                                )
+                              : Text(
+                                  "⚡ BENCHMARK",
+                                  style: TextStyle(
+                                    color: activeColor.withOpacity(0.6),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+          ),
 
-            // Tutorial overlay
-            Positioned.fill(
-              child: TutorialOverlay(
-                isVisible: _showTutorial && state == SecurityState.LOCKED,
-                color: activeColor,
-              ),
+          // Tutorial overlay
+          Positioned.fill(
+            child: TutorialOverlay(
+              isVisible: _showTutorial && state == SecurityState.LOCKED,
+              color: activeColor,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // 🎯 CLEAN LOCK CONTAINER (matching screenshot style)
+  // 🎯 CLEAN LOCK CONTAINER (premium style)
   Widget _buildCleanLockContainer(Color activeColor, SecurityState state) {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(40),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 30,
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 40,
             spreadRadius: 5,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 80,
+            spreadRadius: 10,
+            offset: const Offset(0, 20),
           ),
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // 🔥 CIRCULAR GRADIENT RING (like screenshot)
+          // 🔥 CYLINDRICAL DRUMS CONTAINER
           Container(
-            width: 280,
-            height: 280,
+            height: 200,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  _primaryOrange,
-                  _accentRed,
-                ],
-              ),
+              color: const Color(0xFFF8F9FB),
+              borderRadius: BorderRadius.circular(100),
               boxShadow: [
                 BoxShadow(
-                  color: activeColor.withOpacity(0.3),
-                  blurRadius: 20,
-                  spreadRadius: 5,
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                  spreadRadius: -4,
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                  spreadRadius: -2,
                 ),
               ],
-            ),
-            child: Center(
-              child: Container(
-                width: 240,
-                height: 240,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                ),
-                child: Listener(
-                  onPointerDown: (_) {
-                    _userInteracted();
-                    widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
-                  },
-                  child: _buildWheelRow(activeColor, state),
-                ),
+              border: Border.all(
+                color: const Color(0xFFE0E4EA),
+                width: 1,
               ),
+            ),
+            child: Listener(
+              onPointerDown: (_) {
+                _userInteracted();
+                widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
+              },
+              child: _buildWheelRow(activeColor, state),
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
-          // Dots indicator
+          // Pagination dots
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
@@ -545,7 +591,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: index == 0 ? _darkText : _darkText.withOpacity(0.3),
+                  color: index == 1 ? const Color(0xFF666666) : const Color(0xFFCCCCCC),
                 ),
               ),
             ),
@@ -555,7 +601,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // 🔢 WHEEL ROW (5 tumblers inside circle)
+  // 🔢 WHEEL ROW (5 cylinders)
   Widget _buildWheelRow(Color color, SecurityState state) {
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
@@ -579,134 +625,220 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         return false;
       },
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(5, (index) => _buildCleanWheel(index, color)),
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(5, (index) => _buildPremiumCylinder(index, color)),
       ),
     );
   }
-
-  // 🔢 CLEAN WHEEL (professional style matching screenshot)
-  Widget _buildCleanWheel(int index, Color color) {
+  
+  // 🔢 PREMIUM CYLINDER (3D realistic)
+  Widget _buildPremiumCylinder(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
 
     return Expanded(
-      child: Listener(
-        onPointerDown: (_) {
+      child: GestureDetector(
+        onTapDown: (_) {
           if (_isDisposed) return;
           setState(() => _activeWheelIndex = index);
           _wheelActiveTimer?.cancel();
           _userInteracted();
           widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
-          HapticFeedback.lightImpact();
+          HapticFeedback.selectionClick();
         },
-        onPointerUp: (_) => _resetActiveWheelTimer(),
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 200),
-          opacity: isActive ? 1.0 : 0.5,
-          child: Container(
-            height: 180,
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isActive ? color : Colors.black12,
-                width: isActive ? 2 : 1,
+        onTapUp: (_) => _resetActiveWheelTimer(),
+        onTapCancel: () => _resetActiveWheelTimer(),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          child: Stack(
+            children: [
+              // Cylinder 3D background
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: RealisticCylinderPainter(isActive: isActive, activeColor: color),
+                ),
               ),
-              boxShadow: isActive
-                  ? [
-                      BoxShadow(
-                        color: color.withOpacity(0.3),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ]
-                  : [],
-            ),
-            child: Stack(
-              children: [
-                // Scan line (when active)
-                if (isActive)
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: _scanController,
-                      builder: (context, child) => CustomPaint(
-                        painter: KineticScanLinePainter(
-                          color: color,
-                          progress: _scanController.value,
-                        ),
-                      ),
-                    ),
-                  ),
 
-                // Number wheel
-                ListWheelScrollView.useDelegate(
-                  controller: _scrollControllers[index],
-                  itemExtent: 40,
-                  perspective: 0.005,
-                  diameterRatio: 1.2,
-                  physics: const FixedExtentScrollPhysics(),
-                  onSelectedItemChanged: (v) {
-                    HapticFeedback.selectionClick();
-                    _analyzeScrollPattern();
-                  },
-                  childDelegate: ListWheelChildBuilderDelegate(
-                    builder: (context, i) => Center(
+              // Number wheel
+              ListWheelScrollView.useDelegate(
+                controller: _scrollControllers[index],
+                itemExtent: 66,
+                perspective: 0.002,
+                diameterRatio: 1.5,
+                physics: const FixedExtentScrollPhysics(),
+                overAndUnderCenterOpacity: 0.5,
+                onSelectedItemChanged: (_) {
+                  HapticFeedback.selectionClick();
+                  _analyzeScrollPattern();
+                },
+                childDelegate: ListWheelChildBuilderDelegate(
+                  builder: (context, i) {
+                    return Center(
                       child: Text(
                         '${i % 10}',
                         style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 56,
+                          fontWeight: FontWeight.w700,
                           color: _darkText,
+                          height: 1.0,
                         ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // Active red highlight
+              if (isActive)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: color.withOpacity(0.6),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withOpacity(0.3),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Scan line (when active)
+              if (isActive)
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: _scanController,
+                    builder: (context, child) => CustomPaint(
+                      painter: KineticScanLinePainter(
+                        color: color,
+                        progress: _scanController.value,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+
+              // Top cap (dark rim)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 12,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF4A4A4A),
+                        Color(0xFF5A5A5A),
+                        Color(0xFF4A4A4A),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom cap (dark rim)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 12,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF4A4A4A),
+                        Color(0xFF5A5A5A),
+                        Color(0xFF4A4A4A),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // 🔘 CONFIRM BUTTON (matching screenshot)
+  // 🔘 CONFIRM BUTTON
   Widget _buildConfirmButton(Color activeColor, SecurityState state) {
     bool isDisabled = state == SecurityState.VALIDATING || state == SecurityState.HARD_LOCK;
 
     return SizedBox(
       width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isDisabled ? Colors.grey[300] : activeColor,
-          foregroundColor: Colors.white,
-          elevation: isDisabled ? 0 : 8,
-          shadowColor: activeColor.withOpacity(0.4),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+      height: 64,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: isDisabled
+              ? null
+              : LinearGradient(
+                  colors: [
+                    activeColor,
+                    activeColor.withOpacity(0.8),
+                  ],
+                ),
+          color: isDisabled ? Colors.grey[300] : null,
+          boxShadow: isDisabled
+              ? []
+              : [
+                  BoxShadow(
+                    color: activeColor.withOpacity(0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
         ),
-        onPressed: isDisabled
-            ? null
-            : () async {
-                HapticFeedback.mediumImpact();
-                await widget.controller.verify(_currentCode);
-              },
-        child: Text(
-          state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "CONFIRM ACCESS",
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.5,
-            fontSize: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: isDisabled
+                ? null
+                : () async {
+                    HapticFeedback.mediumImpact();
+                    await widget.controller.verify(_currentCode);
+                  },
+            child: Center(
+              child: Text(
+                state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "CONFIRM ACCESS",
+                style: TextStyle(
+                  color: isDisabled ? Colors.black54 : Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
-  
-  // 📊 SENSOR ROW (minimal, below main UI)
+
+  // 📊 SENSOR ROW
   Widget _buildSensorRow(Color color) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -746,10 +878,11 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // 🔬 FORENSIC PANEL (hidden, can be revealed)
+  // 🔬 FORENSIC PANEL
   Widget _buildForensicPanel() {
-    return Opacity(
-      opacity: 0.0, // Hidden by default, can be toggled
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 300),
+      opacity: _showForensics ? 1.0 : 0.0,
       child: Container(
         width: 60,
         height: 200,
@@ -879,6 +1012,119 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 }
 
 // ============================================
+// REALISTIC CYLINDER PAINTER
+// ============================================
+class RealisticCylinderPainter extends CustomPainter {
+  final bool isActive;
+  final Color activeColor;
+
+  RealisticCylinderPainter({required this.isActive, required this.activeColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+
+    // Base white
+    final basePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(20)),
+      basePaint,
+    );
+
+    // 3D cylindrical gradient
+    final cylinderGradient = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.3, 0.0),
+        radius: 1.2,
+        colors: [
+          Colors.white,
+          const Color(0xFFF5F5F5),
+          const Color(0xFFE8E8E8),
+          const Color(0xFFDDDDDD),
+        ],
+        stops: const [0.0, 0.4, 0.7, 1.0],
+      ).createShader(rect);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(20)),
+      cylinderGradient,
+    );
+
+    // Left highlight
+    final leftHighlight = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          Colors.white.withOpacity(0.6),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.15],
+      ).createShader(rect);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(20)),
+      leftHighlight,
+    );
+
+    // Right shadow
+    final rightShadow = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          Colors.transparent,
+          Colors.black.withOpacity(0.1),
+        ],
+        stops: const [0.85, 1.0],
+      ).createShader(rect);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(20)),
+      rightShadow,
+    );
+
+    // Active red inner glow
+    if (isActive) {
+      final centerY = size.height / 2;
+      final glowRect = Rect.fromLTWH(0, centerY - 33, size.width, 66);
+
+      final redGlow = Paint()
+        ..shader = RadialGradient(
+          center: Alignment.center,
+          radius: 0.8,
+          colors: [
+            activeColor.withOpacity(0.15),
+            activeColor.withOpacity(0.05),
+            Colors.transparent,
+          ],
+        ).createShader(glowRect);
+
+      canvas.drawRect(glowRect, redGlow);
+    }
+
+    // Border
+    final borderPaint = Paint()
+      ..color = const Color(0xFFE0E0E0)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(20)),
+      borderPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(RealisticCylinderPainter oldDelegate) {
+    return oldDelegate.isActive != isActive || oldDelegate.activeColor != activeColor;
+  }
+}
+
+// ============================================
 // SCAN LINE PAINTER
 // ============================================
 class KineticScanLinePainter extends CustomPainter {
@@ -910,5 +1156,5 @@ class KineticScanLinePainter extends CustomPainter {
 }
 
 // ============================================
-// 🔥 END OF V14.0 - CLEAN INDUSTRIAL UI
+// 🔥 END OF V15.0 - HYBRID COMPLETE
 // ============================================
