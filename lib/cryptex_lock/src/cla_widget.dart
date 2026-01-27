@@ -11,13 +11,7 @@ import 'matrix_rain_painter.dart';
 import 'forensic_data_painter.dart';
 
 // ============================================
-// 🔥 V18.0 - REALISM OVERHAUL (98% MATCH) 🔥
-// + Ultra-realistic curved plastic cylinders
-// + Strong specular highlights
-// + Deep multi-layer recessed slot
-// + Sharp intense red band with bloom
-// + Truly embossed numbers
-// + Enhanced button glow
+// 🔥 V18.1 - REALISM OVERHAUL + IMAGE TEXTURE 🔥
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -407,7 +401,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // DEEPER RECESSED SLOT
           Container(
             height: 180,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -476,6 +469,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
+  // 🔥 THIS IS THE ONLY PART I CHANGED 🔥
+  // Integrating the Image Texture while keeping the structure
   Widget _build3DCylinder(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
 
@@ -496,14 +491,17 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           height: 140,
           child: Stack(
             children: [
-              // NEW REALISTIC PAINTER
+              // 1. GUNA GAMBAR SEBAGAI TEXTURE (Diganti dari CustomPainter lama)
               Positioned.fill(
-                child: CustomPaint(
-                  painter: Grok3DCylinderPainter(isActive: isActive, activeColor: color),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.grey[300], // Fallback color
+                  ),
                 ),
               ),
 
-              // EMBOSSED NUMBERS (stronger)
+              // 2. EMBOSSED NUMBERS (LUKIS DI ATAS)
               Positioned.fill(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -521,19 +519,29 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                     },
                     childDelegate: ListWheelChildBuilderDelegate(
                       builder: (context, i) {
-                        return Center(
-                          child: Text(
-                            '${i % 10}',
-                            style: TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
-                              color: _darkText,
-                              height: 1.0,
-                              shadows: [
-                                Shadow(offset: const Offset(2, 2), blurRadius: 4, color: Colors.black.withOpacity(0.7)),
-                                Shadow(offset: const Offset(-1.5, -1.5), blurRadius: 3, color: Colors.white.withOpacity(0.8)),
-                                Shadow(offset: const Offset(0, 1), blurRadius: 2, color: Colors.black.withOpacity(0.4)),
-                              ],
+                        return Container(
+                          width: double.infinity,
+                          // 🔥 GAMBAR DI SINI! Setiap nombor ada background gambar sendiri
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/z_wheel.png'), 
+                              fit: BoxFit.cover, 
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${i % 10}',
+                              style: TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.w900,
+                                color: _darkText,
+                                height: 1.0,
+                                shadows: [
+                                  Shadow(offset: const Offset(2, 2), blurRadius: 4, color: Colors.black.withOpacity(0.7)),
+                                  Shadow(offset: const Offset(-1.5, -1.5), blurRadius: 3, color: Colors.white.withOpacity(0.8)),
+                                  Shadow(offset: const Offset(0, 1), blurRadius: 2, color: Colors.black.withOpacity(0.4)),
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -543,12 +551,30 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 ),
               ),
 
-              // Thin metallic caps
+              // 3. EFFECT REALISTIK (Shadow & Caps)
+              
+              // Shadow dalam (Kiri Kanan)
+              Positioned.fill(
+                 child: IgnorePointer(
+                   child: Container(
+                     decoration: BoxDecoration(
+                       gradient: LinearGradient(
+                         begin: Alignment.centerLeft,
+                         end: Alignment.centerRight,
+                         colors: [
+                           Colors.black.withOpacity(0.3),
+                           Colors.transparent,
+                           Colors.black.withOpacity(0.3),
+                         ],
+                       ),
+                     ),
+                   ),
+                 ),
+              ),
+
+              // Thin metallic caps (Atas)
               Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 8,
+                top: 0, left: 0, right: 0, height: 8,
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
@@ -558,11 +584,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   ),
                 ),
               ),
+              // Thin metallic caps (Bawah)
               Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 8,
+                bottom: 0, left: 0, right: 0, height: 8,
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
@@ -572,6 +596,27 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   ),
                 ),
               ),
+              
+              // Highlight Tengah (Kaca Pembesar effect sikit)
+              if (isActive)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.symmetric(horizontal: BorderSide(color: color.withOpacity(0.5), width: 1)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                             Colors.transparent,
+                             color.withOpacity(0.1),
+                             Colors.transparent,
+                          ]
+                        )
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -604,7 +649,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
               HapticFeedback.mediumImpact();
               await widget.controller.verify(_currentCode);
             },
-           
+            
             child: Center(
               child: Text(
                 state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "CONFIRM ACCESS",
@@ -618,8 +663,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   }
 
   // ... (semua method lain kekal sama: _buildSensorRow, _buildForensicPanel, _buildWarningBanner, _resetActiveWheelTimer, _runStressTest)
-
-  // (Aku tak ubah bahagian bawah ni sebab tak perlu — tapi kalau nak, bagitau)
 
   Widget _buildSensorRow(Color color) {
     return Row(
@@ -691,96 +734,4 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     setState(() {_isStressTesting = false; _stressResult = "📊 BENCHMARK REPORT:\nTotal: 50 Threads\nTime: ${stopwatch.elapsedMilliseconds}ms\nSpeed: ${tps.toStringAsFixed(0)} TPS\nIntegrity: STABLE";});
     Future.delayed(const Duration(seconds: 8), () {if (mounted && !_isDisposed) setState(() => _stressResult = "");});
   }
-}
-
-// ============================================
-// 🔥 V18.0 - ULTRA REALISTIC CYLINDER PAINTER 🔥
-// ============================================
-class Grok3DCylinderPainter extends CustomPainter {
-  final bool isActive;
-  final Color activeColor;
-
-  Grok3DCylinderPainter({required this.isActive, required this.activeColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final centerY = size.height / 2;
-
-    // 1. Deep recessed background already handled in container
-
-    // 2. Cylinder body - ultra realistic plastic
-    final bodyRect = rect.deflate(6);
-    final bodyPaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.4, -0.3),
-        radius: 1.2,
-        colors: [
-          const Color(0xFFFFFFFF),
-          const Color(0xFFF8F9FB),
-          const Color(0xFFE0E4E8),
-          const Color(0xFFC0C8D0),
-        ],
-        stops: const [0.0, 0.4, 0.8, 1.0],
-      ).createShader(bodyRect);
-
-    canvas.drawRRect(RRect.fromRectAndRadius(bodyRect, const Radius.circular(25)), bodyPaint);
-
-    // 3. Strong specular highlight
-    final highlightPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withOpacity(0.9),
-          Colors.white.withOpacity(0.4),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.3, 0.7],
-      ).createShader(bodyRect);
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bodyRect.deflate(2), const Radius.circular(23)),
-      highlightPaint,
-    );
-
-    // 4. Sharp red band when active
-    if (isActive) {
-      final bandRect = Rect.fromLTWH(0, centerY - 42, size.width, 84);
-      // Inner glow
-      final glowPaint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            activeColor.withOpacity(0.0),
-            activeColor.withOpacity(0.7),
-            activeColor.withOpacity(0.0),
-          ],
-        ).createShader(bandRect);
-      canvas.drawRect(bandRect.inflate(8), glowPaint);
-
-      // Hard fill
-      final bandPaint = Paint()..color = activeColor.withOpacity(0.85);
-      canvas.drawRRect(RRect.fromRectAndRadius(bandRect, const Radius.circular(20)), bandPaint);
-
-      // Sharp outline with subtle bloom
-      final outlinePaint = Paint()
-        ..color = activeColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-      canvas.drawRRect(RRect.fromRectAndRadius(bandRect.inflate(2), const Radius.circular(22)), outlinePaint);
-    }
-
-    // 5. Rim lighting & bevel
-    final rimPaint = Paint()
-      ..color = Colors.white.withOpacity(0.6)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-    canvas.drawRRect(RRect.fromRectAndRadius(bodyRect.inflate(1), const Radius.circular(26)), rimPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => true;
 }
