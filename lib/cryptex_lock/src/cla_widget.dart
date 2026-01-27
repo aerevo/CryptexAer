@@ -11,7 +11,7 @@ import 'matrix_rain_painter.dart';
 import 'forensic_data_painter.dart';
 
 // ============================================
-// 🔥 V18.1 - REALISM OVERHAUL + IMAGE TEXTURE 🔥
+// 🔥 V18.2 - IMAGE INTEGRATION FIXED 🔥
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -202,275 +202,192 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         timer.cancel();
         return;
       }
-      if (widget.controller.state == SecurityState.HARD_LOCK) {
-        setState(() {});
-        if (widget.controller.state != SecurityState.HARD_LOCK) timer.cancel();
-      } else {
-        timer.cancel();
-      }
+      setState(() {});
     });
-  }
-
-  void _triggerTouchActive() {
-    if (_isDisposed) return;
-    _touchScoreNotifier.value = 1.0;
-    setState(() => _patternScore = 1.0);
-    _touchDecayTimer?.cancel();
-    _touchDecayTimer = Timer(const Duration(seconds: 3), () {});
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (!mounted || _isDisposed) return;
-      _decayTouch();
-    });
-  }
-
-  void _decayTouch() {
-    if (!mounted || _isDisposed) return;
-    if (_touchScoreNotifier.value > 0) {
-      _touchScoreNotifier.value -= 0.05;
-      if (_touchScoreNotifier.value < 0) _touchScoreNotifier.value = 0;
-      Future.delayed(const Duration(milliseconds: 50), () {
-        if (!mounted || _isDisposed) return;
-        _decayTouch();
-      });
-    }
   }
 
   void _analyzeScrollPattern() {
-    _userInteracted();
-    final now = DateTime.now();
-    double speed = _lastScrollTime != null ? 1000.0 / now.difference(_lastScrollTime!).inMilliseconds : 0.0;
-    _lastScrollTime = now;
-    _touchData.add({'timestamp': now, 'speed': speed, 'pressure': 0.5, 'wheelIndex': _activeWheelIndex ?? 0});
-    if (_touchData.length > 20) _touchData.removeAt(0);
-  }
-
-  void _onRandomizeTrigger() {
-    if (!mounted || _isDisposed) return;
-    _randomizeWheels();
-  }
-
-  void _randomizeWheels() {
-    if (_isDisposed) return;
-    final random = Random();
-    for (int i = 0; i < _scrollControllers.length; i++) {
-      final randomValue = random.nextInt(10);
-      _scrollControllers[i].animateToItem(
-        randomValue,
-        duration: Duration(milliseconds: 500 + random.nextInt(300)),
-        curve: Curves.easeOutBack,
-      );
+    _lastScrollTime = DateTime.now();
+    double patternScore = 0.0;
+    List<int> intervals = [];
+    for (int i = 1; i < _touchData.length; i++) {
+      int interval = (_touchData[i]['time'] as DateTime).difference(_touchData[i - 1]['time'] as DateTime).inMilliseconds;
+      intervals.add(interval);
     }
-    HapticFeedback.heavyImpact();
+    if (intervals.isNotEmpty) {
+      double avg = intervals.reduce((a, b) => a + b) / intervals.length;
+      double variance = intervals.map((x) => (x - avg) * (x - avg)).reduce((a, b) => a + b) / intervals.length;
+      double stdDev = sqrt(variance);
+      double cv = stdDev / avg;
+      patternScore = (1 - cv.clamp(0, 1)).clamp(0.0, 1.0);
+    } else {
+      patternScore = 0.0;
+    }
+    widget.controller.registerScrollPattern(patternScore);
+    if (mounted && !_isDisposed) setState(() => _patternScore = patternScore);
+  }
+
+  void _triggerTouchActive() {
+    _touchScoreNotifier.value = 1.0;
+    _touchDecayTimer?.cancel();
+    _touchDecayTimer = Timer(const Duration(milliseconds: 300), () {
+      _touchScoreNotifier.value = 0.0;
+    });
+  }
+
+  void _onRandomizeTrigger() async {
+    if (widget.controller.shouldRandomizeWheels.value && !_isDisposed) {
+      final random = Random();
+      for (int i = 0; i < _scrollControllers.length; i++) {
+        if (!mounted || _isDisposed) break;
+        final randomIndex = random.nextInt(10) + (i * 100);
+        if (_scrollControllers[i].hasClients) {
+          _scrollControllers[i].animateToItem(randomIndex, duration: const Duration(milliseconds: 600), curve: Curves.easeOut);
+        }
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      widget.controller.shouldRandomizeWheels.value = false;
+    }
   }
 
   @override
   void dispose() {
     _isDisposed = true;
-    WidgetsBinding.instance.removeObserver(this);
-    widget.controller.removeListener(_handleControllerChange);
-    widget.controller.shouldRandomizeWheels.removeListener(_onRandomizeTrigger);
     _accelSub?.cancel();
     _lockoutTimer?.cancel();
     _wheelActiveTimer?.cancel();
-    _touchDecayTimer?.cancel();
     _tutorialHideTimer?.cancel();
+    _touchDecayTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    widget.controller.removeListener(_handleControllerChange);
+    widget.controller.shouldRandomizeWheels.removeListener(_onRandomizeTrigger);
+    for (var c in _scrollControllers) {
+      c.dispose();
+    }
     _pulseController.dispose();
     _scanController.dispose();
     _reticleController.dispose();
     _rainController.dispose();
-    for (var c in _scrollControllers) c.dispose();
-    _motionScoreNotifier.dispose();
-    _touchScoreNotifier.dispose();
-    _accelNotifier.dispose();
     super.dispose();
-  }
-
-  String _getStatusLabel(SecurityState state) {
-    switch (state) {
-      case SecurityState.LOCKED: return "Secure Access";
-      case SecurityState.VALIDATING: return "Validating...";
-      case SecurityState.SOFT_LOCK: return "Access Denied";
-      case SecurityState.HARD_LOCK: return "System Locked";
-      case SecurityState.UNLOCKED: return "Access Granted";
-      default: return "Initializing...";
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isDisposed) return const SizedBox.shrink();
-    SecurityState state = widget.controller.state;
-    Color activeColor = (state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK)
-        ? _accentRed
-        : (state == SecurityState.UNLOCKED ? _successGreen : _primaryOrange);
-    String statusLabel = _getStatusLabel(state);
+    final state = widget.controller.state;
+    final isUnlocked = state == SecurityState.UNLOCKED;
+    final isLocked = state == SecurityState.HARD_LOCK;
+    Color activeColor = isUnlocked ? _successGreen : (isLocked ? Colors.red : _primaryOrange);
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [_lightBlueGray, const Color(0xFFD0D8E8), const Color(0xFFC5D0E5)],
-        ),
-      ),
-      child: Stack(
+    return Scaffold(
+      backgroundColor: const Color(0xFF1A1A1A),
+      body: Stack(
         children: [
-          if (_showForensics) Positioned(left: 0, top: 100, child: _buildForensicPanel()),
-          SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: MatrixRainPainter(
+                rain: _matrixRain,
+                color: activeColor.withOpacity(0.15),
+              ),
+            ),
+          ),
+          SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+              padding: const EdgeInsets.all(20),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(statusLabel, style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: _darkText, letterSpacing: 0.5)),
-                  const SizedBox(height: 40),
-                  _buildCleanLockContainer(activeColor, state),
+                  _buildHeader(activeColor, state),
+                  const SizedBox(height: 30),
+                  _buildSensorRow(activeColor),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: Row(
+                      children: List.generate(5, (i) => _build3DCylinder(i, activeColor)),
+                    ),
+                  ),
                   const SizedBox(height: 30),
                   _buildConfirmButton(activeColor, state),
-                  const SizedBox(height: 20),
-                  if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
-                  const SizedBox(height: 20),
-                  _buildSensorRow(activeColor),
-                  if (_stressResult.isNotEmpty) ...[
-                    const SizedBox(height: 20),
+                  if (widget.controller.attemptCount >= 3) _buildWarningBanner(),
+                  if (_stressResult.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      margin: const EdgeInsets.only(top: 10),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.black.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber),
+                        border: Border.all(color: _successGreen),
                       ),
-                      child: Text(_stressResult, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87, fontSize: 10, fontFamily: 'monospace')),
+                      child: Text(
+                        _stressResult,
+                        style: TextStyle(
+                          color: _successGreen,
+                          fontSize: 9,
+                          fontFamily: 'Courier',
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ],
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          setState(() => _showForensics = !_showForensics);
-                          HapticFeedback.lightImpact();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(border: Border.all(color: _showForensics ? _successGreen : Colors.black26), borderRadius: BorderRadius.circular(8)),
-                          child: Row(
-                            children: [
-                              Icon(_showForensics ? Icons.visibility : Icons.visibility_off, size: 16, color: _showForensics ? _successGreen : Colors.black54),
-                              const SizedBox(width: 4),
-                              Text("FORENSICS", style: TextStyle(color: _showForensics ? _successGreen : Colors.black54, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      GestureDetector(
-                        onLongPress: _runStressTest,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(border: Border.all(color: Colors.black26), borderRadius: BorderRadius.circular(8)),
-                          child: _isStressTesting
-                              ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54))
-                              : Text("⚡ BENCHMARK", style: TextStyle(color: activeColor.withOpacity(0.6), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
           ),
-          Positioned.fill(child: TutorialOverlay(isVisible: _showTutorial && state == SecurityState.LOCKED, color: activeColor)),
+          if (_showForensics)
+            Positioned(right: 0, top: 100, child: _buildForensicPanel()),
+          TutorialOverlay(isVisible: _showTutorial, color: activeColor),
         ],
       ),
     );
   }
 
-  Widget _buildCleanLockContainer(Color activeColor, SecurityState state) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(40),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 40, spreadRadius: 5, offset: const Offset(0, 10)),
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 80, spreadRadius: 10, offset: const Offset(0, 20)),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 180,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8ECEF),
-              borderRadius: BorderRadius.circular(90),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.45), blurRadius: 40, spreadRadius: -25, offset: const Offset(0, 15)),
-                BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 25, spreadRadius: -15, offset: const Offset(0, 10)),
-                BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, spreadRadius: -8, offset: const Offset(0, 6)),
-                BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, spreadRadius: -4, offset: const Offset(0, 3)),
-              ],
-              border: Border.all(color: const Color(0xFFE0E4EA), width: 1),
-            ),
-            child: Listener(
-              onPointerDown: (_) {
-                _userInteracted();
-                widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
-              },
-              child: _buildWheelRow(activeColor, state),
+  Widget _buildHeader(Color color, SecurityState state) {
+    return Column(
+      children: [
+        Text(
+          "CRYPTEX LOCK",
+          style: TextStyle(
+            color: color,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Text(
+            _getStateText(state),
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
             ),
           ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              3,
-              (index) => Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: index == 1 ? const Color(0xFF666666) : const Color(0xFFCCCCCC),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildWheelRow(Color color, SecurityState state) {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is ScrollStartNotification) {
-          for (int i = 0; i < _scrollControllers.length; i++) {
-            if (_scrollControllers[i].position == notification.metrics) {
-              if (mounted && !_isDisposed) setState(() => _activeWheelIndex = i);
-              _wheelActiveTimer?.cancel();
-              break;
-            }
-          }
-        } else if (notification is ScrollUpdateNotification) {
-          _analyzeScrollPattern();
-        } else if (notification is ScrollEndNotification) {
-          _resetActiveWheelTimer();
-        }
-        return false;
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(5, (index) => _build3DCylinder(index, color)),
-      ),
-    );
+  String _getStateText(SecurityState state) {
+    switch (state) {
+      case SecurityState.IDLE:
+        return "AWAITING INPUT";
+      case SecurityState.VALIDATING:
+        return "VALIDATING...";
+      case SecurityState.UNLOCKED:
+        return "ACCESS GRANTED";
+      case SecurityState.HARD_LOCK:
+        return "SYSTEM JAMMED";
+      default:
+        return "READY";
+    }
   }
 
-  // 🔥 THIS IS THE ONLY PART I CHANGED 🔥
-  // Integrating the Image Texture while keeping the structure
   Widget _build3DCylinder(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
 
@@ -487,136 +404,166 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         onTapUp: (_) => _resetActiveWheelTimer(),
         onTapCancel: () => _resetActiveWheelTimer(),
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 2.5),
+          margin: const EdgeInsets.symmetric(horizontal: 2),
           height: 140,
+          decoration: const BoxDecoration(
+            color: Colors.black,
+            image: DecorationImage(
+              image: AssetImage('assets/z_wheel.png'),
+              fit: BoxFit.cover,
+            ),
+            borderRadius: BorderRadius.all(Radius.circular(18)),
+          ),
           child: Stack(
             children: [
-              // 1. GUNA GAMBAR SEBAGAI TEXTURE (Diganti dari CustomPainter lama)
+              // Gradient depth untuk 3D effect
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: Colors.grey[300], // Fallback color
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.8),
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.8),
+                      ],
+                      stops: const [0.0, 0.5, 1.0],
+                    ),
                   ),
                 ),
               ),
 
-              // 2. EMBOSSED NUMBERS (LUKIS DI ATAS)
+              // Nombor scrolling
               Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: ListWheelScrollView.useDelegate(
-                    controller: _scrollControllers[index],
-                    itemExtent: 42,
-                    perspective: 0.003,
-                    diameterRatio: 2.5,
-                    physics: const FixedExtentScrollPhysics(),
-                    overAndUnderCenterOpacity: 0.35,
-                    useMagnifier: false,
-                    onSelectedItemChanged: (_) {
-                      HapticFeedback.selectionClick();
-                      _analyzeScrollPattern();
+                child: ListWheelScrollView.useDelegate(
+                  controller: _scrollControllers[index],
+                  itemExtent: 50,
+                  perspective: 0.006,
+                  diameterRatio: 1.8,
+                  physics: const FixedExtentScrollPhysics(),
+                  overAndUnderCenterOpacity: 0.25,
+                  onSelectedItemChanged: (_) {
+                    HapticFeedback.selectionClick();
+                    _analyzeScrollPattern();
+                  },
+                  childDelegate: ListWheelChildBuilderDelegate(
+                    builder: (context, i) {
+                      return Center(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          child: Text(
+                            '${i % 10}',
+                            style: TextStyle(
+                              fontSize: isActive ? 40 : 36,
+                              fontWeight: FontWeight.w900,
+                              color: isActive 
+                                  ? const Color(0xFFFF6D00)
+                                  : Colors.black.withOpacity(0.7),
+                              shadows: isActive 
+                                  ? [
+                                      const BoxShadow(
+                                        color: Color(0xFFFF6D00),
+                                        blurRadius: 20,
+                                        spreadRadius: 5,
+                                      ),
+                                      const BoxShadow(
+                                        color: Colors.white,
+                                        blurRadius: 5,
+                                      ),
+                                    ]
+                                  : [
+                                      Shadow(
+                                        offset: const Offset(1, 1),
+                                        blurRadius: 1,
+                                        color: Colors.white.withOpacity(0.2),
+                                      ),
+                                      Shadow(
+                                        offset: const Offset(-1, -1),
+                                        blurRadius: 2,
+                                        color: Colors.black.withOpacity(0.8),
+                                      ),
+                                    ],
+                            ),
+                          ),
+                        ),
+                      );
                     },
-                    childDelegate: ListWheelChildBuilderDelegate(
-                      builder: (context, i) {
-                        return Container(
-                          width: double.infinity,
-                          // 🔥 GAMBAR DI SINI! Setiap nombor ada background gambar sendiri
-                          decoration: const BoxDecoration(
-                            image: DecorationImage(
-                              image: AssetImage('assets/z_wheel.png'), 
-                              fit: BoxFit.cover, 
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${i % 10}',
-                              style: TextStyle(
-                                fontSize: 40,
-                                fontWeight: FontWeight.w900,
-                                color: _darkText,
-                                height: 1.0,
-                                shadows: [
-                                  Shadow(offset: const Offset(2, 2), blurRadius: 4, color: Colors.black.withOpacity(0.7)),
-                                  Shadow(offset: const Offset(-1.5, -1.5), blurRadius: 3, color: Colors.white.withOpacity(0.8)),
-                                  Shadow(offset: const Offset(0, 1), blurRadius: 2, color: Colors.black.withOpacity(0.4)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
                   ),
                 ),
               ),
 
-              // 3. EFFECT REALISTIK (Shadow & Caps)
-              
-              // Shadow dalam (Kiri Kanan)
-              Positioned.fill(
-                 child: IgnorePointer(
-                   child: Container(
-                     decoration: BoxDecoration(
-                       gradient: LinearGradient(
-                         begin: Alignment.centerLeft,
-                         end: Alignment.centerRight,
-                         colors: [
-                           Colors.black.withOpacity(0.3),
-                           Colors.transparent,
-                           Colors.black.withOpacity(0.3),
-                         ],
-                       ),
-                     ),
-                   ),
-                 ),
-              ),
-
-              // Thin metallic caps (Atas)
-              Positioned(
-                top: 0, left: 0, right: 0, height: 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
-                    ),
-                  ),
-                ),
-              ),
-              // Thin metallic caps (Bawah)
-              Positioned(
-                bottom: 0, left: 0, right: 0, height: 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
-                    ),
-                  ),
-                ),
-              ),
-              
-              // Highlight Tengah (Kaca Pembesar effect sikit)
+              // HUD focus line
               if (isActive)
-                Positioned.fill(
+                Center(
                   child: IgnorePointer(
                     child: Container(
+                      height: 54,
                       decoration: BoxDecoration(
-                        border: Border.symmetric(horizontal: BorderSide(color: color.withOpacity(0.5), width: 1)),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                             Colors.transparent,
-                             color.withOpacity(0.1),
-                             Colors.transparent,
-                          ]
-                        )
+                        border: Border.symmetric(
+                          horizontal: BorderSide(
+                            color: const Color(0xFFFF6D00).withOpacity(0.6),
+                            width: 1.5,
+                          ),
+                        ),
+                        color: const Color(0xFFFF6D00).withOpacity(0.05),
                       ),
                     ),
                   ),
                 ),
+
+              // Shadow kiri kanan
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.black.withOpacity(0.3),
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.3),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Metallic cap atas
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 8,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Metallic cap bawah
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 8,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(18)),
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -649,11 +596,15 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
               HapticFeedback.mediumImpact();
               await widget.controller.verify(_currentCode);
             },
-            
             child: Center(
               child: Text(
                 state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "CONFIRM ACCESS",
-                style: TextStyle(color: isDisabled ? Colors.black54 : Colors.white, fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 1.2),
+                style: TextStyle(
+                  color: isDisabled ? Colors.black54 : Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
               ),
             ),
           ),
@@ -662,14 +613,18 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // ... (semua method lain kekal sama: _buildSensorRow, _buildForensicPanel, _buildWarningBanner, _resetActiveWheelTimer, _runStressTest)
-
   Widget _buildSensorRow(Color color) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        ValueListenableBuilder<double>(valueListenable: _motionScoreNotifier, builder: (context, val, _) => _buildMiniSensor("MOTION", val, color, Icons.sensors)),
-        ValueListenableBuilder<double>(valueListenable: _touchScoreNotifier, builder: (context, val, _) => _buildMiniSensor("TOUCH", val, color, Icons.fingerprint)),
+        ValueListenableBuilder<double>(
+          valueListenable: _motionScoreNotifier,
+          builder: (context, val, _) => _buildMiniSensor("MOTION", val, color, Icons.sensors),
+        ),
+        ValueListenableBuilder<double>(
+          valueListenable: _touchScoreNotifier,
+          builder: (context, val, _) => _buildMiniSensor("TOUCH", val, color, Icons.fingerprint),
+        ),
         _buildMiniSensor("PATTERN", _patternScore, color, Icons.timeline),
       ],
     );
@@ -679,9 +634,20 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     bool isActive = val > 0.3;
     return Column(
       children: [
-        Icon(isActive ? Icons.check_circle : icon, size: 20, color: isActive ? _successGreen : Colors.black38),
+        Icon(
+          isActive ? Icons.check_circle : icon,
+          size: 20,
+          color: isActive ? _successGreen : Colors.black38,
+        ),
         const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 9, color: isActive ? _successGreen : Colors.black38, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            color: isActive ? _successGreen : Colors.black38,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
@@ -691,12 +657,53 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       duration: const Duration(milliseconds: 300),
       opacity: _showForensics ? 1.0 : 0.0,
       child: Container(
-        width: 60, height: 200, color: Colors.black,
+        width: 60,
+        height: 200,
+        color: Colors.black,
         child: Stack(
           children: [
-            Positioned.fill(child: CustomPaint(painter: MatrixRainPainter(rain: _matrixRain, color: const Color(0xFF00FF00).withOpacity(0.3)))),
-            Positioned.fill(child: CustomPaint(painter: ForensicDataPainter(color: const Color(0xFF00FF00), motionCount: (widget.controller.motionEntropy * 100).toInt(), touchCount: (widget.controller.liveConfidence * 20).toInt(), entropy: widget.controller.motionEntropy, confidence: widget.controller.liveConfidence))),
-            Positioned(top: 10, left: 0, right: 0, child: Container(height: 16, decoration: BoxDecoration(color: const Color(0xFF00FF00).withOpacity(0.2), border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.5))), child: const Center(child: Text('FORENSIC', style: TextStyle(color: Color(0xFF00FF00), fontSize: 7, fontWeight: FontWeight.w900, fontFamily: 'Courier'))))),
+            Positioned.fill(
+              child: CustomPaint(
+                painter: MatrixRainPainter(
+                  rain: _matrixRain,
+                  color: const Color(0xFF00FF00).withOpacity(0.3),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: CustomPaint(
+                painter: ForensicDataPainter(
+                  color: const Color(0xFF00FF00),
+                  motionCount: (widget.controller.motionEntropy * 100).toInt(),
+                  touchCount: (widget.controller.liveConfidence * 20).toInt(),
+                  entropy: widget.controller.motionEntropy,
+                  confidence: widget.controller.liveConfidence,
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 16,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF00).withOpacity(0.2),
+                  border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.5)),
+                ),
+                child: const Center(
+                  child: Text(
+                    'FORENSIC',
+                    style: TextStyle(
+                      color: Color(0xFF00FF00),
+                      fontSize: 7,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: 'Courier',
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -705,9 +712,29 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   Widget _buildWarningBanner() {
     return Container(
-      margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: _accentRed.withOpacity(0.1), border: Border.all(color: _accentRed), borderRadius: BorderRadius.circular(12)),
-      child: Row(children: [Icon(Icons.warning_amber_rounded, color: _accentRed, size: 20), const SizedBox(width: 10), Expanded(child: Text(widget.controller.threatMessage, style: TextStyle(color: _accentRed, fontSize: 11, fontWeight: FontWeight.w600)))]),
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _accentRed.withOpacity(0.1),
+        border: Border.all(color: _accentRed),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: _accentRed, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              widget.controller.threatMessage,
+              style: TextStyle(
+                color: _accentRed,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -720,7 +747,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   Future<void> _runStressTest() async {
     if (_isDisposed) return;
-    setState(() {_isStressTesting = true; _stressResult = "⚠️ LAUNCHING 50 CONCURRENT VECTORS...";});
+    setState(() {
+      _isStressTesting = true;
+      _stressResult = "⚠️ LAUNCHING 50 CONCURRENT VECTORS...";
+    });
     final stopwatch = Stopwatch()..start();
     final random = Random();
     await Future.wait(List.generate(50, (index) async {
@@ -731,7 +761,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     stopwatch.stop();
     final double tps = 50 / (stopwatch.elapsedMilliseconds / 1000);
     if (!mounted || _isDisposed) return;
-    setState(() {_isStressTesting = false; _stressResult = "📊 BENCHMARK REPORT:\nTotal: 50 Threads\nTime: ${stopwatch.elapsedMilliseconds}ms\nSpeed: ${tps.toStringAsFixed(0)} TPS\nIntegrity: STABLE";});
-    Future.delayed(const Duration(seconds: 8), () {if (mounted && !_isDisposed) setState(() => _stressResult = "");});
+    setState(() {
+      _isStressTesting = false;
+      _stressResult = "📊 BENCHMARK REPORT:\n"
+          "Total: 50 Threads\n"
+          "Time: ${stopwatch.elapsedMilliseconds}ms\n"
+          "Speed: ${tps.toStringAsFixed(0)} TPS\n"
+          "Integrity: STABLE";
+    });
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted && !_isDisposed) setState(() => _stressResult = "");
+    });
   }
 }
