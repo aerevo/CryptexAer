@@ -1,4 +1,4 @@
-// File: lib/main.dart (FIXED ✅)
+// File: lib/main.dart (FIXED ✅ - INDUSTRIAL COLOR SCHEME)
 // 🛡️ Z-KINETIC V3.3 (FINAL INTEGRATION)
 // Status: PRODUCTION READY
 
@@ -62,8 +62,8 @@ class ZKineticApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
-        primaryColor: Colors.cyanAccent,
+        scaffoldBackgroundColor: const Color(0xFF121212), // 🔥 FIXED: Matte Black
+        primaryColor: const Color(0xFFFF6F00), // 🔥 NEW: Deep Orange
         useMaterial3: true,
       ),
       home: const LockScreen(systemName: "Z-KINETIC CORE"),
@@ -79,7 +79,6 @@ class LockScreen extends StatefulWidget {
   State<LockScreen> createState() => _LockScreenState();
 }
 
-// ✅ FIXED: Complete _LockScreenState
 class _LockScreenState extends State<LockScreen> {
   late ClaController _controller;
   bool _isInitialized = false;
@@ -91,7 +90,6 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   Future<void> _initializeSystem() async {
-    // 1. Setup Config
     final config = ClaConfig(
       secret: [1, 2, 3, 4, 5],
       maxAttempts: 3,
@@ -101,23 +99,20 @@ class _LockScreenState extends State<LockScreen> {
       thresholdAmount: 5.0,
     );
 
-    // 2. Setup Attestation
     final deviceAttest = DeviceIntegrityAttestation();
-    
+
     final serverConfig = ServerAttestationConfig(
       endpoint: "https://api.z-kinetic.com/verify",
       apiKey: "zk_live_xxx",
     );
     final serverAttest = ServerAttestationProvider(serverConfig);
 
-    // ✅ FIXED: CompositeAttestationProvider (bukan CompositeAttestation)
     final compositeAttest = CompositeAttestationProvider(
       [deviceAttest, serverAttest],
       strategy: AttestationStrategy.WEIGHTED,
       requiredConfidence: 0.85,
     );
 
-    // 3. Setup Controller
     _controller = ClaController(
       config: config.copyWith(attestationProvider: compositeAttest),
     );
@@ -131,11 +126,9 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
-  // ✅ UPDATED SUCCESS HANDLER (Panic Mode Logic)
   void _onSuccess() {
     HapticFeedback.mediumImpact();
 
-    // Check for Panic Mode trigger
     if (_controller.isPanicMode) {
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => const FakeBankScreen()
@@ -143,7 +136,6 @@ class _LockScreenState extends State<LockScreen> {
       return;
     }
 
-    // Normal Success
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("🔓 ACCESS GRANTED"),
@@ -179,7 +171,7 @@ class _LockScreenState extends State<LockScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
-      return const Scaffold(backgroundColor: Colors.black);
+      return const Scaffold(backgroundColor: Color(0xFF121212)); // 🔥 FIXED
     }
 
     return Scaffold(
@@ -190,7 +182,7 @@ class _LockScreenState extends State<LockScreen> {
         title: Text(
           widget.systemName,
           style: const TextStyle(
-            color: Colors.cyanAccent,
+            color: Color(0xFFFF6F00), // 🔥 FIXED: Deep Orange
             fontSize: 10,
             letterSpacing: 2,
             fontWeight: FontWeight.w600,
@@ -211,7 +203,6 @@ class _LockScreenState extends State<LockScreen> {
               ),
               const SizedBox(height: 40),
 
-              // Optional: Visualize Biometric Score
               ValueListenableBuilder<double>(
                 valueListenable: _controller.touchScore,
                 builder: (context, score, _) {
