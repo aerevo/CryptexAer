@@ -4,11 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-// Import fail-fail controller Captain (pastikan nama file betul)
+// Import fail controller & model Captain
 import 'cla_controller_v2.dart'; 
 import 'cla_models.dart';
-// (MatrixRain & Forensic painter boleh import kalau nak guna, 
-//  tapi untuk kod roda ni hamba fokus visual utama dulu)
 
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
@@ -29,19 +27,17 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> {
-  // Controller untuk 5 roda
   late List<FixedExtentScrollController> _scrollControllers;
   int? _activeWheelIndex;
 
-  // Warna UI
+  // 🎨 PALETTE WARNA (FIXED)
   final Color _primaryOrange = const Color(0xFFFF5722);
-  final Color _engravedShadowDark = Colors.black.withOpacity(0.8);
-  final Color _engravedShadowLight = Colors.white.withOpacity(0.4);
+  final Color _engravedShadowDark = Colors.black.withOpacity(0.9); // Lebih gelap sikit
+  final Color _engravedShadowLight = Colors.white.withOpacity(0.5); 
 
   @override
   void initState() {
     super.initState();
-    // Mula semua roda pada nombor 0
     _scrollControllers = List.generate(5, (_) => FixedExtentScrollController(initialItem: 0));
   }
 
@@ -51,7 +47,6 @@ class _CryptexLockState extends State<CryptexLock> {
     super.dispose();
   }
 
-  // Dapatkan kod semasa (untuk dihantar ke controller nanti)
   List<int> get _currentCode {
     return _scrollControllers.map((c) => c.selectedItem % 10).toList();
   }
@@ -59,7 +54,7 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF2F5), // Background kelabu cerah (macam mockup)
+      backgroundColor: const Color(0xFFEEF2F5), // Light Gray Gradient Base
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -67,107 +62,120 @@ class _CryptexLockState extends State<CryptexLock> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 1. STATUS HEADER
+                // ==========================
+                // 1. HEADER (BOLD DARK)
+                // ==========================
                 Text(
                   "SECURE ACCESS",
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 26,
                     fontWeight: FontWeight.w900,
-                    color: Colors.blueGrey[800],
-                    letterSpacing: 2,
+                    color: Colors.blueGrey[900],
+                    letterSpacing: 1.5,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 10),
+                Text(
+                  "ENTER PASSCODE",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueGrey[400],
+                    letterSpacing: 3.0,
+                  ),
+                ),
+                const SizedBox(height: 50),
 
-                // 2. KOTAK PUTIH (FRAME UTAMA)
+                // ==========================
+                // 2. CRYPTEX HOUSING (RECESSED SLOT)
+                // ==========================
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 10),
+                  padding: const EdgeInsets.all(15),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
+                    color: const Color(0xFFEEF2F5),
+                    borderRadius: BorderRadius.circular(20),
+                    // EFEK LUBANG TERBENAM (INSET)
+                    boxShadow: [
+                      // Bayang dalam (Atas Kiri - Gelap)
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        offset: const Offset(5, 5),
+                        blurRadius: 10,
+                        spreadRadius: -2, // Inset effect
+                      ),
+                      // Highlight dalam (Bawah Kanan - Putih)
+                      BoxShadow(
+                        color: Colors.white,
+                        offset: const Offset(-5, -5),
+                        blurRadius: 10,
+                        spreadRadius: -2, // Inset effect
+                      ),
+                    ],
+                  ),
+                  child: Container(
+                    height: 140, // Tinggi FIX (Jangan ubah)
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      // Frame hitam nipis keliling gambar
+                      border: Border.all(color: Colors.black, width: 2),
+                    ),
+                    clipBehavior: Clip.hardEdge, // Potong bucu gambar
+                    child: Stack(
+                      children: [
+                        // 🔥 LAYER A: GAMBAR RODA (BACKGROUND)
+                        Positioned.fill(
+                          child: Image.asset(
+                            'assets/z_wheel.png',
+                            fit: BoxFit.fill, // PAKSA gambar penuh kotak
+                          ),
+                        ),
+
+                        // 🔥 LAYER B: SHADOW KIRI KANAN (DEPTH)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.black.withOpacity(0.7),
+                                  Colors.transparent,
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.7),
+                                ],
+                                stops: const [0.0, 0.15, 0.85, 1.0],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // 🔥 LAYER C: NOMBOR (PIXEL PERFECT ALIGNMENT)
+                        Row(
+                          children: List.generate(5, (index) => _buildPreciseWheel(index)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 60),
+
+                // ==========================
+                // 3. BUTTON (ORANGE GLOW)
+                // ==========================
+                Container(
+                  width: double.infinity,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 30,
-                        offset: const Offset(0, 15),
+                        color: _primaryOrange.withOpacity(0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                  child: Column(
-                    children: [
-                      // 🔥 ZONA RODA (GAMBAR + NOMBOR) 🔥
-                      SizedBox(
-                        height: 140, // Tinggi fix ikut arahan Captain
-                        child: Stack(
-                          children: [
-                            // LAYER A: GAMBAR BACKGROUND (Z_WHEEL)
-                            // Kita guna BoxFit.fill supaya dia stretch penuh kiri-kanan
-                            Positioned.fill(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(15),
-                                  image: const DecorationImage(
-                                    image: AssetImage('assets/z_wheel.png'),
-                                    fit: BoxFit.fill, 
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // LAYER B: SHADOW KIRI KANAN (Masuk dalam sikit)
-                            Positioned.fill(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(15),
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.black.withOpacity(0.5),
-                                      Colors.transparent,
-                                      Colors.transparent,
-                                      Colors.black.withOpacity(0.5),
-                                    ],
-                                    stops: const [0.0, 0.1, 0.9, 1.0],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // LAYER C: NOMBOR SCROLLING (5 LORONG)
-                            // Ini logik alignment tepat yang Captain minta
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: List.generate(5, (index) => _buildWheelLane(index)),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      // 3. INDIKATOR TITIK (DOTS)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(3, (i) => Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: 8, height: 8,
-                          decoration: BoxDecoration(
-                            color: i == 1 ? Colors.blueGrey : Colors.grey[300],
-                            shape: BoxShape.circle,
-                          ),
-                        )),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // 4. BUTTON OREN (CONFIRM)
-                SizedBox(
-                  width: double.infinity,
-                  height: 60,
                   child: ElevatedButton(
                     onPressed: () {
                       HapticFeedback.heavyImpact();
@@ -176,16 +184,15 @@ class _CryptexLockState extends State<CryptexLock> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryOrange,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                      elevation: 10,
-                      shadowColor: _primaryOrange.withOpacity(0.5),
+                      elevation: 0, // Kita guna shadow container
                     ),
                     child: const Text(
-                      "UNLOCK SYSTEM",
+                      "CONFIRM ACCESS",
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w900,
                         color: Colors.white,
-                        letterSpacing: 1.5,
+                        letterSpacing: 2.0,
                       ),
                     ),
                   ),
@@ -198,23 +205,31 @@ class _CryptexLockState extends State<CryptexLock> {
     );
   }
 
-  // 🔥 FUNGSI MEMBINA SETIAP RODA (LORONG)
-  Widget _buildWheelLane(int index) {
+  Widget _buildPreciseWheel(int index) {
+    bool isActive = _activeWheelIndex == index;
+
     return Expanded(
       child: Container(
-        // Margin 4px kiri kanan (Arahan Captain)
-        margin: const EdgeInsets.symmetric(horizontal: 4), 
+        // Margin 5px kiri kanan untuk match frame hitam gambar Captain
+        margin: const EdgeInsets.symmetric(horizontal: 5), 
         
-        // ListWheelScrollView adalah enjin pusingan
+        // Highlight Oren bila disentuh (Subtle Overlay)
+        decoration: BoxDecoration(
+          color: isActive 
+              ? const Color(0xFFFF5722).withOpacity(0.2) // Active Glow
+              : Colors.transparent,
+        ),
+        
         child: ListWheelScrollView.useDelegate(
           controller: _scrollControllers[index],
-          itemExtent: 55,       // Tinggi setiap nombor (Arahan Captain)
-          perspective: 0.005,   // Lengkung 3D sikit (Arahan Captain)
-          diameterRatio: 1.1,   // Radius pusingan ketat (Arahan Captain)
-          physics: const FixedExtentScrollPhysics(),
           
-          // Pudar sikit nombor yang jauh dari tengah
-          overAndUnderCenterOpacity: 0.3, 
+          // 🔥 PARAMETER FIZIKAL (TUNED)
+          itemExtent: 55,       // Match tinggi "shine" roda
+          perspective: 0.006,   // Curve 3D
+          diameterRatio: 1.2,   // Rasa dial fizikal
+          
+          physics: const FixedExtentScrollPhysics(),
+          overAndUnderCenterOpacity: 0.25, // Nombor tepi pudar
           
           onSelectedItemChanged: (_) {
              HapticFeedback.selectionClick();
@@ -223,22 +238,26 @@ class _CryptexLockState extends State<CryptexLock> {
           
           childDelegate: ListWheelChildBuilderDelegate(
             builder: (context, i) {
-              return Center(
+              return Container(
+                // Pastikan container text ni duduk tengah-tengah slot itemExtent
+                alignment: Alignment.center, 
                 child: Text(
                   '${i % 10}',
                   style: TextStyle(
-                    fontSize: 46, // Saiz Font (Arahan Captain)
+                    fontFamily: 'Roboto', // Guna font sistem yang stable
+                    fontSize: 48,         // Besar & Jelas
+                    fontWeight: FontWeight.w900, // Tebal Maksimum
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto', // Atau font sistem standard
+                    height: 1.0,          // 🔥 PENTING: Matikan line-height extra
+                    
                     shadows: [
-                      // Shadow Bawah Kanan (Gelap)
+                      // Emboss Bawah (Gelap)
                       Shadow(
                         offset: const Offset(2, 2),
                         blurRadius: 4,
                         color: _engravedShadowDark,
                       ),
-                      // Shadow Atas Kiri (Terang/Highlight) - Efek Ukir
+                      // Emboss Atas (Terang) - Efek Ukir
                       Shadow(
                         offset: const Offset(-1, -1),
                         blurRadius: 2,
