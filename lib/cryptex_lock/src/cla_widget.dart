@@ -40,18 +40,21 @@ class _CryptexLockState extends State<CryptexLock> {
   static const double imageHeight = 471.0;
   static const double aspectRatio = imageWidth / imageHeight;
 
-  // 🎯 PRECISE MEASUREMENTS (FROM IMAGE ANALYSIS)
+  // 🎯 PRECISE MEASUREMENTS (CORRECTED)
   static const List<double> wheelCenterRatios = [
-    0.1989,  // Slot 1
-    0.3698,  // Slot 2
-    0.5407,  // Slot 3
-    0.7117,  // Slot 4
-    0.8826,  // Slot 5
+    0.1997,  // Wheel 0
+    0.3674,  // Wheel 1
+    0.5351,  // Wheel 2
+    0.7029,  // Wheel 3
+    0.8706,  // Wheel 4
   ];
   
-  static const double wheelWidthRatio = 0.1390;
+  static const double wheelWidthRatio = 0.1300;
   static const double wheelHeightRatio = 0.3057;
   static const double verticalOffsetRatio = -0.0648;
+  
+  // 🔧 IMAGE SCALE (zoom in/out)
+  static const double imageScale = 1.05; // 5% BIGGER
 
   @override
   void initState() {
@@ -217,11 +220,16 @@ class _CryptexLockState extends State<CryptexLock> {
 
     return Stack(
       children: [
-        // 🔥 LAYER A: GAMBAR RODA (BACKGROUND)
-        Positioned.fill(
-          child: Image.asset(
-            'assets/z_wheel.png',
-            fit: BoxFit.cover,
+        // 🔥 LAYER A: GAMBAR RODA (BACKGROUND - SCALED & CENTERED)
+        Center(
+          child: Transform.scale(
+            scale: imageScale, // 5% BIGGER
+            child: Image.asset(
+              'assets/z_wheel.png',
+              width: containerWidth,
+              height: containerHeight,
+              fit: BoxFit.contain, // Maintain aspect ratio, centered
+            ),
           ),
         ),
 
@@ -273,9 +281,9 @@ class _CryptexLockState extends State<CryptexLock> {
         controller: _scrollControllers[index],
         
         // 🔥 PARAMETER FIZIKAL (CALIBRATED)
-        itemExtent: 58,        // From analysis
-        perspective: 0.005,    // Minimal 3D curve
-        diameterRatio: 1.8,    // Flatter wheel
+        itemExtent: 58,
+        perspective: 0.005,
+        diameterRatio: 1.8,
         
         physics: const FixedExtentScrollPhysics(),
         overAndUnderCenterOpacity: 0.25,
@@ -293,7 +301,7 @@ class _CryptexLockState extends State<CryptexLock> {
                 '${i % 10}',
                 style: TextStyle(
                   fontFamily: 'Roboto',
-                  fontSize: 49,              // From analysis
+                  fontSize: 49,
                   fontWeight: FontWeight.w700,
                   color: Colors.white.withOpacity(0.95),
                   height: 1.0,
