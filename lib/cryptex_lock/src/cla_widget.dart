@@ -30,15 +30,28 @@ class _CryptexLockState extends State<CryptexLock> {
   late List<FixedExtentScrollController> _scrollControllers;
   int? _activeWheelIndex;
 
-  // 🎨 PALETTE WARNA (FIXED)
+  // 🎨 PALETTE WARNA
   final Color _primaryOrange = const Color(0xFFFF5722);
   final Color _engravedShadowDark = Colors.black.withOpacity(0.9);
   final Color _engravedShadowLight = Colors.white.withOpacity(0.5);
 
-  // 📐 IMAGE DIMENSIONS
+  // 📐 IMAGE DIMENSIONS (LOCKED)
   static const double imageWidth = 626.0;
   static const double imageHeight = 471.0;
   static const double aspectRatio = imageWidth / imageHeight;
+
+  // 🎯 PRECISE MEASUREMENTS (FROM IMAGE ANALYSIS)
+  static const List<double> wheelCenterRatios = [
+    0.1989,  // Slot 1
+    0.3698,  // Slot 2
+    0.5407,  // Slot 3
+    0.7117,  // Slot 4
+    0.8826,  // Slot 5
+  ];
+  
+  static const double wheelWidthRatio = 0.1390;
+  static const double wheelHeightRatio = 0.3057;
+  static const double verticalOffsetRatio = -0.0648;
 
   @override
   void initState() {
@@ -59,7 +72,7 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A), // Match screenshot background
+      backgroundColor: const Color(0xFF1A1A1A),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -145,7 +158,7 @@ class _CryptexLockState extends State<CryptexLock> {
                 const SizedBox(height: 60),
 
                 // ==========================
-                // 3. BUTTON (ORANGE GLOW)
+                // 3. BUTTON
                 // ==========================
                 Container(
                   width: double.infinity,
@@ -194,19 +207,13 @@ class _CryptexLockState extends State<CryptexLock> {
     final containerWidth = constraints.maxWidth;
     final containerHeight = constraints.maxHeight;
 
-    // 🎯 PRECISE WHEEL POSITIONS (adjusted based on screenshot)
-    // Dari gambar original 626px width, rough estimate position roda:
-    final wheelPositions = [
-      containerWidth * 0.115,  // Wheel 1 - kiri sekali
-      containerWidth * 0.295,  // Wheel 2
-      containerWidth * 0.500,  // Wheel 3 - tengah
-      containerWidth * 0.705,  // Wheel 4
-      containerWidth * 0.885,  // Wheel 5 - kanan sekali
-    ];
-
-    // 🎯 Wheel dimensions - make it narrower to see the wheel behind
-    final wheelWidth = containerWidth * 0.12;  // Smaller untuk nampak roda
-    final wheelHeight = containerHeight * 0.75; // Shorter vertical
+    // Calculate actual wheel dimensions
+    final wheelWidth = containerWidth * wheelWidthRatio;
+    final wheelHeight = containerHeight * wheelHeightRatio;
+    
+    // Calculate vertical position (offset from center)
+    final verticalOffset = containerHeight * verticalOffsetRatio;
+    final topPosition = (containerHeight - wheelHeight) / 2 + verticalOffset;
 
     return Stack(
       children: [
@@ -239,9 +246,11 @@ class _CryptexLockState extends State<CryptexLock> {
 
         // 🔥 LAYER C: WHEELS (POSITIONED PRECISELY)
         ...List.generate(5, (index) {
+          final centerX = containerWidth * wheelCenterRatios[index];
+          
           return Positioned(
-            left: wheelPositions[index] - (wheelWidth / 2),
-            top: (containerHeight - wheelHeight) / 2 + containerHeight * 0.02, // Turun sikit
+            left: centerX - (wheelWidth / 2),
+            top: topPosition,
             width: wheelWidth,
             height: wheelHeight,
             child: _buildPreciseWheel(index),
@@ -263,13 +272,13 @@ class _CryptexLockState extends State<CryptexLock> {
       child: ListWheelScrollView.useDelegate(
         controller: _scrollControllers[index],
         
-        // 🔥 PARAMETER FIZIKAL (TUNED)
-        itemExtent: 45,        // Smaller item height
-        perspective: 0.005,    // Less 3D curve
-        diameterRatio: 1.5,    // Flatter
+        // 🔥 PARAMETER FIZIKAL (CALIBRATED)
+        itemExtent: 58,        // From analysis
+        perspective: 0.005,    // Minimal 3D curve
+        diameterRatio: 1.8,    // Flatter wheel
         
         physics: const FixedExtentScrollPhysics(),
-        overAndUnderCenterOpacity: 0.20,
+        overAndUnderCenterOpacity: 0.25,
         
         onSelectedItemChanged: (_) {
            HapticFeedback.selectionClick();
@@ -284,23 +293,21 @@ class _CryptexLockState extends State<CryptexLock> {
                 '${i % 10}',
                 style: TextStyle(
                   fontFamily: 'Roboto',
-                  fontSize: 32,              // SMALLER font
-                  fontWeight: FontWeight.w700, // Less bold
-                  color: Colors.white.withOpacity(0.95), // Slight transparency
+                  fontSize: 49,              // From analysis
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withOpacity(0.95),
                   height: 1.0,
-                  letterSpacing: 0,
                   
                   shadows: [
-                    // Softer shadow untuk nampak roda belakang
                     Shadow(
                       offset: const Offset(1.5, 1.5),
                       blurRadius: 3,
-                      color: Colors.black.withOpacity(0.7),
+                      color: _engravedShadowDark,
                     ),
                     Shadow(
                       offset: const Offset(-0.5, -0.5),
                       blurRadius: 1,
-                      color: Colors.white.withOpacity(0.3),
+                      color: _engravedShadowLight,
                     ),
                   ],
                 ),
