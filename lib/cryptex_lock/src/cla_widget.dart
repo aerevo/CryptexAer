@@ -11,7 +11,7 @@ import 'matrix_rain_painter.dart';
 import 'forensic_data_painter.dart';
 
 // ============================================
-// 🔥 V18.3 - FIXED BUILD ERRORS 🔥
+// 🔥 V18.5 - FIXED SPACING & LAYOUT 🔥
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -108,8 +108,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   String _stressResult = "";
   bool _isDisposed = false;
   bool _showForensics = false;
-  
-  // LOCAL TRACKING (kalau controller tak ada)
   int _localAttemptCount = 0;
 
   final Color _primaryOrange = const Color(0xFFFF5722);
@@ -222,13 +220,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       double variance = intervals.map((x) => (x - avg) * (x - avg)).reduce((a, b) => a + b) / intervals.length;
       double stdDev = sqrt(variance);
       double cv = stdDev / avg;
-      // 🔥 FIX 1: Cast to double explicitly
       patternScore = ((1 - cv.clamp(0, 1)) as num).clamp(0.0, 1.0).toDouble();
     } else {
       patternScore = 0.0;
     }
-    // 🔥 FIX 2: Remove registerScrollPattern (method tak wujud)
-    // widget.controller.registerScrollPattern(patternScore);
     if (mounted && !_isDisposed) setState(() => _patternScore = patternScore);
   }
 
@@ -296,45 +291,77 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             ),
           ),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  _buildHeader(activeColor, state),
-                  const SizedBox(height: 30),
-                  _buildSensorRow(activeColor),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: Row(
-                      children: List.generate(5, (i) => _build3DCylinder(i, activeColor)),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // 🔥 CALCULATE PROPER SIZING
+                final screenHeight = constraints.maxHeight;
+                final wheelHeight = screenHeight * 0.35; // 35% of screen height
+                
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: screenHeight),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Header
+                          _buildHeader(activeColor, state),
+                          
+                          const SizedBox(height: 20),
+                          
+                          // Sensor Row
+                          _buildSensorRow(activeColor),
+                          
+                          const SizedBox(height: 30),
+                          
+                          // 🔥 WHEELS dengan sizing yang betul
+                          Center(
+                            child: SizedBox(
+                              height: wheelHeight.clamp(180.0, 250.0), // Min 180, Max 250
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(5, (i) => _build3DCylinder(i, activeColor)),
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 30),
+                          
+                          // Confirm Button
+                          _buildConfirmButton(activeColor, state),
+                          
+                          // Warning Banner
+                          if (_localAttemptCount >= 3) 
+                            _buildWarningBanner(),
+                          
+                          // Stress Test Result
+                          if (_stressResult.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.only(top: 10),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: _successGreen),
+                              ),
+                              child: Text(
+                                _stressResult,
+                                style: TextStyle(
+                                  color: _successGreen,
+                                  fontSize: 9,
+                                  fontFamily: 'Courier',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 30),
-                  _buildConfirmButton(activeColor, state),
-                  // 🔥 FIX 3: Guna local counter kalau property tak wujud
-                  if (_localAttemptCount >= 3) _buildWarningBanner(),
-                  if (_stressResult.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(top: 10),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: _successGreen),
-                      ),
-                      child: Text(
-                        _stressResult,
-                        style: TextStyle(
-                          color: _successGreen,
-                          fontSize: 9,
-                          fontFamily: 'Courier',
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                ],
-              ),
+                );
+              },
             ),
           ),
           if (_showForensics)
@@ -352,14 +379,14 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           "CRYPTEX LOCK",
           style: TextStyle(
             color: color,
-            fontSize: 28,
+            fontSize: 24,
             fontWeight: FontWeight.w900,
             letterSpacing: 2,
           ),
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(20),
@@ -369,7 +396,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
             _getStateText(state),
             style: TextStyle(
               color: color,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
             ),
@@ -381,7 +408,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   String _getStateText(SecurityState state) {
     switch (state) {
-      // 🔥 FIX 4: Remove IDLE case (tak wujud dalam enum)
       case SecurityState.VALIDATING:
         return "VALIDATING...";
       case SecurityState.UNLOCKED:
@@ -397,179 +423,204 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     bool isActive = _activeWheelIndex == index;
 
     return Expanded(
-      child: GestureDetector(
-        onTapDown: (_) {
-          if (_isDisposed) return;
-          setState(() => _activeWheelIndex = index);
-          _wheelActiveTimer?.cancel();
-          _userInteracted();
-          widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
-          HapticFeedback.selectionClick();
-        },
-        onTapUp: (_) => _resetActiveWheelTimer(),
-        onTapCancel: () => _resetActiveWheelTimer(),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          height: 140,
-          decoration: const BoxDecoration(
-            color: Colors.black,
-            image: DecorationImage(
-              image: AssetImage('assets/z_wheel.png'),
-              fit: BoxFit.cover,
-            ),
-            borderRadius: BorderRadius.all(Radius.circular(18)),
-          ),
-          child: Stack(
-            children: [
-              // Gradient depth untuk 3D effect
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.8),
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.8),
-                      ],
-                      stops: const [0.0, 0.5, 1.0],
-                    ),
-                  ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: GestureDetector(
+          onTapDown: (_) {
+            if (_isDisposed) return;
+            setState(() => _activeWheelIndex = index);
+            _wheelActiveTimer?.cancel();
+            _userInteracted();
+            widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
+            HapticFeedback.selectionClick();
+          },
+          onTapUp: (_) => _resetActiveWheelTimer(),
+          onTapCancel: () => _resetActiveWheelTimer(),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
-              ),
-
-              // Nombor scrolling
-              Positioned.fill(
-                child: ListWheelScrollView.useDelegate(
-                  controller: _scrollControllers[index],
-                  itemExtent: 50,
-                  perspective: 0.006,
-                  diameterRatio: 1.8,
-                  physics: const FixedExtentScrollPhysics(),
-                  overAndUnderCenterOpacity: 0.25,
-                  onSelectedItemChanged: (_) {
-                    HapticFeedback.selectionClick();
-                    _analyzeScrollPattern();
-                  },
-                  childDelegate: ListWheelChildBuilderDelegate(
-                    builder: (context, i) {
-                      return Center(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          child: Text(
-                            '${i % 10}',
-                            style: TextStyle(
-                              fontSize: isActive ? 40 : 36,
-                              fontWeight: FontWeight.w900,
-                              color: isActive 
-                                  ? const Color(0xFFFF6D00)
-                                  : Colors.black.withOpacity(0.7),
-                              shadows: isActive 
-                                  ? [
-                                      const BoxShadow(
-                                        color: Color(0xFFFF6D00),
-                                        blurRadius: 20,
-                                        spreadRadius: 5,
-                                      ),
-                                      const BoxShadow(
-                                        color: Colors.white,
-                                        blurRadius: 5,
-                                      ),
-                                    ]
-                                  : [
-                                      Shadow(
-                                        offset: const Offset(1, 1),
-                                        blurRadius: 1,
-                                        color: Colors.white.withOpacity(0.2),
-                                      ),
-                                      Shadow(
-                                        offset: const Offset(-1, -1),
-                                        blurRadius: 2,
-                                        color: Colors.black.withOpacity(0.8),
-                                      ),
-                                    ],
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  // Background image
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/z_wheel.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Color(0xFF555555),
+                                Color(0xFF888888),
+                                Color(0xFF555555),
+                              ],
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ),
 
-              // HUD focus line
-              if (isActive)
-                Center(
-                  child: IgnorePointer(
+                  // Depth gradient
+                  Positioned.fill(
                     child: Container(
-                      height: 54,
                       decoration: BoxDecoration(
-                        border: Border.symmetric(
-                          horizontal: BorderSide(
-                            color: const Color(0xFFFF6D00).withOpacity(0.6),
-                            width: 1.5,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.7),
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Numbers
+                  Positioned.fill(
+                    child: ListWheelScrollView.useDelegate(
+                      controller: _scrollControllers[index],
+                      itemExtent: 45,
+                      perspective: 0.005,
+                      diameterRatio: 1.5,
+                      physics: const FixedExtentScrollPhysics(),
+                      overAndUnderCenterOpacity: 0.3,
+                      onSelectedItemChanged: (_) {
+                        HapticFeedback.selectionClick();
+                        _analyzeScrollPattern();
+                      },
+                      childDelegate: ListWheelChildBuilderDelegate(
+                        builder: (context, i) {
+                          return Center(
+                            child: Text(
+                              '${i % 10}',
+                              style: TextStyle(
+                                fontSize: isActive ? 36 : 32,
+                                fontWeight: FontWeight.w900,
+                                color: isActive 
+                                    ? const Color(0xFFFF6D00)
+                                    : _neutralGray,
+                                height: 1.2,
+                                shadows: isActive 
+                                    ? [
+                                        const BoxShadow(
+                                          color: Color(0xFFFF6D00),
+                                          blurRadius: 15,
+                                          spreadRadius: 3,
+                                        ),
+                                        const BoxShadow(
+                                          color: Colors.white,
+                                          blurRadius: 5,
+                                        ),
+                                      ]
+                                    : [
+                                        Shadow(
+                                          offset: const Offset(2, 2),
+                                          blurRadius: 3,
+                                          color: Colors.black.withOpacity(0.7),
+                                        ),
+                                        Shadow(
+                                          offset: const Offset(-1, -1),
+                                          blurRadius: 2,
+                                          color: Colors.white.withOpacity(0.3),
+                                        ),
+                                      ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  // HUD line
+                  if (isActive)
+                    Center(
+                      child: IgnorePointer(
+                        child: Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            border: Border.symmetric(
+                              horizontal: BorderSide(
+                                color: const Color(0xFFFF6D00).withOpacity(0.6),
+                                width: 1.5,
+                              ),
+                            ),
+                            color: const Color(0xFFFF6D00).withOpacity(0.05),
                           ),
                         ),
-                        color: const Color(0xFFFF6D00).withOpacity(0.05),
+                      ),
+                    ),
+
+                  // Side shadows
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.black.withOpacity(0.4),
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.4),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-              // Shadow kiri kanan
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          Colors.black.withOpacity(0.3),
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.3),
-                        ],
+                  // Top cap
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 6,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              // Metallic cap atas
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 8,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
+                  // Bottom cap
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 6,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-
-              // Metallic cap bawah
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 8,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(18)),
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -580,26 +631,25 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     bool isDisabled = state == SecurityState.VALIDATING || state == SecurityState.HARD_LOCK;
     return SizedBox(
       width: double.infinity,
-      height: 64,
+      height: 56,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           gradient: isDisabled ? null : LinearGradient(colors: [activeColor, activeColor.withOpacity(0.8)]),
           color: isDisabled ? Colors.grey[300] : null,
           boxShadow: isDisabled 
               ? [] 
               : [
-                  BoxShadow(color: activeColor.withOpacity(0.6), blurRadius: 30, offset: const Offset(0, 10)),
-                  BoxShadow(color: activeColor.withOpacity(0.3), blurRadius: 60, offset: const Offset(0, 20)),
+                  BoxShadow(color: activeColor.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 8)),
                 ],
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             onTap: isDisabled ? null : () async {
               HapticFeedback.mediumImpact();
-              _localAttemptCount++; // Track locally
+              _localAttemptCount++;
               await widget.controller.verify(_currentCode);
             },
             child: Center(
@@ -607,9 +657,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 state == SecurityState.HARD_LOCK ? "SYSTEM LOCKED" : "CONFIRM ACCESS",
                 style: TextStyle(
                   color: isDisabled ? Colors.black54 : Colors.white,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
+                  letterSpacing: 1,
                 ),
               ),
             ),
@@ -642,14 +692,14 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       children: [
         Icon(
           isActive ? Icons.check_circle : icon,
-          size: 20,
+          size: 18,
           color: isActive ? _successGreen : Colors.black38,
         ),
         const SizedBox(height: 4),
         Text(
           label,
           style: TextStyle(
-            fontSize: 9,
+            fontSize: 8,
             color: isActive ? _successGreen : Colors.black38,
             fontWeight: FontWeight.w600,
           ),
@@ -719,22 +769,22 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   Widget _buildWarningBanner() {
     return Container(
       margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: _accentRed.withOpacity(0.1),
         border: Border.all(color: _accentRed),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_rounded, color: _accentRed, size: 20),
-          const SizedBox(width: 10),
+          Icon(Icons.warning_amber_rounded, color: _accentRed, size: 18),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               widget.controller.threatMessage,
               style: TextStyle(
                 color: _accentRed,
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
             ),
