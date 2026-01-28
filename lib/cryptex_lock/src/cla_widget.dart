@@ -32,6 +32,13 @@ class _CryptexLockState extends State<CryptexLock> {
 
   // 🎨 PALETTE WARNA (FIXED)
   final Color _primaryOrange = const Color(0xFFFF5722);
+  final Color _engravedShadowDark = Colors.black.withOpacity(0.9);
+  final Color _engravedShadowLight = Colors.white.withOpacity(0.5);
+
+  // 📐 IMAGE DIMENSIONS
+  static const double imageWidth = 626.0;
+  static const double imageHeight = 471.0;
+  static const double aspectRatio = imageWidth / imageHeight;
 
   @override
   void initState() {
@@ -52,7 +59,7 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF2F5), // Light Gray Gradient Base
+      backgroundColor: const Color(0xFFEEF2F5),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -61,7 +68,7 @@ class _CryptexLockState extends State<CryptexLock> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // ==========================
-                // 1. HEADER
+                // 1. HEADER (BOLD DARK)
                 // ==========================
                 Text(
                   "SECURE ACCESS",
@@ -92,7 +99,6 @@ class _CryptexLockState extends State<CryptexLock> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFEEF2F5),
                     borderRadius: BorderRadius.circular(20),
-                    // EFEK LUBANG TERBENAM (INSET)
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.15),
@@ -109,47 +115,18 @@ class _CryptexLockState extends State<CryptexLock> {
                     ],
                   ),
                   child: Container(
-                    height: 140, // Tinggi FIX
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(15),
                       border: Border.all(color: Colors.black, width: 2),
                     ),
                     clipBehavior: Clip.hardEdge,
-                    child: Stack(
-                      children: [
-                        // 🔥 LAYER A: GAMBAR RODA (BoxFit.cover)
-                        Positioned.fill(
-                          child: Image.asset(
-                            'assets/z_wheel.png',
-                            fit: BoxFit.cover, // UPDATED: Cover untuk fill gap
-                          ),
-                        ),
-
-                        // 🔥 LAYER B: SHADOW KIRI KANAN (DEPTH)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.black.withOpacity(0.7),
-                                  Colors.transparent,
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.7),
-                                ],
-                                stops: const [0.0, 0.15, 0.85, 1.0],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // 🔥 LAYER C: NOMBOR (PIXEL PERFECT & CLIPPED)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(5, (index) => _buildPreciseWheel(index)),
-                        ),
-                      ],
+                    child: AspectRatio(
+                      aspectRatio: aspectRatio,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return _buildWheelStack(constraints);
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -157,7 +134,7 @@ class _CryptexLockState extends State<CryptexLock> {
                 const SizedBox(height: 60),
 
                 // ==========================
-                // 3. BUTTON
+                // 3. BUTTON (ORANGE GLOW)
                 // ==========================
                 Container(
                   width: double.infinity,
@@ -201,81 +178,125 @@ class _CryptexLockState extends State<CryptexLock> {
     );
   }
 
+  Widget _buildWheelStack(BoxConstraints constraints) {
+    final containerWidth = constraints.maxWidth;
+    final containerHeight = constraints.maxHeight;
+
+    // 📐 Calculate scaling factor
+    final scale = containerWidth / imageWidth;
+    
+    // 🎯 POSITIONS - Adjust these based on your actual wheel centers in the image
+    // Format: [x_center_in_original_image] * scale
+    // Contoh positioning untuk 5 roda yang tersebar merata (adjust based on actual image)
+    final wheelPositions = [
+      containerWidth * 0.11,  // Wheel 1 - ~11% dari kiri
+      containerWidth * 0.28,  // Wheel 2 - ~28% dari kiri
+      containerWidth * 0.50,  // Wheel 3 - tengah (50%)
+      containerWidth * 0.72,  // Wheel 4 - ~72% dari kiri
+      containerWidth * 0.89,  // Wheel 5 - ~89% dari kiri
+    ];
+
+    // 🎯 Wheel dimensions
+    final wheelWidth = containerWidth * 0.15;  // Setiap roda ~15% dari total width
+    final wheelHeight = containerHeight * 0.85; // ~85% dari height untuk capture roda
+
+    return Stack(
+      children: [
+        // 🔥 LAYER A: GAMBAR RODA (BACKGROUND)
+        Positioned.fill(
+          child: Image.asset(
+            'assets/z_wheel.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+
+        // 🔥 LAYER B: SHADOW KIRI KANAN (DEPTH)
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withOpacity(0.7),
+                  Colors.transparent,
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.7),
+                ],
+                stops: const [0.0, 0.15, 0.85, 1.0],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+          ),
+        ),
+
+        // 🔥 LAYER C: WHEELS (POSITIONED PRECISELY)
+        ...List.generate(5, (index) {
+          return Positioned(
+            left: wheelPositions[index] - (wheelWidth / 2),
+            top: (containerHeight - wheelHeight) / 2,
+            width: wheelWidth,
+            height: wheelHeight,
+            child: _buildPreciseWheel(index),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _buildPreciseWheel(int index) {
     bool isActive = _activeWheelIndex == index;
 
-    return Expanded(
-      child: Container(
-        // Margin 2-4px (Arahan Captain)
-        margin: const EdgeInsets.symmetric(horizontal: 3), 
+    return Container(
+      decoration: BoxDecoration(
+        color: isActive 
+            ? const Color(0xFFFF5722).withOpacity(0.2)
+            : Colors.transparent,
+      ),
+      child: ListWheelScrollView.useDelegate(
+        controller: _scrollControllers[index],
         
-        decoration: BoxDecoration(
-          color: isActive 
-              ? const Color(0xFFFF5722).withOpacity(0.3) // Active Highlight
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20), // Match clipping
-        ),
+        // 🔥 PARAMETER FIZIKAL (TUNED)
+        itemExtent: 50,
+        perspective: 0.006,
+        diameterRatio: 1.2,
         
-        // 🔥 CLIPPING: Prevent nombor keluar dari roda
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: ListWheelScrollView.useDelegate(
-            controller: _scrollControllers[index],
-            
-            // 🔥 TUNED PARAMETERS (Arahan Captain)
-            itemExtent: 70,       // Naikkan ke 70 (Range 68-75)
-            perspective: 0.007,   // Curve lebih ketara (Range 0.007-0.009)
-            diameterRatio: 1.0,   // Lebih dalam/tight (Range 0.9-1.1)
-            
-            physics: const FixedExtentScrollPhysics(),
-            overAndUnderCenterOpacity: 0.3, // Kurangkan opacity edge (Range 0.25-0.35)
-            
-            onSelectedItemChanged: (_) {
-               HapticFeedback.selectionClick();
-               setState(() => _activeWheelIndex = index);
-            },
-            
-            childDelegate: ListWheelChildBuilderDelegate(
-              builder: (context, i) {
-                return Align(
-                  // 🔥 ALIGNMENT FIX: Shift naik atas sikit (-0.1)
-                  alignment: const Alignment(0.0, -0.1), 
-                  child: Text(
-                    '${i % 10}',
-                    style: TextStyle(
-                      fontFamily: 'Roboto', 
-                      fontSize: 52,         // Size 50-54
-                      fontWeight: FontWeight.w900, 
-                      color: Colors.white,
-                      height: 1.0,          // Height 1.0 Exact
-                      
-                      // 🔥 EMBOSS SHADOWS (3 Layers)
-                      shadows: [
-                        // Deep Black (Bawah Kanan)
-                        Shadow(
-                          offset: const Offset(3, 4),
-                          blurRadius: 6,
-                          color: Colors.black.withOpacity(0.7),
-                        ),
-                        // Sharp White (Atas Kiri)
-                        Shadow(
-                          offset: const Offset(-2, -3),
-                          blurRadius: 4,
-                          color: Colors.white.withOpacity(0.8),
-                        ),
-                        // Extra Depth (Bawah)
-                        Shadow(
-                          offset: const Offset(0, 2),
-                          blurRadius: 3,
-                          color: Colors.black.withOpacity(0.5),
-                        ),
-                      ],
+        physics: const FixedExtentScrollPhysics(),
+        overAndUnderCenterOpacity: 0.25,
+        
+        onSelectedItemChanged: (_) {
+           HapticFeedback.selectionClick();
+           setState(() => _activeWheelIndex = index);
+        },
+        
+        childDelegate: ListWheelChildBuilderDelegate(
+          builder: (context, i) {
+            return Container(
+              alignment: Alignment.center,
+              child: Text(
+                '${i % 10}',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 42,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1.0,
+                  
+                  shadows: [
+                    Shadow(
+                      offset: const Offset(2, 2),
+                      blurRadius: 4,
+                      color: _engravedShadowDark,
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
+                    Shadow(
+                      offset: const Offset(-1, -1),
+                      blurRadius: 2,
+                      color: _engravedShadowLight,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
