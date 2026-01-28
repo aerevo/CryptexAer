@@ -59,7 +59,7 @@ class _CryptexLockState extends State<CryptexLock> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF2F5),
+      backgroundColor: const Color(0xFF1A1A1A), // Match screenshot background
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -68,14 +68,25 @@ class _CryptexLockState extends State<CryptexLock> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // ==========================
-                // 1. HEADER (BOLD DARK)
+                // 1. HEADER
                 // ==========================
+                const Text(
+                  "Z-KINETIC CORE",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF5722),
+                    letterSpacing: 2.0,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                
                 Text(
                   "SECURE ACCESS",
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: 32,
                     fontWeight: FontWeight.w900,
-                    color: Colors.blueGrey[900],
+                    color: Colors.grey[800],
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -85,39 +96,39 @@ class _CryptexLockState extends State<CryptexLock> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blueGrey[400],
+                    color: Colors.grey[700],
                     letterSpacing: 3.0,
                   ),
                 ),
                 const SizedBox(height: 50),
 
                 // ==========================
-                // 2. CRYPTEX HOUSING (RECESSED SLOT)
+                // 2. CRYPTEX HOUSING
                 // ==========================
                 Container(
-                  padding: const EdgeInsets.all(15),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2F5),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        offset: const Offset(5, 5),
-                        blurRadius: 10,
-                        spreadRadius: -2,
-                      ),
-                      BoxShadow(
-                        color: Colors.white,
-                        offset: const Offset(-5, -5),
-                        blurRadius: 10,
-                        spreadRadius: -2,
+                        color: Colors.white.withOpacity(0.3),
+                        blurRadius: 40,
+                        spreadRadius: 10,
                       ),
                     ],
                   ),
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.black, width: 2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.black, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
                     ),
                     clipBehavior: Clip.hardEdge,
                     child: AspectRatio(
@@ -143,8 +154,9 @@ class _CryptexLockState extends State<CryptexLock> {
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
-                        color: _primaryOrange.withOpacity(0.4),
-                        blurRadius: 20,
+                        color: _primaryOrange.withOpacity(0.5),
+                        blurRadius: 30,
+                        spreadRadius: 5,
                         offset: const Offset(0, 8),
                       ),
                     ],
@@ -182,23 +194,19 @@ class _CryptexLockState extends State<CryptexLock> {
     final containerWidth = constraints.maxWidth;
     final containerHeight = constraints.maxHeight;
 
-    // 📐 Calculate scaling factor
-    final scale = containerWidth / imageWidth;
-    
-    // 🎯 POSITIONS - Adjust these based on your actual wheel centers in the image
-    // Format: [x_center_in_original_image] * scale
-    // Contoh positioning untuk 5 roda yang tersebar merata (adjust based on actual image)
+    // 🎯 PRECISE WHEEL POSITIONS (adjusted based on screenshot)
+    // Dari gambar original 626px width, rough estimate position roda:
     final wheelPositions = [
-      containerWidth * 0.11,  // Wheel 1 - ~11% dari kiri
-      containerWidth * 0.28,  // Wheel 2 - ~28% dari kiri
-      containerWidth * 0.50,  // Wheel 3 - tengah (50%)
-      containerWidth * 0.72,  // Wheel 4 - ~72% dari kiri
-      containerWidth * 0.89,  // Wheel 5 - ~89% dari kiri
+      containerWidth * 0.115,  // Wheel 1 - kiri sekali
+      containerWidth * 0.295,  // Wheel 2
+      containerWidth * 0.500,  // Wheel 3 - tengah
+      containerWidth * 0.705,  // Wheel 4
+      containerWidth * 0.885,  // Wheel 5 - kanan sekali
     ];
 
-    // 🎯 Wheel dimensions
-    final wheelWidth = containerWidth * 0.15;  // Setiap roda ~15% dari total width
-    final wheelHeight = containerHeight * 0.85; // ~85% dari height untuk capture roda
+    // 🎯 Wheel dimensions - make it narrower to see the wheel behind
+    final wheelWidth = containerWidth * 0.12;  // Smaller untuk nampak roda
+    final wheelHeight = containerHeight * 0.75; // Shorter vertical
 
     return Stack(
       children: [
@@ -210,18 +218,18 @@ class _CryptexLockState extends State<CryptexLock> {
           ),
         ),
 
-        // 🔥 LAYER B: SHADOW KIRI KANAN (DEPTH)
+        // 🔥 LAYER B: SHADOW KIRI KANAN (SUBTLE)
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.black.withOpacity(0.7),
+                  Colors.black.withOpacity(0.4),
                   Colors.transparent,
                   Colors.transparent,
-                  Colors.black.withOpacity(0.7),
+                  Colors.black.withOpacity(0.4),
                 ],
-                stops: const [0.0, 0.15, 0.85, 1.0],
+                stops: const [0.0, 0.20, 0.80, 1.0],
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
               ),
@@ -233,7 +241,7 @@ class _CryptexLockState extends State<CryptexLock> {
         ...List.generate(5, (index) {
           return Positioned(
             left: wheelPositions[index] - (wheelWidth / 2),
-            top: (containerHeight - wheelHeight) / 2,
+            top: (containerHeight - wheelHeight) / 2 + containerHeight * 0.02, // Turun sikit
             width: wheelWidth,
             height: wheelHeight,
             child: _buildPreciseWheel(index),
@@ -249,19 +257,19 @@ class _CryptexLockState extends State<CryptexLock> {
     return Container(
       decoration: BoxDecoration(
         color: isActive 
-            ? const Color(0xFFFF5722).withOpacity(0.2)
+            ? const Color(0xFFFF5722).withOpacity(0.15)
             : Colors.transparent,
       ),
       child: ListWheelScrollView.useDelegate(
         controller: _scrollControllers[index],
         
         // 🔥 PARAMETER FIZIKAL (TUNED)
-        itemExtent: 50,
-        perspective: 0.006,
-        diameterRatio: 1.2,
+        itemExtent: 45,        // Smaller item height
+        perspective: 0.005,    // Less 3D curve
+        diameterRatio: 1.5,    // Flatter
         
         physics: const FixedExtentScrollPhysics(),
-        overAndUnderCenterOpacity: 0.25,
+        overAndUnderCenterOpacity: 0.20,
         
         onSelectedItemChanged: (_) {
            HapticFeedback.selectionClick();
@@ -276,21 +284,23 @@ class _CryptexLockState extends State<CryptexLock> {
                 '${i % 10}',
                 style: TextStyle(
                   fontFamily: 'Roboto',
-                  fontSize: 42,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  fontSize: 32,              // SMALLER font
+                  fontWeight: FontWeight.w700, // Less bold
+                  color: Colors.white.withOpacity(0.95), // Slight transparency
                   height: 1.0,
+                  letterSpacing: 0,
                   
                   shadows: [
+                    // Softer shadow untuk nampak roda belakang
                     Shadow(
-                      offset: const Offset(2, 2),
-                      blurRadius: 4,
-                      color: _engravedShadowDark,
+                      offset: const Offset(1.5, 1.5),
+                      blurRadius: 3,
+                      color: Colors.black.withOpacity(0.7),
                     ),
                     Shadow(
-                      offset: const Offset(-1, -1),
-                      blurRadius: 2,
-                      color: _engravedShadowLight,
+                      offset: const Offset(-0.5, -0.5),
+                      blurRadius: 1,
+                      color: Colors.white.withOpacity(0.3),
                     ),
                   ],
                 ),
