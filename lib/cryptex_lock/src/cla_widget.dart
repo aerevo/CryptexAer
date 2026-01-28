@@ -32,8 +32,6 @@ class _CryptexLockState extends State<CryptexLock> {
 
   // 🎨 PALETTE WARNA (FIXED)
   final Color _primaryOrange = const Color(0xFFFF5722);
-  final Color _engravedShadowDark = Colors.black.withOpacity(0.9); // Lebih gelap sikit
-  final Color _engravedShadowLight = Colors.white.withOpacity(0.5); 
 
   @override
   void initState() {
@@ -63,7 +61,7 @@ class _CryptexLockState extends State<CryptexLock> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // ==========================
-                // 1. HEADER (BOLD DARK)
+                // 1. HEADER
                 // ==========================
                 Text(
                   "SECURE ACCESS",
@@ -96,37 +94,34 @@ class _CryptexLockState extends State<CryptexLock> {
                     borderRadius: BorderRadius.circular(20),
                     // EFEK LUBANG TERBENAM (INSET)
                     boxShadow: [
-                      // Bayang dalam (Atas Kiri - Gelap)
                       BoxShadow(
                         color: Colors.black.withOpacity(0.15),
                         offset: const Offset(5, 5),
                         blurRadius: 10,
-                        spreadRadius: -2, // Inset effect
+                        spreadRadius: -2,
                       ),
-                      // Highlight dalam (Bawah Kanan - Putih)
                       BoxShadow(
                         color: Colors.white,
                         offset: const Offset(-5, -5),
                         blurRadius: 10,
-                        spreadRadius: -2, // Inset effect
+                        spreadRadius: -2,
                       ),
                     ],
                   ),
                   child: Container(
-                    height: 140, // Tinggi FIX (Jangan ubah)
+                    height: 140, // Tinggi FIX
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(15),
-                      // Frame hitam nipis keliling gambar
                       border: Border.all(color: Colors.black, width: 2),
                     ),
-                    clipBehavior: Clip.hardEdge, // Potong bucu gambar
+                    clipBehavior: Clip.hardEdge,
                     child: Stack(
                       children: [
-                        // 🔥 LAYER A: GAMBAR RODA (BACKGROUND)
+                        // 🔥 LAYER A: GAMBAR RODA (BoxFit.cover)
                         Positioned.fill(
                           child: Image.asset(
                             'assets/z_wheel.png',
-                            fit: BoxFit.fill, // PAKSA gambar penuh kotak
+                            fit: BoxFit.cover, // UPDATED: Cover untuk fill gap
                           ),
                         ),
 
@@ -149,8 +144,9 @@ class _CryptexLockState extends State<CryptexLock> {
                           ),
                         ),
 
-                        // 🔥 LAYER C: NOMBOR (PIXEL PERFECT ALIGNMENT)
+                        // 🔥 LAYER C: NOMBOR (PIXEL PERFECT & CLIPPED)
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(5, (index) => _buildPreciseWheel(index)),
                         ),
                       ],
@@ -161,7 +157,7 @@ class _CryptexLockState extends State<CryptexLock> {
                 const SizedBox(height: 60),
 
                 // ==========================
-                // 3. BUTTON (ORANGE GLOW)
+                // 3. BUTTON
                 // ==========================
                 Container(
                   width: double.infinity,
@@ -184,7 +180,7 @@ class _CryptexLockState extends State<CryptexLock> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryOrange,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                      elevation: 0, // Kita guna shadow container
+                      elevation: 0,
                     ),
                     child: const Text(
                       "CONFIRM ACCESS",
@@ -210,64 +206,75 @@ class _CryptexLockState extends State<CryptexLock> {
 
     return Expanded(
       child: Container(
-        // Margin 5px kiri kanan untuk match frame hitam gambar Captain
-        margin: const EdgeInsets.symmetric(horizontal: 5), 
+        // Margin 2-4px (Arahan Captain)
+        margin: const EdgeInsets.symmetric(horizontal: 3), 
         
-        // Highlight Oren bila disentuh (Subtle Overlay)
         decoration: BoxDecoration(
           color: isActive 
-              ? const Color(0xFFFF5722).withOpacity(0.2) // Active Glow
+              ? const Color(0xFFFF5722).withOpacity(0.3) // Active Highlight
               : Colors.transparent,
+          borderRadius: BorderRadius.circular(20), // Match clipping
         ),
         
-        child: ListWheelScrollView.useDelegate(
-          controller: _scrollControllers[index],
-          
-          // 🔥 PARAMETER FIZIKAL (TUNED)
-          itemExtent: 55,       // Match tinggi "shine" roda
-          perspective: 0.006,   // Curve 3D
-          diameterRatio: 1.2,   // Rasa dial fizikal
-          
-          physics: const FixedExtentScrollPhysics(),
-          overAndUnderCenterOpacity: 0.25, // Nombor tepi pudar
-          
-          onSelectedItemChanged: (_) {
-             HapticFeedback.selectionClick();
-             setState(() => _activeWheelIndex = index);
-          },
-          
-          childDelegate: ListWheelChildBuilderDelegate(
-            builder: (context, i) {
-              return Container(
-                // Pastikan container text ni duduk tengah-tengah slot itemExtent
-                alignment: Alignment.center, 
-                child: Text(
-                  '${i % 10}',
-                  style: TextStyle(
-                    fontFamily: 'Roboto', // Guna font sistem yang stable
-                    fontSize: 48,         // Besar & Jelas
-                    fontWeight: FontWeight.w900, // Tebal Maksimum
-                    color: Colors.white,
-                    height: 1.0,          // 🔥 PENTING: Matikan line-height extra
-                    
-                    shadows: [
-                      // Emboss Bawah (Gelap)
-                      Shadow(
-                        offset: const Offset(2, 2),
-                        blurRadius: 4,
-                        color: _engravedShadowDark,
-                      ),
-                      // Emboss Atas (Terang) - Efek Ukir
-                      Shadow(
-                        offset: const Offset(-1, -1),
-                        blurRadius: 2,
-                        color: _engravedShadowLight,
-                      ),
-                    ],
-                  ),
-                ),
-              );
+        // 🔥 CLIPPING: Prevent nombor keluar dari roda
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: ListWheelScrollView.useDelegate(
+            controller: _scrollControllers[index],
+            
+            // 🔥 TUNED PARAMETERS (Arahan Captain)
+            itemExtent: 70,       // Naikkan ke 70 (Range 68-75)
+            perspective: 0.007,   // Curve lebih ketara (Range 0.007-0.009)
+            diameterRatio: 1.0,   // Lebih dalam/tight (Range 0.9-1.1)
+            
+            physics: const FixedExtentScrollPhysics(),
+            overAndUnderCenterOpacity: 0.3, // Kurangkan opacity edge (Range 0.25-0.35)
+            
+            onSelectedItemChanged: (_) {
+               HapticFeedback.selectionClick();
+               setState(() => _activeWheelIndex = index);
             },
+            
+            childDelegate: ListWheelChildBuilderDelegate(
+              builder: (context, i) {
+                return Align(
+                  // 🔥 ALIGNMENT FIX: Shift naik atas sikit (-0.1)
+                  alignment: const Alignment(0.0, -0.1), 
+                  child: Text(
+                    '${i % 10}',
+                    style: TextStyle(
+                      fontFamily: 'Roboto', 
+                      fontSize: 52,         // Size 50-54
+                      fontWeight: FontWeight.w900, 
+                      color: Colors.white,
+                      height: 1.0,          // Height 1.0 Exact
+                      
+                      // 🔥 EMBOSS SHADOWS (3 Layers)
+                      shadows: [
+                        // Deep Black (Bawah Kanan)
+                        Shadow(
+                          offset: const Offset(3, 4),
+                          blurRadius: 6,
+                          color: Colors.black.withOpacity(0.7),
+                        ),
+                        // Sharp White (Atas Kiri)
+                        Shadow(
+                          offset: const Offset(-2, -3),
+                          blurRadius: 4,
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                        // Extra Depth (Bawah)
+                        Shadow(
+                          offset: const Offset(0, 2),
+                          blurRadius: 3,
+                          color: Colors.black.withOpacity(0.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
