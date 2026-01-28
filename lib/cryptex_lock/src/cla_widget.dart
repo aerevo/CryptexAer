@@ -54,7 +54,7 @@ class _CryptexLockState extends State<CryptexLock> {
   static const double verticalOffsetRatio = -0.0648;
   
   // 🔧 IMAGE SCALE (zoom in/out)
-  static const double imageScale = 1.05; // 5% BIGGER
+  static const double imageScale = 1.20; // 20% BIGGER
 
   @override
   void initState() {
