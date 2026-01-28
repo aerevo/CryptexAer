@@ -11,7 +11,7 @@ import 'matrix_rain_painter.dart';
 import 'forensic_data_painter.dart';
 
 // ============================================
-// 🔥 V21.0 - GUNA GAMBAR RODA + LUKIS NOMBOR SAHAJA 🔥
+// 🔥 V21.1 - DEBUG MODE + FALLBACK 🔥
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -109,6 +109,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   bool _isDisposed = false;
   bool _showForensics = false;
   int _localAttemptCount = 0;
+  
+  // 🔥 DEBUG FLAG
+  bool _imageLoadFailed = false;
 
   final Color _primaryOrange = const Color(0xFFFF5722);
   final Color _accentRed = const Color(0xFFD32F2F);
@@ -309,20 +312,65 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                           _buildSensorRow(activeColor),
                           const SizedBox(height: 30),
                           
-                          // 🔥 GAMBAR RODA + NOMBOR DI ATAS
+                          // 🔥 WHEELS dengan DEBUG
                           Center(
                             child: SizedBox(
                               height: wheelHeight.clamp(180.0, 250.0),
                               child: Stack(
                                 children: [
-                                  // Gambar 5 roda (dari z_wheel.png)
+                                  // 🔥 DEBUG: Background terang supaya nampak area
+                                  Positioned.fill(
+                                    child: Container(
+                                      color: Colors.grey[800],
+                                      child: Center(
+                                        child: Text(
+                                          'WHEEL AREA',
+                                          style: TextStyle(color: Colors.white54, fontSize: 10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  // Gambar roda
                                   Positioned.fill(
                                     child: Image.asset(
                                       'assets/z_wheel.png',
                                       fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        // 🔥 Kalau gambar fail, set flag
+                                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                                          if (mounted && !_imageLoadFailed) {
+                                            setState(() => _imageLoadFailed = true);
+                                          }
+                                        });
+                                        
+                                        // Show error message
+                                        return Container(
+                                          color: Colors.red.withOpacity(0.3),
+                                          child: Center(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.error_outline, color: Colors.red, size: 40),
+                                                SizedBox(height: 10),
+                                                Text(
+                                                  'IMAGE LOAD FAILED',
+                                                  style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                                                ),
+                                                SizedBox(height: 5),
+                                                Text(
+                                                  'assets/z_wheel.png',
+                                                  style: TextStyle(color: Colors.white70, fontSize: 10),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
-                                  // Nombor scrolling di atas gambar
+                                  
+                                  // Nombor
                                   Row(
                                     children: List.generate(5, (i) => _buildNumberOverlay(i, activeColor)),
                                   ),
@@ -330,6 +378,32 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                               ),
                             ),
                           ),
+                          
+                          // 🔥 DEBUG INFO
+                          if (_imageLoadFailed)
+                            Container(
+                              margin: const EdgeInsets.only(top: 10),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.2),
+                                border: Border.all(color: Colors.red),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    '⚠️ IMAGE LOAD ERROR',
+                                    style: TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Check: assets/z_wheel.png exists\nCheck: pubspec.yaml has asset declared',
+                                    style: TextStyle(color: Colors.white70, fontSize: 9),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
                           
                           const SizedBox(height: 30),
                           _buildConfirmButton(activeColor, state),
@@ -417,7 +491,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     }
   }
 
-  // 🔥 Nombor scrolling sahaja (transparent, di atas gambar)
   Widget _buildNumberOverlay(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
 
@@ -454,7 +527,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                     style: TextStyle(
                       fontSize: 40,
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFF2C2C2C),
+                      // 🔥 Warna putih untuk debug (nampak kalau gambar tak load)
+                      color: _imageLoadFailed ? Colors.white : const Color(0xFF2C2C2C),
                       height: 1.0,
                       shadows: [
                         Shadow(
