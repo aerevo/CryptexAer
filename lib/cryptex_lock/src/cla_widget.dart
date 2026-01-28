@@ -11,7 +11,7 @@ import 'matrix_rain_painter.dart';
 import 'forensic_data_painter.dart';
 
 // ============================================
-// 🔥 V18.5 - FIXED SPACING & LAYOUT 🔥
+// 🔥 V21.0 - GUNA GAMBAR RODA + LUKIS NOMBOR SAHAJA 🔥
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -293,9 +293,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // 🔥 CALCULATE PROPER SIZING
                 final screenHeight = constraints.maxHeight;
-                final wheelHeight = screenHeight * 0.35; // 35% of screen height
+                final wheelHeight = screenHeight * 0.35;
                 
                 return SingleChildScrollView(
                   child: ConstrainedBox(
@@ -305,37 +304,36 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Header
                           _buildHeader(activeColor, state),
-                          
                           const SizedBox(height: 20),
-                          
-                          // Sensor Row
                           _buildSensorRow(activeColor),
-                          
                           const SizedBox(height: 30),
                           
-                          // 🔥 WHEELS dengan sizing yang betul
+                          // 🔥 GAMBAR RODA + NOMBOR DI ATAS
                           Center(
                             child: SizedBox(
-                              height: wheelHeight.clamp(180.0, 250.0), // Min 180, Max 250
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: List.generate(5, (i) => _build3DCylinder(i, activeColor)),
+                              height: wheelHeight.clamp(180.0, 250.0),
+                              child: Stack(
+                                children: [
+                                  // Gambar 5 roda (dari z_wheel.png)
+                                  Positioned.fill(
+                                    child: Image.asset(
+                                      'assets/z_wheel.png',
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                  // Nombor scrolling di atas gambar
+                                  Row(
+                                    children: List.generate(5, (i) => _buildNumberOverlay(i, activeColor)),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                           
                           const SizedBox(height: 30),
-                          
-                          // Confirm Button
                           _buildConfirmButton(activeColor, state),
-                          
-                          // Warning Banner
-                          if (_localAttemptCount >= 3) 
-                            _buildWarningBanner(),
-                          
-                          // Stress Test Result
+                          if (_localAttemptCount >= 3) _buildWarningBanner(),
                           if (_stressResult.isNotEmpty)
                             Container(
                               margin: const EdgeInsets.only(top: 10),
@@ -419,207 +417,61 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     }
   }
 
-  Widget _build3DCylinder(int index, Color color) {
+  // 🔥 Nombor scrolling sahaja (transparent, di atas gambar)
+  Widget _buildNumberOverlay(int index, Color color) {
     bool isActive = _activeWheelIndex == index;
 
     return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: GestureDetector(
-          onTapDown: (_) {
-            if (_isDisposed) return;
-            setState(() => _activeWheelIndex = index);
-            _wheelActiveTimer?.cancel();
-            _userInteracted();
-            widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
-            HapticFeedback.selectionClick();
-          },
-          onTapUp: (_) => _resetActiveWheelTimer(),
-          onTapCancel: () => _resetActiveWheelTimer(),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                children: [
-                  // Background image
-                  Positioned.fill(
-                    child: Image.asset(
-                      'assets/z_wheel.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Color(0xFF555555),
-                                Color(0xFF888888),
-                                Color(0xFF555555),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Depth gradient
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withOpacity(0.7),
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.7),
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
+      child: GestureDetector(
+        onTapDown: (_) {
+          if (_isDisposed) return;
+          setState(() => _activeWheelIndex = index);
+          _wheelActiveTimer?.cancel();
+          _userInteracted();
+          widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now());
+          HapticFeedback.selectionClick();
+        },
+        onTapUp: (_) => _resetActiveWheelTimer(),
+        onTapCancel: () => _resetActiveWheelTimer(),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          child: ListWheelScrollView.useDelegate(
+            controller: _scrollControllers[index],
+            itemExtent: 45,
+            perspective: 0.004,
+            diameterRatio: 1.3,
+            physics: const FixedExtentScrollPhysics(),
+            overAndUnderCenterOpacity: 0.4,
+            onSelectedItemChanged: (_) {
+              HapticFeedback.selectionClick();
+              _analyzeScrollPattern();
+            },
+            childDelegate: ListWheelChildBuilderDelegate(
+              builder: (context, i) {
+                return Center(
+                  child: Text(
+                    '${i % 10}',
+                    style: TextStyle(
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF2C2C2C),
+                      height: 1.0,
+                      shadows: [
+                        Shadow(
+                          offset: const Offset(2, 2),
+                          blurRadius: 3,
+                          color: Colors.black.withOpacity(0.4),
                         ),
-                      ),
-                    ),
-                  ),
-
-                  // Numbers
-                  Positioned.fill(
-                    child: ListWheelScrollView.useDelegate(
-                      controller: _scrollControllers[index],
-                      itemExtent: 45,
-                      perspective: 0.005,
-                      diameterRatio: 1.5,
-                      physics: const FixedExtentScrollPhysics(),
-                      overAndUnderCenterOpacity: 0.3,
-                      onSelectedItemChanged: (_) {
-                        HapticFeedback.selectionClick();
-                        _analyzeScrollPattern();
-                      },
-                      childDelegate: ListWheelChildBuilderDelegate(
-                        builder: (context, i) {
-                          return Center(
-                            child: Text(
-                              '${i % 10}',
-                              style: TextStyle(
-                                fontSize: isActive ? 36 : 32,
-                                fontWeight: FontWeight.w900,
-                                color: isActive 
-                                    ? const Color(0xFFFF6D00)
-                                    : _neutralGray,
-                                height: 1.2,
-                                shadows: isActive 
-                                    ? [
-                                        const BoxShadow(
-                                          color: Color(0xFFFF6D00),
-                                          blurRadius: 15,
-                                          spreadRadius: 3,
-                                        ),
-                                        const BoxShadow(
-                                          color: Colors.white,
-                                          blurRadius: 5,
-                                        ),
-                                      ]
-                                    : [
-                                        Shadow(
-                                          offset: const Offset(2, 2),
-                                          blurRadius: 3,
-                                          color: Colors.black.withOpacity(0.7),
-                                        ),
-                                        Shadow(
-                                          offset: const Offset(-1, -1),
-                                          blurRadius: 2,
-                                          color: Colors.white.withOpacity(0.3),
-                                        ),
-                                      ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-
-                  // HUD line
-                  if (isActive)
-                    Center(
-                      child: IgnorePointer(
-                        child: Container(
-                          height: 48,
-                          decoration: BoxDecoration(
-                            border: Border.symmetric(
-                              horizontal: BorderSide(
-                                color: const Color(0xFFFF6D00).withOpacity(0.6),
-                                width: 1.5,
-                              ),
-                            ),
-                            color: const Color(0xFFFF6D00).withOpacity(0.05),
-                          ),
+                        Shadow(
+                          offset: const Offset(-1, -1),
+                          blurRadius: 1,
+                          color: Colors.white.withOpacity(0.5),
                         ),
-                      ),
-                    ),
-
-                  // Side shadows
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Colors.black.withOpacity(0.4),
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.4),
-                            ],
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
                   ),
-
-                  // Top cap
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 6,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Bottom cap
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 6,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF555555), Color(0xFF444444), Color(0xFF555555)],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ),
