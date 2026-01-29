@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 class CryptexLock extends StatelessWidget {
-  // Hamba terpaksa letak parameter ini supaya main.dart Captain tak error (crash).
-  // Tapi kita takkan guna mereka sekarang.
   final dynamic controller;
   final VoidCallback? onSuccess;
   final VoidCallback? onFail;
@@ -19,12 +17,37 @@ class CryptexLock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Latar belakang hitam
+      // KITA TUKAR JADI MERAH. 
+      // Kalau Captain run dan skrin masih HITAM, maksudnya kod ni tak update.
+      // Kalau skrin MERAH tapi kosong, maksudnya kod jalan tapi gambar hilang.
+      backgroundColor: Colors.red, 
+      
       body: Center(
-        // HANYA PAPAR GAMBAR ORIGINAL
-        child: Image.asset(
-          'assets/z_wheel.png',
-          fit: BoxFit.contain, // Tunjuk gambar penuh, jangan potong
+        child: Container(
+          width: 300,
+          height: 200,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.white, width: 2), // Kotak putih
+          ),
+          child: Image.asset(
+            'assets/z_wheel.png',
+            
+            // Kalau gambar rosak/tak jumpa, dia akan tunjuk icon pangkah
+            errorBuilder: (context, error, stackTrace) {
+              return const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.broken_image, size: 50, color: Colors.white),
+                  SizedBox(height: 10),
+                  Text(
+                    "GAMBAR HILANG!", 
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                  ),
+                ],
+              );
+            },
+            fit: BoxFit.contain,
+          ),
         ),
       ),
     );
