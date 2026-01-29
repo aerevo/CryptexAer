@@ -19,26 +19,62 @@ class CryptexLock extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        // KITA GUNA CONTAINER TANPA HEIGHT TETAP
         child: Container(
-          width: double.infinity, // Lebar Penuh (Wajib)
-          
-          // Letak border sikit supaya Captain nampak batas gambar
+          width: double.infinity,
+          // Decoration sikit utk nampak sempadan
           decoration: BoxDecoration(
             border: Border.symmetric(
               horizontal: BorderSide(color: Colors.white.withOpacity(0.2), width: 1),
             ),
           ),
+          
+          // 🔥 INI KONSEP OVERLAY (STACK) 🔥
+          child: Stack(
+            alignment: Alignment.center, // Pastikan semua benda duduk tengah
+            children: [
+              // ==============================
+              // LAPISAN 1 (BAWAH): GAMBAR RODA
+              // ==============================
+              Image.asset(
+                'assets/z_wheel.png',
+                fit: BoxFit.fitWidth, // Ikut setting Captain yg dah lulus tadi
+              ),
 
-          // 🔥 KOD FIX POTONG ATAS BAWAH 🔥
-          child: Image.asset(
-            'assets/z_wheel.png',
-            
-            // "fitWidth" maksudnya: 
-            // 1. Tarik gambar sampai penuh kiri-kanan.
-            // 2. Tinggi akan 'expand' secara automatik supaya gambar tak terpotong.
-            // 3. Gambar takkan jadi gepenk.
-            fit: BoxFit.fitWidth, 
+              // ==============================
+              // LAPISAN 2 (ATAS): NOMBOR TEST
+              // ==============================
+              // Kita guna Positioned.fill supaya lapisan ni
+              // ikut saiz sebiji macam gambar di belakang.
+              Positioned.fill(
+                child: Row(
+                  // Bahagikan ruang kepada 5 bahagian sama rata
+                  children: List.generate(5, (index) {
+                    return Expanded(
+                      child: Container(
+                        // Hamba letak kotak merah nipis supaya Captain nampak kawasan dia
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.red.withOpacity(0.5), width: 1),
+                        ),
+                        child: Center(
+                          child: Text(
+                            "0", // Nombor Test
+                            style: TextStyle(
+                              fontSize: 40, // Besar sikit
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              // Letak shadow sikit supaya nampak timbul
+                              shadows: [
+                                Shadow(blurRadius: 2, color: Colors.black, offset: Offset(2, 2))
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
           ),
         ),
       ),
