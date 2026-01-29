@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 class CryptexLock extends StatelessWidget {
-  // Parameter wajib (supaya main.dart tak error)
   final dynamic controller;
   final VoidCallback? onSuccess;
   final VoidCallback? onFail;
@@ -18,33 +17,28 @@ class CryptexLock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Latar belakang gelap
+      backgroundColor: Colors.black,
       body: Center(
-        // KOTAK RODA UTAMA
+        // KITA GUNA CONTAINER TANPA HEIGHT TETAP
         child: Container(
-          // Tinggi Roda (Adjust sini kalau nak besar/kecil)
-          height: 160, 
+          width: double.infinity, // Lebar Penuh (Wajib)
           
-          // Lebar Penuh (Full Width)
-          width: double.infinity, 
-          
+          // Letak border sikit supaya Captain nampak batas gambar
           decoration: BoxDecoration(
-            // Warna backup kalau gambar lambat load
-            color: Colors.grey[900], 
-            
-            // Garis putih nipis atas & bawah (supaya nampak frame)
             border: Border.symmetric(
-              horizontal: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
+              horizontal: BorderSide(color: Colors.white.withOpacity(0.2), width: 1),
             ),
+          ),
 
-            // 🔥 INI GAMBAR CAPTAIN 🔥
-            image: const DecorationImage(
-              image: AssetImage('assets/z_wheel.png'),
-              // 'cover' = Penuhkan kotak, potong sikit tepi kalau perlu, janji tak gepenk.
-              // 'fill' = Penuhkan kotak, tapi mungkin jadi gepenk/distorted.
-              // Captain try 'cover' dulu, nampak lebih premium.
-              fit: BoxFit.cover, 
-            ),
+          // 🔥 KOD FIX POTONG ATAS BAWAH 🔥
+          child: Image.asset(
+            'assets/z_wheel.png',
+            
+            // "fitWidth" maksudnya: 
+            // 1. Tarik gambar sampai penuh kiri-kanan.
+            // 2. Tinggi akan 'expand' secara automatik supaya gambar tak terpotong.
+            // 3. Gambar takkan jadi gepenk.
+            fit: BoxFit.fitWidth, 
           ),
         ),
       ),
