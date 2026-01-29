@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 class CryptexLock extends StatelessWidget {
+  // Parameter wajib supaya main.dart tak error semasa build
   final dynamic controller;
   final VoidCallback? onSuccess;
   final VoidCallback? onFail;
@@ -16,38 +17,32 @@ class CryptexLock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // KITA TUKAR JADI MERAH. 
-      // Kalau Captain run dan skrin masih HITAM, maksudnya kod ni tak update.
-      // Kalau skrin MERAH tapi kosong, maksudnya kod jalan tapi gambar hilang.
-      backgroundColor: Colors.red, 
+    // ❌ TAK ADA GAMBAR
+    // ✅ CUMA WARNA PINK TERANG
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.pinkAccent, // Kalau skrin tak jadi Pink, maksudnya APK belum update
       
-      body: Center(
-        child: Container(
-          width: 300,
-          height: 200,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.white, width: 2), // Kotak putih
-          ),
-          child: Image.asset(
-            'assets/z_wheel.png',
-            
-            // Kalau gambar rosak/tak jumpa, dia akan tunjuk icon pangkah
-            errorBuilder: (context, error, stackTrace) {
-              return const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.broken_image, size: 50, color: Colors.white),
-                  SizedBox(height: 10),
-                  Text(
-                    "GAMBAR HILANG!", 
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
-                  ),
-                ],
-              );
-            },
-            fit: BoxFit.contain,
-          ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.warning, size: 60, color: Colors.white),
+            SizedBox(height: 20),
+            Text(
+              "SILA UPDATE APK",
+              style: TextStyle(
+                fontSize: 24, 
+                fontWeight: FontWeight.bold, 
+                color: Colors.white
+              ),
+            ),
+            Text(
+              "Kod Pink Berjaya!",
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
         ),
       ),
     );
