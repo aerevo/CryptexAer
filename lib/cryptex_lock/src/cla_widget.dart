@@ -1,18 +1,15 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 import 'cla_controller_v2.dart';
 import 'cla_models.dart';
-import 'matrix_rain_painter.dart';
-import 'forensic_data_painter.dart';
 
 // ============================================
-// 🔥 CRYPTEX LOCK ULTIMATE V16.0
-// FULL MERGE: Visual Overlay + Advanced Logic
+// 🔥 CRYPTEX LOCK PROFESSIONAL 
+// Clean, Polished, Enterprise-Grade UI
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -61,6 +58,199 @@ class TutorialOverlay extends StatelessWidget {
   }
 }
 
+// 🔥 PROFESSIONAL CONFIRMATION DIALOG (SCREEN-IN-SCREEN)
+class SecurityConfirmationDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final VoidCallback onConfirm;
+  final VoidCallback onCancel;
+  final Color accentColor;
+
+  const SecurityConfirmationDialog({
+    super.key,
+    required this.title,
+    required this.message,
+    required this.onConfirm,
+    required this.onCancel,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 40,
+              spreadRadius: 0,
+              offset: const Offset(0, 20),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ICON HEADER
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.verified_user,
+                color: accentColor,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // TITLE
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF263238),
+                letterSpacing: 0.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+
+            // MESSAGE
+            Text(
+              message,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+
+            // APP INFO CARD (LIKE GOOGLE PLAY PROTECT)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.lock,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Z-Kinetic Security",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF263238),
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.verified, color: Color(0xFF4CAF50), size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              "Verified",
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4CAF50),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // BUTTONS
+            Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: onConfirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "Confirm Access",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: TextButton(
+                    onPressed: onCancel,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.grey[700],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "Cancel",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback onSuccess;
@@ -80,13 +270,13 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, TickerProviderStateMixin {
-  // 🔥 KOORDINAT RODA (626 x 471) - DARI FILE 1
+  // 🔥 KOORDINAT RODA (626 x 471)
   static const List<List<double>> _wheelCoords = [
-    [85, 133, 143, 286],   // Roda 1
-    [180, 132, 242, 285],  // Roda 2
-    [276, 133, 337, 282],  // Roda 3
-    [371, 132, 431, 282],  // Roda 4
-    [467, 130, 529, 285],  // Roda 5
+    [85, 133, 143, 286],
+    [180, 132, 242, 285],
+    [276, 133, 337, 282],
+    [371, 132, 431, 282],
+    [467, 130, 529, 285],
   ];
 
   // 🔥 KOORDINAT BUTTON "CONFIRM ACCESS"
@@ -95,7 +285,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   static const double _imageWidth = 626.0;
   static const double _imageHeight = 471.0;
 
-  // Sensor & Controller State
+  // State Management
   StreamSubscription<UserAccelerometerEvent>? _accelSub;
   Timer? _lockoutTimer;
   int? _activeWheelIndex;
@@ -104,7 +294,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   final ValueNotifier<double> _motionScoreNotifier = ValueNotifier(0.0);
   final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
-  final ValueNotifier<Offset> _accelNotifier = ValueNotifier(Offset.zero);
 
   double _patternScore = 0.0;
   bool _showTutorial = true;
@@ -115,24 +304,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   final List<Map<String, dynamic>> _touchData = [];
   DateTime? _lastScrollTime;
 
-  late AnimationController _pulseController;
   late AnimationController _scanController;
-  late AnimationController _reticleController;
-  late MatrixRain _matrixRain;
-  late AnimationController _rainController;
-
-  bool _isStressTesting = false;
-  String _stressResult = "";
   bool _isDisposed = false;
-  bool _showForensics = false;
 
   // Colors
   final Color _primaryOrange = const Color(0xFFFF5722);
   final Color _accentRed = const Color(0xFFD32F2F);
-  final Color _neutralGray = const Color(0xFFE0E0E0);
-  final Color _darkText = const Color(0xFF263238);
   final Color _successGreen = const Color(0xFF4CAF50);
-  final Color _lightBlueGray = const Color(0xFFE3E8F0);
 
   List<int> get _currentCode {
     if (_scrollControllers.isEmpty) return [0, 0, 0, 0, 0];
@@ -149,17 +327,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     widget.controller.addListener(_handleControllerChange);
     widget.controller.shouldRandomizeWheels.addListener(_onRandomizeTrigger);
     
-    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _scanController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
-    _reticleController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
-
-    _matrixRain = MatrixRain(columnCount: 4);
-    _rainController = AnimationController(vsync: this, duration: const Duration(milliseconds: 50))
-      ..addListener(() {
-        if (!mounted || _isDisposed) return;
-        setState(() {});
-      })
-      ..repeat();
 
     _tutorialHideTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && !_isDisposed) setState(() => _showTutorial = false);
@@ -198,7 +366,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _accelSub?.cancel();
     _accelSub = userAccelerometerEvents.listen((e) {
       if (_isDisposed) return;
-      _accelNotifier.value = Offset(e.x, e.y);
       double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
       _lastX = e.x; _lastY = e.y; _lastZ = e.z;
       double amplifiedMotion = (delta * 10.0).clamp(0.0, 1.0);
@@ -292,14 +459,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     _wheelActiveTimer?.cancel();
     _touchDecayTimer?.cancel();
     _tutorialHideTimer?.cancel();
-    _pulseController.dispose();
     _scanController.dispose();
-    _reticleController.dispose();
-    _rainController.dispose();
     for (var c in _scrollControllers) c.dispose();
     _motionScoreNotifier.dispose();
     _touchScoreNotifier.dispose();
-    _accelNotifier.dispose();
     super.dispose();
   }
 
@@ -312,6 +475,29 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       case SecurityState.UNLOCKED: return "ACCESS GRANTED";
       default: return "INITIALIZING...";
     }
+  }
+
+  // 🔥 SHOW PROFESSIONAL CONFIRMATION DIALOG
+  void _showConfirmationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => SecurityConfirmationDialog(
+        title: "Verify Access",
+        message: "Are you sure you want to proceed with this security code?",
+        accentColor: _primaryOrange,
+        onConfirm: () async {
+          Navigator.pop(context);
+          HapticFeedback.mediumImpact();
+          _userInteracted();
+          await widget.controller.verify(_currentCode);
+        },
+        onCancel: () {
+          Navigator.pop(context);
+          HapticFeedback.lightImpact();
+        },
+      ),
+    );
   }
 
   @override
@@ -327,7 +513,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       color: Colors.black,
       child: Stack(
         children: [
-          if (_showForensics) Positioned(left: 0, top: 100, child: _buildForensicPanel()),
           Center(
             child: SingleChildScrollView(
               child: Column(
@@ -346,9 +531,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   ),
                   const SizedBox(height: 60),
 
-                  // ==================================================
-                  // 🔥 Z-WHEEL SYSTEM (ULTIMATE OVERLAY)
-                  // ==================================================
+                  // Z-WHEEL SYSTEM
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -356,8 +539,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         double screenWidth = constraints.maxWidth;
-                        
-                        // 🎯 KIRA ASPECT RATIO
                         double aspectRatio = _imageWidth / _imageHeight;
                         double imageHeight = screenWidth / aspectRatio;
                         
@@ -366,18 +547,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                           height: imageHeight,
                           child: Stack(
                             children: [
-                              // LAYER 1: GAMBAR Z-WHEEL (BASE)
                               Positioned.fill(
                                 child: Image.asset(
                                   'assets/z_wheel.png',
                                   fit: BoxFit.fill,
                                 ),
                               ),
-
-                              // LAYER 2: RODA OVERLAY (5 WHEELS)
                               ..._buildWheelOverlays(screenWidth, imageHeight, activeColor, state),
-
-                              // LAYER 3: PHANTOM BUTTON (INVISIBLE)
                               _buildPhantomButton(screenWidth, imageHeight, activeColor, state),
                             ],
                           ),
@@ -388,107 +564,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
                   const SizedBox(height: 30),
 
-                  // SENSOR ROW
+                  // WARNING BANNER
                   if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
                   const SizedBox(height: 20),
+
+                  // SENSOR INDICATORS (MINIMAL)
                   _buildSensorRow(activeColor),
-                  
-                  // STRESS TEST RESULT
-                  if (_stressResult.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      margin: const EdgeInsets.symmetric(horizontal: 24),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber),
-                      ),
-                      child: Text(
-                        _stressResult,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.amber,
-                          fontSize: 10,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 10),
-
-                  // FORENSICS & BENCHMARK BUTTONS
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            setState(() => _showForensics = !_showForensics);
-                            HapticFeedback.lightImpact();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: _showForensics ? _successGreen : Colors.white24,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _showForensics ? Icons.visibility : Icons.visibility_off,
-                                  size: 16,
-                                  color: _showForensics ? _successGreen : Colors.white54,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "FORENSICS",
-                                  style: TextStyle(
-                                    color: _showForensics ? _successGreen : Colors.white54,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onLongPress: _runStressTest,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white24),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: _isStressTesting
-                                ? const SizedBox(
-                                    width: 10,
-                                    height: 10,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white54,
-                                    ),
-                                  )
-                                : Text(
-                                    "⚡ BENCHMARK",
-                                    style: TextStyle(
-                                      color: activeColor.withOpacity(0.6),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.5,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -504,14 +585,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  // 🔥 BUILD BUTTON HANTU (INVISIBLE OVERLAY)
   Widget _buildPhantomButton(double screenWidth, double screenHeight, Color activeColor, SecurityState state) {
     double left = _buttonCoords[0];
     double top = _buttonCoords[1];
     double right = _buttonCoords[2];
     double bottom = _buttonCoords[3];
 
-    // Convert ke Pixel Skrin Semasa
     double actualLeft = screenWidth * (left / _imageWidth);
     double actualTop = screenHeight * (top / _imageHeight);
     double actualWidth = screenWidth * ((right - left) / _imageWidth);
@@ -527,29 +606,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: isDisabled
-              ? null
-              : () async {
-                  HapticFeedback.mediumImpact();
-                  _userInteracted();
-                  await widget.controller.verify(_currentCode);
-                },
+          onTap: isDisabled ? null : _showConfirmationDialog, // 🔥 SHOW DIALOG
           splashColor: Colors.white.withOpacity(0.1),
           highlightColor: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(10),
-          child: Container(
-            color: Colors.transparent,
-            // Debug mode: uncomment to see button area
-            // decoration: BoxDecoration(
-            //   border: Border.all(color: Colors.red, width: 2),
-            // ),
-          ),
+          child: Container(color: Colors.transparent),
         ),
       ),
     );
   }
 
-  // 🔥 BUILD SEMUA 5 RODA DENGAN OVERLAY + EFFECTS
   List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight, Color activeColor, SecurityState state) {
     List<Widget> wheels = [];
     
@@ -593,7 +659,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     return wheels;
   }
 
-  // WIDGET SATU RODA (DENGAN EFFECTS)
   Widget _buildAdvancedWheel(int index, double wheelHeight, Color activeColor) {
     bool isActive = _activeWheelIndex == index;
     double itemExtent = wheelHeight * 0.40;
@@ -615,7 +680,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         curve: Curves.easeOut,
         child: Stack(
           children: [
-            // Base Wheel
             ListWheelScrollView.useDelegate(
               controller: _scrollControllers[index],
               itemExtent: itemExtent,
@@ -654,8 +718,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                 },
               ),
             ),
-            
-            // Active Border Glow
             if (isActive)
               Positioned.fill(
                 child: Container(
@@ -672,8 +734,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   ),
                 ),
               ),
-            
-            // Scan Line Effect
             if (isActive)
               Positioned.fill(
                 child: AnimatedBuilder(
@@ -734,64 +794,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  Widget _buildForensicPanel() {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 300),
-      opacity: _showForensics ? 1.0 : 0.0,
-      child: Container(
-        width: 60,
-        height: 200,
-        color: Colors.black,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(
-                painter: MatrixRainPainter(
-                  rain: _matrixRain,
-                  color: const Color(0xFF00FF00).withOpacity(0.3),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: CustomPaint(
-                painter: ForensicDataPainter(
-                  color: const Color(0xFF00FF00),
-                  motionCount: (widget.controller.motionEntropy * 100).toInt(),
-                  touchCount: (widget.controller.liveConfidence * 20).toInt(),
-                  entropy: widget.controller.motionEntropy,
-                  confidence: widget.controller.liveConfidence,
-                ),
-              ),
-            ),
-            Positioned(
-              top: 10,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 16,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00FF00).withOpacity(0.2),
-                  border: Border.all(color: const Color(0xFF00FF00).withOpacity(0.5)),
-                ),
-                child: const Center(
-                  child: Text(
-                    'FORENSIC',
-                    style: TextStyle(
-                      color: Color(0xFF00FF00),
-                      fontSize: 7,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: 'Courier',
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildWarningBanner() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -826,34 +828,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       if (mounted && !_isDisposed) setState(() => _activeWheelIndex = null);
     });
   }
-
-  Future<void> _runStressTest() async {
-    if (_isDisposed) return;
-    setState(() {
-      _isStressTesting = true;
-      _stressResult = "⚠️ LAUNCHING 50 CONCURRENT VECTORS...";
-    });
-    final stopwatch = Stopwatch()..start();
-    final random = Random();
-    await Future.wait(List.generate(50, (index) async {
-      if (_isDisposed) return;
-      await Future.delayed(Duration(milliseconds: random.nextInt(50)));
-      await widget.controller.verify(_currentCode);
-    }));
-    stopwatch.stop();
-    final double tps = 50 / (stopwatch.elapsedMilliseconds / 1000);
-    if (!mounted || _isDisposed) return;
-    setState(() {
-      _isStressTesting = false;
-      _stressResult = "📊 BENCHMARK REPORT:\nTotal: 50 Threads\nTime: ${stopwatch.elapsedMilliseconds}ms\nSpeed: ${tps.toStringAsFixed(0)} TPS\nIntegrity: STABLE";
-    });
-    Future.delayed(const Duration(seconds: 8), () {
-      if (mounted && !_isDisposed) setState(() => _stressResult = "");
-    });
-  }
 }
 
-// 🔥 KINETIC SCAN LINE PAINTER
 class KineticScanLinePainter extends CustomPainter {
   final Color color;
   final double progress;
