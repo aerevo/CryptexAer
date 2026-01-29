@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// Import controller kalau ada
+// Import controller kalau ada (biarkan comment dulu untuk fasa UI)
 // import 'cla_controller_v2.dart'; 
 
 class CryptexLock extends StatefulWidget {
@@ -39,7 +39,7 @@ class _CryptexLockState extends State<CryptexLock> {
   ];
 
   // 🔥 KOORDINAT BUTTON "CONFIRM ACCESS"
-  // Dari Captain: 150, 318, 472, 399
+  // 150, 318, 472, 399
   static const List<double> _buttonCoords = [150, 318, 472, 399];
 
   static const double _imageWidth = 626.0;
@@ -61,12 +61,14 @@ class _CryptexLockState extends State<CryptexLock> {
     return _scrollControllers.map((c) => c.selectedItem % 10).toList();
   }
 
-  // Fungsi Unlock
+  // Fungsi Unlock Dummy (Sementara)
   void _attemptUnlock() {
-    HapticFeedback.heavyImpact();
+    // Haptic feedback supaya rasa macam tekan butang betul
+    HapticFeedback.mediumImpact(); 
+    
     print("ATTEMPTING UNLOCK: $_currentCode");
 
-    // Demo Logic
+    // Demo Logic: Kalau kod 00009, dia unlock
     if (_currentCode.join() == "00009") {
       print("✅ UNLOCKED!");
       widget.onSuccess?.call();
@@ -99,7 +101,7 @@ class _CryptexLockState extends State<CryptexLock> {
               const SizedBox(height: 60),
 
               // ==================================================
-              // 🔥 Z-WHEEL SYSTEM (WHEELS + BUTTON OVERLAY) 🔥
+              // 🔥 Z-WHEEL SYSTEM (FINAL) 🔥
               // ==================================================
               Container(
                 width: double.infinity,
@@ -129,7 +131,7 @@ class _CryptexLockState extends State<CryptexLock> {
                           // LAYER 2: RODA OVERLAY (5 WHEELS)
                           ..._buildWheelOverlays(screenWidth, imageHeight),
 
-                          // LAYER 3: PHANTOM BUTTON (KOTAK MERAH TEST)
+                          // LAYER 3: PHANTOM BUTTON (INVISIBLE)
                           _buildPhantomButton(screenWidth, imageHeight),
                         ],
                       ),
@@ -144,7 +146,7 @@ class _CryptexLockState extends State<CryptexLock> {
     );
   }
 
-  // 🔥 BUILD BUTTON HANTU
+  // 🔥 BUILD BUTTON HANTU (INVISIBLE)
   Widget _buildPhantomButton(double screenWidth, double screenHeight) {
     double left = _buttonCoords[0];
     double top = _buttonCoords[1];
@@ -163,29 +165,16 @@ class _CryptexLockState extends State<CryptexLock> {
       width: actualWidth,
       height: actualHeight,
       child: Material(
-        color: Colors.transparent, // Material mesti transparent
+        color: Colors.transparent, // ✅ TRANSPARENT 100%
         child: InkWell(
-          onTap: _attemptUnlock, // Panggil fungsi unlock bila tekan kotak ni
-          splashColor: Colors.white.withOpacity(0.3), // Efek kilat bila tekan
-          borderRadius: BorderRadius.circular(10), // Curve sikit bucu effect
+          onTap: _attemptUnlock, 
+          // ✅ Ripple effect halus warna putih supaya user tahu dia dah tekan
+          splashColor: Colors.white.withOpacity(0.1), 
+          highlightColor: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(10), 
           
-          // 🔥 CONTAINER VISUAL UNTUK TESTING (KOTAK MERAH)
           child: Container(
-            decoration: BoxDecoration(
-              // Nanti kita buang border ni bila Captain kata LULUS
-              border: Border.all(color: Colors.redAccent, width: 3), 
-              color: Colors.red.withOpacity(0.2), // Isi merah pudar sikit
-            ),
-            child: const Center(
-              child: Text(
-                "TAP HERE",
-                style: TextStyle(
-                  color: Colors.white, 
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
+            color: Colors.transparent, // Kosongkan container
           ),
         ),
       ),
