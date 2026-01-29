@@ -28,10 +28,7 @@ class _CryptexLockState extends State<CryptexLock> {
   late List<FixedExtentScrollController> _scrollControllers;
   int? _activeWheelIndex;
 
-  // Warna Emas/Oren Captain
-  final Color _primaryOrange = const Color(0xFFFF5722);
-
-  // 🔥 KOORDINAT SEBENAR DARI IMAGE MAP (626 x 471)
+  // 🔥 KOORDINAT RODA (626 x 471)
   // Format: [left, top, right, bottom]
   static const List<List<double>> _wheelCoords = [
     [85, 133, 143, 286],   // Roda 1
@@ -40,6 +37,10 @@ class _CryptexLockState extends State<CryptexLock> {
     [371, 132, 431, 282],  // Roda 4
     [467, 130, 529, 285],  // Roda 5
   ];
+
+  // 🔥 KOORDINAT BUTTON "CONFIRM ACCESS"
+  // Dari Captain: 150, 318, 472, 399
+  static const List<double> _buttonCoords = [150, 318, 472, 399];
 
   static const double _imageWidth = 626.0;
   static const double _imageHeight = 471.0;
@@ -58,6 +59,21 @@ class _CryptexLockState extends State<CryptexLock> {
 
   List<int> get _currentCode {
     return _scrollControllers.map((c) => c.selectedItem % 10).toList();
+  }
+
+  // Fungsi Unlock
+  void _attemptUnlock() {
+    HapticFeedback.heavyImpact();
+    print("ATTEMPTING UNLOCK: $_currentCode");
+
+    // Demo Logic
+    if (_currentCode.join() == "00009") {
+      print("✅ UNLOCKED!");
+      widget.onSuccess?.call();
+    } else {
+      print("❌ WRONG CODE");
+      widget.onFail?.call();
+    }
   }
 
   @override
@@ -83,7 +99,7 @@ class _CryptexLockState extends State<CryptexLock> {
               const SizedBox(height: 60),
 
               // ==================================================
-              // 🔥 Z-WHEEL SYSTEM (PIXEL PERFECT v2.0) 🔥
+              // 🔥 Z-WHEEL SYSTEM (WHEELS + BUTTON OVERLAY) 🔥
               // ==================================================
               Container(
                 width: double.infinity,
@@ -93,7 +109,7 @@ class _CryptexLockState extends State<CryptexLock> {
                   builder: (context, constraints) {
                     double screenWidth = constraints.maxWidth;
                     
-                    // 🎯 KIRA ASPECT RATIO SUPAYA GAMBAR TAK DISTORT
+                    // 🎯 KIRA ASPECT RATIO
                     double aspectRatio = _imageWidth / _imageHeight;
                     double imageHeight = screenWidth / aspectRatio;
                     
@@ -102,7 +118,7 @@ class _CryptexLockState extends State<CryptexLock> {
                       height: imageHeight,
                       child: Stack(
                         children: [
-                          // LAYER 1: GAMBAR Z-WHEEL
+                          // LAYER 1: GAMBAR Z-WHEEL (BASE)
                           Positioned.fill(
                             child: Image.asset(
                               'assets/z_wheel.png',
@@ -112,47 +128,13 @@ class _CryptexLockState extends State<CryptexLock> {
 
                           // LAYER 2: RODA OVERLAY (5 WHEELS)
                           ..._buildWheelOverlays(screenWidth, imageHeight),
+
+                          // LAYER 3: PHANTOM BUTTON (KOTAK MERAH TEST)
+                          _buildPhantomButton(screenWidth, imageHeight),
                         ],
                       ),
                     );
                   },
-                ),
-              ),
-
-              const SizedBox(height: 80),
-
-              // TOMBOL UNLOCK
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40),
-                width: double.infinity,
-                height: 60,
-                child: ElevatedButton(
-                  onPressed: () {
-                    HapticFeedback.heavyImpact();
-                    // widget.controller?.verify(_currentCode);
-                    print("CODE: $_currentCode");
-                    
-                    // Demo: Check kalau kod betul
-                    if (_currentCode.join() == "00009") {
-                      print("✅ UNLOCKED!");
-                      widget.onSuccess?.call();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryOrange,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    shadowColor: _primaryOrange.withOpacity(0.5),
-                    elevation: 10,
-                  ),
-                  child: const Text(
-                    "UNLOCK SYSTEM",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 2.0,
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -162,28 +144,68 @@ class _CryptexLockState extends State<CryptexLock> {
     );
   }
 
-  // 🔥 BUILD SEMUA 5 RODA DENGAN POSITIONED YANG TEPAT
+  // 🔥 BUILD BUTTON HANTU
+  Widget _buildPhantomButton(double screenWidth, double screenHeight) {
+    double left = _buttonCoords[0];
+    double top = _buttonCoords[1];
+    double right = _buttonCoords[2];
+    double bottom = _buttonCoords[3];
+
+    // Convert ke Pixel Skrin Semasa
+    double actualLeft = screenWidth * (left / _imageWidth);
+    double actualTop = screenHeight * (top / _imageHeight);
+    double actualWidth = screenWidth * ((right - left) / _imageWidth);
+    double actualHeight = screenHeight * ((bottom - top) / _imageHeight);
+
+    return Positioned(
+      left: actualLeft,
+      top: actualTop,
+      width: actualWidth,
+      height: actualHeight,
+      child: Material(
+        color: Colors.transparent, // Material mesti transparent
+        child: InkWell(
+          onTap: _attemptUnlock, // Panggil fungsi unlock bila tekan kotak ni
+          splashColor: Colors.white.withOpacity(0.3), // Efek kilat bila tekan
+          borderRadius: BorderRadius.circular(10), // Curve sikit bucu effect
+          
+          // 🔥 CONTAINER VISUAL UNTUK TESTING (KOTAK MERAH)
+          child: Container(
+            decoration: BoxDecoration(
+              // Nanti kita buang border ni bila Captain kata LULUS
+              border: Border.all(color: Colors.redAccent, width: 3), 
+              color: Colors.red.withOpacity(0.2), // Isi merah pudar sikit
+            ),
+            child: const Center(
+              child: Text(
+                "TAP HERE",
+                style: TextStyle(
+                  color: Colors.white, 
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🔥 BUILD SEMUA 5 RODA
   List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight) {
     List<Widget> wheels = [];
     
     for (int i = 0; i < 5; i++) {
-      // Ambil koordinat asal (dalam pixel)
       double left = _wheelCoords[i][0];
       double top = _wheelCoords[i][1];
       double right = _wheelCoords[i][2];
       double bottom = _wheelCoords[i][3];
       
-      // 🎯 CONVERT PIXEL → PERATUS (%)
-      double leftPct = left / _imageWidth;
-      double topPct = top / _imageHeight;
-      double widthPct = (right - left) / _imageWidth;
-      double heightPct = (bottom - top) / _imageHeight;
-      
-      // 🎯 CONVERT PERATUS → PIXEL SKRIN SEMASA
-      double actualLeft = screenWidth * leftPct;
-      double actualTop = screenHeight * topPct;
-      double actualWidth = screenWidth * widthPct;
-      double actualHeight = screenHeight * heightPct;
+      double actualLeft = screenWidth * (left / _imageWidth);
+      double actualTop = screenHeight * (top / _imageHeight);
+      double actualWidth = screenWidth * ((right - left) / _imageWidth);
+      double actualHeight = screenHeight * ((bottom - top) / _imageHeight);
       
       wheels.add(
         Positioned(
@@ -195,20 +217,18 @@ class _CryptexLockState extends State<CryptexLock> {
         ),
       );
     }
-    
     return wheels;
   }
 
   // WIDGET SATU RODA
   Widget _buildWheel(int index, double wheelHeight) {
-    // 🎯 ITEM EXTENT = 35% DARI TINGGI RODA (BOLEH ADJUST)
     double itemExtent = wheelHeight * 0.40;
     
     return ListWheelScrollView.useDelegate(
       controller: _scrollControllers[index],
       itemExtent: itemExtent,
-      perspective: 0.003,        // Kurangkan sikit untuk effect lebih flat
-      diameterRatio: 1.5,        // Adjust curve
+      perspective: 0.003,
+      diameterRatio: 1.5,
       physics: const FixedExtentScrollPhysics(),
       
       onSelectedItemChanged: (_) {
@@ -222,23 +242,13 @@ class _CryptexLockState extends State<CryptexLock> {
             child: Text(
               '${i % 10}',
               style: TextStyle(
-                fontSize: wheelHeight * 0.30,  // Font size 30% dari tinggi roda
+                fontSize: wheelHeight * 0.30,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
                 height: 1.0,
-                
-                // Efek Ukiran
                 shadows: [
-                  Shadow(
-                    offset: const Offset(2, 2),
-                    blurRadius: 4,
-                    color: Colors.black.withOpacity(0.8),
-                  ),
-                  Shadow(
-                    offset: const Offset(-1, -1),
-                    blurRadius: 2,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
+                  Shadow(offset: const Offset(2, 2), blurRadius: 4, color: Colors.black.withOpacity(0.8)),
+                  Shadow(offset: const Offset(-1, -1), blurRadius: 2, color: Colors.white.withOpacity(0.3)),
                 ],
               ),
             ),
