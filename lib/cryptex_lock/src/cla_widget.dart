@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-import 'src/cla_controller_v2.dart';
-import 'src/cla_models.dart';
-import 'src/matrix_rain_painter.dart';
-import 'src/forensic_data_painter.dart';
+import 'cla_controller_v2.dart';
+import 'cla_models.dart';
+import 'matrix_rain_painter.dart';
+import 'forensic_data_painter.dart';
 
 // ============================================
 // 🔥 CRYPTEX LOCK ULTIMATE V16.0
