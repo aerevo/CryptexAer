@@ -8,8 +8,8 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 CRYPTEX LOCK PROFESSIONAL 
-// Clean, Polished, Enterprise-Grade UI
+// 🔥 CRYPTEX LOCK PROFESSIONAL V17.1
+// Full-Screen Confirmation + Compact Success
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -58,13 +58,14 @@ class TutorialOverlay extends StatelessWidget {
   }
 }
 
-// 🔥 PROFESSIONAL CONFIRMATION DIALOG (SCREEN-IN-SCREEN)
+// 🔥 FULL-SCREEN CONFIRMATION DIALOG (BEFORE VERIFY)
 class SecurityConfirmationDialog extends StatelessWidget {
   final String title;
   final String message;
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
   final Color accentColor;
+  final List<int> currentCode;
 
   const SecurityConfirmationDialog({
     super.key,
@@ -73,17 +74,20 @@ class SecurityConfirmationDialog extends StatelessWidget {
     required this.onConfirm,
     required this.onCancel,
     required this.accentColor,
+    required this.currentCode,
   });
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       child: Container(
-        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.3),
@@ -96,10 +100,10 @@ class SecurityConfirmationDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ICON HEADER
+            // ICON HEADER (BIGGER)
             Container(
-              width: 64,
-              height: 64,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                 color: accentColor.withOpacity(0.1),
                 shape: BoxShape.circle,
@@ -107,39 +111,82 @@ class SecurityConfirmationDialog extends StatelessWidget {
               child: Icon(
                 Icons.verified_user,
                 color: accentColor,
-                size: 32,
+                size: 40,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            // TITLE
+            // TITLE (BIGGER)
             Text(
               title,
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF263238),
                 letterSpacing: 0.5,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
             // MESSAGE
             Text(
               message,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 15,
                 color: Colors.grey[700],
-                height: 1.5,
+                height: 1.6,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 32),
 
-            // APP INFO CARD (LIKE GOOGLE PLAY PROTECT)
+            // CODE DISPLAY
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: currentCode.map((digit) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 6),
+                    width: 48,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: accentColor.withOpacity(0.3), width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$digit',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: accentColor,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // APP INFO CARD
+            Container(
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(16),
@@ -147,16 +194,16 @@ class SecurityConfirmationDialog extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       color: accentColor,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Icon(
                       Icons.lock,
                       color: Colors.white,
-                      size: 24,
+                      size: 28,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -167,20 +214,20 @@ class SecurityConfirmationDialog extends StatelessWidget {
                         Text(
                           "Z-Kinetic Security",
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 17,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF263238),
                           ),
                         ),
-                        SizedBox(height: 4),
+                        SizedBox(height: 6),
                         Row(
                           children: [
-                            Icon(Icons.verified, color: Color(0xFF4CAF50), size: 16),
-                            SizedBox(width: 4),
+                            Icon(Icons.verified, color: Color(0xFF4CAF50), size: 18),
+                            SizedBox(width: 6),
                             Text(
-                              "Verified",
+                              "Verified & Secure",
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: Color(0xFF4CAF50),
                                 fontWeight: FontWeight.w500,
                               ),
@@ -193,14 +240,14 @@ class SecurityConfirmationDialog extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-            // BUTTONS
+            // BUTTONS (BIGGER)
             Column(
               children: [
                 SizedBox(
                   width: double.infinity,
-                  height: 50,
+                  height: 56,
                   child: ElevatedButton(
                     onPressed: onConfirm,
                     style: ElevatedButton.styleFrom(
@@ -208,35 +255,35 @@ class SecurityConfirmationDialog extends StatelessWidget {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     child: const Text(
                       "Confirm Access",
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
-                  height: 50,
+                  height: 56,
                   child: TextButton(
                     onPressed: onCancel,
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.grey[700],
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     child: const Text(
                       "Cancel",
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -245,6 +292,234 @@ class SecurityConfirmationDialog extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// 🔥 COMPACT SUCCESS DIALOG (AFTER SUCCESS)
+class CompactSuccessDialog extends StatefulWidget {
+  final String message;
+  final Color accentColor;
+
+  const CompactSuccessDialog({
+    super.key,
+    required this.message,
+    required this.accentColor,
+  });
+
+  @override
+  State<CompactSuccessDialog> createState() => _CompactSuccessDialogState();
+}
+
+class _CompactSuccessDialogState extends State<CompactSuccessDialog> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    
+    _scaleAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
+    );
+    
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeIn,
+    );
+    
+    _controller.forward();
+    
+    // Auto dismiss after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.accentColor.withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // SUCCESS ICON
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: widget.accentColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: widget.accentColor,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // MESSAGE
+                Text(
+                  widget.message,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF263238),
+                    letterSpacing: 0.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// 🔥 COMPACT FAIL DIALOG (AFTER FAIL)
+class CompactFailDialog extends StatefulWidget {
+  final String message;
+  final Color accentColor;
+
+  const CompactFailDialog({
+    super.key,
+    required this.message,
+    required this.accentColor,
+  });
+
+  @override
+  State<CompactFailDialog> createState() => _CompactFailDialogState();
+}
+
+class _CompactFailDialogState extends State<CompactFailDialog> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _shakeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    
+    _shakeAnimation = Tween<double>(begin: 0, end: 10).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticIn),
+    );
+    
+    _controller.forward();
+    
+    // Auto dismiss after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _shakeAnimation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(_shakeAnimation.value * ((_controller.value * 4).floor() % 2 == 0 ? 1 : -1), 0),
+          child: child,
+        );
+      },
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: widget.accentColor.withOpacity(0.3),
+                blurRadius: 20,
+                spreadRadius: 0,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // FAIL ICON
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: widget.accentColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.cancel,
+                  color: widget.accentColor,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // MESSAGE
+              Text(
+                widget.message,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF263238),
+                  letterSpacing: 0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -336,11 +611,36 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   void _handleControllerChange() {
     if (_isDisposed) return;
-    if (widget.controller.state == SecurityState.UNLOCKED) widget.onSuccess();
-    else if (widget.controller.state == SecurityState.HARD_LOCK) {
+    
+    if (widget.controller.state == SecurityState.UNLOCKED) {
+      // 🔥 SHOW COMPACT SUCCESS DIALOG
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (context) => CompactSuccessDialog(
+          message: "BERJAYA",
+          accentColor: _successGreen,
+        ),
+      );
+      widget.onSuccess();
+    } else if (widget.controller.state == SecurityState.SOFT_LOCK) {
+      // 🔥 SHOW COMPACT FAIL DIALOG
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder: (context) => CompactFailDialog(
+          message: "KOD SALAH",
+          accentColor: _accentRed,
+        ),
+      );
+      widget.onFail();
+    } else if (widget.controller.state == SecurityState.HARD_LOCK) {
       _startLockoutTimer();
       widget.onJammed();
     }
+    
     if (mounted) setState(() {});
   }
 
@@ -477,15 +777,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     }
   }
 
-  // 🔥 SHOW PROFESSIONAL CONFIRMATION DIALOG
+  // 🔥 SHOW FULL-SCREEN CONFIRMATION DIALOG
   void _showConfirmationDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => SecurityConfirmationDialog(
         title: "Verify Access",
-        message: "Are you sure you want to proceed with this security code?",
+        message: "Please confirm your security code to proceed with authentication.",
         accentColor: _primaryOrange,
+        currentCode: _currentCode,
         onConfirm: () async {
           Navigator.pop(context);
           HapticFeedback.mediumImpact();
@@ -568,7 +869,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                   if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
                   const SizedBox(height: 20),
 
-                  // SENSOR INDICATORS (MINIMAL)
+                  // SENSOR INDICATORS
                   _buildSensorRow(activeColor),
                 ],
               ),
@@ -606,7 +907,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: isDisabled ? null : _showConfirmationDialog, // 🔥 SHOW DIALOG
+          onTap: isDisabled ? null : _showConfirmationDialog,
           splashColor: Colors.white.withOpacity(0.1),
           highlightColor: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(10),
