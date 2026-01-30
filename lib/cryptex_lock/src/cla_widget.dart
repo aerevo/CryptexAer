@@ -273,18 +273,18 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   static const Color _accentRed = Color(0xFFD32F2F);
   static const Color _successGreen = Color(0xFF4CAF50);
 
-  static const double _imageWidth = 1080.0;
-  static const double _imageHeight = 610.0;
+  static const double _imageWidth = 720.0;
+  static const double _imageHeight = 407.0;
 
   final List<List<double>> _wheelCoords = [
-    [32, 111, 174, 483],
-    [242, 111, 384, 483],
-    [452, 111, 594, 483],
-    [662, 111, 804, 483],
-    [872, 111, 1014, 483],
+    [21, 74, 116, 322],
+    [161, 74, 256, 322],
+    [301, 74, 396, 322],
+    [441, 74, 536, 322],
+    [581, 74, 676, 322],
   ];
 
-  final List<double> _phantomButtonCoords = [478, 520, 570, 570];
+  final List<double> _phantomButtonCoords = [319, 347, 380, 380];
 
   @override
   void initState() {
@@ -318,7 +318,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       if (magnitude > 1.5) {
         double score = (magnitude / 10.0).clamp(0.0, 1.0);
         _motionScoreNotifier.value = (_motionScoreNotifier.value * 0.85 + score * 0.15).clamp(0.0, 1.0);
-        widget.controller.updateMotion(score);
+        widget.controller.registerMotion(score);
       }
     });
     
@@ -326,7 +326,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
       if (magnitude > 10.0) {
         double score = ((magnitude - 9.8).abs() / 5.0).clamp(0.0, 1.0);
-        widget.controller.updateMotion(score);
+        widget.controller.registerMotion(score);
       }
     });
   }
@@ -337,7 +337,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       _onSuccess();
     } else if (widget.controller.state == SecurityState.HARD_LOCK) {
       _onJammed();
-    } else if (widget.controller.state == SecurityState.ATTEMPT_FAILED) {
+    } else if (widget.controller.state == SecurityState.FAILED) {
       _onFail();
     }
   }
@@ -400,7 +400,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _interactionTimeout?.cancel();
     _interactionTimeout = Timer(const Duration(milliseconds: 800), () {
       double score = widget.controller.touchScore.value;
-      widget.controller.updateTouch(score);
+      widget.controller.registerTouch(score);
     });
     
     _analyzeScrollPattern();
@@ -416,7 +416,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     
     double normalizedPattern = (totalDistance / 500.0).clamp(0.0, 1.0);
     setState(() => _patternScore = normalizedPattern);
-    widget.controller.updatePattern(normalizedPattern);
+    widget.controller.registerPattern(normalizedPattern);
   }
 
   List<int> _getCurrentCode() {
@@ -575,7 +575,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       double actualLeft = screenWidth * (left / _imageWidth);
       double actualTop = screenHeight * (top / _imageHeight);
       double actualWidth = screenWidth * ((right - left) / _imageWidth);
-      double actualHeight = screenWidth * ((bottom - top) / _imageHeight);
+      double actualHeight = screenHeight * ((bottom - top) / _imageHeight);
       
       wheels.add(
         Positioned(
