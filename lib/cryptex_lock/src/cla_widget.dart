@@ -11,6 +11,7 @@ import 'cla_models.dart';
 // 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
 // Complete rewrite with centered card layout
 // Phantom button integration
+// Full compatibility with ClaController V3.3
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -266,7 +267,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   StreamSubscription<GyroscopeEvent>? _gyroSub;
 
   final ValueNotifier<double> _motionScoreNotifier = ValueNotifier(0.0);
-  final ValueNotifier<double> _touchScoreNotifier = ValueNotifier(0.0);
 
   double _patternScore = 0.0;
   int? _activeWheelIndex;
@@ -309,7 +309,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
 
-    widget.controller.state.addListener(_onStateChange);
+    widget.controller.addListener(_onControllerStateChange);
 
     _accelSub = accelerometerEventStream(samplingPeriod: const Duration(milliseconds: 100))
         .listen(_onAccelerometer);
@@ -329,35 +329,34 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _accelSub?.cancel();
     _gyroSub?.cancel();
     _wheelActiveTimer?.cancel();
-    widget.controller.state.removeListener(_onStateChange);
+    widget.controller.removeListener(_onControllerStateChange);
 
     for (var c in _scrollControllers) {
       c.dispose();
     }
 
     _motionScoreNotifier.dispose();
-    _touchScoreNotifier.dispose();
 
     super.dispose();
   }
 
-  void _onStateChange() {
+  void _onControllerStateChange() {
     if (!mounted || _isDisposed) return;
-    final state = widget.controller.state.value;
+    final state = widget.controller.state;
 
     if (state == SecurityState.UNLOCKED) {
       widget.onSuccess?.call();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const SuccessScreen(message: "Access Granted")),
       );
-    } else if (state == SecurityState.FAILED) {
+    } else if (state == SecurityState.LOCKED && widget.controller.failedAttempts > 0) {
       widget.onFail?.call();
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => CompactFailDialog(message: "INVALID CODE", accentColor: _accentRed),
       );
-    } else if (state == SecurityState.JAMMED) {
+    } else if (state == SecurityState.HARD_LOCK) {
       widget.onJammed?.call();
       showDialog(
         context: context,
@@ -372,20 +371,35 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
     double normalized = (magnitude / 20.0).clamp(0.0, 1.0);
     _motionScoreNotifier.value = normalized;
-    widget.controller.recordMotion(normalized);
+    
+    widget.controller.registerMotion(
+      event.x,
+      event.y,
+      event.z,
+      DateTime.now(),
+    );
   }
 
   void _onGyroscope(GyroscopeEvent event) {
     if (_isDisposed) return;
     double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-    double normalized = (magnitude / 5.0).clamp(0.0, 1.0);
-    widget.controller.recordMotion(normalized);
+    
+    widget.controller.registerMotion(
+      event.x,
+      event.y,
+      event.z,
+      DateTime.now(),
+    );
   }
 
-  void _userInteracted() {
-    double touchScore = Random().nextDouble() * 0.4 + 0.6;
-    _touchScoreNotifier.value = touchScore;
-    widget.controller.recordTouch(touchScore);
+  void _userInteracted(Offset position) {
+    double pressure = Random().nextDouble() * 0.4 + 0.6;
+    
+    widget.controller.registerTouch(
+      position,
+      pressure,
+      DateTime.now(),
+    );
   }
 
   void _analyzeScrollPattern() {
@@ -414,17 +428,18 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   void _handlePhantomButtonTap() {
     HapticFeedback.mediumImpact();
-    _userInteracted();
+    _userInteracted(const Offset(300, 350));
     List<int> code = _getCurrentCode();
     widget.controller.verify(code);
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<SecurityState>(
-      valueListenable: widget.controller.state,
-      builder: (context, state, _) {
-        Color activeColor = state == SecurityState.JAMMED ? _accentRed : _accentOrange;
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) {
+        final state = widget.controller.state;
+        Color activeColor = state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
 
         return Scaffold(
           backgroundColor: Colors.black,
@@ -473,7 +488,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                         _buildWheelSystem(activeColor, state),
                         const SizedBox(height: 20),
                         _buildSensorRow(activeColor),
-                        if (state == SecurityState.JAMMED) ...[
+                        if (state == SecurityState.HARD_LOCK) ...[
                           const SizedBox(height: 12),
                           _buildWarningBanner(),
                         ],
@@ -599,11 +614,11 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     double itemExtent = wheelHeight * 0.40;
     
     return GestureDetector(
-      onTapDown: (_) {
+      onTapDown: (details) {
         if (_isDisposed) return;
         setState(() => _activeWheelIndex = index);
         _wheelActiveTimer?.cancel();
-        _userInteracted();
+        _userInteracted(details.localPosition);
         HapticFeedback.selectionClick();
       },
       onTapUp: (_) => _resetActiveWheelTimer(),
@@ -697,7 +712,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
             builder: (context, val, _) => _buildMiniSensor("MOTION", val, color, Icons.sensors),
           ),
           ValueListenableBuilder<double>(
-            valueListenable: _touchScoreNotifier,
+            valueListenable: widget.controller.touchScore,
             builder: (context, val, _) => _buildMiniSensor("TOUCH", val, color, Icons.fingerprint),
           ),
           _buildMiniSensor("PATTERN", _patternScore, color, Icons.timeline),
