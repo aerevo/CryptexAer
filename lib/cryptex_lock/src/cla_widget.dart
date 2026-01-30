@@ -58,7 +58,7 @@ class TutorialOverlay extends StatelessWidget {
   }
 }
 
-// 🔥 FULL-SCREEN CONFIRMATION DIALOG (BEFORE VERIFY)
+// 🔥 STATIC SCREEN-IN-SCREEN DIALOG (GOOGLE PLAY PROTECT STYLE)
 class SecurityConfirmationDialog extends StatelessWidget {
   final String title;
   final String message;
@@ -79,226 +79,244 @@ class SecurityConfirmationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(32),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 40,
-              spreadRadius: 0,
-              offset: const Offset(0, 20),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ICON HEADER (BIGGER)
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.1),
-                shape: BoxShape.circle,
+    // STATIC DIALOG - BUKAN POPUP, TAPI SENTIASA ADA DI TENGAH SKRIN
+    return Container(
+      color: Colors.transparent, // Background tetap transparent supaya nampak roda
+      child: Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 60),
+          padding: const EdgeInsets.all(24),
+          constraints: const BoxConstraints(maxWidth: 400),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 30,
+                spreadRadius: 0,
+                offset: const Offset(0, 15),
               ),
-              child: Icon(
-                Icons.verified_user,
-                color: accentColor,
-                size: 40,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // TITLE (BIGGER)
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF263238),
-                letterSpacing: 0.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-
-            // MESSAGE
-            Text(
-              message,
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey[700],
-                height: 1.6,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-
-            // CODE DISPLAY
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Row(
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // HEADER ICON (MACAM GOOGLE PLAY PROTECT)
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: currentCode.map((digit) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                    width: 48,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: accentColor.withOpacity(0.3), width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accentColor.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        '$digit',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: accentColor,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // APP INFO CARD
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
                 children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: accentColor,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.lock,
-                      color: Colors.white,
-                      size: 28,
-                    ),
+                  Icon(
+                    Icons.verified_user_outlined,
+                    color: Colors.grey[700],
+                    size: 18,
                   ),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Z-Kinetic Security",
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF263238),
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(Icons.verified, color: Color(0xFF4CAF50), size: 18),
-                            SizedBox(width: 6),
-                            Text(
-                              "Verified & Secure",
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF4CAF50),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                  const SizedBox(width: 8),
+                  Text(
+                    'Security Protect',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 32),
+              const SizedBox(height: 20),
 
-            // BUTTONS (BIGGER)
-            Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: onConfirm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentColor,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+              // TITLE (MACAM "This app looks safe")
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+
+              // APP INFO CARD (MACAM GOOGLE PLAY PROTECT)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    // App Icon
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.lock,
+                        color: Colors.white,
+                        size: 26,
                       ),
                     ),
-                    child: const Text(
-                      "Confirm Access",
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
+                    const SizedBox(width: 12),
+                    // App Name & Verified
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "zkinetic",
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
+                              SizedBox(width: 4),
+                              Text(
+                                "Verified",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF4CAF50),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // CODE DISPLAY (SMALLER & COMPACT)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: currentCode.map((digit) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: 36,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: accentColor.withOpacity(0.3), width: 1.5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$digit',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: accentColor,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // CHECK ICON (MACAM GOOGLE PLAY PROTECT)
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.grey[400]!,
+                    width: 2.5,
+                  ),
+                ),
+                child: Icon(
+                  Icons.check,
+                  color: Colors.grey[400],
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // SUBTITLE
+              Text(
+                'You can continue to access',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // ACCESS BUTTON (MACAM GOOGLE PLAY PROTECT)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onConfirm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD6E8F7),
+                    foregroundColor: Colors.black87,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Access',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: TextButton(
-                    onPressed: onCancel,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey[700],
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+              ),
+              const SizedBox(height: 10),
+
+              // CANCEL BUTTON
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: onCancel,
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFFD6E8F7),
+                    foregroundColor: Colors.black87,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
-                      "Cancel",
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  ),
+                  child: const Text(
+                    "Don't access",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// 🔥 COMPACT SUCCESS DIALOG (AFTER SUCCESS)
+// 🔥 BERJAYA SUCCESS DIALOG (AFTER SUCCESS)
 class CompactSuccessDialog extends StatefulWidget {
   final String message;
   final Color accentColor;
@@ -322,7 +340,7 @@ class _CompactSuccessDialogState extends State<CompactSuccessDialog> with Single
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     
@@ -338,8 +356,8 @@ class _CompactSuccessDialogState extends State<CompactSuccessDialog> with Single
     
     _controller.forward();
     
-    // Auto dismiss after 2 seconds
-    Future.delayed(const Duration(seconds: 2), () {
+    // Auto dismiss after 2.5 seconds
+    Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -362,46 +380,60 @@ class _CompactSuccessDialogState extends State<CompactSuccessDialog> with Single
           backgroundColor: Colors.transparent,
           elevation: 0,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(32),
               boxShadow: [
                 BoxShadow(
-                  color: widget.accentColor.withOpacity(0.3),
-                  blurRadius: 20,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 10),
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 30,
+                  offset: const Offset(0, 15),
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // SUCCESS ICON
+                // SUCCESS ICON (BIGGER & GREEN)
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 100,
+                  height: 100,
                   decoration: BoxDecoration(
-                    color: widget.accentColor.withOpacity(0.1),
+                    color: const Color(0xFF4CAF50).withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.check_circle,
-                    color: widget.accentColor,
-                    size: 36,
+                    color: Color(0xFF4CAF50),
+                    size: 60,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
+                // BERJAYA TEXT (SAIZ BESAR & MUAT)
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'BERJAYA!',
+                    style: TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.green[700],
+                      letterSpacing: 2,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 
-                // MESSAGE
+                // SUBTITLE
                 Text(
                   widget.message,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF263238),
-                    letterSpacing: 0.5,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -441,13 +473,12 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
       vsync: this,
     );
     
-    _shakeAnimation = Tween<double>(begin: 0, end: 10).animate(
+    _shakeAnimation = Tween<double>(begin: -10, end: 10).animate(
       CurvedAnimation(parent: _controller, curve: Curves.elasticIn),
     );
     
-    _controller.forward();
+    _controller.repeat(reverse: true);
     
-    // Auto dismiss after 2 seconds
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         Navigator.of(context).pop();
@@ -465,60 +496,54 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _shakeAnimation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(_shakeAnimation.value * ((_controller.value * 4).floor() % 2 == 0 ? 1 : -1), 0),
-          child: child,
-        );
-      },
-      child: Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: widget.accentColor.withOpacity(0.3),
-                blurRadius: 20,
-                spreadRadius: 0,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // FAIL ICON
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: widget.accentColor.withOpacity(0.1),
-                  shape: BoxShape.circle,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(_shakeAnimation.value, 0),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.accentColor.withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 10),
                 ),
-                child: Icon(
-                  Icons.cancel,
-                  color: widget.accentColor,
-                  size: 36,
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: widget.accentColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.cancel,
+                    color: widget.accentColor,
+                    size: 36,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              
-              // MESSAGE
-              Text(
-                widget.message,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF263238),
-                  letterSpacing: 0.5,
+                const SizedBox(height: 16),
+                Text(
+                  widget.message,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF263238),
+                    letterSpacing: 0.5,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -526,19 +551,11 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
+// 🔥 MAIN WIDGET
 class CryptexLock extends StatefulWidget {
-  final ClaController controller;
-  final VoidCallback onSuccess;
-  final VoidCallback onFail;
-  final VoidCallback onJammed;
+  final SecurityController controller;
 
-  const CryptexLock({
-    super.key,
-    required this.controller,
-    required this.onSuccess,
-    required this.onFail,
-    required this.onJammed,
-  });
+  const CryptexLock({super.key, required this.controller});
 
   @override
   State<CryptexLock> createState() => _CryptexLockState();
@@ -572,6 +589,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   double _patternScore = 0.0;
   bool _showTutorial = true;
+  bool _showStaticDialog = false; // 🔥 TRACK STATIC DIALOG
   Timer? _tutorialHideTimer;
   Timer? _touchDecayTimer;
 
@@ -617,188 +635,191 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       showDialog(
         context: context,
         barrierDismissible: false,
-        barrierColor: Colors.black.withOpacity(0.5),
         builder: (context) => CompactSuccessDialog(
-          message: "BERJAYA",
+          message: "Access Granted Successfully",
           accentColor: _successGreen,
         ),
       );
-      widget.onSuccess();
-    } else if (widget.controller.state == SecurityState.SOFT_LOCK) {
-      // 🔥 SHOW COMPACT FAIL DIALOG
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        barrierColor: Colors.black.withOpacity(0.5),
-        builder: (context) => CompactFailDialog(
-          message: "KOD SALAH",
-          accentColor: _accentRed,
-        ),
-      );
-      widget.onFail();
-    } else if (widget.controller.state == SecurityState.HARD_LOCK) {
-      _startLockoutTimer();
-      widget.onJammed();
+    } else if (widget.controller.state == SecurityState.SOFT_LOCK || widget.controller.state == SecurityState.HARD_LOCK) {
+      // 🔥 SHOW FAIL DIALOG
+      if (widget.controller.threatMessage.isNotEmpty) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => CompactFailDialog(
+            message: widget.controller.threatMessage,
+            accentColor: _accentRed,
+          ),
+        );
+      }
+      
+      if (widget.controller.state == SecurityState.HARD_LOCK) {
+        _lockoutTimer = Timer(Duration(seconds: widget.controller.lockoutSeconds), () {
+          if (mounted) {
+            widget.controller.resetLockout();
+            _randomizeAllWheels();
+          }
+        });
+      }
     }
     
-    if (mounted) setState(() {});
+    if (mounted && !_isDisposed) setState(() {});
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _startListening();
-    else if (state == AppLifecycleState.paused) _accelSub?.cancel();
+  void _onRandomizeTrigger() {
+    if (widget.controller.shouldRandomizeWheels.value) {
+      _randomizeAllWheels();
+      widget.controller.shouldRandomizeWheels.value = false;
+    }
   }
 
   void _initScrollControllers() {
-    _scrollControllers = List.generate(5, (i) => FixedExtentScrollController(initialItem: 0));
-  }
-
-  void _userInteracted() {
-    if (_showTutorial) {
-      if (mounted && !_isDisposed) setState(() => _showTutorial = false);
-      _tutorialHideTimer?.cancel();
-    }
-    _triggerTouchActive();
+    _scrollControllers = List.generate(
+      5,
+      (i) => FixedExtentScrollController(initialItem: 0),
+    );
   }
 
   void _startListening() {
-    _accelSub?.cancel();
-    _accelSub = userAccelerometerEvents.listen((e) {
+    _accelSub = userAccelerometerEventStream(samplingPeriod: const Duration(milliseconds: 100)).listen((event) {
       if (_isDisposed) return;
-      double delta = (e.x - _lastX).abs() + (e.y - _lastY).abs() + (e.z - _lastZ).abs();
-      _lastX = e.x; _lastY = e.y; _lastZ = e.z;
-      double amplifiedMotion = (delta * 10.0).clamp(0.0, 1.0);
-      if (amplifiedMotion > 0.5) _userInteracted();
-      widget.controller.registerMotion(e.x, e.y, e.z, DateTime.now());
-      double currentScore = _motionScoreNotifier.value;
-      if (amplifiedMotion > currentScore) {
-        _motionScoreNotifier.value = amplifiedMotion;
-      } else {
-        _motionScoreNotifier.value = (currentScore * 0.92);
+      
+      double deltaX = (event.x - _lastX).abs();
+      double deltaY = (event.y - _lastY).abs();
+      double deltaZ = (event.z - _lastZ).abs();
+      double totalMotion = deltaX + deltaY + deltaZ;
+      
+      if (totalMotion > 0.5) {
+        _userInteracted();
+        double clampedMotion = (totalMotion / 15.0).clamp(0.0, 1.0);
+        _motionScoreNotifier.value = clampedMotion;
+        widget.controller.registerMotion(totalMotion, DateTime.now());
+        
+        _touchDecayTimer?.cancel();
+        _touchDecayTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted && !_isDisposed) _motionScoreNotifier.value = 0.0;
+        });
       }
+      
+      _lastX = event.x;
+      _lastY = event.y;
+      _lastZ = event.z;
     });
   }
 
-  void _startLockoutTimer() {
-    _lockoutTimer?.cancel();
-    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted || _isDisposed) {
-        timer.cancel();
-        return;
-      }
-      if (widget.controller.state == SecurityState.HARD_LOCK) {
-        setState(() {});
-        if (widget.controller.state != SecurityState.HARD_LOCK) timer.cancel();
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  void _triggerTouchActive() {
+  void _userInteracted() {
     if (_isDisposed) return;
-    _touchScoreNotifier.value = 1.0;
-    setState(() => _patternScore = 1.0);
-    _touchDecayTimer?.cancel();
-    _touchDecayTimer = Timer(const Duration(seconds: 3), () {});
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (!mounted || _isDisposed) return;
-      _decayTouch();
-    });
-  }
-
-  void _decayTouch() {
-    if (!mounted || _isDisposed) return;
-    if (_touchScoreNotifier.value > 0) {
-      _touchScoreNotifier.value -= 0.05;
-      if (_touchScoreNotifier.value < 0) _touchScoreNotifier.value = 0;
-      Future.delayed(const Duration(milliseconds: 50), () {
-        if (!mounted || _isDisposed) return;
-        _decayTouch();
-      });
+    widget.controller.onInteractionStart();
+    if (_showTutorial && mounted && !_isDisposed) {
+      setState(() => _showTutorial = false);
+      _tutorialHideTimer?.cancel();
     }
   }
 
   void _analyzeScrollPattern() {
-    _userInteracted();
-    final now = DateTime.now();
-    double speed = _lastScrollTime != null ? 1000.0 / now.difference(_lastScrollTime!).inMilliseconds : 0.0;
-    _lastScrollTime = now;
-    _touchData.add({'timestamp': now, 'speed': speed, 'pressure': 0.5, 'wheelIndex': _activeWheelIndex ?? 0});
-    if (_touchData.length > 20) _touchData.removeAt(0);
-  }
-
-  void _onRandomizeTrigger() {
-    if (!mounted || _isDisposed) return;
-    _randomizeWheels();
-  }
-
-  void _randomizeWheels() {
     if (_isDisposed) return;
-    final random = Random();
-    for (int i = 0; i < _scrollControllers.length; i++) {
-      final randomValue = random.nextInt(10);
-      _scrollControllers[i].animateToItem(
-        randomValue,
-        duration: Duration(milliseconds: 500 + random.nextInt(300)),
-        curve: Curves.easeOutBack,
-      );
+    
+    final now = DateTime.now();
+    if (_lastScrollTime != null) {
+      final delta = now.difference(_lastScrollTime!).inMilliseconds;
+      if (delta > 50 && delta < 500) {
+        _patternScore = ((500 - delta) / 500).clamp(0.0, 1.0);
+        widget.controller.registerPattern(_patternScore, now);
+      }
     }
-    HapticFeedback.heavyImpact();
+    _lastScrollTime = now;
+    
+    if (_activeWheelIndex != null) {
+      double pressure = 0.8;
+      _touchScoreNotifier.value = pressure;
+      widget.controller.registerTouch(Offset.zero, pressure, now);
+      
+      _touchDecayTimer?.cancel();
+      _touchDecayTimer = Timer(const Duration(milliseconds: 1500), () {
+        if (mounted && !_isDisposed) _touchScoreNotifier.value = 0.0;
+      });
+    }
+    
+    if (mounted && !_isDisposed) setState(() {});
+  }
+
+  void _randomizeAllWheels() {
+    if (_isDisposed) return;
+    final r = Random();
+    for (var controller in _scrollControllers) {
+      if (controller.hasClients) {
+        controller.jumpToItem(r.nextInt(10) + (r.nextInt(10) * 10));
+      }
+    }
+    if (mounted && !_isDisposed) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      widget.controller.onInteractionStop();
+    } else if (state == AppLifecycleState.resumed) {
+      widget.controller.onInteractionStart();
+    }
   }
 
   @override
   void dispose() {
     _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
-    widget.controller.removeListener(_handleControllerChange);
-    widget.controller.shouldRandomizeWheels.removeListener(_onRandomizeTrigger);
     _accelSub?.cancel();
     _lockoutTimer?.cancel();
+    _tutorialHideTimer?.cancel();
     _wheelActiveTimer?.cancel();
     _touchDecayTimer?.cancel();
-    _tutorialHideTimer?.cancel();
     _scanController.dispose();
-    for (var c in _scrollControllers) c.dispose();
-    _motionScoreNotifier.dispose();
-    _touchScoreNotifier.dispose();
+    widget.controller.removeListener(_handleControllerChange);
+    widget.controller.shouldRandomizeWheels.removeListener(_onRandomizeTrigger);
+    for (var c in _scrollControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   String _getStatusLabel(SecurityState state) {
     switch (state) {
-      case SecurityState.LOCKED: return "SECURE ACCESS";
-      case SecurityState.VALIDATING: return "VALIDATING...";
-      case SecurityState.SOFT_LOCK: return "ACCESS DENIED";
-      case SecurityState.HARD_LOCK: return "SYSTEM LOCKED";
-      case SecurityState.UNLOCKED: return "ACCESS GRANTED";
-      default: return "INITIALIZING...";
+      case SecurityState.LOCKED:
+        return "Z-KINETIC";
+      case SecurityState.VALIDATING:
+        return "VALIDATING...";
+      case SecurityState.UNLOCKED:
+        return "UNLOCKED";
+      case SecurityState.SOFT_LOCK:
+        return "SOFT LOCK";
+      case SecurityState.HARD_LOCK:
+        return "HARD LOCK";
     }
   }
 
-  // 🔥 SHOW FULL-SCREEN CONFIRMATION DIALOG
+  // 🔥 SHOW STATIC CONFIRMATION DIALOG
   void _showConfirmationDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => SecurityConfirmationDialog(
-        title: "Verify Access",
-        message: "Please confirm your security code to proceed with authentication.",
-        accentColor: _primaryOrange,
-        currentCode: _currentCode,
-        onConfirm: () async {
-          Navigator.pop(context);
-          HapticFeedback.mediumImpact();
-          _userInteracted();
-          await widget.controller.verify(_currentCode);
-        },
-        onCancel: () {
-          Navigator.pop(context);
-          HapticFeedback.lightImpact();
-        },
-      ),
-    );
+    setState(() {
+      _showStaticDialog = true;
+    });
+    _userInteracted();
+  }
+
+  // 🔥 HANDLE CONFIRM ACCESS FROM STATIC DIALOG
+  void _handleConfirmAccess() async {
+    setState(() {
+      _showStaticDialog = false;
+    });
+    HapticFeedback.mediumImpact();
+    _userInteracted();
+    await widget.controller.verify(_currentCode);
+  }
+
+  // 🔥 HANDLE CANCEL FROM STATIC DIALOG
+  void _handleCancelAccess() {
+    setState(() {
+      _showStaticDialog = false;
+    });
+    HapticFeedback.lightImpact();
   }
 
   @override
@@ -881,6 +902,18 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
               color: activeColor,
             ),
           ),
+          // 🔥 STATIC CONFIRMATION DIALOG OVERLAY (GOOGLE PLAY PROTECT STYLE)
+          if (_showStaticDialog)
+            Positioned.fill(
+              child: SecurityConfirmationDialog(
+                title: "This app looks safe",
+                message: "Verify your security code",
+                accentColor: _primaryOrange,
+                currentCode: _currentCode,
+                onConfirm: _handleConfirmAccess,
+                onCancel: _handleCancelAccess,
+              ),
+            ),
         ],
       ),
     );
