@@ -416,7 +416,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     widget.controller.verify(code);
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.controller,
@@ -426,74 +426,77 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
         return Scaffold(
           backgroundColor: Colors.black,
-          // ✅ FIX: Masukkan SingleChildScrollView supaya TAK CRASH (Black Screen)
-          // ✅ FIX: Set NeverScrollable supaya RODA BOLEH PUSING (No conflict)
-          body: Center(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(), // PAGE STATIK, RODA PUSING
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  
-                  const SizedBox(height: 50),
+          // ✅ FIX 1: Guna SizedBox.expand untuk paksa ambil 100% saiz skrin
+          body: SizedBox.expand(
+            child: Center(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(), // Kunci skrol
+                child: Column(
+                  // ✅ FIX 2: Pastikan Column duduk tengah
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.max, // Paksa maksimum
+                  children: [
+                    
+                    const SizedBox(height: 50),
 
-                  // ✅ CONTAINER (BONE WHITE)
-                  Container(
-                    width: MediaQuery.of(context).size.width * 0.96,
-                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECEFF1), // Bone White
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.black12, width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black87,
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // LOGO (DALAM CONTAINER)
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.security,
-                              color: const Color(0xFFFF6F00),
-                              size: 42,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Z-KINETIC",
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                color: Color(0xFFFF6F00),
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 3,
-                                fontSize: 18,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 35),
-                        _buildWheelSystem(activeColor, state),
-                        const SizedBox(height: 20),
-                        _buildSensorRow(activeColor),
-                        
-                        if (state == SecurityState.HARD_LOCK) ...[
-                          const SizedBox(height: 12),
-                          _buildWarningBanner(),
+                    // ✅ CONTAINER (BONE WHITE)
+                    Container(
+                      width: MediaQuery.of(context).size.width * 0.96,
+                      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECEFF1), // Bone White
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.black12, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black87,
+                            blurRadius: 30,
+                            spreadRadius: 5,
+                            offset: const Offset(0, 10),
+                          ),
                         ],
-                      ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // LOGO (DALAM CONTAINER)
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.security,
+                                color: const Color(0xFFFF6F00),
+                                size: 42,
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                "Z-KINETIC",
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  color: Color(0xFFFF6F00),
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 3,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 35),
+                          _buildWheelSystem(activeColor, state),
+                          const SizedBox(height: 20),
+                          _buildSensorRow(activeColor),
+                          
+                          if (state == SecurityState.HARD_LOCK) ...[
+                            const SizedBox(height: 12),
+                            _buildWarningBanner(),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
