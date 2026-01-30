@@ -8,7 +8,7 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 CRYPTEX LOCK WITH GOOGLE PLAY PROTECT STYLE FRAME
+// 🔥 CRYPTEX LOCK WITH Z-KINETIC CORE STYLE FRAME
 // Main Screen: Interactive with frame design
 // Success Screen: BERJAYA with fitted text
 // ============================================
@@ -241,7 +241,7 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// 🔥 MAIN WIDGET WITH GOOGLE PLAY PROTECT FRAME
+// 🔥 MAIN WIDGET WITH Z-KINETIC CORE FRAME
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -288,7 +288,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   double _patternScore = 0.0;
   bool _showTutorial = true;
-  bool _showSuccessScreen = false; // 🔥 TRACK SUCCESS SCREEN
+  bool _showSuccessScreen = false;
   Timer? _tutorialHideTimer;
   Timer? _touchDecayTimer;
 
@@ -299,8 +299,8 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   late AnimationController _scanController;
   bool _isDisposed = false;
 
-  // Colors
-  final Color _primaryOrange = const Color(0xFFFF5722);
+  // Colors - WARNA OREN UNTUK Z-KINETIC!
+  final Color _primaryOrange = const Color(0xFFFF6F00); // WARNA OREN
   final Color _accentRed = const Color(0xFFD32F2F);
   final Color _successGreen = const Color(0xFF4CAF50);
 
@@ -330,15 +330,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     if (_isDisposed) return;
     
     if (widget.controller.state == SecurityState.UNLOCKED) {
-      // 🔥 SHOW SUCCESS SCREEN
       setState(() {
         _showSuccessScreen = true;
       });
       
-      // Call onSuccess callback
       widget.onSuccess?.call();
       
-      // Auto hide after 3 seconds
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted && !_isDisposed) {
           setState(() {
@@ -347,7 +344,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         }
       });
     } else if (widget.controller.state == SecurityState.SOFT_LOCK || widget.controller.state == SecurityState.HARD_LOCK) {
-      // 🔥 SHOW FAIL DIALOG
       if (widget.controller.threatMessage.isNotEmpty) {
         showDialog(
           context: context,
@@ -359,16 +355,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         );
       }
       
-      // Call appropriate callback
       if (widget.controller.state == SecurityState.SOFT_LOCK) {
         widget.onFail?.call();
       } else if (widget.controller.state == SecurityState.HARD_LOCK) {
         widget.onJammed?.call();
         
-        // Auto reset after 30 seconds (hard-coded since lockoutSeconds might not exist)
         _lockoutTimer = Timer(const Duration(seconds: 30), () {
           if (mounted) {
-            // Just randomize wheels instead of resetLockout
             _randomizeAllWheels();
           }
         });
@@ -405,7 +398,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         _userInteracted();
         double clampedMotion = (totalMotion / 15.0).clamp(0.0, 1.0);
         _motionScoreNotifier.value = clampedMotion;
-        // widget.controller.registerMotion(totalMotion, DateTime.now()); // Removed - method signature mismatch
         
         _touchDecayTimer?.cancel();
         _touchDecayTimer = Timer(const Duration(seconds: 2), () {
@@ -436,7 +428,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
       final delta = now.difference(_lastScrollTime!).inMilliseconds;
       if (delta > 50 && delta < 500) {
         _patternScore = ((500 - delta) / 500).clamp(0.0, 1.0);
-        // widget.controller.registerPattern(_patternScore, now); // Removed - method doesn't exist
       }
     }
     _lastScrollTime = now;
@@ -444,7 +435,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     if (_activeWheelIndex != null) {
       double pressure = 0.8;
       _touchScoreNotifier.value = pressure;
-      // widget.controller.registerTouch(Offset.zero, pressure, now); // Removed - might not exist
       
       _touchDecayTimer?.cancel();
       _touchDecayTimer = Timer(const Duration(milliseconds: 1500), () {
@@ -469,9 +459,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      // widget.controller.onInteractionStop(); // Removed - method doesn't exist
+      _accelSub?.pause();
     } else if (state == AppLifecycleState.resumed) {
-      widget.controller.onInteractionStart();
+      _accelSub?.resume();
     }
   }
 
@@ -481,173 +471,67 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     WidgetsBinding.instance.removeObserver(this);
     _accelSub?.cancel();
     _lockoutTimer?.cancel();
-    _tutorialHideTimer?.cancel();
     _wheelActiveTimer?.cancel();
+    _tutorialHideTimer?.cancel();
     _touchDecayTimer?.cancel();
-    _scanController.dispose();
-    widget.controller.removeListener(_handleControllerChange);
-    widget.controller.shouldRandomizeWheels.removeListener(_onRandomizeTrigger);
     for (var c in _scrollControllers) {
       c.dispose();
     }
+    _scanController.dispose();
+    _motionScoreNotifier.dispose();
+    _touchScoreNotifier.dispose();
     super.dispose();
   }
 
-  String _getStatusLabel(SecurityState state) {
-    switch (state) {
-      case SecurityState.LOCKED:
-        return "Z-KINETIC";
-      case SecurityState.VALIDATING:
-        return "VALIDATING...";
-      case SecurityState.UNLOCKED:
-        return "UNLOCKED";
-      case SecurityState.SOFT_LOCK:
-        return "SOFT LOCK";
-      case SecurityState.HARD_LOCK:
-        return "HARD LOCK";
-    }
-  }
-
-  // 🔥 HANDLE ACCESS BUTTON
-  void _handleAccessButton() async {
-    HapticFeedback.mediumImpact();
+  void _handleAccessButton() {
     _userInteracted();
-    await widget.controller.verify(_currentCode);
+    HapticFeedback.mediumImpact();
+    widget.controller.attemptUnlock();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isDisposed) return const SizedBox.shrink();
-    
-    // 🔥 KALAU SUCCESS, TUNJUK SUCCESS SCREEN
     if (_showSuccessScreen) {
-      return const SuccessScreen(
-        message: "Access Granted Successfully",
-      );
+      return const SuccessScreen(message: "Access granted!");
     }
-    
-    // 🔥 MAIN SCREEN WITH GOOGLE PLAY PROTECT FRAME
-    SecurityState state = widget.controller.state;
-    Color activeColor = (state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK)
-        ? _accentRed
-        : (state == SecurityState.UNLOCKED ? _successGreen : _primaryOrange);
 
-    return Container(
-      color: const Color(0xFF607D8B), // Background color macam screenshot
-      child: Stack(
+    SecurityState state = widget.controller.state;
+    Color activeColor = state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK
+        ? _accentRed
+        : _primaryOrange;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
         children: [
-          // MAIN CONTENT WITH GOOGLE PLAY PROTECT FRAME
-          Center(
+          SafeArea(
             child: SingleChildScrollView(
-              child: Container(
-                margin: const EdgeInsets.all(24),
-                padding: const EdgeInsets.all(24),
-                constraints: const BoxConstraints(maxWidth: 500),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
-                      blurRadius: 30,
-                      offset: const Offset(0, 15),
-                    ),
-                  ],
-                ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // HEADER (MACAM GOOGLE PLAY PROTECT)
+                    // ✅ 1) GANTI "Security Protect" → "Z-Kinetic Core" WARNA OREN
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.verified_user_outlined,
-                          color: Colors.grey[700],
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
+                        Icon(Icons.security, color: _primaryOrange, size: 20),
+                        const SizedBox(width: 6),
                         Text(
-                          'Security Protect',
+                          'Z-Kinetic Core',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w500,
+                            color: _primaryOrange, // WARNA OREN
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
 
-                    // TITLE
-                    const Text(
-                      'This app looks safe',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
+                    // ✅ 2) PADAM "This app looks safe" - TIADA LAGI!
 
-                    // APP INFO CARD
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: activeColor,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.lock,
-                              color: Colors.white,
-                              size: 26,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "zkinetic",
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      "Verified",
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Color(0xFF4CAF50),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    // ✅ 3) PADAM gambar mangga & z kinetic verified - TIADA LAGI!
 
                     // Z-WHEEL SYSTEM (INTERACTIVE!)
                     Container(
@@ -679,70 +563,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                     ),
                     const SizedBox(height: 20),
 
-                    // CODE DISPLAY
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: _currentCode.map((digit) {
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: 36,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: activeColor.withOpacity(0.3), width: 1.5),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '$digit',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: activeColor,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    // ✅ 4) PADAM nombor kt bawah - TIADA CODE DISPLAY LAGI!
 
-                    // CHECK ICON
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.grey[400]!,
-                          width: 2.5,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.check,
-                        color: Colors.grey[400],
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // SUBTITLE
-                    Text(
-                      'You can continue to access',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    // ✅ 5) PADAM tanda √ dan "You can continue to access" - TIADA LAGI!
 
                     // ACCESS BUTTON
                     SizedBox(
@@ -799,8 +622,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   }
 
   Widget _buildAccessButton(double screenWidth, double screenHeight, Color activeColor, SecurityState state) {
-    // This is now handled by the ElevatedButton in the main build
-    // Keep phantom button for backward compatibility with wheel interactions
     return const SizedBox.shrink();
   }
 
@@ -857,7 +678,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         setState(() => _activeWheelIndex = index);
         _wheelActiveTimer?.cancel();
         _userInteracted();
-        // widget.controller.registerTouch(Offset.zero, 1.0, DateTime.now()); // Removed
         HapticFeedback.selectionClick();
       },
       onTapUp: (_) => _resetActiveWheelTimer(),
