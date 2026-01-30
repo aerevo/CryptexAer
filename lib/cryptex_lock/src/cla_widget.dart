@@ -399,6 +399,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         double clampedMotion = (totalMotion / 15.0).clamp(0.0, 1.0);
         _motionScoreNotifier.value = clampedMotion;
         
+        // Register motion dengan controller
+        widget.controller.registerMotion(event.x, event.y, event.z, DateTime.now());
+        
         _touchDecayTimer?.cancel();
         _touchDecayTimer = Timer(const Duration(seconds: 2), () {
           if (mounted && !_isDisposed) _motionScoreNotifier.value = 0.0;
@@ -435,6 +438,9 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     if (_activeWheelIndex != null) {
       double pressure = 0.8;
       _touchScoreNotifier.value = pressure;
+      
+      // Register touch dengan controller
+      widget.controller.registerTouch(Offset.zero, pressure, now);
       
       _touchDecayTimer?.cancel();
       _touchDecayTimer = Timer(const Duration(milliseconds: 1500), () {
@@ -483,10 +489,16 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     super.dispose();
   }
 
-  void _handleAccessButton() {
+  // ✅ FIXED: Gunakan verify() dengan current code
+  void _handleAccessButton() async {
     _userInteracted();
     HapticFeedback.mediumImpact();
-    widget.controller.attemptUnlock();
+    
+    // Get current code dari wheels
+    List<int> currentCode = _currentCode;
+    
+    // Call verify() method yang betul
+    await widget.controller.verify(currentCode);
   }
 
   @override
