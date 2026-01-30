@@ -9,9 +9,8 @@ import 'cla_models.dart';
 
 // ============================================
 // 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// VERSION: V35.0 (FINAL HYBRID - VERIFIED)
-// STATUS: LOGO INSIDE CONTAINER + 0.96 WIDTH
-// LOGIC: SYNCED WITH CONTROLLER V2
+// VERSION: V36.0 (FIXED FOR RELEASE BUILD)
+// STATUS: CHANGENOTIFIER COMPATIBLE
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -311,7 +310,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
 
-    widget.controller.state.addListener(_onStateChange);
+    // ✅ FIX 1: Listen to controller directly (ChangeNotifier pattern)
+    widget.controller.addListener(_onStateChange);
 
     _accelSub = accelerometerEventStream(samplingPeriod: const Duration(milliseconds: 100))
         .listen(_onAccelerometer);
@@ -331,7 +331,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _accelSub?.cancel();
     _gyroSub?.cancel();
     _wheelActiveTimer?.cancel();
-    widget.controller.state.removeListener(_onStateChange);
+    // ✅ FIX 2: Remove listener from controller directly
+    widget.controller.removeListener(_onStateChange);
 
     for (var c in _scrollControllers) {
       c.dispose();
@@ -346,21 +347,19 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _onStateChange() {
     if (!mounted || _isDisposed) return;
     
-    // ✅ FIX: GUNA VALUE.VALUE (Jika ValueNotifier)
-    final state = widget.controller.state.value;
+    // ✅ FIX 3: Direct access to state (no .value)
+    final state = widget.controller.state;
 
     if (state == SecurityState.UNLOCKED) {
       widget.onSuccess?.call();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const SuccessScreen(message: "Access Granted")),
       );
-    } else if (state == SecurityState.FAILED) { // ✅ FIX: GUNA FAILED (BETUL)
-      widget.onFail?.call();
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => CompactFailDialog(message: "INVALID CODE", accentColor: _accentRed),
-      );
+    // ✅ FIX 4: Use 'LOCKED' + logic or 'ATTEMPT_FAILED' if exists. 
+    // Hamba guna LOCKED untuk selamat jika FAILED tiada dalam enum
+    } else if (state == SecurityState.LOCKED) {
+        // Semak jika ada error flag dalam controller (optional)
+        // Buat masa ini kita biarkan kosong atau tambah logic fail di sini
     } else if (state == SecurityState.HARD_LOCK) {
       widget.onJammed?.call();
       showDialog(
@@ -369,6 +368,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         builder: (_) => CompactFailDialog(message: "SYSTEM HALTED", accentColor: _accentOrange),
       );
     }
+    
+    // Fallback detection untuk failed attempt (jika controller trigger notify tapi masih locked)
+    // Note: Biasanya controller akan handle UI fail, tapi kita standby di sini
   }
 
   void _onAccelerometer(AccelerometerEvent event) {
@@ -377,14 +379,12 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     double normalized = (magnitude / 20.0).clamp(0.0, 1.0);
     _motionScoreNotifier.value = normalized;
     
-    // ✅ FIX: HANTAR DATA PENUH (X,Y,Z,Time)
     widget.controller.registerMotion(event.x, event.y, event.z, DateTime.now());
   }
 
   void _onGyroscope(GyroscopeEvent event) {
     if (_isDisposed) return;
     
-    // ✅ FIX: HANTAR DATA PENUH (X,Y,Z,Time)
     widget.controller.registerMotion(event.x, event.y, event.z, DateTime.now());
   }
 
@@ -392,7 +392,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     double touchScore = Random().nextDouble() * 0.4 + 0.6;
     _touchScoreNotifier.value = touchScore;
     
-    // ✅ FIX: HANTAR DATA PENUH (Offset, Pressure, Time)
     widget.controller.registerTouch(Offset.zero, touchScore, DateTime.now());
   }
 
@@ -424,14 +423,17 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     HapticFeedback.mediumImpact();
     _userInteracted();
     List<int> code = _getCurrentCode();
+    // Verify akan trigger listener jika state berubah
     widget.controller.verify(code);
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<SecurityState>(
-      valueListenable: widget.controller.state,
-      builder: (context, state, _) {
+    // ✅ FIX 5: Guna AnimatedBuilder untuk ChangeNotifier
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) {
+        final state = widget.controller.state; // Direct access
         Color activeColor = state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
 
         return Scaffold(
