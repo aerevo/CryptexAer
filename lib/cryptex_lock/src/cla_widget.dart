@@ -9,9 +9,10 @@ import 'cla_models.dart';
 
 // ============================================
 // 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// VERSION: V37.0 (FINAL BONE WHITE EDITION)
-// THEME: Industrial Bone White (Light) on Black
-// STATUS: LOGIC PERFECT + UI CENTERED
+// VERSION: V38.0 (RECOVERY & STABILITY)
+// FIX: RESTORED SCROLLVIEW (PREVENT BLACK SCREEN)
+// FIX: LOCKED PAGE SCROLL (ALLOW WHEEL SPIN)
+// THEME: BONE WHITE + DARK TEXT
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -235,7 +236,7 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// 🔥 MAIN WIDGET - BONE WHITE EDITION
+// 🔥 MAIN WIDGET - V38.0 STABLE
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -283,7 +284,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   final Color _accentRed = const Color(0xFFD32F2F);
   final Color _successGreen = const Color(0xFF4CAF50);
 
-  // ✅ KEKALKAN KOORDINAT ASAL CAPTAIN (626x471)
+  // ✅ KEKALKAN KOORDINAT (626x471)
   final double _imageWidth = 626.0;
   final double _imageHeight = 471.0;
 
@@ -354,7 +355,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         MaterialPageRoute(builder: (_) => const SuccessScreen(message: "Access Granted")),
       );
     } else if (state == SecurityState.LOCKED) {
-       // Logic fail handled by controller usually
+       // Logic handled
     } else if (state == SecurityState.HARD_LOCK) {
       widget.onJammed?.call();
       showDialog(
@@ -370,7 +371,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
     double normalized = (magnitude / 20.0).clamp(0.0, 1.0);
     _motionScoreNotifier.value = normalized;
-    
     widget.controller.registerMotion(event.x, event.y, event.z, DateTime.now());
   }
 
@@ -425,17 +425,17 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         Color activeColor = state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
 
         return Scaffold(
-          backgroundColor: Colors.black, // Kontras dengan kad Putih
-          body: SizedBox(
-            width: double.infinity, // ✅ FIX: Paksa tengah secara melintang
-            height: double.infinity,
-            child: Center(
+          backgroundColor: Colors.black,
+          // ✅ FIX: Masukkan SingleChildScrollView supaya TAK CRASH (Black Screen)
+          // ✅ FIX: Set NeverScrollable supaya RODA BOLEH PUSING (No conflict)
+          body: Center(
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(), // PAGE STATIK, RODA PUSING
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center, // ✅ FIX: Paksa items center
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   
-                  // RUANG KOSONG DI ATAS
                   const SizedBox(height: 50),
 
                   // ✅ CONTAINER (BONE WHITE)
@@ -443,9 +443,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                     width: MediaQuery.of(context).size.width * 0.96,
                     padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECEFF1), // ✅ BONE WHITE
+                      color: const Color(0xFFECEFF1), // Bone White
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.black12, width: 1), // Border halus
+                      border: Border.all(color: Colors.black12, width: 1),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black87,
@@ -458,7 +458,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // LOGO & NAMA (DALAM CONTAINER)
+                        // LOGO (DALAM CONTAINER)
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -645,19 +645,19 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                       style: TextStyle(
                         fontSize: wheelHeight * 0.30,
                         fontWeight: FontWeight.w900,
-                        // ✅ TEKS WARNA GELAP (Untuk Background Putih)
+                        // ✅ WARNA GELAP UNTUK BACKGROUND PUTIH
                         color: const Color(0xFF263238), 
                         height: 1.0,
                         shadows: [
                           Shadow(
                             offset: const Offset(1, 1),
                             blurRadius: 2,
-                            color: Colors.white.withOpacity(0.5), // Highlight
+                            color: Colors.white.withOpacity(0.5),
                           ),
                           Shadow(
                             offset: const Offset(-1, -1),
                             blurRadius: 2,
-                            color: Colors.black.withOpacity(0.1), // Soft Shadow
+                            color: Colors.black.withOpacity(0.1),
                           ),
                         ],
                       ),
