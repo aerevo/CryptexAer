@@ -451,8 +451,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                 ),
                 const SizedBox(height: 25),
                 Container(
-                  width: MediaQuery.of(context).size.width * 0.9,
-                  padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 15),
+                  width: MediaQuery.of(context).size.width * 0.96,
+                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E1E1E),
                     borderRadius: BorderRadius.circular(24),
@@ -479,7 +479,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                           color: Color(0xFFB0BEC5),
                         ),
                       ),
-                      const SizedBox(height: 35),
+                      const SizedBox(height: 40),
                       _buildWheelSystem(activeColor, state),
                       const SizedBox(height: 20),
                       _buildSensorRow(activeColor),
