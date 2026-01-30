@@ -243,9 +243,18 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
 
 // 🔥 MAIN WIDGET WITH GOOGLE PLAY PROTECT FRAME
 class CryptexLock extends StatefulWidget {
-  final SecurityController controller;
+  final ClaController controller;
+  final VoidCallback? onSuccess;
+  final VoidCallback? onFail;
+  final VoidCallback? onJammed;
 
-  const CryptexLock({super.key, required this.controller});
+  const CryptexLock({
+    super.key, 
+    required this.controller,
+    this.onSuccess,
+    this.onFail,
+    this.onJammed,
+  });
 
   @override
   State<CryptexLock> createState() => _CryptexLockState();
@@ -320,11 +329,14 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
   void _handleControllerChange() {
     if (_isDisposed) return;
     
-    if (widget.controller.state == SecurityState.UNLOCKED) {
+    if (widget.controller.state == ClaState.UNLOCKED) {
       // 🔥 SHOW SUCCESS SCREEN
       setState(() {
         _showSuccessScreen = true;
       });
+      
+      // Call onSuccess callback
+      widget.onSuccess?.call();
       
       // Auto hide after 3 seconds
       Future.delayed(const Duration(seconds: 3), () {
@@ -334,7 +346,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           });
         }
       });
-    } else if (widget.controller.state == SecurityState.SOFT_LOCK || widget.controller.state == SecurityState.HARD_LOCK) {
+    } else if (widget.controller.state == ClaState.SOFT_LOCK || widget.controller.state == ClaState.HARD_LOCK) {
       // 🔥 SHOW FAIL DIALOG
       if (widget.controller.threatMessage.isNotEmpty) {
         showDialog(
@@ -347,7 +359,12 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         );
       }
       
-      if (widget.controller.state == SecurityState.HARD_LOCK) {
+      // Call appropriate callback
+      if (widget.controller.state == ClaState.SOFT_LOCK) {
+        widget.onFail?.call();
+      } else if (widget.controller.state == ClaState.HARD_LOCK) {
+        widget.onJammed?.call();
+        
         _lockoutTimer = Timer(Duration(seconds: widget.controller.lockoutSeconds), () {
           if (mounted) {
             widget.controller.resetLockout();
@@ -475,17 +492,17 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     super.dispose();
   }
 
-  String _getStatusLabel(SecurityState state) {
+  String _getStatusLabel(ClaState state) {
     switch (state) {
-      case SecurityState.LOCKED:
+      case ClaState.LOCKED:
         return "Z-KINETIC";
-      case SecurityState.VALIDATING:
+      case ClaState.VALIDATING:
         return "VALIDATING...";
-      case SecurityState.UNLOCKED:
+      case ClaState.UNLOCKED:
         return "UNLOCKED";
-      case SecurityState.SOFT_LOCK:
+      case ClaState.SOFT_LOCK:
         return "SOFT LOCK";
-      case SecurityState.HARD_LOCK:
+      case ClaState.HARD_LOCK:
         return "HARD LOCK";
     }
   }
@@ -509,10 +526,10 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     }
     
     // 🔥 MAIN SCREEN WITH GOOGLE PLAY PROTECT FRAME
-    SecurityState state = widget.controller.state;
-    Color activeColor = (state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK)
+    ClaState state = widget.controller.state;
+    Color activeColor = (state == ClaState.SOFT_LOCK || state == ClaState.HARD_LOCK)
         ? _accentRed
-        : (state == SecurityState.UNLOCKED ? _successGreen : _primaryOrange);
+        : (state == ClaState.UNLOCKED ? _successGreen : _primaryOrange);
 
     return Container(
       color: const Color(0xFF607D8B), // Background color macam screenshot
@@ -730,7 +747,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: state == SecurityState.VALIDATING || state == SecurityState.HARD_LOCK
+                        onPressed: state == ClaState.VALIDATING || state == ClaState.HARD_LOCK
                             ? null
                             : _handleAccessButton,
                         style: ElevatedButton.styleFrom(
@@ -771,7 +788,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
           // TUTORIAL OVERLAY
           Positioned.fill(
             child: TutorialOverlay(
-              isVisible: _showTutorial && state == SecurityState.LOCKED,
+              isVisible: _showTutorial && state == ClaState.LOCKED,
               color: activeColor,
             ),
           ),
@@ -780,13 +797,13 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     );
   }
 
-  Widget _buildAccessButton(double screenWidth, double screenHeight, Color activeColor, SecurityState state) {
+  Widget _buildAccessButton(double screenWidth, double screenHeight, Color activeColor, ClaState state) {
     // This is now handled by the ElevatedButton in the main build
     // Keep phantom button for backward compatibility with wheel interactions
     return const SizedBox.shrink();
   }
 
-  List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight, Color activeColor, SecurityState state) {
+  List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight, Color activeColor, ClaState state) {
     List<Widget> wheels = [];
     
     for (int i = 0; i < 5; i++) {
