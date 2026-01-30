@@ -8,8 +8,9 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 CRYPTEX LOCK PROFESSIONAL V17.1
-// Full-Screen Confirmation + Compact Success
+// 🔥 CRYPTEX LOCK WITH GOOGLE PLAY PROTECT STYLE FRAME
+// Main Screen: Interactive with frame design
+// Success Screen: BERJAYA with fitted text
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -58,255 +59,74 @@ class TutorialOverlay extends StatelessWidget {
   }
 }
 
-// 🔥 STATIC SCREEN-IN-SCREEN DIALOG (GOOGLE PLAY PROTECT STYLE)
-class SecurityConfirmationDialog extends StatelessWidget {
-  final String title;
+// 🔥 SUCCESS SCREEN - BERJAYA!
+class SuccessScreen extends StatelessWidget {
   final String message;
-  final VoidCallback onConfirm;
-  final VoidCallback onCancel;
-  final Color accentColor;
-  final List<int> currentCode;
 
-  const SecurityConfirmationDialog({
-    super.key,
-    required this.title,
-    required this.message,
-    required this.onConfirm,
-    required this.onCancel,
-    required this.accentColor,
-    required this.currentCode,
-  });
+  const SuccessScreen({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
-    // STATIC DIALOG - BUKAN POPUP, TAPI SENTIASA ADA DI TENGAH SKRIN
     return Container(
-      color: Colors.transparent, // Background tetap transparent supaya nampak roda
+      color: const Color(0xFF607D8B),
       child: Center(
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 60),
-          padding: const EdgeInsets.all(24),
-          constraints: const BoxConstraints(maxWidth: 400),
+          margin: const EdgeInsets.all(40),
+          padding: const EdgeInsets.all(48),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(32),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.25),
-                blurRadius: 30,
-                spreadRadius: 0,
-                offset: const Offset(0, 15),
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 40,
+                offset: const Offset(0, 20),
               ),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // HEADER ICON (MACAM GOOGLE PLAY PROTECT)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.verified_user_outlined,
-                    color: Colors.grey[700],
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Security Protect',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // TITLE (MACAM "This app looks safe")
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+              // SUCCESS ICON
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4CAF50).withOpacity(0.15),
+                  shape: BoxShape.circle,
                 ),
-                textAlign: TextAlign.center,
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF4CAF50),
+                  size: 70,
+                ),
+              ),
+              const SizedBox(height: 40),
+              
+              // BERJAYA TEXT (SAIZ BESAR & AUTO MUAT)
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'BERJAYA!',
+                  style: TextStyle(
+                    fontSize: 56,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.green[700],
+                    letterSpacing: 3,
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
-
-              // APP INFO CARD (MACAM GOOGLE PLAY PROTECT)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    // App Icon
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: accentColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.lock,
-                        color: Colors.white,
-                        size: 26,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // App Name & Verified
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "zkinetic",
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
-                              SizedBox(width: 4),
-                              Text(
-                                "Verified",
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF4CAF50),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // CODE DISPLAY (SMALLER & COMPACT)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: currentCode.map((digit) {
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: 36,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: accentColor.withOpacity(0.3), width: 1.5),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '$digit',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: accentColor,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // CHECK ICON (MACAM GOOGLE PLAY PROTECT)
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.grey[400]!,
-                    width: 2.5,
-                  ),
-                ),
-                child: Icon(
-                  Icons.check,
-                  color: Colors.grey[400],
-                  size: 28,
-                ),
-              ),
-              const SizedBox(height: 12),
-
+              
               // SUBTITLE
               Text(
-                'You can continue to access',
+                message,
                 style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey[700],
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              const SizedBox(height: 24),
-
-              // ACCESS BUTTON (MACAM GOOGLE PLAY PROTECT)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: onConfirm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD6E8F7),
-                    foregroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Access',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // CANCEL BUTTON
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: onCancel,
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFFD6E8F7),
-                    foregroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    "Don't access",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -316,137 +136,7 @@ class SecurityConfirmationDialog extends StatelessWidget {
   }
 }
 
-// 🔥 BERJAYA SUCCESS DIALOG (AFTER SUCCESS)
-class CompactSuccessDialog extends StatefulWidget {
-  final String message;
-  final Color accentColor;
-
-  const CompactSuccessDialog({
-    super.key,
-    required this.message,
-    required this.accentColor,
-  });
-
-  @override
-  State<CompactSuccessDialog> createState() => _CompactSuccessDialogState();
-}
-
-class _CompactSuccessDialogState extends State<CompactSuccessDialog> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-    
-    _scaleAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
-    );
-    
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
-    
-    _controller.forward();
-    
-    // Auto dismiss after 2.5 seconds
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 32),
-            padding: const EdgeInsets.all(40),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(32),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 30,
-                  offset: const Offset(0, 15),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // SUCCESS ICON (BIGGER & GREEN)
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    color: Color(0xFF4CAF50),
-                    size: 60,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                
-                // BERJAYA TEXT (SAIZ BESAR & MUAT)
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'BERJAYA!',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.green[700],
-                      letterSpacing: 2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // SUBTITLE
-                Text(
-                  widget.message,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// 🔥 COMPACT FAIL DIALOG (AFTER FAIL)
+// 🔥 FAIL DIALOG
 class CompactFailDialog extends StatefulWidget {
   final String message;
   final Color accentColor;
@@ -551,7 +241,7 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// 🔥 MAIN WIDGET
+// 🔥 MAIN WIDGET WITH GOOGLE PLAY PROTECT FRAME
 class CryptexLock extends StatefulWidget {
   final SecurityController controller;
 
@@ -571,7 +261,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     [467, 130, 529, 285],
   ];
 
-  // 🔥 KOORDINAT BUTTON "CONFIRM ACCESS"
+  // 🔥 KOORDINAT BUTTON "ACCESS"
   static const List<double> _buttonCoords = [150, 318, 472, 399];
 
   static const double _imageWidth = 626.0;
@@ -589,7 +279,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   double _patternScore = 0.0;
   bool _showTutorial = true;
-  bool _showStaticDialog = false; // 🔥 TRACK STATIC DIALOG
+  bool _showSuccessScreen = false; // 🔥 TRACK SUCCESS SCREEN
   Timer? _tutorialHideTimer;
   Timer? _touchDecayTimer;
 
@@ -631,15 +321,19 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     if (_isDisposed) return;
     
     if (widget.controller.state == SecurityState.UNLOCKED) {
-      // 🔥 SHOW COMPACT SUCCESS DIALOG
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => CompactSuccessDialog(
-          message: "Access Granted Successfully",
-          accentColor: _successGreen,
-        ),
-      );
+      // 🔥 SHOW SUCCESS SCREEN
+      setState(() {
+        _showSuccessScreen = true;
+      });
+      
+      // Auto hide after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && !_isDisposed) {
+          setState(() {
+            _showSuccessScreen = false;
+          });
+        }
+      });
     } else if (widget.controller.state == SecurityState.SOFT_LOCK || widget.controller.state == SecurityState.HARD_LOCK) {
       // 🔥 SHOW FAIL DIALOG
       if (widget.controller.threatMessage.isNotEmpty) {
@@ -796,158 +490,300 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
     }
   }
 
-  // 🔥 SHOW STATIC CONFIRMATION DIALOG
-  void _showConfirmationDialog() {
-    setState(() {
-      _showStaticDialog = true;
-    });
-    _userInteracted();
-  }
-
-  // 🔥 HANDLE CONFIRM ACCESS FROM STATIC DIALOG
-  void _handleConfirmAccess() async {
-    setState(() {
-      _showStaticDialog = false;
-    });
+  // 🔥 HANDLE ACCESS BUTTON
+  void _handleAccessButton() async {
     HapticFeedback.mediumImpact();
     _userInteracted();
     await widget.controller.verify(_currentCode);
   }
 
-  // 🔥 HANDLE CANCEL FROM STATIC DIALOG
-  void _handleCancelAccess() {
-    setState(() {
-      _showStaticDialog = false;
-    });
-    HapticFeedback.lightImpact();
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isDisposed) return const SizedBox.shrink();
+    
+    // 🔥 KALAU SUCCESS, TUNJUK SUCCESS SCREEN
+    if (_showSuccessScreen) {
+      return const SuccessScreen(
+        message: "Access Granted Successfully",
+      );
+    }
+    
+    // 🔥 MAIN SCREEN WITH GOOGLE PLAY PROTECT FRAME
     SecurityState state = widget.controller.state;
     Color activeColor = (state == SecurityState.SOFT_LOCK || state == SecurityState.HARD_LOCK)
         ? _accentRed
         : (state == SecurityState.UNLOCKED ? _successGreen : _primaryOrange);
-    String statusLabel = _getStatusLabel(state);
 
     return Container(
-      color: Colors.black,
+      color: const Color(0xFF607D8B), // Background color macam screenshot
       child: Stack(
         children: [
+          // MAIN CONTENT WITH GOOGLE PLAY PROTECT FRAME
           Center(
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // HEADER
-                  Text(
-                    statusLabel,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.blueGrey[200],
-                      letterSpacing: 4.0,
+              child: Container(
+                margin: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
+                constraints: const BoxConstraints(maxWidth: 500),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 30,
+                      offset: const Offset(0, 15),
                     ),
-                  ),
-                  const SizedBox(height: 60),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // HEADER (MACAM GOOGLE PLAY PROTECT)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.verified_user_outlined,
+                          color: Colors.grey[700],
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Security Protect',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
-                  // Z-WHEEL SYSTEM
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        double screenWidth = constraints.maxWidth;
-                        double aspectRatio = _imageWidth / _imageHeight;
-                        double imageHeight = screenWidth / aspectRatio;
-                        
-                        return SizedBox(
-                          width: screenWidth,
-                          height: imageHeight,
-                          child: Stack(
-                            children: [
-                              Positioned.fill(
-                                child: Image.asset(
-                                  'assets/z_wheel.png',
-                                  fit: BoxFit.fill,
+                    // TITLE
+                    const Text(
+                      'This app looks safe',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // APP INFO CARD
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: activeColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.lock,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "zkinetic",
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "Verified",
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF4CAF50),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Z-WHEEL SYSTEM (INTERACTIVE!)
+                    Container(
+                      width: double.infinity,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          double screenWidth = constraints.maxWidth;
+                          double aspectRatio = _imageWidth / _imageHeight;
+                          double imageHeight = screenWidth / aspectRatio;
+                          
+                          return SizedBox(
+                            width: screenWidth,
+                            height: imageHeight,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: Image.asset(
+                                    'assets/z_wheel.png',
+                                    fit: BoxFit.fill,
+                                  ),
+                                ),
+                                ..._buildWheelOverlays(screenWidth, imageHeight, activeColor, state),
+                                _buildAccessButton(screenWidth, imageHeight, activeColor, state),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // CODE DISPLAY
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: _currentCode.map((digit) {
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: 36,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: activeColor.withOpacity(0.3), width: 1.5),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$digit',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: activeColor,
                                 ),
                               ),
-                              ..._buildWheelOverlays(screenWidth, imageHeight, activeColor, state),
-                              _buildPhantomButton(screenWidth, imageHeight, activeColor, state),
-                            ],
-                          ),
-                        );
-                      },
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 20),
 
-                  const SizedBox(height: 30),
+                    // CHECK ICON
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.grey[400]!,
+                          width: 2.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.check,
+                        color: Colors.grey[400],
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-                  // WARNING BANNER
-                  if (widget.controller.threatMessage.isNotEmpty) _buildWarningBanner(),
-                  const SizedBox(height: 20),
+                    // SUBTITLE
+                    Text(
+                      'You can continue to access',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
-                  // SENSOR INDICATORS
-                  _buildSensorRow(activeColor),
-                ],
+                    // ACCESS BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: state == SecurityState.VALIDATING || state == SecurityState.HARD_LOCK
+                            ? null
+                            : _handleAccessButton,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD6E8F7),
+                          foregroundColor: Colors.black87,
+                          disabledBackgroundColor: Colors.grey[300],
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Access',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // SENSOR INDICATORS
+                    _buildSensorRow(activeColor),
+                    
+                    // WARNING BANNER
+                    if (widget.controller.threatMessage.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildWarningBanner(),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
+          
+          // TUTORIAL OVERLAY
           Positioned.fill(
             child: TutorialOverlay(
               isVisible: _showTutorial && state == SecurityState.LOCKED,
               color: activeColor,
             ),
           ),
-          // 🔥 STATIC CONFIRMATION DIALOG OVERLAY (GOOGLE PLAY PROTECT STYLE)
-          if (_showStaticDialog)
-            Positioned.fill(
-              child: SecurityConfirmationDialog(
-                title: "This app looks safe",
-                message: "Verify your security code",
-                accentColor: _primaryOrange,
-                currentCode: _currentCode,
-                onConfirm: _handleConfirmAccess,
-                onCancel: _handleCancelAccess,
-              ),
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildPhantomButton(double screenWidth, double screenHeight, Color activeColor, SecurityState state) {
-    double left = _buttonCoords[0];
-    double top = _buttonCoords[1];
-    double right = _buttonCoords[2];
-    double bottom = _buttonCoords[3];
-
-    double actualLeft = screenWidth * (left / _imageWidth);
-    double actualTop = screenHeight * (top / _imageHeight);
-    double actualWidth = screenWidth * ((right - left) / _imageWidth);
-    double actualHeight = screenHeight * ((bottom - top) / _imageHeight);
-
-    bool isDisabled = state == SecurityState.VALIDATING || state == SecurityState.HARD_LOCK;
-
-    return Positioned(
-      left: actualLeft,
-      top: actualTop,
-      width: actualWidth,
-      height: actualHeight,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: isDisabled ? null : _showConfirmationDialog,
-          splashColor: Colors.white.withOpacity(0.1),
-          highlightColor: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(10),
-          child: Container(color: Colors.transparent),
-        ),
-      ),
-    );
+  Widget _buildAccessButton(double screenWidth, double screenHeight, Color activeColor, SecurityState state) {
+    // This is now handled by the ElevatedButton in the main build
+    // Keep phantom button for backward compatibility with wheel interactions
+    return const SizedBox.shrink();
   }
 
   List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight, Color activeColor, SecurityState state) {
@@ -1088,7 +924,7 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   Widget _buildSensorRow(Color color) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -1113,14 +949,14 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
         Icon(
           isActive ? Icons.check_circle : icon,
           size: 20,
-          color: isActive ? _successGreen : Colors.white38,
+          color: isActive ? _successGreen : Colors.grey[400],
         ),
         const SizedBox(height: 4),
         Text(
           label,
           style: TextStyle(
             fontSize: 9,
-            color: isActive ? _successGreen : Colors.white38,
+            color: isActive ? _successGreen : Colors.grey[400],
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1130,7 +966,6 @@ class _CryptexLockState extends State<CryptexLock> with WidgetsBindingObserver, 
 
   Widget _buildWarningBanner() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _accentRed.withOpacity(0.1),
