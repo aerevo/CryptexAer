@@ -9,9 +9,7 @@ import 'cla_models.dart';
 
 // ============================================
 // 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// Complete rewrite with centered card layout
-// Phantom button integration
-// Full compatibility with ClaController V3.3
+// FIXED: Full compatibility + Centered layout + Working wheels
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -382,7 +380,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   void _onGyroscope(GyroscopeEvent event) {
     if (_isDisposed) return;
-    double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
     
     widget.controller.registerMotion(
       event.x,
@@ -441,64 +438,67 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         final state = widget.controller.state;
         Color activeColor = state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
 
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.security,
-                    color: const Color(0xFFFF6F00),
-                    size: 48,
+        return Stack(
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.security,
+                  color: const Color(0xFFFF6F00),
+                  size: 48,
+                ),
+                const SizedBox(height: 25),
+                Container(
+                  width: MediaQuery.of(context).size.width * 0.9,
+                  padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 15),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white12, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black87,
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 25),
-                  Container(
-                    width: MediaQuery.of(context).size.width * 0.9,
-                    padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 15),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white12, width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black87,
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                          offset: const Offset(0, 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "Z-KINETIC CORE",
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                          letterSpacing: 4.0,
+                          color: Color(0xFFB0BEC5),
                         ),
+                      ),
+                      const SizedBox(height: 35),
+                      _buildWheelSystem(activeColor, state),
+                      const SizedBox(height: 20),
+                      _buildSensorRow(activeColor),
+                      if (state == SecurityState.HARD_LOCK) ...[
+                        const SizedBox(height: 12),
+                        _buildWarningBanner(),
                       ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          "Z-KINETIC CORE",
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                            letterSpacing: 4.0,
-                            color: Color(0xFFB0BEC5),
-                          ),
-                        ),
-                        const SizedBox(height: 35),
-                        _buildWheelSystem(activeColor, state),
-                        const SizedBox(height: 20),
-                        _buildSensorRow(activeColor),
-                        if (state == SecurityState.HARD_LOCK) ...[
-                          const SizedBox(height: 12),
-                          _buildWarningBanner(),
-                        ],
-                      ],
-                    ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+            Positioned.fill(
+              child: TutorialOverlay(
+                isVisible: _showTutorial && state == SecurityState.LOCKED,
+                color: activeColor,
               ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -511,31 +511,21 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         double aspectRatio = _imageWidth / _imageHeight;
         double calculatedHeight = availableWidth / aspectRatio;
 
-        return Stack(
-          children: [
-            SizedBox(
-              width: availableWidth,
-              height: calculatedHeight,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.asset(
-                      'assets/z_wheel.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  ..._buildWheelOverlays(availableWidth, calculatedHeight, activeColor, state),
-                  _buildPhantomButton(availableWidth, calculatedHeight),
-                ],
+        return SizedBox(
+          width: availableWidth,
+          height: calculatedHeight,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/z_wheel.png',
+                  fit: BoxFit.contain,
+                ),
               ),
-            ),
-            Positioned.fill(
-              child: TutorialOverlay(
-                isVisible: _showTutorial && state == SecurityState.LOCKED,
-                color: activeColor,
-              ),
-            ),
-          ],
+              ..._buildWheelOverlays(availableWidth, calculatedHeight, activeColor, state),
+              _buildPhantomButton(availableWidth, calculatedHeight),
+            ],
+          ),
         );
       },
     );
