@@ -440,10 +440,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                     
                     const SizedBox(height: 50),
 
-                    // ✅ CONTAINER (BONE WHITE)
+                    // ✅ CONTAINER (BONE WHITE) - AUTO CENTER
                     Container(
-                      width: MediaQuery.of(context).size.width * 0.92,  // Kurangkan dari 0.96 ke 0.92
-                      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),  // Naikkan dari 15 ke 20
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),  // ← INI MAGIC NYA
+                      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                       decoration: BoxDecoration(
                         color: const Color(0xFFECEFF1), // Bone White
                         borderRadius: BorderRadius.circular(24),
