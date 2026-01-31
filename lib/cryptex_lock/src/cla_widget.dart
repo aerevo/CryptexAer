@@ -588,13 +588,14 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildMainContainer(Color activeColor, SecurityState state) {
-    _updateDebug("Building main container");
-    
+Widget _buildMainContainer(Color activeColor, SecurityState state) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
+      width: 350,  // <--- TAMBAH INI (Paksa lebar)
+      // height: 600, // <--- Kalau masih tak jadi, uncomment ini pula
+      
       decoration: BoxDecoration(
         color: const Color(0xFFECEFF1),
+        // ... kod lain sama ...
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.black12),
         boxShadow: const [
