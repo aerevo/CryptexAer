@@ -9,9 +9,9 @@ import 'cla_models.dart';
 
 // ============================================
 // 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// VERSION: V42.0 (THE PERFECT HYBRID)
-// LAYOUT: BASED ON V36 (PROVEN CENTER)
-// THEME: BONE WHITE (V41)
+// VERSION: V41.0 (CENTER FIXED - CONFIRM)
+// FIX: REVERT KE STRUKTUR LAMA YANG WORKS
+// THEME: BONE WHITE + DARK TEXT
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -235,7 +235,7 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// 🔥 MAIN WIDGET - V42.0 PERFECT HYBRID
+// 🔥 MAIN WIDGET - V41.0
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -283,7 +283,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   final Color _accentRed = const Color(0xFFD32F2F);
   final Color _successGreen = const Color(0xFF4CAF50);
 
-  // ✅ KEKALKAN KOORDINAT (626x471)
   final double _imageWidth = 626.0;
   final double _imageHeight = 471.0;
 
@@ -415,6 +414,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     widget.controller.verify(code);
   }
 
+  // ✅ V41.0 - REVERT KE STRUKTUR LAMA YANG WORKS
+  // Struktur: Center → SingleChildScrollView → Column(crossAxisAlignment: center) → Container
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -425,25 +426,22 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
         return Scaffold(
           backgroundColor: Colors.black,
-          // ✅ FIX: STRUKTUR V36 (CENTER > SCROLL > COLUMN)
           body: Center(
             child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(), // Biar roda je pusing
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center, // WAJIB ADA
+                crossAxisAlignment: CrossAxisAlignment.center,  // ✅ INI yang center the container
                 children: [
-                  
                   const SizedBox(height: 50),
 
-                  // ✅ TEMA V41 (BONE WHITE)
+                  // ✅ CONTAINER - BONE WHITE THEME
                   Container(
-                    width: MediaQuery.of(context).size.width * 0.96, // LEBAR ASAL CAPTAIN
+                    width: MediaQuery.of(context).size.width * 0.92,  // ✅ 0.92 = spacing tepi lebih cantik
                     padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECEFF1), // Bone White
+                      color: const Color(0xFFECEFF1),  // ✅ Bone White (tukar dari 0x1E1E1E)
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.black12, width: 1),
+                      border: Border.all(color: Colors.black12, width: 1),  // ✅ Tukar dari white12
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black87,
@@ -456,7 +454,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // LOGO
+                        // LOGO & NAMA
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -643,8 +641,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                       style: TextStyle(
                         fontSize: wheelHeight * 0.30,
                         fontWeight: FontWeight.w900,
-                        // ✅ TEKS GELAP (V41)
-                        color: const Color(0xFF263238), 
+                        color: const Color(0xFF263238),  // ✅ Dark text for Bone White bg
                         height: 1.0,
                         shadows: [
                           Shadow(
