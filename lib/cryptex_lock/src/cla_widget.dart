@@ -8,7 +8,7 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 Z-KINETIC CORE - PROPERLY FIXED
+// 🔥 Z-KINETIC CORE - WITH DEBUG OVERLAY
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -232,6 +232,67 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
+// ===============================
+// ✅ DEBUG WRAPPER - SHOWS ERRORS ON SCREEN
+// ===============================
+class DebugErrorBoundary extends StatelessWidget {
+  final Widget child;
+  final String widgetName;
+
+  const DebugErrorBoundary({
+    super.key,
+    required this.child,
+    this.widgetName = 'Widget',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (context) {
+        try {
+          return child;
+        } catch (e, stack) {
+          return Container(
+            color: Colors.red.shade900,
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error, color: Colors.white, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      'ERROR in $widgetName',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      e.toString(),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      stack.toString(),
+                      style: const TextStyle(color: Colors.white70, fontSize: 10),
+                      maxLines: 10,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }
+}
+
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -292,30 +353,50 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   final List<double> _phantomButtonCoords = [154, 322, 467, 401];
 
+  // ✅ DEBUG INFO
+  String _debugInfo = "Initializing...";
+
   @override
   void initState() {
     super.initState();
+    
+    _updateDebug("initState started");
 
-    _scanController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat();
+    try {
+      _scanController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1500),
+      )..repeat();
+      _updateDebug("scanController created");
 
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
+      _pulseController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 2000),
+      )..repeat(reverse: true);
+      _updateDebug("pulseController created");
 
-    widget.controller.addListener(_onStateChange);
+      widget.controller.addListener(_onStateChange);
+      _updateDebug("listener added");
 
-    _accelSub = accelerometerEventStream(samplingPeriod: const Duration(milliseconds: 100))
-        .listen(_onAccelerometer);
-    _gyroSub = gyroscopeEventStream(samplingPeriod: const Duration(milliseconds: 100))
-        .listen(_onGyroscope);
+      _accelSub = accelerometerEventStream(samplingPeriod: const Duration(milliseconds: 100))
+          .listen(_onAccelerometer);
+      _gyroSub = gyroscopeEventStream(samplingPeriod: const Duration(milliseconds: 100))
+          .listen(_onGyroscope);
+      _updateDebug("sensors initialized");
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && !_isDisposed) setState(() => _showTutorial = false);
-    });
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && !_isDisposed) setState(() => _showTutorial = false);
+      });
+      
+      _updateDebug("Init complete!");
+    } catch (e) {
+      _updateDebug("Init ERROR: $e");
+    }
+  }
+
+  void _updateDebug(String msg) {
+    setState(() => _debugInfo = msg);
+    print("🔍 DEBUG: $msg");
   }
 
   @override
@@ -411,10 +492,12 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   // ===============================
-  // ✅ PROPER BUILD METHOD
+  // ✅ BUILD WITH DEBUG OVERLAY
   // ===============================
   @override
   Widget build(BuildContext context) {
+    _updateDebug("build() called");
+    
     final state = widget.controller.state;
     
     Color activeColor = state == SecurityState.HARD_LOCK
@@ -425,47 +508,89 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
-                    maxWidth: 420,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Stack(
-                          children: [
-                            _buildMainContainer(activeColor, state),
-                            Positioned.fill(
-                              child: TutorialOverlay(
-                                isVisible: _showTutorial && state == SecurityState.LOCKED,
-                                color: activeColor,
+      body: Stack(
+        children: [
+          // MAIN CONTENT
+          SafeArea(
+            child: DebugErrorBoundary(
+              widgetName: "Main Content",
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: DebugErrorBoundary(
+                      widgetName: "Container Stack",
+                      child: Stack(
+                        children: [
+                          DebugErrorBoundary(
+                            widgetName: "Main Container",
+                            child: _buildMainContainer(activeColor, state),
+                          ),
+                          if (_showTutorial && state == SecurityState.LOCKED)
+                            DebugErrorBoundary(
+                              widgetName: "Tutorial Overlay",
+                              child: Positioned.fill(
+                                child: TutorialOverlay(
+                                  isVisible: true,
+                                  color: activeColor,
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          );
-        },
+          ),
+          
+          // ✅ DEBUG INFO OVERLAY (TOP LEFT)
+          Positioned(
+            top: 50,
+            left: 10,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '🔍 DEBUG',
+                    style: const TextStyle(
+                      color: Colors.green,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _debugInfo,
+                    style: const TextStyle(color: Colors.white, fontSize: 9),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'State: ${state.toString().split('.').last}',
+                    style: const TextStyle(color: Colors.yellow, fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildMainContainer(Color activeColor, SecurityState state) {
+    _updateDebug("Building main container");
+    
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
       decoration: BoxDecoration(
@@ -505,12 +630,21 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
             ],
           ),
           const SizedBox(height: 35),
-          _buildWheelSystem(activeColor, state),
+          DebugErrorBoundary(
+            widgetName: "Wheel System",
+            child: _buildWheelSystem(activeColor, state),
+          ),
           const SizedBox(height: 20),
-          _buildSensorRow(activeColor),
+          DebugErrorBoundary(
+            widgetName: "Sensor Row",
+            child: _buildSensorRow(activeColor),
+          ),
           if (state == SecurityState.HARD_LOCK) ...[
             const SizedBox(height: 12),
-            _buildWarningBanner(),
+            DebugErrorBoundary(
+              widgetName: "Warning Banner",
+              child: _buildWarningBanner(),
+            ),
           ],
         ],
       ),
@@ -520,6 +654,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   Widget _buildWheelSystem(Color activeColor, SecurityState state) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        _updateDebug("Wheel constraints: ${constraints.maxWidth}");
+        
         double availableWidth = constraints.maxWidth;
         double aspectRatio = _imageWidth / _imageHeight;
         double calculatedHeight = availableWidth / aspectRatio;
@@ -533,6 +669,14 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                 child: Image.asset(
                   'assets/z_wheel.png',
                   fit: BoxFit.contain,
+                  errorBuilder: (context, error, stack) {
+                    return Container(
+                      color: Colors.red.shade200,
+                      child: const Center(
+                        child: Text('IMAGE ERROR'),
+                      ),
+                    );
+                  },
                 ),
               ),
               ..._buildWheelOverlays(availableWidth, calculatedHeight, activeColor, state),
