@@ -435,18 +435,21 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               SingleChildScrollView(
                 physics: const NeverScrollableScrollPhysics(),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width - 32,
-                      ),
-                      child: _buildMainContainer(activeColor, state),
-                    ),
-                  ),
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40), // ✅ REAL SPACING
+                child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                maxWidth: 420, // ✅ HARD CAP (UX BETUL)
               ),
+                child: SizedBox(
+                width: double.infinity, // ✅ FORCE CENTER FILL
+               child: _buildMainContainer(activeColor, state),
+              ),
+            ),
+          ),
+        ),
+      ),
 
               // ===============================
               // TUTORIAL OVERLAY
