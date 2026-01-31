@@ -8,7 +8,10 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 Z-KINETIC CORE - WITH DEBUG OVERLAY
+// 🔥 Z-KINETIC CORE - V70.0 (STATIC DIMENSION FIX)
+// FIX: REMOVED LAYOUTBUILDER (IT CAUSED 0x0 SIZE)
+// FIX: CALCULATE SIZE EXPLICITLY IN BUILD()
+// FIX: FORCE CONTAINER TO HAVE EXACT PIXEL WIDTH
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -232,67 +235,7 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// ===============================
-// ✅ DEBUG WRAPPER - SHOWS ERRORS ON SCREEN
-// ===============================
-class DebugErrorBoundary extends StatelessWidget {
-  final Widget child;
-  final String widgetName;
-
-  const DebugErrorBoundary({
-    super.key,
-    required this.child,
-    this.widgetName = 'Widget',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Builder(
-      builder: (context) {
-        try {
-          return child;
-        } catch (e, stack) {
-          return Container(
-            color: Colors.red.shade900,
-            padding: const EdgeInsets.all(16),
-            child: Center(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error, color: Colors.white, size: 48),
-                    const SizedBox(height: 16),
-                    Text(
-                      'ERROR in $widgetName',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      e.toString(),
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      stack.toString(),
-                      style: const TextStyle(color: Colors.white70, fontSize: 10),
-                      maxLines: 10,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-      },
-    );
-  }
-}
-
+// 🔥 MAIN WIDGET - V70.0 STATIC DIMENSION FIX
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -340,6 +283,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   final Color _accentRed = const Color(0xFFD32F2F);
   final Color _successGreen = const Color(0xFF4CAF50);
 
+  // ✅ KEKALKAN KOORDINAT (626x471)
   final double _imageWidth = 626.0;
   final double _imageHeight = 471.0;
 
@@ -353,50 +297,30 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   final List<double> _phantomButtonCoords = [154, 322, 467, 401];
 
-  // ✅ DEBUG INFO
-  String _debugInfo = "Initializing...";
-
   @override
   void initState() {
     super.initState();
-    
-    _updateDebug("initState started");
 
-    try {
-      _scanController = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 1500),
-      )..repeat();
-      _updateDebug("scanController created");
+    _scanController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
 
-      _pulseController = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 2000),
-      )..repeat(reverse: true);
-      _updateDebug("pulseController created");
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
 
-      widget.controller.addListener(_onStateChange);
-      _updateDebug("listener added");
+    widget.controller.addListener(_onStateChange);
 
-      _accelSub = accelerometerEventStream(samplingPeriod: const Duration(milliseconds: 100))
-          .listen(_onAccelerometer);
-      _gyroSub = gyroscopeEventStream(samplingPeriod: const Duration(milliseconds: 100))
-          .listen(_onGyroscope);
-      _updateDebug("sensors initialized");
+    _accelSub = accelerometerEventStream(samplingPeriod: const Duration(milliseconds: 100))
+        .listen(_onAccelerometer);
+    _gyroSub = gyroscopeEventStream(samplingPeriod: const Duration(milliseconds: 100))
+        .listen(_onGyroscope);
 
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted && !_isDisposed) setState(() => _showTutorial = false);
-      });
-      
-      _updateDebug("Init complete!");
-    } catch (e) {
-      _updateDebug("Init ERROR: $e");
-    }
-  }
-
-  void _updateDebug(String msg) {
-    setState(() => _debugInfo = msg);
-    print("🔍 DEBUG: $msg");
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && !_isDisposed) setState(() => _showTutorial = false);
+    });
   }
 
   @override
@@ -491,201 +415,123 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     widget.controller.verify(code);
   }
 
-  // ===============================
-  // ✅ BUILD WITH DEBUG OVERLAY
-  // ===============================
+  // ===========================================
+  // ✅ FIX: KIRA SAIZ SEBELUM MASUK LAYOUT
+  // ===========================================
   @override
   Widget build(BuildContext context) {
-    _updateDebug("build() called");
+    // 1. Dapatkan saiz skrin
+    final Size screenSize = MediaQuery.of(context).size;
     
-    final state = widget.controller.state;
+    // 2. Kira lebar kad secara manual (Maksimum 400px, atau 90% skrin)
+    // Ini memastikan kad sentiasa ada lebar, takkan jadi 0.
+    final double cardWidth = min(screenSize.width * 0.90, 420.0);
     
-    Color activeColor = state == SecurityState.HARD_LOCK
-        ? _accentRed
-        : state == SecurityState.UNLOCKED
-            ? _successGreen
-            : _accentOrange;
+    // 3. Kira tinggi roda berdasarkan aspek rasio (471/626)
+    final double wheelHeight = cardWidth * (_imageHeight / _imageWidth);
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // MAIN CONTENT
-          SafeArea(
-            child: DebugErrorBoundary(
-              widgetName: "Main Content",
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: DebugErrorBoundary(
-                      widgetName: "Container Stack",
-                      child: Stack(
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) {
+        final state = widget.controller.state;
+        Color activeColor = state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
+
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: SizedBox.expand( 
+            child: Center( // Centerkan semua benda
+              child: SingleChildScrollView( // Kalau skrin pendek, boleh scroll
+                child: Container(
+                  width: cardWidth, // 🔥 PAKSA LEBAR DI SINI
+                  // Tinggi akan ikut content (Column)
+                  
+                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECEFF1), // Bone White
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.black12, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black87,
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min, // Bungkus ketat-ketat
+                    children: [
+                      // LOGO
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          DebugErrorBoundary(
-                            widgetName: "Main Container",
-                            child: _buildMainContainer(activeColor, state),
+                          Icon(
+                            Icons.security,
+                            color: const Color(0xFFFF6F00),
+                            size: 42,
                           ),
-                          if (_showTutorial && state == SecurityState.LOCKED)
-                            DebugErrorBoundary(
-                              widgetName: "Tutorial Overlay",
-                              child: Positioned.fill(
-                                child: TutorialOverlay(
-                                  isVisible: true,
-                                  color: activeColor,
-                                ),
-                              ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            "Z-KINETIC",
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              color: Color(0xFFFF6F00),
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 3,
+                              fontSize: 18,
                             ),
+                          ),
                         ],
                       ),
-                    ),
+
+                      const SizedBox(height: 35),
+                      
+                      // RODA (Pass saiz yang dah kira tadi)
+                      _buildWheelSystemFixed(cardWidth, wheelHeight, activeColor, state),
+                      
+                      const SizedBox(height: 20),
+                      _buildSensorRow(activeColor),
+                      
+                      if (state == SecurityState.HARD_LOCK) ...[
+                        const SizedBox(height: 12),
+                        _buildWarningBanner(),
+                      ],
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
-          
-          // ✅ DEBUG INFO OVERLAY (TOP LEFT)
-          Positioned(
-            top: 50,
-            left: 10,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '🔍 DEBUG',
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _debugInfo,
-                    style: const TextStyle(color: Colors.white, fontSize: 9),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'State: ${state.toString().split('.').last}',
-                    style: const TextStyle(color: Colors.yellow, fontSize: 9),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-Widget _buildMainContainer(Color activeColor, SecurityState state) {
-    return Container(
-      width: 350,  // <--- TAMBAH INI (Paksa lebar)
-      // height: 600, // <--- Kalau masih tak jadi, uncomment ini pula
-      
-      decoration: BoxDecoration(
-        color: const Color(0xFFECEFF1),
-        // ... kod lain sama ...
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black12),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black87,
-            blurRadius: 30,
-            spreadRadius: 5,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Column(
-            children: [
-              Icon(
-                Icons.security,
-                color: Color(0xFFFF6F00),
-                size: 42,
-              ),
-              SizedBox(height: 8),
-              Text(
-                "Z-KINETIC",
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  color: Color(0xFFFF6F00),
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 3,
-                  fontSize: 18,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 35),
-          DebugErrorBoundary(
-            widgetName: "Wheel System",
-            child: _buildWheelSystem(activeColor, state),
-          ),
-          const SizedBox(height: 20),
-          DebugErrorBoundary(
-            widgetName: "Sensor Row",
-            child: _buildSensorRow(activeColor),
-          ),
-          if (state == SecurityState.HARD_LOCK) ...[
-            const SizedBox(height: 12),
-            DebugErrorBoundary(
-              widgetName: "Warning Banner",
-              child: _buildWarningBanner(),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWheelSystem(Color activeColor, SecurityState state) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _updateDebug("Wheel constraints: ${constraints.maxWidth}");
-        
-        double availableWidth = constraints.maxWidth;
-        double aspectRatio = _imageWidth / _imageHeight;
-        double calculatedHeight = availableWidth / aspectRatio;
-
-        return SizedBox(
-          width: availableWidth,
-          height: calculatedHeight,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/z_wheel.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stack) {
-                    return Container(
-                      color: Colors.red.shade200,
-                      child: const Center(
-                        child: Text('IMAGE ERROR'),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              ..._buildWheelOverlays(availableWidth, calculatedHeight, activeColor, state),
-              _buildPhantomButton(availableWidth, calculatedHeight),
-            ],
           ),
         );
       },
+    );
+  }
+
+  // ✅ METHOD BARU: Guna fixed width/height, bukan LayoutBuilder
+  Widget _buildWheelSystemFixed(double width, double height, Color activeColor, SecurityState state) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/z_wheel.png',
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey),
+            ),
+          ),
+          ..._buildWheelOverlays(width, height, activeColor, state),
+          _buildPhantomButton(width, height),
+          Positioned.fill(
+            child: TutorialOverlay(
+              isVisible: _showTutorial && state == SecurityState.LOCKED,
+              color: activeColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -707,7 +553,6 @@ Widget _buildMainContainer(Color activeColor, SecurityState state) {
       height: actualHeight,
       child: GestureDetector(
         onTap: _handlePhantomButtonTap,
-        behavior: HitTestBehavior.opaque,
         child: Container(
           color: Colors.transparent,
         ),
@@ -760,7 +605,9 @@ Widget _buildMainContainer(Color activeColor, SecurityState state) {
 
   Widget _buildAdvancedWheel(int index, double wheelHeight, Color activeColor) {
     bool isActive = _activeWheelIndex == index;
-    double itemExtent = wheelHeight * 0.40;
+    // PENTING: Item extent tak boleh 0. Kalau wheelHeight 0, app crash.
+    // Tapi sebab kita dah hardcode wheelHeight > 0, ini selamat.
+    double itemExtent = wheelHeight * 0.40; 
     
     return GestureDetector(
       onTapDown: (_) {
@@ -772,7 +619,6 @@ Widget _buildMainContainer(Color activeColor, SecurityState state) {
       },
       onTapUp: (_) => _resetActiveWheelTimer(),
       onTapCancel: () => _resetActiveWheelTimer(),
-      behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: isActive ? 1.03 : 1.0,
         duration: const Duration(milliseconds: 200),
@@ -797,7 +643,7 @@ Widget _buildMainContainer(Color activeColor, SecurityState state) {
                       style: TextStyle(
                         fontSize: wheelHeight * 0.30,
                         fontWeight: FontWeight.w900,
-                        color: const Color(0xFF263238),
+                        color: const Color(0xFF263238), 
                         height: 1.0,
                         shadows: [
                           Shadow(
@@ -818,7 +664,7 @@ Widget _buildMainContainer(Color activeColor, SecurityState state) {
               ),
             ),
             if (isActive)
-              IgnorePointer(
+              Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
@@ -834,7 +680,7 @@ Widget _buildMainContainer(Color activeColor, SecurityState state) {
                 ),
               ),
             if (isActive)
-              IgnorePointer(
+              Positioned.fill(
                 child: AnimatedBuilder(
                   animation: _scanController,
                   builder: (context, child) => CustomPaint(
