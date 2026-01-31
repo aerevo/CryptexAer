@@ -8,10 +8,7 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 Z-KINETIC CORE - V44.0 FINAL
-// FIX: CONSTRAINT-CORRECT CENTERING
-// NO Column(mainAxisSize.min) TRAP
-// ALIGN + CONSTRAINEDBOX APPROACH
+// 🔥 Z-KINETIC CORE - FIXED CENTERING
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -349,24 +346,21 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     if (state == SecurityState.UNLOCKED) {
       widget.onSuccess?.call();
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const SuccessScreen(message: "Access Granted")),
+        MaterialPageRoute(
+          builder: (context) => const SuccessScreen(
+            message: "Access granted, Captain.",
+          ),
+        ),
       );
-    } else if (state == SecurityState.LOCKED) {
-       // Logic handled
     } else if (state == SecurityState.HARD_LOCK) {
       widget.onJammed?.call();
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => CompactFailDialog(message: "SYSTEM HALTED", accentColor: _accentOrange),
-      );
     }
   }
 
   void _onAccelerometer(AccelerometerEvent event) {
     if (_isDisposed) return;
     double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-    double normalized = (magnitude / 20.0).clamp(0.0, 1.0);
+    double normalized = (magnitude / 20).clamp(0.0, 1.0);
     _motionScoreNotifier.value = normalized;
     widget.controller.registerMotion(event.x, event.y, event.z, DateTime.now());
   }
@@ -414,47 +408,48 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   // ===============================
-  // ✅ BUILD METHOD - CONSTRAINT-CORRECT
+  // ✅ FIXED BUILD METHOD - PROPER CENTERING
   // ===============================
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: Colors.black,
-    body: SafeArea(
-      child: Align(
-        alignment: Alignment.topCenter, // ⬅️ ANCHOR MUTLAK
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 420, // ⬅️ WIDTH REAL
-            ),
-            child: CryptexLock(
-              controller: controller,
-              onSuccess: () {},
-              onFail: () {},
-              onJammed: () {},
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.controller.state;
+    
+    Color activeColor = state == SecurityState.HARD_LOCK
+        ? _accentRed
+        : state == SecurityState.UNLOCKED
+            ? _successGreen
+            : _accentOrange;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Center(  // ✅ INI YANG PENTING - CENTER!
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 420,
+                ),
+                child: Stack(
+                  children: [
+                    // Main content
+                    _buildMainContainer(activeColor, state),
+                    
+                    // Tutorial overlay
+                    Positioned.fill(
+                      child: TutorialOverlay(
+                        isVisible: _showTutorial && state == SecurityState.LOCKED,
+                        color: activeColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
-
-              // ===============================
-              // TUTORIAL OVERLAY
-              // ===============================
-              Positioned.fill(
-                child: TutorialOverlay(
-                  isVisible: _showTutorial && state == SecurityState.LOCKED,
-                  color: activeColor,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
