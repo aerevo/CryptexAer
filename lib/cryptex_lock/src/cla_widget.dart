@@ -416,40 +416,31 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   // ===============================
   // ✅ BUILD METHOD - CONSTRAINT-CORRECT
   // ===============================
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.controller,
-      builder: (context, _) {
-        final state = widget.controller.state;
-        final Color activeColor =
-            state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
-
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            children: [
-              // ===============================
-              // MAIN CONTENT (CENTER FIXED)
-              // ===============================
-              SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(),
-                child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40), // ✅ REAL SPACING
-                child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                maxWidth: 420, // ✅ HARD CAP (UX BETUL)
-              ),
-                child: SizedBox(
-                width: double.infinity, // ✅ FORCE CENTER FILL
-               child: _buildMainContainer(activeColor, state),
-              ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.black,
+    body: SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter, // ⬅️ ANCHOR MUTLAK
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 420, // ⬅️ WIDTH REAL
+            ),
+            child: CryptexLock(
+              controller: controller,
+              onSuccess: () {},
+              onFail: () {},
+              onJammed: () {},
             ),
           ),
         ),
       ),
+    ),
+  );
+}
 
               // ===============================
               // TUTORIAL OVERLAY
