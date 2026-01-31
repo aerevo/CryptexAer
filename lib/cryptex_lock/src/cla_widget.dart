@@ -8,10 +8,10 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// VERSION: V41.0 (CENTER FIXED - CONFIRM)
-// FIX: REVERT KE STRUKTUR LAMA YANG WORKS
-// THEME: BONE WHITE + DARK TEXT
+// 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI  
+// VERSION: V42.0 (PADDING APPROACH)
+// FIX: GUNA PADDING INSTEAD OF WIDTH
+// CONFIRM CENTER KALI NI!
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -235,7 +235,6 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// 🔥 MAIN WIDGET - V41.0
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -414,8 +413,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     widget.controller.verify(code);
   }
 
-  // ✅ V41.0 - REVERT KE STRUKTUR LAMA YANG WORKS
-  // Struktur: Center → SingleChildScrollView → Column(crossAxisAlignment: center) → Container
+  // ✅ V42.0 - PADDING APPROACH (NO WIDTH CALCULATION)
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -426,70 +424,75 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
         return Scaffold(
           backgroundColor: Colors.black,
-          body: Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,  // ✅ INI yang center the container
-                children: [
-                  const SizedBox(height: 50),
+          body: SafeArea(  // ✅ Tambah SafeArea
+            child: Center(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 50),
 
-                  // ✅ CONTAINER - BONE WHITE THEME
-                  Container(
-                    width: MediaQuery.of(context).size.width * 0.92,  // ✅ 0.92 = spacing tepi lebih cantik
-                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECEFF1),  // ✅ Bone White (tukar dari 0x1E1E1E)
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.black12, width: 1),  // ✅ Tukar dari white12
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black87,
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // LOGO & NAMA
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.security,
-                              color: const Color(0xFFFF6F00),
-                              size: 42,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Z-KINETIC",
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                color: Color(0xFFFF6F00),
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 3,
-                                fontSize: 18,
-                              ),
+                    // ✅ GUNA PADDING APPROACH - NO WIDTH!
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),  // ✅ Simple padding
+                      child: Container(
+                        // ❌ NO width: MediaQuery... 
+                        // Container akan auto expand dengan padding constraint
+                        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECEFF1),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.black12, width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black87,
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.security,
+                                  color: const Color(0xFFFF6F00),
+                                  size: 42,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  "Z-KINETIC",
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    color: Color(0xFFFF6F00),
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 3,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
 
-                        const SizedBox(height: 35),
-                        _buildWheelSystem(activeColor, state),
-                        const SizedBox(height: 20),
-                        _buildSensorRow(activeColor),
-                        
-                        if (state == SecurityState.HARD_LOCK) ...[
-                          const SizedBox(height: 12),
-                          _buildWarningBanner(),
-                        ],
-                      ],
+                            const SizedBox(height: 35),
+                            _buildWheelSystem(activeColor, state),
+                            const SizedBox(height: 20),
+                            _buildSensorRow(activeColor),
+                            
+                            if (state == SecurityState.HARD_LOCK) ...[
+                              const SizedBox(height: 12),
+                              _buildWarningBanner(),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -641,7 +644,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                       style: TextStyle(
                         fontSize: wheelHeight * 0.30,
                         fontWeight: FontWeight.w900,
-                        color: const Color(0xFF263238),  // ✅ Dark text for Bone White bg
+                        color: const Color(0xFF263238),
                         height: 1.0,
                         shadows: [
                           Shadow(
