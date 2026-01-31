@@ -1,3 +1,4 @@
+```dart
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -9,9 +10,9 @@ import 'cla_models.dart';
 
 // ============================================
 // 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// VERSION: V39.0 (AUTO CENTER FIX)
-// FIX: FRACTIONALLYSIZEDBOX - CONFIRM CENTER!
-// THEME: BONE WHITE + DARK TEXT
+// VERSION: V40.0 (FINAL CENTER FIX)
+// FIX: DOUBLE CENTER + OPTIMIZED WIDTHFACTOR
+// CONFIRM CENTER KALI NI!
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -235,7 +236,7 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// 🔥 MAIN WIDGET - V39.0 AUTO CENTER
+// 🔥 MAIN WIDGET - V40.0 FINAL CENTER FIX
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -283,7 +284,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   final Color _accentRed = const Color(0xFFD32F2F);
   final Color _successGreen = const Color(0xFF4CAF50);
 
-  // ✅ KEKALKAN KOORDINAT (626x471)
   final double _imageWidth = 626.0;
   final double _imageHeight = 471.0;
 
@@ -415,7 +415,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     widget.controller.verify(code);
   }
 
-  // ✅ BUILD METHOD - V39.0 AUTO CENTER FIX
+  // ✅ BUILD METHOD - V40.0 FINAL CENTER FIX
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -426,69 +426,64 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
         return Scaffold(
           backgroundColor: Colors.black,
-          body: Center(  // ✅ Center vertical
-            child: FractionallySizedBox(  // ✅ AUTO CENTER HORIZONTAL!
-              widthFactor: 0.9,  // 90% screen width, 10% auto spacing (5% kiri + 5% kanan)
-              child: SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(),
-                child: Container(
-                  // ❌ BUANG width: MediaQuery... (FractionallySizedBox dah handle!)
-                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFECEFF1), // Bone White
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.black12, width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black87,
-                        blurRadius: 30,
-                        spreadRadius: 5,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // LOGO & NAMA (DALAM CONTAINER)
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.security,
-                            color: const Color(0xFFFF6F00),
-                            size: 42,
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            "Z-KINETIC",
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              color: Color(0xFFFF6F00),
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 3,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 35),
-                      
-                      // RODA
-                      _buildWheelSystem(activeColor, state),
-                      
-                      const SizedBox(height: 20),
-                      
-                      // SENSOR
-                      _buildSensorRow(activeColor),
-                      
-                      // AMARAN JIKA JAMMED
-                      if (state == SecurityState.HARD_LOCK) ...[
-                        const SizedBox(height: 12),
-                        _buildWarningBanner(),
+          body: Center(  // ✅ Center vertical & horizontal
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Center(  // ✅ DOUBLE CENTER - Force centerkan container!
+                child: FractionallySizedBox(
+                  widthFactor: 0.88,  // ✅ 88% width = 12% spacing (6% kiri + 6% kanan)
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECEFF1), // Bone White
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.black12, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black87,
+                          blurRadius: 30,
+                          spreadRadius: 5,
+                          offset: const Offset(0, 10),
+                        ),
                       ],
-                    ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // LOGO & NAMA
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.security,
+                              color: const Color(0xFFFF6F00),
+                              size: 42,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              "Z-KINETIC",
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                color: Color(0xFFFF6F00),
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 3,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 35),
+                        _buildWheelSystem(activeColor, state),
+                        const SizedBox(height: 20),
+                        _buildSensorRow(activeColor),
+                        
+                        if (state == SecurityState.HARD_LOCK) ...[
+                          const SizedBox(height: 12),
+                          _buildWarningBanner(),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ),
