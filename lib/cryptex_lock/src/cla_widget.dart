@@ -9,9 +9,9 @@ import 'cla_models.dart';
 
 // ============================================
 // 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// VERSION: V40.0 (FINAL CENTER FIX)
-// FIX: DOUBLE CENTER + OPTIMIZED WIDTHFACTOR
-// CONFIRM CENTER KALI NI!
+// VERSION: V42.0 (THE PERFECT HYBRID)
+// LAYOUT: BASED ON V36 (PROVEN CENTER)
+// THEME: BONE WHITE (V41)
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -235,7 +235,7 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// 🔥 MAIN WIDGET - V40.0 FINAL CENTER FIX
+// 🔥 MAIN WIDGET - V42.0 PERFECT HYBRID
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -283,6 +283,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   final Color _accentRed = const Color(0xFFD32F2F);
   final Color _successGreen = const Color(0xFF4CAF50);
 
+  // ✅ KEKALKAN KOORDINAT (626x471)
   final double _imageWidth = 626.0;
   final double _imageHeight = 471.0;
 
@@ -414,7 +415,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     widget.controller.verify(code);
   }
 
-  // ✅ BUILD METHOD - V40.0 FINAL CENTER FIX
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -425,14 +425,21 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
         return Scaffold(
           backgroundColor: Colors.black,
-          body: Center(  // ✅ Center vertical & horizontal
+          // ✅ FIX: STRUKTUR V36 (CENTER > SCROLL > COLUMN)
+          body: Center(
             child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              child: Center(  // ✅ DOUBLE CENTER - Force centerkan container!
-                child: FractionallySizedBox(
-                  widthFactor: 0.88,  // ✅ 88% width = 12% spacing (6% kiri + 6% kanan)
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+              physics: const NeverScrollableScrollPhysics(), // Biar roda je pusing
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center, // WAJIB ADA
+                children: [
+                  
+                  const SizedBox(height: 50),
+
+                  // ✅ TEMA V41 (BONE WHITE)
+                  Container(
+                    width: MediaQuery.of(context).size.width * 0.96, // LEBAR ASAL CAPTAIN
+                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
                     decoration: BoxDecoration(
                       color: const Color(0xFFECEFF1), // Bone White
                       borderRadius: BorderRadius.circular(24),
@@ -449,7 +456,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // LOGO & NAMA
+                        // LOGO
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -484,7 +491,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -636,6 +643,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                       style: TextStyle(
                         fontSize: wheelHeight * 0.30,
                         fontWeight: FontWeight.w900,
+                        // ✅ TEKS GELAP (V41)
                         color: const Color(0xFF263238), 
                         height: 1.0,
                         shadows: [
