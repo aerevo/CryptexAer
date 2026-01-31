@@ -8,9 +8,9 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-//  Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// VERSION: V36.0 (FIXED FOR RELEASE BUILD)
-// STATUS: CHANGENOTIFIER COMPATIBLE
+// 🔥 Z-KINETIC CORE - V43.0 FINAL FIX
+// STRUKTUR: PADDING APPROACH (NO WIDTH)
+// CONFIRMED CENTER METHOD FROM V15.1
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -234,7 +234,6 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-//  MAIN WIDGET - HYBRID FIXED VERSION
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -282,7 +281,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   final Color _accentRed = const Color(0xFFD32F2F);
   final Color _successGreen = const Color(0xFF4CAF50);
 
-  //  KEKALKAN KOORDINAT ASAL CAPTAIN
   final double _imageWidth = 626.0;
   final double _imageHeight = 471.0;
 
@@ -310,7 +308,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
 
-    //  FIX 1: Listen to controller directly (ChangeNotifier pattern)
     widget.controller.addListener(_onStateChange);
 
     _accelSub = accelerometerEventStream(samplingPeriod: const Duration(milliseconds: 100))
@@ -331,7 +328,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _accelSub?.cancel();
     _gyroSub?.cancel();
     _wheelActiveTimer?.cancel();
-    //  FIX 2: Remove listener from controller directly
     widget.controller.removeListener(_onStateChange);
 
     for (var c in _scrollControllers) {
@@ -347,7 +343,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _onStateChange() {
     if (!mounted || _isDisposed) return;
     
-    //  FIX 3: Direct access to state (no .value)
     final state = widget.controller.state;
 
     if (state == SecurityState.UNLOCKED) {
@@ -355,11 +350,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const SuccessScreen(message: "Access Granted")),
       );
-    //  FIX 4: Use 'LOCKED' + logic or 'ATTEMPT_FAILED' if exists. 
-    // Hamba guna LOCKED untuk selamat jika FAILED tiada dalam enum
     } else if (state == SecurityState.LOCKED) {
-        // Semak jika ada error flag dalam controller (optional)
-        // Buat masa ini kita biarkan kosong atau tambah logic fail di sini
+       // Logic handled
     } else if (state == SecurityState.HARD_LOCK) {
       widget.onJammed?.call();
       showDialog(
@@ -368,9 +360,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         builder: (_) => CompactFailDialog(message: "SYSTEM HALTED", accentColor: _accentOrange),
       );
     }
-    
-    // Fallback detection untuk failed attempt (jika controller trigger notify tapi masih locked)
-    // Note: Biasanya controller akan handle UI fail, tapi kita standby di sini
   }
 
   void _onAccelerometer(AccelerometerEvent event) {
@@ -378,20 +367,17 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
     double normalized = (magnitude / 20.0).clamp(0.0, 1.0);
     _motionScoreNotifier.value = normalized;
-    
     widget.controller.registerMotion(event.x, event.y, event.z, DateTime.now());
   }
 
   void _onGyroscope(GyroscopeEvent event) {
     if (_isDisposed) return;
-    
     widget.controller.registerMotion(event.x, event.y, event.z, DateTime.now());
   }
 
   void _userInteracted() {
     double touchScore = Random().nextDouble() * 0.4 + 0.6;
     _touchScoreNotifier.value = touchScore;
-    
     widget.controller.registerTouch(Offset.zero, touchScore, DateTime.now());
   }
 
@@ -423,89 +409,96 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     HapticFeedback.mediumImpact();
     _userInteracted();
     List<int> code = _getCurrentCode();
-    // Verify akan trigger listener jika state berubah
     widget.controller.verify(code);
   }
 
+  // ✅ V43.0 - FOLLOW V15.1 STRUCTURE (PADDING, NO WIDTH)
   @override
   Widget build(BuildContext context) {
-    //  FIX 5: Guna AnimatedBuilder untuk ChangeNotifier
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
-        final state = widget.controller.state; // Direct access
+        final state = widget.controller.state;
         Color activeColor = state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
 
         return Scaffold(
           backgroundColor: Colors.black,
-          body: Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  
-                  //  RUANG KOSONG DI ATAS (SPACER)
-                  const SizedBox(height: 50),
+          body: Stack(
+            children: [
+              SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),  // ✅ PADDING APPROACH
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 10),
 
-                  //  CONTAINER DENGAN LEBAR 96% + LOGO DI DALAM
-                  Container(
-                    width: MediaQuery.of(context).size.width * 0.96,
-                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white12, width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black87,
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        //  LOGO & NAMA DI DALAM CONTAINER
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.security,
-                              color: const Color(0xFFFF6F00),
-                              size: 42,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Z-KINETIC",
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                color: Color(0xFFFF6F00),
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 3,
-                                fontSize: 18,
-                              ),
+                      // ✅ CONTAINER - NO WIDTH!
+                      Container(
+                        // ❌ NO width: MediaQuery...
+                        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECEFF1),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.black12, width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black87,
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.security,
+                                  color: const Color(0xFFFF6F00),
+                                  size: 42,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  "Z-KINETIC",
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    color: Color(0xFFFF6F00),
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 3,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
 
-                        const SizedBox(height: 35),
-                        _buildWheelSystem(activeColor, state),
-                        const SizedBox(height: 20),
-                        _buildSensorRow(activeColor),
-                        
-                        if (state == SecurityState.HARD_LOCK) ...[
-                          const SizedBox(height: 12),
-                          _buildWarningBanner(),
-                        ],
-                      ],
-                    ),
+                            const SizedBox(height: 35),
+                            _buildWheelSystem(activeColor, state),
+                            const SizedBox(height: 20),
+                            _buildSensorRow(activeColor),
+                            
+                            if (state == SecurityState.HARD_LOCK) ...[
+                              const SizedBox(height: 12),
+                              _buildWarningBanner(),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+              Positioned.fill(
+                child: TutorialOverlay(
+                  isVisible: _showTutorial && state == SecurityState.LOCKED,
+                  color: activeColor,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -535,12 +528,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                   ..._buildWheelOverlays(availableWidth, calculatedHeight, activeColor, state),
                   _buildPhantomButton(availableWidth, calculatedHeight),
                 ],
-              ),
-            ),
-            Positioned.fill(
-              child: TutorialOverlay(
-                isVisible: _showTutorial && state == SecurityState.LOCKED,
-                color: activeColor,
               ),
             ),
           ],
@@ -655,18 +642,18 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                       style: TextStyle(
                         fontSize: wheelHeight * 0.30,
                         fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                        color: const Color(0xFF263238),
                         height: 1.0,
                         shadows: [
                           Shadow(
-                            offset: const Offset(2, 2),
-                            blurRadius: 4,
-                            color: Colors.black.withOpacity(0.8),
+                            offset: const Offset(1, 1),
+                            blurRadius: 2,
+                            color: Colors.white.withOpacity(0.5),
                           ),
                           Shadow(
                             offset: const Offset(-1, -1),
                             blurRadius: 2,
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.black.withOpacity(0.1),
                           ),
                         ],
                       ),
