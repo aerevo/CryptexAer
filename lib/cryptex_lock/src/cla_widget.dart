@@ -8,7 +8,7 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 Z-KINETIC CORE - FIXED CENTERING
+// 🔥 Z-KINETIC CORE - PROPERLY FIXED
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -346,21 +346,24 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     if (state == SecurityState.UNLOCKED) {
       widget.onSuccess?.call();
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const SuccessScreen(
-            message: "Access granted, Captain.",
-          ),
-        ),
+        MaterialPageRoute(builder: (_) => const SuccessScreen(message: "Access Granted")),
       );
+    } else if (state == SecurityState.LOCKED) {
+       // Logic handled
     } else if (state == SecurityState.HARD_LOCK) {
       widget.onJammed?.call();
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => CompactFailDialog(message: "SYSTEM HALTED", accentColor: _accentOrange),
+      );
     }
   }
 
   void _onAccelerometer(AccelerometerEvent event) {
     if (_isDisposed) return;
     double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-    double normalized = (magnitude / 20).clamp(0.0, 1.0);
+    double normalized = (magnitude / 20.0).clamp(0.0, 1.0);
     _motionScoreNotifier.value = normalized;
     widget.controller.registerMotion(event.x, event.y, event.z, DateTime.now());
   }
@@ -408,7 +411,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   // ===============================
-  // ✅ FIXED BUILD METHOD - PROPER CENTERING
+  // ✅ PROPER BUILD METHOD
   // ===============================
   @override
   Widget build(BuildContext context) {
@@ -422,45 +425,51 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Center(  // ✅ INI YANG PENTING - CENTER!
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 420,
-                ),
-                child: Stack(
-                  children: [
-                    // Main content
-                    _buildMainContainer(activeColor, state),
-                    
-                    // Tutorial overlay
-                    Positioned.fill(
-                      child: TutorialOverlay(
-                        isVisible: _showTutorial && state == SecurityState.LOCKED,
-                        color: activeColor,
-                      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                    maxWidth: 420,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Stack(
+                          children: [
+                            _buildMainContainer(activeColor, state),
+                            Positioned.fill(
+                              child: TutorialOverlay(
+                                isVisible: _showTutorial && state == SecurityState.LOCKED,
+                                color: activeColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  // ===============================
-  // ✅ MAIN CONTAINER (CLEAN & READABLE)
-  // ===============================
   Widget _buildMainContainer(Color activeColor, SecurityState state) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
       decoration: BoxDecoration(
-        color: const Color(0xFFECEFF1), // Bone White
+        color: const Color(0xFFECEFF1),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.black12),
         boxShadow: const [
@@ -475,9 +484,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ===============================
-          // HEADER
-          // ===============================
           const Column(
             children: [
               Icon(
@@ -498,24 +504,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               ),
             ],
           ),
-
           const SizedBox(height: 35),
-
-          // ===============================
-          // WHEEL SYSTEM
-          // ===============================
           _buildWheelSystem(activeColor, state),
-
           const SizedBox(height: 20),
-
-          // ===============================
-          // SENSOR STATUS
-          // ===============================
           _buildSensorRow(activeColor),
-
-          // ===============================
-          // HARD LOCK WARNING
-          // ===============================
           if (state == SecurityState.HARD_LOCK) ...[
             const SizedBox(height: 12),
             _buildWarningBanner(),
@@ -532,25 +524,21 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         double aspectRatio = _imageWidth / _imageHeight;
         double calculatedHeight = availableWidth / aspectRatio;
 
-        return Stack(
-          children: [
-            SizedBox(
-              width: availableWidth,
-              height: calculatedHeight,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.asset(
-                      'assets/z_wheel.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  ..._buildWheelOverlays(availableWidth, calculatedHeight, activeColor, state),
-                  _buildPhantomButton(availableWidth, calculatedHeight),
-                ],
+        return SizedBox(
+          width: availableWidth,
+          height: calculatedHeight,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/z_wheel.png',
+                  fit: BoxFit.contain,
+                ),
               ),
-            ),
-          ],
+              ..._buildWheelOverlays(availableWidth, calculatedHeight, activeColor, state),
+              _buildPhantomButton(availableWidth, calculatedHeight),
+            ],
+          ),
         );
       },
     );
@@ -574,6 +562,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       height: actualHeight,
       child: GestureDetector(
         onTap: _handlePhantomButtonTap,
+        behavior: HitTestBehavior.opaque,
         child: Container(
           color: Colors.transparent,
         ),
@@ -638,6 +627,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       },
       onTapUp: (_) => _resetActiveWheelTimer(),
       onTapCancel: () => _resetActiveWheelTimer(),
+      behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: isActive ? 1.03 : 1.0,
         duration: const Duration(milliseconds: 200),
@@ -683,7 +673,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               ),
             ),
             if (isActive)
-              Positioned.fill(
+              IgnorePointer(
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
@@ -699,7 +689,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                 ),
               ),
             if (isActive)
-              Positioned.fill(
+              IgnorePointer(
                 child: AnimatedBuilder(
                   animation: _scanController,
                   builder: (context, child) => CustomPaint(
