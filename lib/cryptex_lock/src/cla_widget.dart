@@ -9,9 +9,8 @@ import 'cla_models.dart';
 
 // ============================================
 // 🔥 Z-KINETIC CORE - INDUSTRIAL SECURITY UI
-// VERSION: V38.0 (RECOVERY & STABILITY)
-// FIX: RESTORED SCROLLVIEW (PREVENT BLACK SCREEN)
-// FIX: LOCKED PAGE SCROLL (ALLOW WHEEL SPIN)
+// VERSION: V39.0 (AUTO CENTER FIX)
+// FIX: FRACTIONALLYSIZEDBOX - CONFIRM CENTER!
 // THEME: BONE WHITE + DARK TEXT
 // ============================================
 
@@ -236,7 +235,7 @@ class _CompactFailDialogState extends State<CompactFailDialog> with SingleTicker
   }
 }
 
-// 🔥 MAIN WIDGET - V38.0 STABLE
+// 🔥 MAIN WIDGET - V39.0 AUTO CENTER
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -416,7 +415,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     widget.controller.verify(code);
   }
 
-@override
+  // ✅ BUILD METHOD - V39.0 AUTO CENTER FIX
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.controller,
@@ -426,13 +426,13 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
         return Scaffold(
           backgroundColor: Colors.black,
-          body: Center( // ✅ FIX: Centerkan keseluruhan body
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(), // Kunci page, biar roda je pusing
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0), // ✅ FIX: Padding kiri kanan seimbang
+          body: Center(  // ✅ Center vertical
+            child: FractionallySizedBox(  // ✅ AUTO CENTER HORIZONTAL!
+              widthFactor: 0.9,  // 90% screen width, 10% auto spacing (5% kiri + 5% kanan)
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
                 child: Container(
-                  // ❌ width: MediaQuery... (DIBUANG supaya ikut padding)
+                  // ❌ BUANG width: MediaQuery... (FractionallySizedBox dah handle!)
                   padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                   decoration: BoxDecoration(
                     color: const Color(0xFFECEFF1), // Bone White
@@ -642,7 +642,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                       style: TextStyle(
                         fontSize: wheelHeight * 0.30,
                         fontWeight: FontWeight.w900,
-                        // ✅ WARNA GELAP UNTUK BACKGROUND PUTIH
                         color: const Color(0xFF263238), 
                         height: 1.0,
                         shadows: [
