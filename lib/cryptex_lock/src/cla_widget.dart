@@ -426,76 +426,70 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
         return Scaffold(
           backgroundColor: Colors.black,
-          // ✅ FIX 1: Guna SizedBox.expand untuk paksa ambil 100% saiz skrin
-          body: SizedBox.expand(
-            child: Center(
-              child: SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(), // Kunci skrol
-                child: Column(
-                  // ✅ FIX 2: Pastikan Column duduk tengah
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.max, // Paksa maksimum
-                  children: [
-                    
-                    const SizedBox(height: 50),
-
-                    // ✅ CONTAINER (BONE WHITE) - AUTO CENTER
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),  // ← INI MAGIC NYA
-                      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFECEFF1), // Bone White
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.black12, width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black87,
-                            blurRadius: 30,
-                            spreadRadius: 5,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
+          body: Center( // ✅ FIX: Centerkan keseluruhan body
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(), // Kunci page, biar roda je pusing
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0), // ✅ FIX: Padding kiri kanan seimbang
+                child: Container(
+                  // ❌ width: MediaQuery... (DIBUANG supaya ikut padding)
+                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECEFF1), // Bone White
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.black12, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black87,
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                        offset: const Offset(0, 10),
                       ),
-                      child: Column(
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // LOGO & NAMA (DALAM CONTAINER)
+                      Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // LOGO (DALAM CONTAINER)
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.security,
-                                color: const Color(0xFFFF6F00),
-                                size: 42,
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                "Z-KINETIC",
-                                style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  color: Color(0xFFFF6F00),
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 3,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ],
+                          Icon(
+                            Icons.security,
+                            color: const Color(0xFFFF6F00),
+                            size: 42,
                           ),
-
-                          const SizedBox(height: 35),
-                          _buildWheelSystem(activeColor, state),
-                          const SizedBox(height: 20),
-                          _buildSensorRow(activeColor),
-                          
-                          if (state == SecurityState.HARD_LOCK) ...[
-                            const SizedBox(height: 12),
-                            _buildWarningBanner(),
-                          ],
+                          const SizedBox(height: 8),
+                          const Text(
+                            "Z-KINETIC",
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              color: Color(0xFFFF6F00),
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 3,
+                              fontSize: 18,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 35),
+                      
+                      // RODA
+                      _buildWheelSystem(activeColor, state),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // SENSOR
+                      _buildSensorRow(activeColor),
+                      
+                      // AMARAN JIKA JAMMED
+                      if (state == SecurityState.HARD_LOCK) ...[
+                        const SizedBox(height: 12),
+                        _buildWarningBanner(),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),
