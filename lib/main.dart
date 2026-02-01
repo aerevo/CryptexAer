@@ -25,9 +25,11 @@ class ImageTestScreen extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            vertical: 24,
-            horizontal: 24,
+          padding: const EdgeInsets.only(
+            top: 24,    // ✅ Padding atas bawah je
+            bottom: 24,
+            left: 0,    // ✅ KIRI 0
+            right: 0,   // ✅ KANAN 0
           ),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
@@ -64,40 +66,34 @@ class ImageTestScreen extends StatelessWidget {
               
               const SizedBox(height: 30),
               
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Image.asset(
-                      'assets/z_wheel.png',
-                      width: constraints.maxWidth,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: constraints.maxWidth,
-                          height: 300,
-                          color: Colors.red,
-                          child: const Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.error, color: Colors.white, size: 60),
-                                SizedBox(height: 10),
-                                Text(
-                                  'IMAGE ERROR',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                  ),
-                                ),
-                              ],
+              // ✅ GAMBAR TANPA BORDER RADIUS, FULL WIDTH
+              Image.asset(
+                'assets/z_wheel.png',
+                width: double.infinity,  // ✅ FULL WIDTH
+                fit: BoxFit.cover,       // ✅ COVER PENUH
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: double.infinity,
+                    height: 300,
+                    color: Colors.red,
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.error, color: Colors.white, size: 60),
+                          SizedBox(height: 10),
+                          Text(
+                            'IMAGE ERROR',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
                             ),
                           ),
-                        );
-                      },
-                    );
-                  },
-                ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
               
               const SizedBox(height: 24),
