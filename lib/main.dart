@@ -27,7 +27,7 @@ class ImageTestScreen extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(
             vertical: 24,
-            horizontal: 24, // Padding atas bawah je, bukan kiri kanan gambar
+            horizontal: 24,
           ),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
@@ -45,7 +45,6 @@ class ImageTestScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header icon
               const Icon(
                 Icons.security,
                 color: Color(0xFFFF6F00),
@@ -53,7 +52,6 @@ class ImageTestScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               
-              // Title
               const Text(
                 'Z-KINETIC',
                 style: TextStyle(
@@ -66,16 +64,14 @@ class ImageTestScreen extends StatelessWidget {
               
               const SizedBox(height: 30),
               
-              // ✅ GAMBAR FULL WIDTH - NO SIDE SPACING
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    // ✅ GUNA FULL WIDTH CONTAINER
                     return Image.asset(
                       'assets/z_wheel.png',
-                      width: constraints.maxWidth, // ✅ FULL WIDTH!
-                      fit: BoxFit.cover, // ✅ COVER = ZOOM FILL
+                      width: constraints.maxWidth,
+                      fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           width: constraints.maxWidth,
@@ -106,7 +102,6 @@ class ImageTestScreen extends StatelessWidget {
               
               const SizedBox(height: 24),
               
-              // Status row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -143,3 +138,4 @@ class ImageTestScreen extends StatelessWidget {
       ],
     );
   }
+}
