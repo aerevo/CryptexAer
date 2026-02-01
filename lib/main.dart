@@ -26,14 +26,29 @@ class ImageTestScreen extends StatelessWidget {
       body: Center(
         child: Container(
           padding: const EdgeInsets.only(
-            top: 24,    // ✅ Padding atas bawah je
+            top: 24,
             bottom: 24,
-            left: 0,    // ✅ KIRI 0
-            right: 0,   // ✅ KANAN 0
+            left: 0,
+            right: 0,
           ),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            // ✅ PILIH SATU:
+            
+            // OPTION 1: Solid funky orange
+            color: const Color(0xFFFF5722),  // Material Deep Orange
+            
+            // OPTION 2: Gradient funky (UNCOMMENT ni, COMMENT line atas)
+            // gradient: const LinearGradient(
+            //   begin: Alignment.topLeft,
+            //   end: Alignment.bottomRight,
+            //   colors: [
+            //     Color(0xFFFF6F00),
+            //     Color(0xFFFF9800),
+            //     Color(0xFFFFB74D),
+            //   ],
+            // ),
+            
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -49,7 +64,7 @@ class ImageTestScreen extends StatelessWidget {
             children: [
               const Icon(
                 Icons.security,
-                color: Color(0xFFFF6F00),
+                color: Colors.white,  // ✅ TUKAR PUTIH sebab background oren
                 size: 48,
               ),
               const SizedBox(height: 12),
@@ -59,18 +74,17 @@ class ImageTestScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFFFF6F00),
+                  color: Colors.white,  // ✅ TUKAR PUTIH
                   letterSpacing: 3,
                 ),
               ),
               
               const SizedBox(height: 30),
               
-              // ✅ GAMBAR TANPA BORDER RADIUS, FULL WIDTH
               Image.asset(
                 'assets/z_wheel.png',
-                width: double.infinity,  // ✅ FULL WIDTH
-                fit: BoxFit.cover,       // ✅ COVER PENUH
+                width: double.infinity,
+                fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     width: double.infinity,
@@ -119,14 +133,14 @@ class ImageTestScreen extends StatelessWidget {
         Icon(
           icon,
           size: 24,
-          color: Colors.grey[400],
+          color: Colors.white70,  // ✅ TUKAR PUTIH sebab background oren
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 10,
-            color: Colors.grey[600],
+            color: Colors.white70,  // ✅ TUKAR PUTIH
             fontWeight: FontWeight.w600,
             letterSpacing: 1,
           ),
