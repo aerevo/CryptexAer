@@ -8,9 +8,9 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 Z-KINETIC CORE - V100.1 (FINAL FIXED VERSION)
-// STATUS: PRODUCTION READY - FULLY STABLE
-// LAYOUT: SCROLLABLE + CENTERED + PROPER CONSTRAINTS
+// 🔥 Z-KINETIC CORE - V100.2 (SUPER SIMPLE CENTER FIX)
+// STATUS: FIXED - CONTAINER PASTI CENTER
+// LAYOUT: SUPER SIMPLE - NO COMPLEX NESTING
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -377,7 +377,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   // ===========================================
-  // ✅ FINAL FIXED LAYOUT - NO MORE BLACK SCREEN
+  // ✅ FINAL - SUPER SIMPLE CENTER FIX
+  // TIDAK ADA LAYOUTBUILDER, CONSTRAINEDBOX, INTRINSICHEIGHT
   // ===========================================
   @override
   Widget build(BuildContext context) {
@@ -387,111 +388,94 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         final state = widget.controller.state;
         Color activeColor = state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
 
+        // KIRA SAIZ SEKALI GUS
+        final screenWidth = MediaQuery.of(context).size.width;
+        final cardWidth = min(screenWidth * 0.9, 420.0); // 90% screen atau max 420
+        final wheelHeight = cardWidth * (_imageHeight / _imageWidth);
+
         return Scaffold(
           backgroundColor: Colors.black,
           body: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Kira saiz kad secara automatik
-                final double cardWidth = min(constraints.maxWidth * 0.92, 420.0);
-                final double wheelHeight = cardWidth * (_imageHeight / _imageWidth);
-
-                return SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(), // ✅ Smooth scrolling
-                  child: ConstrainedBox(
-                    // ✅ FIX UTAMA: PAKSA tinggi minimum setinggi skrin
-                    constraints: BoxConstraints(
-                      minWidth: constraints.maxWidth,
-                      minHeight: constraints.maxHeight,
+            child: Center( // ✅ INI YANG PALING PENTING - CENTER
+              child: Container(
+                width: cardWidth, // ✅ SET WIDTH TETAP
+                margin: const EdgeInsets.all(20),
+                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECEFF1), // Bone White
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.black12, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black87,
+                      blurRadius: 30,
+                      spreadRadius: 5,
+                      offset: const Offset(0, 15),
                     ),
-                    child: IntrinsicHeight(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 30),
-                          child: Container(
-                            width: cardWidth,
-                            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 15),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFECEFF1), // Bone White
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(color: Colors.black12, width: 1),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black87,
-                                  blurRadius: 30,
-                                  spreadRadius: 5,
-                                  offset: const Offset(0, 15),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // LOGO
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.security, color: _accentOrange, size: 42),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      "Z-KINETIC",
-                                      style: TextStyle(
-                                        fontFamily: 'Roboto',
-                                        color: Color(0xFFFF6F00),
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 4,
-                                        fontSize: 18,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 35),
-
-                                // WHEEL SYSTEM
-                                SizedBox(
-                                  width: cardWidth,
-                                  height: wheelHeight,
-                                  child: Stack(
-                                    children: [
-                                      Positioned.fill(
-                                        child: Image.asset(
-                                          'assets/z_wheel.png',
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (context, e, s) => Container(
-                                            color: Colors.grey[300],
-                                            child: const Center(child: Text("IMG MISSING")),
-                                          ),
-                                        ),
-                                      ),
-                                      ..._buildWheelOverlays(cardWidth, wheelHeight, activeColor, state),
-                                      _buildPhantomButton(cardWidth, wheelHeight),
-                                      Positioned.fill(
-                                        child: TutorialOverlay(
-                                          isVisible: _showTutorial && state == SecurityState.LOCKED,
-                                          color: activeColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                const SizedBox(height: 30),
-                                _buildSensorRow(activeColor),
-                                
-                                if (state == SecurityState.HARD_LOCK) ...[
-                                  const SizedBox(height: 20),
-                                  _buildWarningBanner(),
-                                ],
-                              ],
-                            ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // LOGO
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.security, color: _accentOrange, size: 42),
+                        const SizedBox(height: 8),
+                        const Text(
+                          "Z-KINETIC",
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            color: Color(0xFFFF6F00),
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4,
+                            fontSize: 18,
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 35),
+
+                    // WHEEL SYSTEM - PASTI CENTER KERANA PARENT CENTER
+                    SizedBox(
+                      width: cardWidth,
+                      height: wheelHeight,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: Image.asset(
+                              'assets/z_wheel.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, e, s) => Container(
+                                color: Colors.grey[300],
+                                child: const Center(child: Text("IMG MISSING")),
+                              ),
+                            ),
+                          ),
+                          ..._buildWheelOverlays(cardWidth, wheelHeight, activeColor, state),
+                          _buildPhantomButton(cardWidth, wheelHeight),
+                          Positioned.fill(
+                            child: TutorialOverlay(
+                              isVisible: _showTutorial && state == SecurityState.LOCKED,
+                              color: activeColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                );
-              }
+
+                    const SizedBox(height: 30),
+                    _buildSensorRow(activeColor),
+                    
+                    if (state == SecurityState.HARD_LOCK) ...[
+                      const SizedBox(height: 20),
+                      _buildWarningBanner(),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         );
@@ -698,7 +682,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
             ),
           ),
         ],
-      ),
+      );
     );
   }
 
