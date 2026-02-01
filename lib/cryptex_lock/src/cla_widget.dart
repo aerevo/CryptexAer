@@ -8,9 +8,9 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🔥 Z-KINETIC CORE - V100.2 (SUPER SIMPLE CENTER FIX)
-// STATUS: FIXED - CONTAINER PASTI CENTER
-// LAYOUT: SUPER SIMPLE - NO COMPLEX NESTING
+// 🔥 Z-KINETIC CORE - V100.3 (FULLSCREEN SECURITY MODAL)
+// STATUS: FIXED - FULLSCREEN MODAL TANPA SCROLL
+// LAYOUT: FULL VIEWPORT - NO MARGINS/SCROLL
 // ============================================
 
 class TutorialOverlay extends StatelessWidget {
@@ -377,8 +377,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   // ===========================================
-  // ✅ FINAL - SUPER SIMPLE CENTER FIX
-  // TIDAK ADA LAYOUTBUILDER, CONSTRAINEDBOX, INTRINSICHEIGHT
+  // ✅ FIX: FULLSCREEN MODAL - NO SCROLL, FULL VIEWPORT
+  // SEPERTI GOOGLE PLAY PROTECT / reCAPTCHA
   // ===========================================
   @override
   Widget build(BuildContext context) {
@@ -388,92 +388,110 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         final state = widget.controller.state;
         Color activeColor = state == SecurityState.HARD_LOCK ? _accentRed : _accentOrange;
 
-        // KIRA SAIZ SEKALI GUS
-        final screenWidth = MediaQuery.of(context).size.width;
-        final cardWidth = min(screenWidth * 0.9, 420.0); // 90% screen atau max 420
-        final wheelHeight = cardWidth * (_imageHeight / _imageWidth);
-
         return Scaffold(
           backgroundColor: Colors.black,
           body: SafeArea(
-            child: Center( // ✅ INI YANG PALING PENTING - CENTER
+            // ⭐ TANPA SafeArea KALAU MAHU FULLSCREEN
+            child: SizedBox.expand( // ⭐ INI YANG PENTING: FILL ENTIRE SPACE
               child: Container(
-                width: cardWidth, // ✅ SET WIDTH TETAP
-                margin: const EdgeInsets.all(20),
-                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECEFF1), // Bone White
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.black12, width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black87,
-                      blurRadius: 30,
-                      spreadRadius: 5,
-                      offset: const Offset(0, 15),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // LOGO
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.security, color: _accentOrange, size: 42),
-                        const SizedBox(height: 8),
-                        const Text(
-                          "Z-KINETIC",
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            color: Color(0xFFFF6F00),
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 4,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 35),
-
-                    // WHEEL SYSTEM - PASTI CENTER KERANA PARENT CENTER
-                    SizedBox(
-                      width: cardWidth,
-                      height: wheelHeight,
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: Image.asset(
-                              'assets/z_wheel.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, e, s) => Container(
-                                color: Colors.grey[300],
-                                child: const Center(child: Text("IMG MISSING")),
-                              ),
-                            ),
-                          ),
-                          ..._buildWheelOverlays(cardWidth, wheelHeight, activeColor, state),
-                          _buildPhantomButton(cardWidth, wheelHeight),
-                          Positioned.fill(
-                            child: TutorialOverlay(
-                              isVisible: _showTutorial && state == SecurityState.LOCKED,
-                              color: activeColor,
-                            ),
+                color: Colors.black, // ⭐ BACKGROUND HITAM FULLSCREEN
+                child: Center(
+                  child: AspectRatio(
+                    // ⭐ GUNA ASPECT RATIO UNTUK CONSISTENT SIZE
+                    aspectRatio: 3/4, // Atau 1/1 untuk square
+                    child: Container(
+                      margin: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECEFF1), // Bone White
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(color: Colors.black12, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black87,
+                            blurRadius: 30,
+                            spreadRadius: 5,
+                            offset: const Offset(0, 15),
                           ),
                         ],
                       ),
-                    ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // LOGO
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.security, color: _accentOrange, size: 42),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  "Z-KINETIC",
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    color: Color(0xFFFF6F00),
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 4,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 30),
 
-                    const SizedBox(height: 30),
-                    _buildSensorRow(activeColor),
-                    
-                    if (state == SecurityState.HARD_LOCK) ...[
-                      const SizedBox(height: 20),
-                      _buildWarningBanner(),
-                    ],
-                  ],
+                            // WHEEL SYSTEM - CENTERED DAN RESPONSIVE
+                            Expanded(
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final double availableHeight = constraints.maxHeight;
+                                  final double wheelHeight = availableHeight * 0.6;
+                                  final double wheelWidth = wheelHeight * (_imageWidth / _imageHeight);
+                                  
+                                  return Center(
+                                    child: SizedBox(
+                                      width: wheelWidth,
+                                      height: wheelHeight,
+                                      child: Stack(
+                                        children: [
+                                          Positioned.fill(
+                                            child: Image.asset(
+                                              'assets/z_wheel.png',
+                                              fit: BoxFit.contain,
+                                              errorBuilder: (context, e, s) => Container(
+                                                color: Colors.grey[300],
+                                                child: const Center(child: Text("IMG MISSING")),
+                                              ),
+                                            ),
+                                          ),
+                                          ..._buildWheelOverlays(wheelWidth, wheelHeight, activeColor, state),
+                                          _buildPhantomButton(wheelWidth, wheelHeight),
+                                          Positioned.fill(
+                                            child: TutorialOverlay(
+                                              isVisible: _showTutorial && state == SecurityState.LOCKED,
+                                              color: activeColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+                            _buildSensorRow(activeColor),
+                            
+                            if (state == SecurityState.HARD_LOCK) ...[
+                              const SizedBox(height: 15),
+                              _buildWarningBanner(),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -682,7 +700,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
             ),
           ),
         ],
-      );
+      ),
     );
   }
 
