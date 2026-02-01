@@ -8,12 +8,12 @@ import 'cla_controller_v2.dart';
 import 'cla_models.dart';
 
 // ============================================
-// 🎯 Z-KINETIC RESET - PLACEHOLDER MODE
-// VERSION: V101.0 (BACK TO BASICS)
-// STATUS: PREVENTING MAIN.DART ERRORS
+// 🎯 Z-KINETIC RESET - V102.0 (EMERGENCY FLARE)
+// TUJUAN: PAKSA VISIBILITI KONTENA
+// STATUS: FORCED FULL-SCREEN TEST
 // ============================================
 
-// Placeholder untuk TutorialOverlay supaya main.dart tidak error
+// Placeholder tetap ada supaya main.dart tidak meraung
 class TutorialOverlay extends StatelessWidget {
   final bool isVisible;
   final Color color;
@@ -22,28 +22,24 @@ class TutorialOverlay extends StatelessWidget {
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-// Placeholder untuk SuccessScreen supaya navigation tidak crash
 class SuccessScreen extends StatelessWidget {
   final String message;
   const SuccessScreen({super.key, required this.message});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text("SUCCESS: $message")),
-    );
+    return Scaffold(backgroundColor: Colors.green, body: Center(child: Text(message)));
   }
 }
 
-// Placeholder untuk CompactFailDialog
 class CompactFailDialog extends StatelessWidget {
   final String message;
   final Color accentColor;
   const CompactFailDialog({super.key, required this.message, required this.accentColor});
   @override
-  Widget build(BuildContext context) => AlertDialog(title: Text(message));
+  Widget build(BuildContext context) => const AlertDialog(title: Text("FAILED"));
 }
 
-// 🔥 MAIN WIDGET - ENTRY POINT FOR main.dart
+// 🔥 WIDGET UTAMA YANG DIPANGGIL main.dart
 class CryptexLock extends StatefulWidget {
   final ClaController controller;
   final VoidCallback? onSuccess;
@@ -65,57 +61,80 @@ class CryptexLock extends StatefulWidget {
 class _CryptexLockState extends State<CryptexLock> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // Latar belakang hitam pekat
-      backgroundColor: Colors.black, 
-      
-      // Memastikan content duduk di tengah-tengah skrin
-      body: Center(
-        child: Container(
-          // Hardcoded size untuk memastikan ia tidak 'collapse'
-          width: 300,
-          height: 300,
-          
-          decoration: BoxDecoration(
-            color: Colors.deepOrange, // Warna pilihan Francois
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.deepOrange.withOpacity(0.4),
-                blurRadius: 40,
-                spreadRadius: 5,
-                offset: const Offset(0, 15),
+    // Hamba guna ColoredBox dan Align untuk elakkan Scaffold bug
+    return Container(
+      color: Colors.blue, // JIKA CAPTAIN NAMPAK BIRU, WIDGET INI BERFUNGSI
+      child: SizedBox.expand(
+        child: Stack(
+          children: [
+            // KOTAK UJIAN DI TENGAH
+            Align(
+              alignment: Alignment.center,
+              child: Container(
+                width: 280,
+                height: 280,
+                decoration: BoxDecoration(
+                  color: Colors.yellow, // WARNA PALING TERANG
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white, width: 10),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black54,
+                      blurRadius: 50,
+                      spreadRadius: 10,
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.visibility, color: Colors.black, size: 80),
+                      SizedBox(height: 20),
+                      Text(
+                        "V102.0",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 40,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      Text(
+                        "TARGET ACQUIRED",
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
-          child: const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.refresh_rounded, color: Colors.white, size: 60),
-                SizedBox(height: 20),
-                Text(
-                  "BASE RESET",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 22,
-                    letterSpacing: 4,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  "Z-KINETIC PROJECT",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ],
             ),
-          ),
+            
+            // INDIKATOR PENJURU (UNTUK CHECK ALIGNMENT)
+            Positioned(
+              top: 40,
+              left: 20,
+              child: _debugLabel("TOP-LEFT"),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _debugLabel(String text) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      color: Colors.black,
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.white, fontSize: 10, decoration: TextDecoration.none),
       ),
     );
   }
