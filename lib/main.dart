@@ -25,24 +25,15 @@ class ImageTestScreen extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Center(
         child: Container(
-          // Outer container - Google Play Protect style
+          // Outer container - NOW WHITE to match inner frame
           padding: const EdgeInsets.all(24),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            // Gradient background (light grey to white)
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFFF5F5F5), // Light grey
-                Color(0xFFFFFFFF), // White
-              ],
-            ),
+            color: Colors.white, // ✅ TUKAR JADI PUTIH
             borderRadius: BorderRadius.circular(24),
-            // Soft shadow like Google Play Protect
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withOpacity(0.3),
                 blurRadius: 30,
                 spreadRadius: 5,
                 offset: const Offset(0, 10),
@@ -55,7 +46,7 @@ class ImageTestScreen extends StatelessWidget {
               // Header icon
               const Icon(
                 Icons.security,
-                color: Color(0xFFFF6F00), // Deep orange
+                color: Color(0xFFFF6F00),
                 size: 48,
               ),
               const SizedBox(height: 12),
@@ -73,58 +64,43 @@ class ImageTestScreen extends StatelessWidget {
               
               const SizedBox(height: 30),
               
-              // Main image container
-              Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFFFF6F00).withOpacity(0.3),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.asset(
-                    'assets/z_wheel.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.red,
-                        child: const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.error, color: Colors.white, size: 60),
-                              SizedBox(height: 10),
-                              Text(
-                                'IMAGE ERROR',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                ),
+              // ✅ IMAGE DIRECT - NO INNER CONTAINER
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.asset(
+                  'assets/z_wheel.png',
+                  width: 320, // ✅ EXPAND LEBIH BESAR
+                  height: 320,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 320,
+                      height: 320,
+                      color: Colors.red,
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error, color: Colors.white, size: 60),
+                            SizedBox(height: 10),
+                            Text(
+                              'IMAGE ERROR',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
               
               const SizedBox(height: 24),
               
-              // Status row (like sensors)
+              // Status row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
