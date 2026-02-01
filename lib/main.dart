@@ -25,11 +25,13 @@ class ImageTestScreen extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Center(
         child: Container(
-          // Outer container - NOW WHITE to match inner frame
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(
+            vertical: 24,
+            horizontal: 24, // Padding atas bawah je, bukan kiri kanan gambar
+          ),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: Colors.white, // ✅ TUKAR JADI PUTIH
+            color: Colors.white,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -64,35 +66,39 @@ class ImageTestScreen extends StatelessWidget {
               
               const SizedBox(height: 30),
               
-              // ✅ IMAGE DIRECT - NO INNER CONTAINER
+              // ✅ GAMBAR FULL WIDTH - NO SIDE SPACING
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.asset(
-                  'assets/z_wheel.png',
-                  width: 320, // ✅ EXPAND LEBIH BESAR
-                  height: 320,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 320,
-                      height: 320,
-                      color: Colors.red,
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.error, color: Colors.white, size: 60),
-                            SizedBox(height: 10),
-                            Text(
-                              'IMAGE ERROR',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                              ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // ✅ GUNA FULL WIDTH CONTAINER
+                    return Image.asset(
+                      'assets/z_wheel.png',
+                      width: constraints.maxWidth, // ✅ FULL WIDTH!
+                      fit: BoxFit.cover, // ✅ COVER = ZOOM FILL
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: constraints.maxWidth,
+                          height: 300,
+                          color: Colors.red,
+                          child: const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.error, color: Colors.white, size: 60),
+                                SizedBox(height: 10),
+                                Text(
+                                  'IMAGE ERROR',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
@@ -137,4 +143,3 @@ class ImageTestScreen extends StatelessWidget {
       ],
     );
   }
-}
