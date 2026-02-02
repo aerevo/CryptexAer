@@ -19,21 +19,21 @@ class MyApp extends StatelessWidget {
 class ImageTestScreen extends StatelessWidget {
   const ImageTestScreen({super.key});
 
-  // ✅ KOORDINAT DARI IMAGE MAP
+  // ✅ KOORDINAT BETUL (UPDATED)
   static const double imageWidth = 706.0;
   static const double imageHeight = 610.0;
 
   // 5 Roda coordinates [left, top, right, bottom]
   static const List<List<double>> wheelCoords = [
-    [25, 163, 113, 375],   // Roda 1
-    [166, 163, 256, 375],  // Roda 2
-    [309, 159, 398, 377],  // Roda 3
-    [452, 154, 543, 375],  // Roda 4
-    [592, 163, 680, 376],  // Roda 5
+    [25, 159, 113, 378],   // Roda 1
+    [165, 160, 257, 379],  // Roda 2
+    [308, 160, 396, 379],  // Roda 3
+    [448, 159, 541, 378],  // Roda 4
+    [591, 159, 681, 379],  // Roda 5
   ];
 
   // Butang coordinates [left, top, right, bottom]
-  static const List<double> buttonCoords = [120, 430, 594, 545];
+  static const List<double> buttonCoords = [123, 433, 594, 545];
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +49,9 @@ class ImageTestScreen extends StatelessWidget {
           ),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            // ✅ OREN FUNKY BALIK!
+            color: const Color(0xFFFF5722), // Material Deep Orange - VIBRANT!
+            
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -65,7 +67,7 @@ class ImageTestScreen extends StatelessWidget {
             children: [
               const Icon(
                 Icons.security,
-                color: Color(0xFFFF6F00),
+                color: Colors.white, // ✅ PUTIH sebab background oren
                 size: 48,
               ),
               const SizedBox(height: 12),
@@ -75,7 +77,7 @@ class ImageTestScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFFFF6F00),
+                  color: Colors.white, // ✅ PUTIH sebab background oren
                   letterSpacing: 3,
                 ),
               ),
@@ -105,7 +107,6 @@ class ImageTestScreen extends StatelessWidget {
   Widget _buildWheelSystem() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Calculate actual dimensions maintaining aspect ratio
         double availableWidth = constraints.maxWidth;
         double aspectRatio = imageWidth / imageHeight;
         double calculatedHeight = availableWidth / aspectRatio;
@@ -165,7 +166,6 @@ class ImageTestScreen extends StatelessWidget {
       double right = wheelCoords[i][2];
       double bottom = wheelCoords[i][3];
       
-      // Convert image coordinates to screen coordinates
       double actualLeft = screenWidth * (left / imageWidth);
       double actualTop = screenHeight * (top / imageHeight);
       double actualWidth = screenWidth * ((right - left) / imageWidth);
@@ -179,7 +179,6 @@ class ImageTestScreen extends StatelessWidget {
           height: actualHeight,
           child: Container(
             decoration: BoxDecoration(
-              // ✅ PENANDA DEBUG - Semi-transparent
               border: Border.all(color: Colors.red, width: 2),
               color: Colors.red.withOpacity(0.2),
             ),
@@ -219,7 +218,6 @@ class ImageTestScreen extends StatelessWidget {
       height: actualHeight,
       child: Container(
         decoration: BoxDecoration(
-          // ✅ PENANDA DEBUG - Semi-transparent
           border: Border.all(color: Colors.green, width: 2),
           color: Colors.green.withOpacity(0.2),
         ),
@@ -243,14 +241,14 @@ class ImageTestScreen extends StatelessWidget {
         Icon(
           icon,
           size: 24,
-          color: Colors.grey[400],
+          color: Colors.white70, // ✅ PUTIH sebab background oren
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 10,
-            color: Colors.grey[600],
+            color: Colors.white70, // ✅ PUTIH sebab background oren
             fontWeight: FontWeight.w600,
             letterSpacing: 1,
           ),
