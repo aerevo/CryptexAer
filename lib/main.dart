@@ -40,12 +40,12 @@ class ZKineticLockScreen extends StatefulWidget {
 }
 
 class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
-  late SimpleController _controller;
+  late SmartController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = SimpleController(correctCode: [1, 2, 3, 4, 5]);
+    _controller = SmartController(correctCode: [1, 2, 3, 4, 5]);
   }
 
   @override
@@ -104,20 +104,28 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.security,
-                color: Colors.white,
-                size: 48,
-              ),
-              const SizedBox(height: 12),
+              // ✅ UPGRADED LOGO - Custom Shield
+              _buildPremiumLogo(),
               
-              const Text(
-                'Z-KINETIC',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 3,
+              const SizedBox(height: 16),
+              
+              // ✅ UPGRADED BRANDING - Premium Typography
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [
+                    Color(0xFFFFFFFF),
+                    Color(0xFFFFEEDD),
+                  ],
+                ).createShader(bounds),
+                child: const Text(
+                  'Z·KINETIC',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w100,
+                    color: Colors.white,
+                    letterSpacing: 8,
+                    fontFamily: 'monospace',
+                  ),
                 ),
               ),
               
@@ -138,13 +146,18 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   return ValueListenableBuilder<double>(
                     valueListenable: _controller.touchScore,
                     builder: (context, touch, _) {
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStatusItem(Icons.sensors, 'MOTION', motion),
-                          _buildStatusItem(Icons.fingerprint, 'TOUCH', touch),
-                          _buildStatusItem(Icons.timeline, 'PATTERN', 0.0),
-                        ],
+                      return ValueListenableBuilder<double>(
+                        valueListenable: _controller.patternScore,
+                        builder: (context, pattern, _) {
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildStatusItem(Icons.sensors, 'MOTION', motion),
+                              _buildStatusItem(Icons.fingerprint, 'TOUCH', touch),
+                              _buildStatusItem(Icons.timeline, 'PATTERN', pattern),
+                            ],
+                          );
+                        },
                       );
                     },
                   );
@@ -157,8 +170,62 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     );
   }
 
+  // ✅ PREMIUM LOGO dengan geometri custom
+  Widget _buildPremiumLogo() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFFFFF),
+            Color(0xFFFFDDDD),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.3),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Shield outline
+          Center(
+            child: CustomPaint(
+              size: const Size(32, 32),
+              painter: ShieldPainter(),
+            ),
+          ),
+          // Z letter overlay
+          Center(
+            child: Text(
+              'Z',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFFF5722),
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusItem(IconData icon, String label, double score) {
-    bool isActive = score > 0.3;
+    bool isActive = score > 0.15; // ✅ LOWERED from 0.3 for accessibility
     return Column(
       children: [
         Icon(
@@ -181,20 +248,75 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
   }
 }
 
+// ✅ Custom Shield Painter
+class ShieldPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFFF5722)
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    final w = size.width;
+    final h = size.height;
+
+    // Shield shape
+    path.moveTo(w * 0.5, 0);
+    path.lineTo(w, h * 0.3);
+    path.lineTo(w, h * 0.7);
+    path.quadraticBezierTo(w * 0.5, h * 1.2, w * 0.5, h);
+    path.quadraticBezierTo(w * 0.5, h * 1.2, 0, h * 0.7);
+    path.lineTo(0, h * 0.3);
+    path.close();
+
+    canvas.drawPath(path, paint);
+
+    // Inner detail
+    final innerPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final innerPath = Path();
+    innerPath.moveTo(w * 0.5, h * 0.2);
+    innerPath.lineTo(w * 0.8, h * 0.4);
+    innerPath.lineTo(w * 0.8, h * 0.65);
+    innerPath.quadraticBezierTo(w * 0.5, h * 0.95, w * 0.5, h * 0.85);
+    innerPath.quadraticBezierTo(w * 0.5, h * 0.95, w * 0.2, h * 0.65);
+    innerPath.lineTo(w * 0.2, h * 0.4);
+    innerPath.close();
+
+    canvas.drawPath(innerPath, innerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 // ============================================
-// 🔥 SIMPLE CONTROLLER (Lightweight)
+// 🔥 SMART CONTROLLER - FIXED SENSORS
 // ============================================
 
-class SimpleController {
+class SmartController {
   final List<int> correctCode;
   final ValueNotifier<double> motionScore = ValueNotifier(0.0);
   final ValueNotifier<double> touchScore = ValueNotifier(0.0);
+  final ValueNotifier<double> patternScore = ValueNotifier(0.0);
   
   StreamSubscription<AccelerometerEvent>? _accelSub;
   StreamSubscription<GyroscopeEvent>? _gyroSub;
+  
+  // ✅ Motion tracking (detect CHANGE, not magnitude)
+  double _lastMagnitude = 9.8; // Initialize to gravity
+  DateTime _lastMotionTime = DateTime.now();
+  Timer? _decayTimer;
+  
+  // ✅ Pattern tracking (scroll timing)
+  final List<int> _scrollTimings = [];
+  DateTime _lastScrollTime = DateTime.now();
 
-  SimpleController({required this.correctCode}) {
+  SmartController({required this.correctCode}) {
     _initSensors();
+    _startDecayTimer();
   }
 
   void _initSensors() {
@@ -202,49 +324,113 @@ class SimpleController {
       samplingPeriod: const Duration(milliseconds: 100),
     ).listen((event) {
       double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-      double normalized = (magnitude / 20.0).clamp(0.0, 1.0);
-      motionScore.value = normalized;
+      
+      // ✅ DETECT CHANGE (movement), not static gravity
+      double delta = (magnitude - _lastMagnitude).abs();
+      
+      if (delta > 0.3) { // ✅ LOWERED from 0.5 for OKU/elderly
+        DateTime now = DateTime.now();
+        
+        // Score based on movement intensity
+        double score = (delta / 3.0).clamp(0.0, 1.0);
+        motionScore.value = score;
+        _lastMotionTime = now;
+      }
+      
+      _lastMagnitude = magnitude;
     });
 
     _gyroSub = gyroscopeEventStream(
       samplingPeriod: const Duration(milliseconds: 100),
     ).listen((event) {
-      // Gyro tracking
+      // Additional motion data (optional enhancement)
+    });
+  }
+
+  void _startDecayTimer() {
+    _decayTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      DateTime now = DateTime.now();
+      int timeSinceLastMotion = now.difference(_lastMotionTime).inMilliseconds;
+      
+      // ✅ SLOW DECAY - 0.05 per second (accessible for slow movers)
+      if (timeSinceLastMotion > 500) {
+        double decay = (timeSinceLastMotion / 1000.0) * 0.05;
+        motionScore.value = (motionScore.value - decay).clamp(0.0, 1.0);
+      }
     });
   }
 
   void registerTouch() {
-    touchScore.value = Random().nextDouble() * 0.4 + 0.6;
+    // ✅ Random touch score (simulates biometric variance)
+    touchScore.value = Random().nextDouble() * 0.3 + 0.7;
+  }
+
+  void registerScroll() {
+    DateTime now = DateTime.now();
+    int delta = now.difference(_lastScrollTime).inMilliseconds;
+    _scrollTimings.add(delta);
+    _lastScrollTime = now;
+
+    if (_scrollTimings.length > 10) _scrollTimings.removeAt(0);
+
+    if (_scrollTimings.length >= 3) {
+      // ✅ Calculate variance (human = irregular, bot = consistent)
+      double avg = _scrollTimings.reduce((a, b) => a + b) / _scrollTimings.length;
+      double variance = _scrollTimings
+          .map((e) => pow(e - avg, 2))
+          .reduce((a, b) => a + b) / _scrollTimings.length;
+      
+      // ✅ High variance = human-like
+      double humanness = (variance / 10000).clamp(0.0, 1.0);
+      patternScore.value = humanness;
+    }
   }
 
   bool verify(List<int> code) {
-    bool isCorrect = true;
+    // ✅ MINIMUM THRESHOLDS (accessible)
+    bool motionOK = motionScore.value > 0.15;  // Very low - even tremor passes
+    bool touchOK = touchScore.value > 0.15;    // Very low - any interaction passes
+    bool patternOK = patternScore.value > 0.10; // Very low - minimal scroll variance
+    
+    // ✅ CODE CHECK
+    bool codeCorrect = true;
     if (code.length != correctCode.length) return false;
     
     for (int i = 0; i < code.length; i++) {
       if (code[i] != correctCode[i]) {
-        isCorrect = false;
+        codeCorrect = false;
         break;
       }
     }
     
-    return isCorrect;
+    // ✅ REQUIRE: Code correct + at least 2/3 sensors OK
+    int sensorsActive = [motionOK, touchOK, patternOK].where((x) => x).length;
+    
+    print('🔍 Motion: ${motionScore.value.toStringAsFixed(2)} (${motionOK ? "✅" : "❌"})');
+    print('🔍 Touch: ${touchScore.value.toStringAsFixed(2)} (${touchOK ? "✅" : "❌"})');
+    print('🔍 Pattern: ${patternScore.value.toStringAsFixed(2)} (${patternOK ? "✅" : "❌"})');
+    print('🔍 Code: ${codeCorrect ? "✅" : "❌"}');
+    print('🔍 Sensors: $sensorsActive/3');
+    
+    return codeCorrect && sensorsActive >= 2;
   }
 
   void dispose() {
     _accelSub?.cancel();
     _gyroSub?.cancel();
+    _decayTimer?.cancel();
     motionScore.dispose();
     touchScore.dispose();
+    patternScore.dispose();
   }
 }
 
 // ============================================
-// 🔥 CRYPTEX LOCK - NEON GLOW + EMBOSSED
+// 🔥 CRYPTEX LOCK
 // ============================================
 
 class CryptexLock extends StatefulWidget {
-  final SimpleController controller;
+  final SmartController controller;
   final VoidCallback? onSuccess;
   final VoidCallback? onFail;
 
@@ -296,6 +482,7 @@ class _CryptexLockState extends State<CryptexLock> {
     _wheelActiveTimer?.cancel();
     HapticFeedback.selectionClick();
     widget.controller.registerTouch();
+    widget.controller.registerScroll(); // ✅ Track pattern
   }
 
   void _onWheelScrollEnd() {
@@ -320,8 +507,6 @@ class _CryptexLockState extends State<CryptexLock> {
     List<int> currentCode = _scrollControllers
         .map((c) => c.selectedItem % 10)
         .toList();
-    
-    print('🔐 Code: ${currentCode.join()}');
     
     bool isCorrect = widget.controller.verify(currentCode);
     
@@ -395,6 +580,8 @@ class _CryptexLockState extends State<CryptexLock> {
                 if (_scrollControllers[i].position == notification.metrics) {
                   _onWheelScrollStart(i);
                 }
+              } else if (notification is ScrollUpdateNotification) {
+                widget.controller.registerScroll(); // ✅ Track during scroll
               } else if (notification is ScrollEndNotification) {
                 _onWheelScrollEnd();
               }
@@ -420,7 +607,6 @@ class _CryptexLockState extends State<CryptexLock> {
       behavior: HitTestBehavior.opaque,
       child: Stack(
         children: [
-          // Scrollable wheel
           ListWheelScrollView.useDelegate(
             controller: _scrollControllers[index],
             itemExtent: itemExtent,
@@ -455,7 +641,6 @@ class _CryptexLockState extends State<CryptexLock> {
                               ),
                             ]
                           : [
-                              // ✅ EMBOSSED EFFECT - Terpahat
                               Shadow(
                                 offset: const Offset(1, 1),
                                 blurRadius: 1,
@@ -475,13 +660,11 @@ class _CryptexLockState extends State<CryptexLock> {
             ),
           ),
 
-          // ✅ NEON GLOW OVERLAY (No border, just shadow)
           if (isActive)
             IgnorePointer(
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  // ✅ NO BORDER - Just glow
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFFFF5722).withOpacity(0.5),
