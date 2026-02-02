@@ -47,7 +47,7 @@ class ZKineticLockScreen extends StatelessWidget {
           ),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF5722), // FUNKY ORANGE
+            color: const Color(0xFFFF5722),
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -80,12 +80,10 @@ class ZKineticLockScreen extends StatelessWidget {
               
               const SizedBox(height: 30),
               
-              // Main cryptex widget
-              CryptexLock(), // ✅ REMOVE const
+              CryptexLock(),
               
               const SizedBox(height: 24),
               
-              // Status indicators
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -125,8 +123,7 @@ class ZKineticLockScreen extends StatelessWidget {
 }
 
 // ============================================
-// 🔥 Z-KINETIC CRYPTEX LOCK
-// Interactive wheels with NEON ORANGE GLOW
+// 🔥 CRYPTEX LOCK - NEON NUMBER GLOW
 // ============================================
 
 class CryptexLock extends StatefulWidget {
@@ -137,29 +134,24 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> {
-  // Image dimensions
   static const double imageWidth = 706.0;
   static const double imageHeight = 610.0;
 
-  // 5 Wheel coordinates [left, top, right, bottom]
   static const List<List<double>> wheelCoords = [
-    [25, 159, 113, 378],   // Wheel 1
-    [165, 160, 257, 379],  // Wheel 2
-    [308, 160, 396, 379],  // Wheel 3
-    [448, 159, 541, 378],  // Wheel 4
-    [591, 159, 681, 379],  // Wheel 5
+    [25, 159, 113, 378],
+    [165, 160, 257, 379],
+    [308, 160, 396, 379],
+    [448, 159, 541, 378],
+    [591, 159, 681, 379],
   ];
 
-  // Button coordinates [left, top, right, bottom]
   static const List<double> buttonCoords = [123, 433, 594, 545];
 
-  // Wheel controllers
   final List<FixedExtentScrollController> _scrollControllers = List.generate(
     5,
     (i) => FixedExtentScrollController(initialItem: 0),
   );
 
-  // Active wheel tracking (for NEON GLOW effect)
   int? _activeWheelIndex;
   Timer? _wheelActiveTimer;
 
@@ -193,7 +185,7 @@ class _CryptexLockState extends State<CryptexLock> {
         .map((c) => c.selectedItem % 10)
         .toList();
     
-    print('🔐 Code entered: ${currentCode.join()}');
+    print('🔐 Code: ${currentCode.join()}');
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -217,7 +209,6 @@ class _CryptexLockState extends State<CryptexLock> {
           height: calculatedHeight,
           child: Stack(
             children: [
-              // Background image
               Positioned.fill(
                 child: Image.asset(
                   'assets/z_wheel.png',
@@ -226,21 +217,14 @@ class _CryptexLockState extends State<CryptexLock> {
                     return Container(
                       color: Colors.red,
                       child: const Center(
-                        child: Icon(
-                          Icons.error,
-                          color: Colors.white,
-                          size: 60,
-                        ),
+                        child: Icon(Icons.error, color: Colors.white, size: 60),
                       ),
                     );
                   },
                 ),
               ),
 
-              // ✅ 5 INTERACTIVE WHEELS with NEON GLOW
               ..._buildWheelOverlays(availableWidth, calculatedHeight),
-
-              // ✅ INVISIBLE BUTTON (transparent but clickable)
               _buildInvisibleButton(availableWidth, calculatedHeight),
             ],
           ),
@@ -294,61 +278,52 @@ class _CryptexLockState extends State<CryptexLock> {
     double itemExtent = wheelHeight * 0.40;
 
     return GestureDetector(
-      onTapDown: (_) {
-        _onWheelScrollStart(index);
-      },
+      onTapDown: (_) => _onWheelScrollStart(index),
       onTapUp: (_) => _onWheelScrollEnd(),
       onTapCancel: () => _onWheelScrollEnd(),
       behavior: HitTestBehavior.opaque,
-      child: Stack(
-        children: [
-          // Scrollable wheel (invisible numbers)
-          ListWheelScrollView.useDelegate(
-            controller: _scrollControllers[index],
-            itemExtent: itemExtent,
-            perspective: 0.003,
-            diameterRatio: 1.5,
-            physics: const FixedExtentScrollPhysics(),
-            onSelectedItemChanged: (_) {
-              HapticFeedback.selectionClick();
-            },
-            childDelegate: ListWheelChildBuilderDelegate(
-              builder: (context, i) {
-                // Invisible placeholder
-                return Container();
-              },
-            ),
-          ),
-
-          // ✅ NEON ORANGE GLOW OVERLAY
-          if (isActive)
-            IgnorePointer(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFFF5722),
-                    width: 3,
-                  ),
-                  boxShadow: [
-                    // ✅ NEON GLOW EFFECT
-                    BoxShadow(
-                      color: const Color(0xFFFF5722).withOpacity(0.8),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                    BoxShadow(
-                      color: const Color(0xFFFF5722).withOpacity(0.5),
-                      blurRadius: 40,
-                      spreadRadius: 5,
-                    ),
-                  ],
+      child: ListWheelScrollView.useDelegate(
+        controller: _scrollControllers[index],
+        itemExtent: itemExtent,
+        perspective: 0.003,
+        diameterRatio: 1.5,
+        physics: const FixedExtentScrollPhysics(),
+        onSelectedItemChanged: (_) {
+          HapticFeedback.selectionClick();
+        },
+        childDelegate: ListWheelChildBuilderDelegate(
+          builder: (context, wheelIndex) {
+            int displayNumber = wheelIndex % 10;
+            
+            // ✅ NEON GLOW PADA NOMBOR TENGAH
+            return Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  fontSize: wheelHeight * 0.30,
+                  fontWeight: FontWeight.w900,
+                  color: isActive 
+                      ? const Color(0xFFFF5722)  // ✅ NEON ORANGE bila active
+                      : Colors.transparent,      // ✅ Invisible bila tak active
+                  shadows: isActive
+                      ? [
+                          // ✅ NEON GLOW EFFECT
+                          Shadow(
+                            color: const Color(0xFFFF5722).withOpacity(0.8),
+                            blurRadius: 20,
+                          ),
+                          Shadow(
+                            color: const Color(0xFFFF5722).withOpacity(0.5),
+                            blurRadius: 40,
+                          ),
+                        ]
+                      : [],
                 ),
+                child: Text('$displayNumber'),
               ),
-            ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -372,10 +347,7 @@ class _CryptexLockState extends State<CryptexLock> {
       child: GestureDetector(
         onTap: _onButtonTap,
         behavior: HitTestBehavior.opaque,
-        child: Container(
-          // ✅ FULLY TRANSPARENT - image button shows through
-          color: Colors.transparent,
-        ),
+        child: Container(color: Colors.transparent),
       ),
     );
   }
