@@ -123,7 +123,7 @@ class ZKineticLockScreen extends StatelessWidget {
 }
 
 // ============================================
-// 🔥 CRYPTEX LOCK - NEON NUMBER GLOW
+// 🔥 CRYPTEX LOCK - NEON GLOW (FIXED)
 // ============================================
 
 class CryptexLock extends StatefulWidget {
@@ -154,6 +154,7 @@ class _CryptexLockState extends State<CryptexLock> {
 
   int? _activeWheelIndex;
   Timer? _wheelActiveTimer;
+  bool _isButtonPressed = false; // ✅ Track button state
 
   @override
   void dispose() {
@@ -181,6 +182,13 @@ class _CryptexLockState extends State<CryptexLock> {
 
   void _onButtonTap() {
     HapticFeedback.mediumImpact();
+    
+    // ✅ Button glow effect
+    setState(() => _isButtonPressed = true);
+    Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _isButtonPressed = false);
+    });
+    
     List<int> currentCode = _scrollControllers
         .map((c) => c.selectedItem % 10)
         .toList();
@@ -225,7 +233,7 @@ class _CryptexLockState extends State<CryptexLock> {
               ),
 
               ..._buildWheelOverlays(availableWidth, calculatedHeight),
-              _buildInvisibleButton(availableWidth, calculatedHeight),
+              _buildGlowingButton(availableWidth, calculatedHeight), // ✅ NEW
             ],
           ),
         );
@@ -295,7 +303,7 @@ class _CryptexLockState extends State<CryptexLock> {
           builder: (context, wheelIndex) {
             int displayNumber = wheelIndex % 10;
             
-            // ✅ NEON GLOW PADA NOMBOR TENGAH
+            // ✅ NOMBOR KEKAL NAMPAK - Menyala bila active, normal bila tak active
             return Center(
               child: AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
@@ -303,8 +311,8 @@ class _CryptexLockState extends State<CryptexLock> {
                   fontSize: wheelHeight * 0.30,
                   fontWeight: FontWeight.w900,
                   color: isActive 
-                      ? const Color(0xFFFF5722)  // ✅ NEON ORANGE bila active
-                      : Colors.transparent,      // ✅ Invisible bila tak active
+                      ? const Color(0xFFFF5722)      // ✅ NEON ORANGE bila active
+                      : const Color(0xFF263238),     // ✅ DARK GREY bila normal (NAMPAK!)
                   shadows: isActive
                       ? [
                           // ✅ NEON GLOW EFFECT
@@ -317,7 +325,14 @@ class _CryptexLockState extends State<CryptexLock> {
                             blurRadius: 40,
                           ),
                         ]
-                      : [],
+                      : [
+                          // ✅ Subtle shadow bila normal
+                          Shadow(
+                            offset: const Offset(1, 1),
+                            blurRadius: 2,
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                        ],
                 ),
                 child: Text('$displayNumber'),
               ),
@@ -328,7 +343,8 @@ class _CryptexLockState extends State<CryptexLock> {
     );
   }
 
-  Widget _buildInvisibleButton(double screenWidth, double screenHeight) {
+  // ✅ GLOWING BUTTON (no border, just glow overlay)
+  Widget _buildGlowingButton(double screenWidth, double screenHeight) {
     double left = buttonCoords[0];
     double top = buttonCoords[1];
     double right = buttonCoords[2];
@@ -347,7 +363,35 @@ class _CryptexLockState extends State<CryptexLock> {
       child: GestureDetector(
         onTap: _onButtonTap,
         behavior: HitTestBehavior.opaque,
-        child: Container(color: Colors.transparent),
+        child: Stack(
+          children: [
+            // Transparent clickable area
+            Container(color: Colors.transparent),
+            
+            // ✅ NEON GLOW OVERLAY (only when pressed)
+            if (_isButtonPressed)
+              IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    // ✅ NO BORDER - Just glow shadow
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF5722).withOpacity(0.6),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFFFF5722).withOpacity(0.3),
+                        blurRadius: 50,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
