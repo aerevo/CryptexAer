@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ============================================
-// ✅ SECURITY PRE-CHECK WITH SMART DEGRADATION
+// SECURITY PRE-CHECK (unchanged)
 // ============================================
 class SecurityCheckScreen extends StatefulWidget {
   const SecurityCheckScreen({super.key});
@@ -59,17 +59,14 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
   }
 
   Future<void> _performSecurityChecks() async {
-    // ✅ CHECK 1: Root/Jailbreak Detection
     setState(() => _status = "Checking device integrity...");
     await Future.delayed(const Duration(milliseconds: 500));
     
     try {
-    // ✅ FIX: Guna SafeDevice
-     _isRooted = await SafeDevice.isJailBroken;
-    // Kita anggap Emulator (Not Real Device) sebagai Developer Mode
-     _isDeveloperMode = !(await SafeDevice.isRealDevice); 
+      _isRooted = await SafeDevice.isJailBroken;
+      _isDeveloperMode = !(await SafeDevice.isRealDevice);
 
-  if (_isRooted || _isDeveloperMode) {
+      if (_isRooted || _isDeveloperMode) {
         setState(() {
           _status = "⚠️ COMPROMISED DEVICE DETECTED";
           _checkComplete = true;
@@ -78,22 +75,18 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
         return;
       }
     } catch (e) {
-      print('⚠️ Root detection error: $e (Graceful degradation)');
-      // Continue if detection fails
+      print('⚠️ Root detection error: $e');
     }
     
-    // ✅ CHECK 2: Server reachability (OPTIONAL)
     setState(() => _status = "Verifying server connection...");
     await Future.delayed(const Duration(milliseconds: 500));
     
     bool serverReachable = await _pingServer();
     
     if (!serverReachable) {
-      print('⚠️ Server offline - proceeding with local-only mode');
-      // ✅ GRACEFUL DEGRADATION: Continue without server
+      print('⚠️ Server offline - local mode');
     }
     
-    // ✅ ALL CHECKS PASSED (or gracefully degraded)
     setState(() => _status = "✅ Security verified");
     await Future.delayed(const Duration(milliseconds: 800));
     
@@ -103,28 +96,14 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
   }
 
   Future<bool> _pingServer() async {
-    // 📝 TODO: Replace with actual server ping
-    // Example: GET https://your-server.com/health
-    // 
-    // try {
-    //   final response = await http.get(
-    //     Uri.parse('https://api.z-kinetic.com/health'),
-    //   ).timeout(Duration(seconds: 3));
-    //   return response.statusCode == 200;
-    // } catch (e) {
-    //   return false;
-    // }
-    
-    // ✅ PLACEHOLDER: Simulate server offline for now
     await Future.delayed(const Duration(milliseconds: 300));
-    return false; // Change to true when server is ready
+    return false;
   }
 
   Future<void> _requestLocationAndProceed() async {
-    setState(() => _status = "Requesting location permission...");
+    setState(() => _status = "Requesting location...");
     
     try {
-      // Check permission
       LocationPermission permission = await Geolocator.checkPermission();
       
       if (permission == LocationPermission.denied) {
@@ -134,51 +113,30 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
       if (permission == LocationPermission.denied || 
           permission == LocationPermission.deniedForever) {
         setState(() {
-          _status = "⛔ Location permission required for rooted devices";
+          _status = "⛔ Location required for rooted devices";
         });
         return;
       }
       
-      // Get location
       setState(() => _status = "Capturing location...");
       _capturedLocation = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
       
-      // ✅ Log to server (placeholder)
       await _logRootedDeviceAccess();
       
-      setState(() => _status = "✅ Location verified - proceeding with caution");
+      setState(() => _status = "✅ Location verified");
       await Future.delayed(const Duration(milliseconds: 1000));
       
       _proceedToMainScreen(isCompromised: true);
       
     } catch (e) {
-      setState(() {
-        _status = "❌ Location capture failed: $e";
-      });
+      setState(() => _status = "❌ Location failed: $e");
     }
   }
 
   Future<void> _logRootedDeviceAccess() async {
-    // 📝 TODO: Send to your server
-    // 
-    // POST https://your-server.com/api/security/rooted-device-access
-    // Body: {
-    //   "device_id": "...",
-    //   "timestamp": "...",
-    //   "latitude": _capturedLocation.latitude,
-    //   "longitude": _capturedLocation.longitude,
-    //   "is_rooted": true,
-    //   "is_developer_mode": _isDeveloperMode,
-    //   "user_consented": true
-    // }
-    
-    print('📍 Rooted device access logged:');
-    print('   Lat: ${_capturedLocation?.latitude}');
-    print('   Lng: ${_capturedLocation?.longitude}');
-    print('   Time: ${DateTime.now()}');
-    
+    print('📍 Rooted access: ${_capturedLocation?.latitude}, ${_capturedLocation?.longitude}');
     await Future.delayed(const Duration(milliseconds: 500));
   }
 
@@ -206,7 +164,6 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Shield icon
               Icon(
                 (_isRooted || _isDeveloperMode) ? Icons.warning_amber_rounded : Icons.shield,
                 color: (_isRooted || _isDeveloperMode) ? Colors.orange : const Color(0xFFFF5722),
@@ -215,7 +172,6 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
               
               const SizedBox(height: 30),
               
-              // Status text
               Text(
                 _status,
                 style: TextStyle(
@@ -228,7 +184,6 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
               
               const SizedBox(height: 20),
               
-              // Loading indicator
               if (!_checkComplete && !_needsLocationConsent)
                 const SizedBox(
                   width: 30,
@@ -239,7 +194,6 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
                   ),
                 ),
               
-              // ✅ ROOTED DEVICE WARNING + CONSENT
               if (_needsLocationConsent) ...[
                 const SizedBox(height: 30),
                 
@@ -252,17 +206,11 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
                   ),
                   child: Column(
                     children: [
-                      const Icon(
-                        Icons.developer_mode,
-                        color: Colors.orange,
-                        size: 40,
-                      ),
+                      const Icon(Icons.developer_mode, color: Colors.orange, size: 40),
                       const SizedBox(height: 16),
                       
                       Text(
-                        _isDeveloperMode 
-                            ? 'DEVELOPER MODE DETECTED'
-                            : 'ROOTED DEVICE DETECTED',
+                        _isDeveloperMode ? 'DEVELOPER MODE' : 'ROOTED DEVICE',
                         style: const TextStyle(
                           color: Colors.orange,
                           fontSize: 16,
@@ -273,17 +221,9 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
                       const SizedBox(height: 16),
                       
                       const Text(
-                        'Kami dapati peranti anda telah diubahsuai. Untuk keselamatan, '
-                        'kami perlu:\n\n'
-                        '• Mengesahkan lokasi peranti anda (satu kali)\n'
-                        '• Merekod transaksi untuk audit\n'
-                        '• Mematuhi syarat keselamatan ketat\n\n'
-                        'Sila matikan Developer Options jika ini adalah kesilapan.',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          height: 1.5,
-                        ),
+                        'Sila matikan Developer Options. Untuk keselamatan, '
+                        'kami perlu lokasi peranti anda (satu kali).',
+                        style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
                         textAlign: TextAlign.center,
                       ),
                       
@@ -293,19 +233,15 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () {
-                                SystemNavigator.pop(); // Close app
-                              },
+                              onPressed: () => SystemNavigator.pop(),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.white70,
-                                side: BorderSide(color: Colors.white30),
+                                side: const BorderSide(color: Colors.white30),
                               ),
                               child: const Text('BATAL'),
                             ),
                           ),
-                          
                           const SizedBox(width: 12),
-                          
                           Expanded(
                             child: ElevatedButton(
                               onPressed: _requestLocationAndProceed,
@@ -313,10 +249,7 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
                                 backgroundColor: Colors.orange,
                                 foregroundColor: Colors.black,
                               ),
-                              child: const Text(
-                                'TERUSKAN',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
+                              child: const Text('TERUSKAN', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
@@ -334,7 +267,130 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
 }
 
 // ============================================
-// MAIN LOCK SCREEN
+// ✅ NEW: HEXAGON SHIELD PAINTER (MODERN)
+// ============================================
+class ModernShieldPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFFF5722)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+
+    final w = size.width;
+    final h = size.height;
+
+    // Modern hexagonal shield
+    final path = Path();
+    path.moveTo(w * 0.5, 0);
+    path.lineTo(w * 0.9, h * 0.25);
+    path.lineTo(w * 0.9, h * 0.6);
+    path.lineTo(w * 0.5, h * 0.95);
+    path.lineTo(w * 0.1, h * 0.6);
+    path.lineTo(w * 0.1, h * 0.25);
+    path.close();
+
+    canvas.drawPath(path, paint);
+
+    // Inner accent
+    final accentPaint = Paint()
+      ..color = const Color(0xFFFF5722).withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+
+    final innerPath = Path();
+    innerPath.moveTo(w * 0.5, h * 0.15);
+    innerPath.lineTo(w * 0.75, h * 0.35);
+    innerPath.lineTo(w * 0.75, h * 0.55);
+    innerPath.lineTo(w * 0.5, h * 0.75);
+    innerPath.lineTo(w * 0.25, h * 0.55);
+    innerPath.lineTo(w * 0.25, h * 0.35);
+    innerPath.close();
+
+    canvas.drawPath(innerPath, accentPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ============================================
+// SUCCESS SCREEN
+// ============================================
+class SuccessScreen extends StatelessWidget {
+  final String message;
+  final bool isPanicMode;
+
+  const SuccessScreen({
+    super.key,
+    required this.message,
+    this.isPanicMode = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: isPanicMode ? const Color(0xFF607D8B) : const Color(0xFF4CAF50),
+      body: Center(
+        child: Container(
+          margin: const EdgeInsets.all(40),
+          padding: const EdgeInsets.all(48),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 40,
+                offset: const Offset(0, 20),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4CAF50).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF4CAF50),
+                  size: 70,
+                ),
+              ),
+              const SizedBox(height: 40),
+              Text(
+                isPanicMode ? 'SAFE MODE' : 'ACCESS GRANTED',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.green[700],
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                message,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================
+// ✅ MAIN LOCK SCREEN (REBRANDED)
 // ============================================
 class ZKineticLockScreen extends StatefulWidget {
   final bool isCompromisedDevice;
@@ -369,13 +425,15 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     super.dispose();
   }
 
-  void _onSuccess() {
+  void _onSuccess(bool isPanicMode) {
     HapticFeedback.heavyImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('🔓 ACCESS GRANTED'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SuccessScreen(
+          message: isPanicMode ? "Panic mode activated" : "Welcome back",
+          isPanicMode: isPanicMode,
+        ),
       ),
     );
   }
@@ -397,7 +455,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Main content
           Center(
             child: Container(
               padding: const EdgeInsets.only(top: 24, bottom: 24, left: 0, right: 0),
@@ -417,50 +474,106 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildPremiumLogo(),
-                  const SizedBox(height: 16),
+                  // ✅ NEW: Modern logo
+                  _buildModernLogo(),
+                  const SizedBox(height: 20),
                   
-                  ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFFFFFFFF), Color(0xFFFFEEDD)],
-                    ).createShader(bounds),
-                    child: const Text(
-                      'Z·KINETIC',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w100,
-                        color: Colors.white,
-                        letterSpacing: 8,
-                        fontFamily: 'monospace',
+                  // ✅ NEW: Sleek title with gradient
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Glow effect
+                      Text(
+                        'Z-KINETIC',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          foreground: Paint()
+                            ..style = PaintingStyle.stroke
+                            ..strokeWidth = 8
+                            ..color = Colors.white.withOpacity(0.2),
+                          letterSpacing: 4,
+                        ),
                       ),
-                    ),
+                      // Main text
+                      ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [
+                            Color(0xFFFFFFFF),
+                            Color(0xFFFFCCBC),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ).createShader(bounds),
+                        child: const Text(
+                          'Z-KINETIC',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 4,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   
+                  // ✅ NEW: Marketing tagline
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'ENTERPRISE EDITION',
-                      style: TextStyle(
-                        fontSize: 8,
-                        color: Colors.white70,
-                        letterSpacing: 2,
-                        fontWeight: FontWeight.w600,
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.25),
+                          Colors.white.withOpacity(0.15),
+                        ],
                       ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.greenAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'MILITARY-GRADE BIOMETRIC LOCK',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Colors.white,
+                            letterSpacing: 1.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   
                   const SizedBox(height: 30),
                   
-                  CryptexLock(
-                    controller: _controller,
-                    onSuccess: _onSuccess,
-                    onFail: _onFail,
+                  // ✅ Cryptex with randomization
+                  ValueListenableBuilder<int>(
+                    valueListenable: _controller.randomizeTrigger,
+                    builder: (context, trigger, _) {
+                      return CryptexLock(
+                        key: ValueKey(trigger), // Force rebuild on randomize
+                        controller: _controller,
+                        onSuccess: _onSuccess,
+                        onFail: _onFail,
+                      );
+                    },
                   ),
                   
                   const SizedBox(height: 24),
@@ -493,7 +606,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
             ),
           ),
           
-          // ✅ COMPROMISED DEVICE WARNING BANNER
           if (widget.isCompromisedDevice)
             Positioned(
               top: 50,
@@ -505,14 +617,14 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   color: Colors.orange,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.black, size: 20),
-                    const SizedBox(width: 10),
+                    Icon(Icons.warning_amber_rounded, color: Colors.black, size: 20),
+                    SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'DEVELOPER MODE - Aktiviti direkod',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.black,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -528,22 +640,29 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     );
   }
 
-  Widget _buildPremiumLogo() {
+  // ✅ NEW: Modern hexagon logo
+  Widget _buildModernLogo() {
     return Container(
-      width: 56,
-      height: 56,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFFFFF), Color(0xFFFFDDDD)],
+        gradient: RadialGradient(
+          colors: [
+            const Color(0xFFFFFFFF),
+            const Color(0xFFFFE0E0).withOpacity(0.8),
+          ],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.white.withOpacity(0.3),
-            blurRadius: 12,
+            color: Colors.white.withOpacity(0.4),
+            blurRadius: 20,
             spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: const Color(0xFFFF5722).withOpacity(0.3),
+            blurRadius: 30,
+            spreadRadius: -5,
           ),
         ],
       ),
@@ -551,23 +670,27 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
         children: [
           Center(
             child: CustomPaint(
-              size: const Size(32, 32),
-              painter: ShieldPainter(),
+              size: const Size(36, 36),
+              painter: ModernShieldPainter(),
             ),
           ),
           Center(
-            child: Text(
-              'Z',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFFFF5722),
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 2,
-                  ),
+            child: ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [
+                  Color(0xFFFF5722),
+                  Color(0xFFFF7043),
                 ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ).createShader(bounds),
+              child: const Text(
+                'Z',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -600,31 +723,8 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
   }
 }
 
-class ShieldPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFFF5722)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-
-    final path = Path();
-    path.moveTo(size.width * 0.5, size.height * 0.1);
-    path.lineTo(size.width * 0.85, size.height * 0.3);
-    path.lineTo(size.width * 0.85, size.height * 0.65);
-    path.quadraticBezierTo(size.width * 0.5, size.height * 1.05, size.width * 0.5, size.height * 0.9);
-    path.quadraticBezierTo(size.width * 0.5, size.height * 1.05, size.width * 0.15, size.height * 0.65);
-    path.lineTo(size.width * 0.15, size.height * 0.3);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 // ============================================
-// ✅ ENTERPRISE CONTROLLER (WITH GRACEFUL DEGRADATION)
+// ✅ ENTERPRISE CONTROLLER (WITH RANDOMIZATION)
 // ============================================
 
 class EnterpriseController {
@@ -635,6 +735,9 @@ class EnterpriseController {
   final ValueNotifier<double> motionScore = ValueNotifier(0.0);
   final ValueNotifier<double> touchScore = ValueNotifier(0.0);
   final ValueNotifier<double> patternScore = ValueNotifier(0.0);
+  
+  // ✅ NEW: Randomization trigger
+  final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
   
   StreamSubscription<AccelerometerEvent>? _accelSub;
   StreamSubscription<GyroscopeEvent>? _gyroSub;
@@ -653,11 +756,6 @@ class EnterpriseController {
   }) {
     _initSensors();
     _startDecayTimer();
-    
-    if (isCompromisedDevice) {
-      print('⚠️ Running in COMPROMISED MODE');
-      print('📍 Location: ${deviceLocation?.latitude}, ${deviceLocation?.longitude}');
-    }
   }
 
   void _initSensors() {
@@ -719,136 +817,57 @@ class EnterpriseController {
     }
   }
 
-  Future<bool> verify(List<int> code) async {
-    // ✅ LOCAL CHECKS
+  // ✅ NEW: Randomize wheels on fail
+  void randomizeWheels() {
+    randomizeTrigger.value++;
+    print('🔀 Wheels randomized (trigger: ${randomizeTrigger.value})');
+  }
+
+  Future<Map<String, dynamic>> verify(List<int> code) async {
+    // Panic mode check
+    String inputStr = code.join();
+    String correctStr = correctCode.join();
+    String reversedStr = correctCode.reversed.join();
+    
+    if (inputStr == reversedStr) {
+      print('🚨 PANIC MODE ACTIVATED');
+      return {'allowed': true, 'isPanicMode': true};
+    }
+    
+    // Local checks
     bool motionOK = motionScore.value > 0.15;
     bool touchOK = touchScore.value > 0.15;
     bool patternOK = patternScore.value > 0.10;
     
-    bool codeCorrect = true;
-    if (code.length != correctCode.length) return false;
-    
-    for (int i = 0; i < code.length; i++) {
-      if (code[i] != correctCode[i]) {
-        codeCorrect = false;
-        break;
-      }
-    }
-    
+    bool codeCorrect = inputStr == correctStr;
     int sensorsActive = [motionOK, touchOK, patternOK].where((x) => x).length;
     bool localPass = codeCorrect && sensorsActive >= 2;
     
     if (!localPass) {
       print('❌ Local check failed');
-      return false;
+      // ✅ RANDOMIZE on fail
+      randomizeWheels();
+      return {'allowed': false, 'isPanicMode': false};
     }
     
-    // ✅ SERVER CHECK (with graceful degradation)
+    // Server check
     print('🔄 Contacting server...');
     bool serverPass = await _checkWithServer(code);
     
-    if (!serverPass) {
-      print('⚠️ Server verification failed - checking fallback policy');
-      
-      // ✅ GRACEFUL DEGRADATION: Allow if server offline AND not compromised
-      if (!isCompromisedDevice) {
-        print('✅ Offline mode: Access granted (normal device)');
-        return true;
-      } else {
-        print('❌ Compromised device requires server verification');
-        return false;
-      }
+    if (!serverPass && isCompromisedDevice) {
+      print('❌ Compromised device requires server');
+      // ✅ RANDOMIZE on fail
+      randomizeWheels();
+      return {'allowed': false, 'isPanicMode': false};
     }
     
-    print('✅ Access granted (Server verified)');
-    return true;
+    print('✅ Access granted');
+    return {'allowed': true, 'isPanicMode': false};
   }
 
   Future<bool> _checkWithServer(List<int> code) async {
-    // 📝 TODO (FOR CLAUDE, CAPTAIN, & FRANCOIS):
-    // ================================================
-    // Replace this placeholder with actual server call
-    // 
-    // ENDPOINT: POST https://api.z-kinetic.com/v1/verify
-    // HEADERS:
-    //   - Authorization: Bearer YOUR_API_KEY
-    //   - Content-Type: application/json
-    // 
-    // BODY:
-    // {
-    //   "device_id": "unique_device_identifier",
-    //   "code_hash": "SHA256(code + device_secret)",
-    //   "biometric_summary": {
-    //     "motion_score": 0.75,
-    //     "touch_score": 0.82,
-    //     "pattern_score": 0.68
-    //   },
-    //   "is_compromised": false,
-    //   "location": {
-    //     "lat": 3.1390,
-    //     "lng": 101.6869
-    //   },
-    //   "timestamp": "2026-02-03T12:45:30Z",
-    //   "nonce": "random_unique_string"
-    // }
-    // 
-    // EXPECTED RESPONSE:
-    // {
-    //   "allowed": true,
-    //   "confidence": 0.92,
-    //   "reason": "VERIFIED",
-    //   "device_status": "SAFE" | "BLACKLISTED" | "WATCH_LIST"
-    // }
-    // 
-    // ERROR HANDLING:
-    // - Timeout: 5 seconds
-    // - Retry: 2 times with exponential backoff
-    // - If all fail: Return false (graceful degradation handles it)
-    // 
-    // EXAMPLE IMPLEMENTATION:
-    // 
-    // try {
-    //   final response = await http.post(
-    //     Uri.parse('https://api.z-kinetic.com/v1/verify'),
-    //     headers: {
-    //       'Authorization': 'Bearer YOUR_API_KEY',
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: jsonEncode({
-    //       'device_id': await _getDeviceId(),
-    //       'code_hash': _hashCode(code),
-    //       'biometric_summary': {
-    //         'motion_score': motionScore.value,
-    //         'touch_score': touchScore.value,
-    //         'pattern_score': patternScore.value,
-    //       },
-    //       'is_compromised': isCompromisedDevice,
-    //       'location': deviceLocation != null ? {
-    //         'lat': deviceLocation!.latitude,
-    //         'lng': deviceLocation!.longitude,
-    //       } : null,
-    //       'timestamp': DateTime.now().toIso8601String(),
-    //       'nonce': _generateNonce(),
-    //     }),
-    //   ).timeout(Duration(seconds: 5));
-    //   
-    //   if (response.statusCode == 200) {
-    //     final data = jsonDecode(response.body);
-    //     return data['allowed'] == true;
-    //   }
-    //   
-    //   return false;
-    // } catch (e) {
-    //   print('Server error: $e');
-    //   return false; // Graceful degradation will handle
-    // }
-    // ================================================
-    
-    // ✅ PLACEHOLDER SIMULATION
     await Future.delayed(const Duration(milliseconds: 800));
-    
-    // Simulate server offline (change to true when server ready)
-    return false; // This triggers graceful degradation
+    return false;
   }
 
   void dispose() {
@@ -858,22 +877,23 @@ class EnterpriseController {
     motionScore.dispose();
     touchScore.dispose();
     patternScore.dispose();
+    randomizeTrigger.dispose();
   }
 }
 
 // ============================================
-// CRYPTEX LOCK (unchanged - copy from previous)
+// CRYPTEX LOCK (with random initial positions)
 // ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
-  final VoidCallback? onSuccess;
-  final VoidCallback? onFail;
+  final Function(bool isPanicMode) onSuccess;
+  final VoidCallback onFail;
 
   const CryptexLock({
     super.key,
     required this.controller,
-    this.onSuccess,
-    this.onFail,
+    required this.onSuccess,
+    required this.onFail,
   });
 
   @override
@@ -894,10 +914,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   static const List<double> buttonCoords = [123, 433, 594, 545];
 
-  final List<FixedExtentScrollController> _scrollControllers = List.generate(
-    5,
-    (i) => FixedExtentScrollController(initialItem: 0),
-  );
+  late List<FixedExtentScrollController> _scrollControllers;
 
   int? _activeWheelIndex;
   Timer? _wheelActiveTimer;
@@ -913,6 +930,14 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
+    
+    // ✅ NEW: Random initial positions
+    _scrollControllers = List.generate(
+      5,
+      (i) => FixedExtentScrollController(
+        initialItem: _random.nextInt(10), // Random 0-9
+      ),
+    );
     
     _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
       if (mounted && _activeWheelIndex == null) {
@@ -990,13 +1015,12 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         .map((c) => c.selectedItem % 10)
         .toList();
     
-    // ✅ Await server verification
-    bool isCorrect = await widget.controller.verify(currentCode);
+    final result = await widget.controller.verify(currentCode);
     
-    if (isCorrect) {
-      widget.onSuccess?.call();
+    if (result['allowed']) {
+      widget.onSuccess(result['isPanicMode'] ?? false);
     } else {
-      widget.onFail?.call();
+      widget.onFail();
     }
   }
 
