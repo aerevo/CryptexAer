@@ -2,7 +2,9 @@
  * PROJECT: Z-KINETIC SECURITY CORE
  * MODULE: Behavioral Pattern Analyzer (EDGE COMPUTING - PRIVACY FIRST)
  * PURPOSE: Local-only biometric analysis - NO RAW DATA UPLOAD
- * FILE: lib/cryptex_lock/src/behavioral_analyzer.dart (PART 1/3)
+ * FILE: lib/cryptex_lock/src/behavioral_analyzer.dart
+ * 
+ * 🔥 UPDATED: Added Play Integrity attestation
  *
  * PRIVACY GUARANTEE:
  * - All analysis happens on-device
@@ -16,6 +18,9 @@ import 'motion_models.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
+
+// 🔥 NEW: Play Integrity import
+import 'package:play_integrity/play_integrity.dart';
 
 /// Behavioral pattern analysis result
 class BehavioralAnalysis {
@@ -47,7 +52,7 @@ class BehavioralAnalysis {
   bool get isProbablyBot => botProbability > 0.6;
   bool get isAnomalous => anomalyScore > 0.7;
   
-  // 🔥 NEW: Check if threat should be reported
+  // 🔥 Check if threat should be reported
   bool get shouldReportThreat {
     if (threatLevel == ThreatLevel.HIGH_RISK || threatLevel == ThreatLevel.CRITICAL) {
       return true;
@@ -179,7 +184,7 @@ class BehavioralAnalyzer {
       humanIndicators: humanIndicators,
     );
     
-    // 🔥 Report threat (PRIVACY-SAFE)
+    // 🔥 Report threat (PRIVACY-SAFE with Play Integrity)
     if (analysis.shouldReportThreat) {
       _reportThreat(analysis, session);
     }
@@ -187,9 +192,31 @@ class BehavioralAnalyzer {
     return analysis;
   }
   
-  /// 🔥 NEW: Report threat to global intelligence
+  /// 🔥 UPDATED: Report threat to global intelligence with Play Integrity
   Future<void> _reportThreat(BehavioralAnalysis analysis, BiometricSession session) async {
     try {
+      // 🔥 STEP 1: Request Play Integrity Token
+      String? integrityToken;
+      
+      if (Platform.isAndroid) {
+        try {
+          final nonce = _generateNonce();
+          integrityToken = await PlayIntegrity.requestIntegrityToken(
+            nonce: nonce,
+            cloudProjectNumber: 55621733629, // Z-Kinetic project number
+          );
+          
+          if (kDebugMode) {
+            print('✅ Play Integrity token obtained');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ Play Integrity failed: $e (continuing without token)');
+          }
+          // Continue without token (will be rejected by server if strict mode)
+        }
+      }
+      
       final deviceInfo = await _getAnonymizedDeviceInfo();
       
       String threatType = 'UNKNOWN';
@@ -212,7 +239,7 @@ class BehavioralAnalyzer {
         severity = 'HIGH';
       }
       
-      // 🔥 PRIVACY-SAFE DATA (NO RAW BIOMETRICS)
+      // 🔥 STEP 2: PRIVACY-SAFE DATA with Integrity Token
       final threatData = {
         'threat_type': threatType,
         'severity': severity,
@@ -227,18 +254,29 @@ class BehavioralAnalyzer {
           'suspicious_count': analysis.suspiciousIndicators.length,
         },
         'region': 'ASIA_SOUTHEAST',
+        
+        // 🔥 NEW: Play Integrity Token
+        'integrity_token': integrityToken,
+        'has_integrity_token': integrityToken != null,
       };
       
       await _firestore.collection('global_threat_intel').add(threatData);
       
       if (kDebugMode) {
-        print('🚨 Threat reported: $threatType ($severity)');
+        print('🚨 Threat reported: $threatType ($severity) [Token: ${integrityToken != null ? "✅" : "❌"}]');
       }
     } catch (e) {
       if (kDebugMode) {
         print('⚠️ Failed to report threat: $e');
       }
     }
+  }
+  
+  /// 🔥 NEW: Generate cryptographic nonce
+  String _generateNonce() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
   
   Future<Map<String, String>> _getAnonymizedDeviceInfo() async {
@@ -258,239 +296,6 @@ class BehavioralAnalyzer {
           'type': 'iOS',
           'app_version': '1.0.0',
         };
-      }
-    } catch (e) {}
-    return {'os': 'Unknown', 'type': 'Unknown', 'app_version': '1.0.0'};
-  }
-  
-  /*
- * FILE: lib/cryptex_lock/src/behavioral_analyzer.dart
- * EDGE COMPUTING - PRIVACY FIRST (NO RAW DATA UPLOAD)
- */
-
-import 'dart:math';
-import 'package:flutter/foundation.dart';
-import 'motion_models.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:io';
-
-class BehavioralAnalysis {
-  final double humanLikelihood;
-  final double botProbability;
-  final double anomalyScore;
-  final MotionPattern motionPattern;
-  final TouchPattern touchPattern;
-  final TemporalPattern temporalPattern;
-  final BehavioralFingerprint fingerprint;
-  final ThreatLevel threatLevel;
-  final List<String> suspiciousIndicators;
-  final List<String> humanIndicators;
-  
-  BehavioralAnalysis({
-    required this.humanLikelihood,
-    required this.botProbability,
-    required this.anomalyScore,
-    required this.motionPattern,
-    required this.touchPattern,
-    required this.temporalPattern,
-    required this.fingerprint,
-    required this.threatLevel,
-    required this.suspiciousIndicators,
-    required this.humanIndicators,
-  });
-  
-  bool get isProbablyHuman => humanLikelihood > 0.7;
-  bool get isProbablyBot => botProbability > 0.6;
-  bool get isAnomalous => anomalyScore > 0.7;
-  
-  bool get shouldReportThreat {
-    if (threatLevel == ThreatLevel.HIGH_RISK || threatLevel == ThreatLevel.CRITICAL) return true;
-    if (isProbablyBot && suspiciousIndicators.length >= 2) return true;
-    return false;
-  }
-  
-  Map<String, dynamic> toJson() => {
-    'human_likelihood': humanLikelihood.toStringAsFixed(3),
-    'bot_probability': botProbability.toStringAsFixed(3),
-    'threat_level': threatLevel.name,
-    'suspicious_indicators': suspiciousIndicators,
-  };
-}
-
-class MotionPattern {
-  final double tremorFrequency;
-  final double microMovementRatio;
-  final double rhythmConsistency;
-  final double accelerationProfile;
-  final double directionChanges;
-  
-  MotionPattern({
-    required this.tremorFrequency,
-    required this.microMovementRatio,
-    required this.rhythmConsistency,
-    required this.accelerationProfile,
-    required this.directionChanges,
-  });
-  
-  Map<String, dynamic> toJson() => {
-    'tremor_hz': tremorFrequency.toStringAsFixed(2),
-    'micro_movement_ratio': microMovementRatio.toStringAsFixed(3),
-    'rhythm_consistency': rhythmConsistency.toStringAsFixed(3),
-    'acceleration_profile': accelerationProfile.toStringAsFixed(3),
-    'direction_changes': directionChanges.toStringAsFixed(3),
-  };
-}
-
-class TouchPattern {
-  final double pressureVariance;
-  final double velocityProfile;
-  final double hesitationCount;
-  final double coordinationScore;
-  
-  TouchPattern({
-    required this.pressureVariance,
-    required this.velocityProfile,
-    required this.hesitationCount,
-    required this.coordinationScore,
-  });
-  
-  Map<String, dynamic> toJson() => {
-    'pressure_variance': pressureVariance.toStringAsFixed(3),
-    'velocity_profile': velocityProfile.toStringAsFixed(3),
-    'hesitation_count': hesitationCount.toStringAsFixed(0),
-    'coordination_score': coordinationScore.toStringAsFixed(3),
-  };
-}
-
-class TemporalPattern {
-  final double averageInteractionTime;
-  final double speedVariability;
-  final double pauseFrequency;
-  final double burstiness;
-  
-  TemporalPattern({
-    required this.averageInteractionTime,
-    required this.speedVariability,
-    required this.pauseFrequency,
-    required this.burstiness,
-  });
-  
-  Map<String, dynamic> toJson() => {
-    'avg_interaction_ms': averageInteractionTime.toStringAsFixed(0),
-    'speed_variability': speedVariability.toStringAsFixed(3),
-    'pause_frequency': pauseFrequency.toStringAsFixed(3),
-    'burstiness': burstiness.toStringAsFixed(3),
-  };
-}
-
-class BehavioralFingerprint {
-  final String signatureHash;
-  final Map<String, double> features;
-  
-  BehavioralFingerprint({required this.signatureHash, required this.features});
-  
-  Map<String, dynamic> toJson() => {'signature': signatureHash, 'features': features};
-}
-
-class BehavioralAnalyzer {
-  static const double HUMAN_TREMOR_MIN = 8.0;
-  static const double HUMAN_TREMOR_MAX = 12.0;
-  static const double HUMAN_RHYTHM_VARIANCE = 0.15;
-  static const double BOT_RHYTHM_VARIANCE = 0.03;
-  
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
-  BehavioralAnalysis analyze(BiometricSession session) {
-    final motionPattern = _analyzeMotionPattern(session.motionEvents);
-    final touchPattern = _analyzeTouchPattern(session.touchEvents);
-    final temporalPattern = _analyzeTemporalPattern(session);
-    
-    final humanLikelihood = _calculateHumanLikelihood(motionPattern, touchPattern, temporalPattern);
-    final botProbability = _calculateBotProbability(motionPattern, touchPattern, temporalPattern);
-    final anomalyScore = _calculateAnomalyScore(motionPattern, touchPattern, temporalPattern);
-    final fingerprint = _generateFingerprint(motionPattern, touchPattern, temporalPattern);
-    final suspiciousIndicators = _findSuspiciousIndicators(motionPattern, touchPattern, temporalPattern);
-    final humanIndicators = _findHumanIndicators(motionPattern, touchPattern, temporalPattern);
-    final threatLevel = _assessThreatLevel(humanLikelihood, botProbability, anomalyScore);
-    
-    final analysis = BehavioralAnalysis(
-      humanLikelihood: humanLikelihood,
-      botProbability: botProbability,
-      anomalyScore: anomalyScore,
-      motionPattern: motionPattern,
-      touchPattern: touchPattern,
-      temporalPattern: temporalPattern,
-      fingerprint: fingerprint,
-      threatLevel: threatLevel,
-      suspiciousIndicators: suspiciousIndicators,
-      humanIndicators: humanIndicators,
-    );
-    
-    if (analysis.shouldReportThreat) {
-      _reportThreat(analysis);
-    }
-    
-    return analysis;
-  }
-  
-  Future<void> _reportThreat(BehavioralAnalysis analysis) async {
-    try {
-      final deviceInfo = await _getAnonymizedDeviceInfo();
-      
-      String threatType = 'UNKNOWN';
-      if (analysis.suspiciousIndicators.contains('MECHANICAL_RHYTHM')) {
-        threatType = 'MECHANICAL_RHYTHM';
-      } else if (analysis.suspiciousIndicators.contains('NO_PHYSIOLOGICAL_TREMOR')) {
-        threatType = 'NO_TREMOR_DETECTED';
-      } else if (analysis.suspiciousIndicators.contains('CONSTANT_PRESSURE')) {
-        threatType = 'CONSTANT_PRESSURE';
-      } else if (analysis.suspiciousIndicators.contains('INHUMAN_SPEED')) {
-        threatType = 'INHUMAN_SPEED';
-      } else if (analysis.suspiciousIndicators.contains('LINEAR_MOVEMENT')) {
-        threatType = 'LINEAR_MOVEMENT';
-      }
-      
-      String severity = 'MEDIUM';
-      if (analysis.threatLevel == ThreatLevel.CRITICAL) {
-        severity = 'CRITICAL';
-      } else if (analysis.threatLevel == ThreatLevel.HIGH_RISK) {
-        severity = 'HIGH';
-      }
-      
-      final threatData = {
-        'threat_type': threatType,
-        'severity': severity,
-        'device_os': deviceInfo['os'],
-        'device_type': deviceInfo['type'],
-        'app_version': deviceInfo['app_version'],
-        'timestamp': FieldValue.serverTimestamp(),
-        'indicators': {
-          'bot_probability': (analysis.botProbability * 100).round(),
-          'human_likelihood': (analysis.humanLikelihood * 100).round(),
-          'anomaly_score': (analysis.anomalyScore * 100).round(),
-          'suspicious_count': analysis.suspiciousIndicators.length,
-        },
-        'region': 'ASIA_SOUTHEAST',
-      };
-      
-      await _firestore.collection('global_threat_intel').add(threatData);
-      
-      if (kDebugMode) print('🚨 Threat reported: $threatType ($severity)');
-    } catch (e) {
-      if (kDebugMode) print('⚠️ Failed to report threat: $e');
-    }
-  }
-  
-  Future<Map<String, String>> _getAnonymizedDeviceInfo() async {
-    final deviceInfo = DeviceInfoPlugin();
-    try {
-      if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        return {'os': 'Android ${androidInfo.version.release}', 'type': 'Android', 'app_version': '1.0.0'};
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        return {'os': 'iOS ${iosInfo.systemVersion}', 'type': 'iOS', 'app_version': '1.0.0'};
       }
     } catch (e) {}
     return {'os': 'Unknown', 'type': 'Unknown', 'app_version': '1.0.0'};
