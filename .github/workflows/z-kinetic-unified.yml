@@ -1,4 +1,4 @@
-name: Z-Kinetic Final Fix
+name: Z-Kinetic Final Release (Auto-Config)
 on:
   workflow_dispatch:
   push:
@@ -6,8 +6,11 @@ on:
 
 jobs:
   build-apk:
-    name: 🛡️ Build APK (SDK 36)
+    name: 🛡️ Build APK (com.aer.zkinetic)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
@@ -24,31 +27,175 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: 🔥 Nuclear Clean
+      - name: 🔥 Nuclear Clean (Remove Old Android Folder)
         run: |
-          rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock || true
+          echo "==> Destroying old Android folder..."
+          rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock
+          echo "✅ Clean complete."
 
-      - name: 🏗️ Create Android Project
+      - name: 🏗️ Create Fresh Project (com.aer.zkinetic)
         run: |
+          echo "==> Creating fresh project structure..."
+          # Pastikan org dan project-name bergabung jadi com.aer.zkinetic
           flutter create --platforms android --org com.aer --project-name zkinetic .
 
-      - name: 🔥 Create Firebase Configs
+      - name: 🔐 Inject google-services.json (Real Data)
         run: |
-          mkdir -p lib android/app
-          
-          # 1. DUMMY FIREBASE OPTIONS
+          echo "==> Injecting Real google-services.json..."
+          cat > android/app/google-services.json << 'EOF'
+          {
+            "project_info": {
+              "project_number": "55621733629",
+              "project_id": "z-kinetic",
+              "storage_bucket": "z-kinetic.firebasestorage.app"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:55621733629:android:ef51c1276ef226b0408294",
+                  "android_client_info": {
+                    "package_name": "com.aer.zkinetic"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          echo "✅ google-services.json injected."
+
+      - name: 🔧 Inject App build.gradle (Hardened)
+        run: |
+          echo "==> Overwriting android/app/build.gradle..."
+          cat > android/app/build.gradle << 'EOF'
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+              id "com.google.gms.google-services"
+          }
+
+          android {
+              namespace "com.aer.zkinetic"
+              compileSdk flutter.compileSdkVersion
+              ndkVersion flutter.ndkVersion
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+
+              kotlinOptions {
+                  jvmTarget = '1.8'
+              }
+
+              sourceSets {
+                  main.java.srcDirs += 'src/main/kotlin'
+              }
+
+              defaultConfig {
+                  applicationId "com.aer.zkinetic"
+                  minSdkVersion flutter.minSdkVersion
+                  targetSdkVersion flutter.targetSdkVersion
+                  versionCode flutter.versionCode
+                  versionName flutter.versionName
+              }
+
+              buildTypes {
+                  release {
+                      // Security: Obfuscate code to hide logic from hackers
+                      minifyEnabled true
+                      shrinkResources true
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+
+          flutter {
+              source '../..'
+          }
+
+          dependencies {
+              implementation platform('com.google.firebase:firebase-bom:33.7.0')
+              implementation 'com.google.firebase:firebase-analytics'
+              // 🔥 WAJIB: App Check Play Integrity
+              implementation 'com.google.firebase:firebase-appcheck-playintegrity'
+          }
+          EOF
+
+      - name: 🔧 Inject Project build.gradle
+        run: |
+          echo "==> Overwriting android/build.gradle..."
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.2.1'
+                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22"
+                  classpath 'com.google.gms:google-services:4.4.0'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.buildDir = '../build'
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(':app')
+          }
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
+
+      - name: 🔥 Generate Dummy firebase_options.dart (Bypass)
+        run: |
+          # Kalau main.dart perlukan fail ni, kita create dummy supaya compile tak error.
+          # Android akan guna google-services.json, jadi fail ni cuma placeholder untuk Flutter.
+          mkdir -p lib
           cat > lib/firebase_options.dart << 'EOF'
           import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
           import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+
           class DefaultFirebaseOptions {
             static FirebaseOptions get currentPlatform {
               if (kIsWeb) throw UnsupportedError('Web not configured');
               switch (defaultTargetPlatform) {
-                case TargetPlatform.android: return android;
-                case TargetPlatform.iOS: return ios;
-                default: throw UnsupportedError('Platform not supported');
+                case TargetPlatform.android:
+                  return android;
+                case TargetPlatform.iOS:
+                  throw UnsupportedError('iOS not configured');
+                case TargetPlatform.macOS:
+                  throw UnsupportedError('MacOS not configured');
+                case TargetPlatform.windows:
+                  throw UnsupportedError('Windows not configured');
+                case TargetPlatform.linux:
+                  throw UnsupportedError('Linux not configured');
+                default:
+                  throw UnsupportedError('Unknown platform');
               }
             }
+
             static const FirebaseOptions android = FirebaseOptions(
               apiKey: 'AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w',
               appId: '1:55621733629:android:ef51c1276ef226b0408294',
@@ -56,99 +203,18 @@ jobs:
               projectId: 'z-kinetic',
               storageBucket: 'z-kinetic.firebasestorage.app',
             );
-            static const FirebaseOptions ios = FirebaseOptions(
-              apiKey: 'IOS_KEY', appId: '1:55621733629:ios:dummy', messagingSenderId: '55621733629', projectId: 'z-kinetic', storageBucket: 'z-kinetic.firebasestorage.app', iosBundleId: 'com.aer.zkinetic'
-            );
           }
-          EOF
-          
-          # 2. GOOGLE SERVICES JSON
-          cat > android/app/google-services.json << 'EOF'
-          {
-            "project_info": { "project_number": "55621733629", "project_id": "z-kinetic", "storage_bucket": "z-kinetic.firebasestorage.app" },
-            "client": [{
-              "client_info": { "mobilesdk_app_id": "1:55621733629:android:ef51c1276ef226b0408294", "android_client_info": { "package_name": "com.aer.zkinetic" } },
-              "api_key": [{ "current_key": "AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w" }]
-            }],
-            "configuration_version": "1"
-          }
-          EOF
-
-      - name: 🔧 Inject build.gradle (SDK 36 No Minify)
-        run: |
-          cat > android/app/build.gradle << 'EOF'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
-              id "com.google.firebase.crashlytics"
-          }
-          android {
-              namespace = "com.aer.zkinetic"
-              compileSdk = 36
-              ndkVersion = flutter.ndkVersion
-              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-              kotlinOptions { jvmTarget = "17" }
-              defaultConfig {
-                  applicationId = "com.aer.zkinetic"
-                  minSdk = 23
-                  targetSdk = 36
-                  versionCode = 1
-                  versionName = "1.0"
-                  multiDexEnabled = true
-              }
-              buildTypes {
-                  release {
-                      signingConfig = signingConfigs.debug
-                      // 👇 KITA MATIKAN R8 SUPAYA TAK ADA ERROR LAMA
-                      minifyEnabled = false
-                      shrinkResources = false
-                  }
-              }
-          }
-          flutter { source = "../.." }
-          dependencies {
-              implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-              implementation("com.google.firebase:firebase-analytics")
-              implementation("com.google.firebase:firebase-crashlytics")
-              implementation("com.google.firebase:firebase-auth")
-              implementation("com.google.firebase:firebase-firestore")
-              // Tambah functions dependencies
-              implementation("com.google.firebase:firebase-functions")
-              implementation("androidx.multidex:multidex:2.0.1")
-          }
-          EOF
-
-      - name: 🔧 Inject Project build.gradle
-        run: |
-          cat > android/build.gradle << 'EOF'
-          buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies {
-                  classpath("com.android.tools.build:gradle:8.2.1")
-                  classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22")
-                  classpath("com.google.gms:google-services:4.4.0")
-                  classpath("com.google.firebase:firebase-crashlytics-gradle:2.9.9")
-              }
-          }
-          allprojects { repositories { google(); mavenCentral() } }
-          rootProject.buildDir = "../build"
-          subprojects { project.buildDir = "${rootProject.buildDir}/${project.name}"; project.evaluationDependsOn(":app") }
-          tasks.register("clean", Delete) { delete rootProject.buildDir }
           EOF
 
       - name: 📦 Install Dependencies
-        run: |
-          flutter pub get
+        run: flutter pub get
 
       - name: 🚀 Build APK
-        run: |
-          flutter build apk --release
+        run: flutter build apk --release
 
-      - name: 📤 Upload APK
+      - name: 📤 Upload Artifact
         uses: actions/upload-artifact@v4
-        if: success()
         with:
-          name: z-kinetic-final
+          name: z-kinetic-release-signed
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
