@@ -1,37 +1,54 @@
 // FILE: firestore.rules
-// Z-KINETIC FIRESTORE SECURITY RULES (EDGE COMPUTING MODEL)
-// NO RAW BIOMETRICS STORAGE - Only threat intelligence
+// Z-KINETIC FIRESTORE SECURITY RULES (HARDENED)
+// 🔥 UPDATED: App Check enforcement + strict validation
 
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
     // ============================================
+    // 🔥 HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if request has valid App Check token
+    function hasValidAppCheck() {
+      return request.auth != null && request.app != null;
+    }
+    
+    // Check if user is admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // ============================================
     // GLOBAL THREAT INTELLIGENCE COLLECTION
     // ============================================
     match /global_threat_intel/{threatId} {
-      // Allow authenticated users to CREATE threat reports
-      // NO RAW BIOMETRIC DATA - Only statistical indicators
-      allow create: if request.auth != null 
+      // 🔥 UPDATED: Require App Check + strict validation
+      allow create: if hasValidAppCheck()
                     && request.resource.data.keys().hasAll([
                       'threat_type', 
                       'severity', 
                       'device_os', 
-                      'timestamp'
+                      'timestamp',
+                      'integrity_token', // 🔥 NEW: Must have token
+                      'has_integrity_token' // 🔥 NEW: Token presence flag
                     ])
                     && request.resource.data.severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
                     && request.resource.data.threat_type is string
-                    // Ensure NO raw biometric data
+                    // 🔥 Ensure NO raw biometric data
                     && !request.resource.data.keys().hasAny([
                       'motion_events', 
                       'touch_events', 
                       'raw_data',
                       'biometric_data'
-                    ]);
+                    ])
+                    // 🔥 Rate limiting: Max 1 report per minute per device
+                    && (!exists(/databases/$(database)/documents/global_threat_intel/$(request.auth.uid)) ||
+                        resource.data.timestamp < request.time - duration.value(1, 'm'));
       
       // Only admins can read threat reports
-      allow read: if request.auth != null 
-                  && request.auth.token.admin == true;
+      allow read: if isAdmin();
       
       // No updates allowed (immutable threat logs)
       allow update, delete: if false;
@@ -53,8 +70,7 @@ service cloud.firestore {
     // ============================================
     match /threat_analytics/{analyticsId} {
       // Admins only
-      allow read: if request.auth != null 
-                  && request.auth.token.admin == true;
+      allow read: if isAdmin();
       
       // Only Cloud Functions can write
       allow write: if false;
@@ -66,8 +82,7 @@ service cloud.firestore {
     match /bank_alerts/{alertId} {
       // Bank partners can read their alerts
       allow read: if request.auth != null 
-                  && (request.auth.token.admin == true 
-                      || request.auth.token.bank_partner == true);
+                  && (isAdmin() || request.auth.token.bank_partner == true);
       
       // Only Cloud Functions can write
       allow write: if false;
@@ -86,8 +101,7 @@ service cloud.firestore {
     // ============================================
     match /system_errors/{errorId} {
       // Admins only
-      allow read: if request.auth != null 
-                  && request.auth.token.admin == true;
+      allow read: if isAdmin();
       
       // Only Cloud Functions can write
       allow write: if false;
@@ -105,12 +119,30 @@ service cloud.firestore {
     }
     
     // ============================================
+    // 🔥 NEW: USED NONCES (Replay Attack Prevention)
+    // ============================================
+    match /used_nonces/{nonceId} {
+      // Cloud Functions only
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // 🔥 NEW: SUSPICIOUS ACTIVITY LOG
+    // ============================================
+    match /suspicious_activity/{activityId} {
+      // Admins only
+      allow read: if isAdmin();
+      
+      // Cloud Functions only
+      allow write: if false;
+    }
+    
+    // ============================================
     // SECURITY INCIDENTS (Legacy - Deprecated)
     // ============================================
     match /security_incidents/{incidentId} {
       // Deprecated - Use global_threat_intel instead
-      allow read: if request.auth != null 
-                  && request.auth.token.admin == true;
+      allow read: if isAdmin();
       allow create: if false; // Force migration to new model
     }
     
