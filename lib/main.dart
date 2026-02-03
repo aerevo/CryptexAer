@@ -253,12 +253,11 @@ class ShieldPainter extends CustomPainter {
     final path = Path();
     path.moveTo(size.width * 0.5, size.height * 0.1);
     path.lineTo(size.width * 0.85, size.height * 0.3);
-    path.lineTo(size.width * 0.85, size.height * 0.6);
-    path.lineTo(size.width * 0.5, size.height * 0.9);
-    path.lineTo(size.width * 0.15, size.height * 0.6);
+    path.lineTo(size.width * 0.85, size.height * 0.65);
+    path.quadraticBezierTo(size.width * 0.5, size.height * 1.05, size.width * 0.5, size.height * 0.9);
+    path.quadraticBezierTo(size.width * 0.5, size.height * 1.05, size.width * 0.15, size.height * 0.65);
     path.lineTo(size.width * 0.15, size.height * 0.3);
     path.close();
-
     canvas.drawPath(path, paint);
   }
 
@@ -266,25 +265,25 @@ class ShieldPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ============================================================================
-// 🔥 SMART CONTROLLER - Brain of Anti-Bot System
-// ============================================================================
+// ============================================
+// 🔥 SMART CONTROLLER
+// ============================================
+
 class SmartController {
   final List<int> correctCode;
-  
   final ValueNotifier<double> motionScore = ValueNotifier(0.0);
   final ValueNotifier<double> touchScore = ValueNotifier(0.0);
   final ValueNotifier<double> patternScore = ValueNotifier(0.0);
   
-  StreamSubscription<AccelerometerEvent>? _accelSubscription;
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+  StreamSubscription<GyroscopeEvent>? _gyroSub;
   
-  int _touchCount = 0;
-  int _scrollCount = 0;
-  DateTime? _lastTouch;
-  DateTime? _lastScroll;
+  double _lastMagnitude = 9.8;
+  DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
   
-  final Random _random = Random();
+  final List<int> _scrollTimings = [];
+  DateTime _lastScrollTime = DateTime.now();
 
   SmartController({required this.correctCode}) {
     _initSensors();
@@ -292,83 +291,93 @@ class SmartController {
   }
 
   void _initSensors() {
-    _accelSubscription = accelerometerEvents.listen((event) {
-      double magnitude = sqrt(
-        event.x * event.x + 
-        event.y * event.y + 
-        event.z * event.z
-      );
+    _accelSub = accelerometerEventStream(
+      samplingPeriod: const Duration(milliseconds: 100),
+    ).listen((event) {
+      double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+      double delta = (magnitude - _lastMagnitude).abs();
       
-      if (magnitude > 1.5) {
-        motionScore.value = min(1.0, motionScore.value + 0.15);
+      if (delta > 0.3) {
+        DateTime now = DateTime.now();
+        double score = (delta / 3.0).clamp(0.0, 1.0);
+        motionScore.value = score;
+        _lastMotionTime = now;
       }
+      
+      _lastMagnitude = magnitude;
+    });
+
+    _gyroSub = gyroscopeEventStream(
+      samplingPeriod: const Duration(milliseconds: 100),
+    ).listen((event) {
+      // Gyro tracking
     });
   }
 
   void _startDecayTimer() {
-    _decayTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      motionScore.value = max(0.0, motionScore.value - 0.1);
-      touchScore.value = max(0.0, touchScore.value - 0.1);
-      patternScore.value = max(0.0, patternScore.value - 0.1);
+    _decayTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      DateTime now = DateTime.now();
+      int timeSinceLastMotion = now.difference(_lastMotionTime).inMilliseconds;
+      
+      if (timeSinceLastMotion > 500) {
+        double decay = (timeSinceLastMotion / 1000.0) * 0.05;
+        motionScore.value = (motionScore.value - decay).clamp(0.0, 1.0);
+      }
     });
   }
 
   void registerTouch() {
-    _touchCount++;
-    DateTime now = DateTime.now();
-    
-    if (_lastTouch != null) {
-      int gap = now.difference(_lastTouch!).inMilliseconds;
-      if (gap > 100 && gap < 2000) {
-        touchScore.value = min(1.0, touchScore.value + 0.2);
-      }
-    }
-    
-    _lastTouch = now;
+    touchScore.value = Random().nextDouble() * 0.3 + 0.7;
   }
 
   void registerScroll() {
-    _scrollCount++;
     DateTime now = DateTime.now();
-    
-    if (_lastScroll != null) {
-      int gap = now.difference(_lastScroll!).inMilliseconds;
-      if (gap > 50 && gap < 1000) {
-        patternScore.value = min(1.0, patternScore.value + 0.15);
-      }
+    int delta = now.difference(_lastScrollTime).inMilliseconds;
+    _scrollTimings.add(delta);
+    _lastScrollTime = now;
+
+    if (_scrollTimings.length > 10) _scrollTimings.removeAt(0);
+
+    if (_scrollTimings.length >= 3) {
+      double avg = _scrollTimings.reduce((a, b) => a + b) / _scrollTimings.length;
+      double variance = _scrollTimings
+          .map((e) => pow(e - avg, 2))
+          .reduce((a, b) => a + b) / _scrollTimings.length;
+      
+      double humanness = (variance / 10000).clamp(0.0, 1.0);
+      patternScore.value = humanness;
     }
-    
-    _lastScroll = now;
   }
 
-  bool verify(List<int> userCode) {
-    if (userCode.length != correctCode.length) return false;
+  bool verify(List<int> code) {
+    bool motionOK = motionScore.value > 0.15;
+    bool touchOK = touchScore.value > 0.15;
+    bool patternOK = patternScore.value > 0.10;
     
-    double humanScore = (
-      motionScore.value * 0.3 +
-      touchScore.value * 0.4 +
-      patternScore.value * 0.3
-    );
+    bool codeCorrect = true;
+    if (code.length != correctCode.length) return false;
     
-    bool codeMatch = true;
-    for (int i = 0; i < userCode.length; i++) {
-      if (userCode[i] != correctCode[i]) {
-        codeMatch = false;
+    for (int i = 0; i < code.length; i++) {
+      if (code[i] != correctCode[i]) {
+        codeCorrect = false;
         break;
       }
     }
     
-    if (!codeMatch) return false;
+    int sensorsActive = [motionOK, touchOK, patternOK].where((x) => x).length;
     
-    if (humanScore < 0.3) {
-      return _random.nextDouble() > 0.7;
-    }
+    print('🔍 Motion: ${motionScore.value.toStringAsFixed(2)} (${motionOK ? "✅" : "❌"})');
+    print('🔍 Touch: ${touchScore.value.toStringAsFixed(2)} (${touchOK ? "✅" : "❌"})');
+    print('🔍 Pattern: ${patternScore.value.toStringAsFixed(2)} (${patternOK ? "✅" : "❌"})');
+    print('🔍 Code: ${codeCorrect ? "✅" : "❌"}');
+    print('🔍 Sensors: $sensorsActive/3');
     
-    return true;
+    return codeCorrect && sensorsActive >= 2;
   }
 
   void dispose() {
-    _accelSubscription?.cancel();
+    _accelSub?.cancel();
+    _gyroSub?.cancel();
     _decayTimer?.cancel();
     motionScore.dispose();
     touchScore.dispose();
@@ -376,9 +385,10 @@ class SmartController {
   }
 }
 
-// ============================================================================
-// 🔥 CRYPTEX LOCK - Main Widget with FULL Anti-OCR Arsenal
-// ============================================================================
+// ============================================
+// 🔥 CRYPTEX LOCK - FIXED KOORDINAT
+// ============================================
+
 class CryptexLock extends StatefulWidget {
   final SmartController controller;
   final VoidCallback? onSuccess;
@@ -396,84 +406,75 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
-  static const double imageWidth = 1080.0;
-  static const double imageHeight = 1263.0;
-  
-  static const List<List<double>> wheelCoords = [
-    [120, 480, 270, 750],
-    [300, 480, 450, 750],
-    [480, 480, 630, 750],
-    [660, 480, 810, 750],
-    [840, 480, 990, 750],
-  ];
-  
-  static const List<double> buttonCoords = [425, 890, 655, 1020];
+  static const double imageWidth = 706.0;
+  static const double imageHeight = 610.0;
 
-  late List<FixedExtentScrollController> _scrollControllers;
-  
+  // ✅ KOORDINAT YANG BETUL (dari screenshot)
+  static const List<List<double>> wheelCoords = [
+    [25, 159, 113, 378],
+    [165, 160, 257, 379],
+    [308, 160, 396, 379],
+    [448, 159, 541, 378],
+    [591, 159, 681, 379],
+  ];
+
+  static const List<double> buttonCoords = [123, 433, 594, 545];
+
+  final List<FixedExtentScrollController> _scrollControllers = List.generate(
+    5,
+    (i) => FixedExtentScrollController(initialItem: 0),
+  );
+
   int? _activeWheelIndex;
   Timer? _wheelActiveTimer;
   bool _isButtonPressed = false;
-
-  // 🆕 UPGRADE 1: Micro-drift controllers
-  late List<AnimationController> _driftControllers;
-  late List<Animation<double>> _driftAnimations;
   
-  // 🆕 UPGRADE 2: Opacity breathing controller
-  late AnimationController _breathingController;
-  late Animation<double> _breathingAnimation;
-  
-  // 🆕 UPGRADE 3: Async settle delays
-  final List<int> _wheelSettleDelays = [];
+  // ✅ Micro-drift untuk text (bukan whole wheel)
   final Random _random = Random();
+  late Timer _driftTimer;
+  final List<Offset> _textDriftOffsets = List.generate(5, (_) => Offset.zero);
+  
+  // ✅ Async opacity breathing
+  late List<AnimationController> _opacityControllers;
+  late List<Animation<double>> _opacityAnimations;
 
   @override
   void initState() {
     super.initState();
     
-    // Original scroll controllers
-    _scrollControllers = List.generate(
-      5,
-      (index) => FixedExtentScrollController(initialItem: 0),
-    );
-
-    // 🆕 UPGRADE 1: Micro-drift per wheel
-    _driftControllers = List.generate(
-      5,
-      (index) => AnimationController(
-        duration: Duration(milliseconds: 1500 + _random.nextInt(1000)),
+    // ✅ Text drift animation (2px max)
+    _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+      if (mounted && _activeWheelIndex == null) {
+        setState(() {
+          for (int i = 0; i < 5; i++) {
+            _textDriftOffsets[i] = Offset(
+              (_random.nextDouble() - 0.5) * 2.5, // ±1.25px X
+              (_random.nextDouble() - 0.5) * 2.5, // ±1.25px Y
+            );
+          }
+        });
+      }
+    });
+    
+    // ✅ Opacity breathing
+    _opacityControllers = List.generate(5, (i) {
+      final controller = AnimationController(
         vsync: this,
-      )..repeat(reverse: true),
-    );
+        duration: Duration(milliseconds: 1800 + (_random.nextInt(400))),
+      );
+      
+      Future.delayed(Duration(milliseconds: _random.nextInt(1000)), () {
+        if (mounted) controller.repeat(reverse: true);
+      });
+      
+      return controller;
+    });
     
-    _driftAnimations = _driftControllers.map((controller) {
-      return Tween<double>(
-        begin: -0.8, // Subtle pixel drift
-        end: 0.8,
-      ).animate(CurvedAnimation(
-        parent: controller,
-        curve: Curves.easeInOut,
-      ));
+    _opacityAnimations = _opacityControllers.map((c) {
+      return Tween<double>(begin: 0.75, end: 1.0).animate(
+        CurvedAnimation(parent: c, curve: Curves.easeInOut),
+      );
     }).toList();
-
-    // 🆕 UPGRADE 2: Opacity breathing (global)
-    _breathingController = AnimationController(
-      duration: const Duration(milliseconds: 2200),
-      vsync: this,
-    )..repeat(reverse: true);
-    
-    _breathingAnimation = Tween<double>(
-      begin: 0.88,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _breathingController,
-      curve: Curves.easeInOut,
-    ));
-
-    // 🆕 UPGRADE 3: Random settle delays for each wheel
-    for (int i = 0; i < 5; i++) {
-      _wheelSettleDelays.add(50 + _random.nextInt(150)); // 50-200ms variance
-    }
   }
 
   @override
@@ -481,37 +482,28 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     for (var controller in _scrollControllers) {
       controller.dispose();
     }
-    _wheelActiveTimer?.cancel();
-    
-    // Clean up new controllers
-    for (var controller in _driftControllers) {
+    for (var controller in _opacityControllers) {
       controller.dispose();
     }
-    _breathingController.dispose();
-    
+    _wheelActiveTimer?.cancel();
+    _driftTimer.cancel();
     super.dispose();
   }
 
   void _onWheelScrollStart(int index) {
     setState(() => _activeWheelIndex = index);
     _wheelActiveTimer?.cancel();
-    
+    HapticFeedback.selectionClick();
     widget.controller.registerTouch();
-    widget.controller.registerScroll();
   }
 
-  void _onWheelScrollEnd(int wheelIndex) {
+  void _onWheelScrollEnd(int index) {
     _wheelActiveTimer?.cancel();
-    
-    // 🆕 UPGRADE 3: Async settle with random delay per wheel
-    _wheelActiveTimer = Timer(
-      Duration(milliseconds: 500 + _wheelSettleDelays[wheelIndex]),
-      () {
-        if (mounted) {
-          setState(() => _activeWheelIndex = null);
-        }
-      },
-    );
+    _wheelActiveTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() => _activeWheelIndex = null);
+      }
+    });
   }
 
   void _onButtonTap() {
@@ -603,7 +595,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               } else if (notification is ScrollUpdateNotification) {
                 widget.controller.registerScroll();
               } else if (notification is ScrollEndNotification) {
-                // Pass wheel index for async settle
                 _onWheelScrollEnd(i);
               }
               return false;
@@ -628,79 +619,73 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       behavior: HitTestBehavior.opaque,
       child: Stack(
         children: [
-          // 🆕 UPGRADE 1: Wrap wheel with drift animation
-          AnimatedBuilder(
-            animation: _driftAnimations[index],
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(0, isActive ? 0 : _driftAnimations[index].value),
-                child: child,
-              );
+          // ✅ WHEEL (NO TRANSFORM - koordinat tetap betul)
+          ListWheelScrollView.useDelegate(
+            controller: _scrollControllers[index],
+            itemExtent: itemExtent,
+            perspective: 0.003,
+            diameterRatio: 1.5,
+            physics: const FixedExtentScrollPhysics(),
+            onSelectedItemChanged: (_) {
+              HapticFeedback.selectionClick();
             },
-            child: ListWheelScrollView.useDelegate(
-              controller: _scrollControllers[index],
-              itemExtent: itemExtent,
-              perspective: 0.003,
-              diameterRatio: 1.5,
-              physics: const FixedExtentScrollPhysics(),
-              onSelectedItemChanged: (_) {
-                HapticFeedback.selectionClick();
-              },
-              childDelegate: ListWheelChildBuilderDelegate(
-                builder: (context, wheelIndex) {
-                  int displayNumber = wheelIndex % 10;
-                  
-                  return Center(
-                    // 🆕 UPGRADE 2: Apply opacity breathing
-                    child: AnimatedBuilder(
-                      animation: _breathingAnimation,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: isActive ? 1.0 : _breathingAnimation.value,
-                          child: child,
-                        );
-                      },
-                      child: AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 200),
-                        style: TextStyle(
-                          fontSize: wheelHeight * 0.30,
-                          fontWeight: FontWeight.w900,
-                          color: isActive 
-                              ? const Color(0xFFFF5722)
-                              : const Color(0xFF263238),
-                          shadows: isActive
-                              ? [
-                                  Shadow(
-                                    color: const Color(0xFFFF5722).withOpacity(0.8),
-                                    blurRadius: 20,
-                                  ),
-                                  Shadow(
-                                    color: const Color(0xFFFF5722).withOpacity(0.5),
-                                    blurRadius: 40,
-                                  ),
-                                ]
-                              : [
-                                  Shadow(
-                                    offset: const Offset(1, 1),
-                                    blurRadius: 1,
-                                    color: Colors.white.withOpacity(0.4),
-                                  ),
-                                  Shadow(
-                                    offset: const Offset(-1, -1),
-                                    blurRadius: 1,
-                                    color: Colors.black.withOpacity(0.6),
-                                  ),
-                                ],
+            childDelegate: ListWheelChildBuilderDelegate(
+              builder: (context, wheelIndex) {
+                int displayNumber = wheelIndex % 10;
+                
+                // ✅ DRIFT + OPACITY applied to TEXT only
+                return Center(
+                  child: AnimatedBuilder(
+                    animation: _opacityAnimations[index],
+                    builder: (context, child) {
+                      return Transform.translate(
+                        // ✅ Drift hanya pada TEXT, bukan wheel position
+                        offset: isActive ? Offset.zero : _textDriftOffsets[index],
+                        child: Opacity(
+                          opacity: isActive ? 1.0 : _opacityAnimations[index].value,
+                          child: Text(
+                            '$displayNumber',
+                            style: TextStyle(
+                              fontSize: wheelHeight * 0.30,
+                              fontWeight: FontWeight.w900,
+                              color: isActive 
+                                  ? const Color(0xFFFF5722)
+                                  : const Color(0xFF263238),
+                              shadows: isActive
+                                  ? [
+                                      Shadow(
+                                        color: const Color(0xFFFF5722).withOpacity(0.8),
+                                        blurRadius: 20,
+                                      ),
+                                      Shadow(
+                                        color: const Color(0xFFFF5722).withOpacity(0.5),
+                                        blurRadius: 40,
+                                      ),
+                                    ]
+                                  : [
+                                      Shadow(
+                                        offset: const Offset(1, 1),
+                                        blurRadius: 1,
+                                        color: Colors.white.withOpacity(0.4),
+                                      ),
+                                      Shadow(
+                                        offset: const Offset(-1, -1),
+                                        blurRadius: 1,
+                                        color: Colors.black.withOpacity(0.6),
+                                      ),
+                                    ],
+                            ),
+                          ),
                         ),
-                        child: Text('$displayNumber'),
-                      ),
-                    ),
-                  );
-                },
-              ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           ),
 
+          // Neon glow
           if (isActive)
             IgnorePointer(
               child: Container(
