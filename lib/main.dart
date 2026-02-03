@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
-import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
+import 'package:safe_device/safe_device.dart';
 import 'package:geolocator/geolocator.dart';
 
 void main() {
@@ -864,3 +864,4 @@ class EnterpriseController {
 // ============================================
 // [Same as previous CryptexLock code]
 // ... (keeping it short for readability)
+
