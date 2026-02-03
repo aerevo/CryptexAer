@@ -32,7 +32,7 @@ dependencies:
   local_auth: ^2.2.0
   
   # 🛡️ TIER-3 SECURITY (TAMBAHAN CLAUDE - KEKALKAN)
-  flutter_jailbreak_detection: ^1.1.1
+  safe_device: ^1.2.3
   geolocator: ^10.1.0
 
   # 📱 SENSORS (HAMBA KEMBALIKAN KE VERSI ASAL CAPTAIN)
@@ -63,3 +63,4 @@ flutter:
 dependency_overrides:
   web: ^1.1.0
   firebase_core_web: ^2.18.1
+
