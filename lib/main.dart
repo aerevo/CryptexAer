@@ -64,10 +64,12 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
     await Future.delayed(const Duration(milliseconds: 500));
     
     try {
-      _isRooted = await FlutterJailbreakDetection.jailbroken;
-      _isDeveloperMode = await FlutterJailbreakDetection.developerMode;
-      
-      if (_isRooted || _isDeveloperMode) {
+    // ✅ FIX: Guna SafeDevice
+     _isRooted = await SafeDevice.isJailBroken;
+    // Kita anggap Emulator (Not Real Device) sebagai Developer Mode
+     _isDeveloperMode = !(await SafeDevice.isRealDevice); 
+
+  if (_isRooted || _isDeveloperMode) {
         setState(() {
           _status = "⚠️ COMPROMISED DEVICE DETECTED";
           _checkComplete = true;
@@ -860,8 +862,368 @@ class EnterpriseController {
 }
 
 // ============================================
-// CRYPTEX LOCK (unchanged - copy from before)
+// CRYPTEX LOCK (unchanged - copy from previous)
 // ============================================
-// [Same as previous CryptexLock code]
-// ... (keeping it short for readability)
+class CryptexLock extends StatefulWidget {
+  final EnterpriseController controller;
+  final VoidCallback? onSuccess;
+  final VoidCallback? onFail;
 
+  const CryptexLock({
+    super.key,
+    required this.controller,
+    this.onSuccess,
+    this.onFail,
+  });
+
+  @override
+  State<CryptexLock> createState() => _CryptexLockState();
+}
+
+class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
+  static const double imageWidth = 706.0;
+  static const double imageHeight = 610.0;
+
+  static const List<List<double>> wheelCoords = [
+    [25, 159, 113, 378],
+    [165, 160, 257, 379],
+    [308, 160, 396, 379],
+    [448, 159, 541, 378],
+    [591, 159, 681, 379],
+  ];
+
+  static const List<double> buttonCoords = [123, 433, 594, 545];
+
+  final List<FixedExtentScrollController> _scrollControllers = List.generate(
+    5,
+    (i) => FixedExtentScrollController(initialItem: 0),
+  );
+
+  int? _activeWheelIndex;
+  Timer? _wheelActiveTimer;
+  bool _isButtonPressed = false;
+  
+  final Random _random = Random();
+  late Timer _driftTimer;
+  final List<Offset> _textDriftOffsets = List.generate(5, (_) => Offset.zero);
+  
+  late List<AnimationController> _opacityControllers;
+  late List<Animation<double>> _opacityAnimations;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+      if (mounted && _activeWheelIndex == null) {
+        setState(() {
+          for (int i = 0; i < 5; i++) {
+            _textDriftOffsets[i] = Offset(
+              (_random.nextDouble() - 0.5) * 2.5,
+              (_random.nextDouble() - 0.5) * 2.5,
+            );
+          }
+        });
+      }
+    });
+    
+    _opacityControllers = List.generate(5, (i) {
+      final controller = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: 1800 + (_random.nextInt(400))),
+      );
+      
+      Future.delayed(Duration(milliseconds: _random.nextInt(1000)), () {
+        if (mounted) controller.repeat(reverse: true);
+      });
+      
+      return controller;
+    });
+    
+    _opacityAnimations = _opacityControllers.map((c) {
+      return Tween<double>(begin: 0.75, end: 1.0).animate(
+        CurvedAnimation(parent: c, curve: Curves.easeInOut),
+      );
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _scrollControllers) {
+      controller.dispose();
+    }
+    for (var controller in _opacityControllers) {
+      controller.dispose();
+    }
+    _wheelActiveTimer?.cancel();
+    _driftTimer.cancel();
+    super.dispose();
+  }
+
+  void _onWheelScrollStart(int index) {
+    setState(() => _activeWheelIndex = index);
+    _wheelActiveTimer?.cancel();
+    HapticFeedback.selectionClick();
+    widget.controller.registerTouch();
+  }
+
+  void _onWheelScrollEnd(int index) {
+    _wheelActiveTimer?.cancel();
+    _wheelActiveTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() => _activeWheelIndex = null);
+      }
+    });
+  }
+
+  void _onButtonTap() async {
+    HapticFeedback.mediumImpact();
+    
+    setState(() => _isButtonPressed = true);
+    Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _isButtonPressed = false);
+    });
+    
+    widget.controller.registerTouch();
+    
+    List<int> currentCode = _scrollControllers
+        .map((c) => c.selectedItem % 10)
+        .toList();
+    
+    // ✅ Await server verification
+    bool isCorrect = await widget.controller.verify(currentCode);
+    
+    if (isCorrect) {
+      widget.onSuccess?.call();
+    } else {
+      widget.onFail?.call();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double availableWidth = constraints.maxWidth;
+        double aspectRatio = imageWidth / imageHeight;
+        double calculatedHeight = availableWidth / aspectRatio;
+
+        return SizedBox(
+          width: availableWidth,
+          height: calculatedHeight,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/z_wheel.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.red,
+                      child: const Center(
+                        child: Icon(Icons.error, color: Colors.white, size: 60),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              ..._buildWheelOverlays(availableWidth, calculatedHeight),
+              _buildGlowingButton(availableWidth, calculatedHeight),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight) {
+    List<Widget> overlays = [];
+
+    for (int i = 0; i < wheelCoords.length; i++) {
+      double left = wheelCoords[i][0];
+      double top = wheelCoords[i][1];
+      double right = wheelCoords[i][2];
+      double bottom = wheelCoords[i][3];
+
+      double actualLeft = screenWidth * (left / imageWidth);
+      double actualTop = screenHeight * (top / imageHeight);
+      double actualWidth = screenWidth * ((right - left) / imageWidth);
+      double actualHeight = screenHeight * ((bottom - top) / imageHeight);
+
+      overlays.add(
+        Positioned(
+          left: actualLeft,
+          top: actualTop,
+          width: actualWidth,
+          height: actualHeight,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollStartNotification) {
+                if (_scrollControllers[i].position == notification.metrics) {
+                  _onWheelScrollStart(i);
+                }
+              } else if (notification is ScrollUpdateNotification) {
+                widget.controller.registerScroll();
+              } else if (notification is ScrollEndNotification) {
+                _onWheelScrollEnd(i);
+              }
+              return false;
+            },
+            child: _buildInteractiveWheel(i, actualHeight),
+          ),
+        ),
+      );
+    }
+
+    return overlays;
+  }
+
+  Widget _buildInteractiveWheel(int index, double wheelHeight) {
+    bool isActive = _activeWheelIndex == index;
+    double itemExtent = wheelHeight * 0.40;
+
+    return GestureDetector(
+      onTapDown: (_) => _onWheelScrollStart(index),
+      onTapUp: (_) => _onWheelScrollEnd(index),
+      onTapCancel: () => _onWheelScrollEnd(index),
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        children: [
+          ListWheelScrollView.useDelegate(
+            controller: _scrollControllers[index],
+            itemExtent: itemExtent,
+            perspective: 0.003,
+            diameterRatio: 1.5,
+            physics: const FixedExtentScrollPhysics(),
+            onSelectedItemChanged: (_) {
+              HapticFeedback.selectionClick();
+            },
+            childDelegate: ListWheelChildBuilderDelegate(
+              builder: (context, wheelIndex) {
+                int displayNumber = wheelIndex % 10;
+                
+                return Center(
+                  child: AnimatedBuilder(
+                    animation: _opacityAnimations[index],
+                    builder: (context, child) {
+                      return Transform.translate(
+                        offset: isActive ? Offset.zero : _textDriftOffsets[index],
+                        child: Opacity(
+                          opacity: isActive ? 1.0 : _opacityAnimations[index].value,
+                          child: Text(
+                            '$displayNumber',
+                            style: TextStyle(
+                              fontSize: wheelHeight * 0.30,
+                              fontWeight: FontWeight.w900,
+                              color: isActive 
+                                  ? const Color(0xFFFF5722)
+                                  : const Color(0xFF263238),
+                              shadows: isActive
+                                  ? [
+                                      Shadow(
+                                        color: const Color(0xFFFF5722).withOpacity(0.8),
+                                        blurRadius: 20,
+                                      ),
+                                      Shadow(
+                                        color: const Color(0xFFFF5722).withOpacity(0.5),
+                                        blurRadius: 40,
+                                      ),
+                                    ]
+                                  : [
+                                      Shadow(
+                                        offset: const Offset(1, 1),
+                                        blurRadius: 1,
+                                        color: Colors.white.withOpacity(0.4),
+                                      ),
+                                      Shadow(
+                                        offset: const Offset(-1, -1),
+                                        blurRadius: 1,
+                                        color: Colors.black.withOpacity(0.6),
+                                      ),
+                                    ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+
+          if (isActive)
+            IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF5722).withOpacity(0.5),
+                      blurRadius: 25,
+                      spreadRadius: 3,
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFFFF5722).withOpacity(0.3),
+                      blurRadius: 40,
+                      spreadRadius: 6,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlowingButton(double screenWidth, double screenHeight) {
+    double left = buttonCoords[0];
+    double top = buttonCoords[1];
+    double right = buttonCoords[2];
+    double bottom = buttonCoords[3];
+
+    double actualLeft = screenWidth * (left / imageWidth);
+    double actualTop = screenHeight * (top / imageHeight);
+    double actualWidth = screenWidth * ((right - left) / imageWidth);
+    double actualHeight = screenHeight * ((bottom - top) / imageHeight);
+
+    return Positioned(
+      left: actualLeft,
+      top: actualTop,
+      width: actualWidth,
+      height: actualHeight,
+      child: GestureDetector(
+        onTap: _onButtonTap,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          children: [
+            Container(color: Colors.transparent),
+            
+            if (_isButtonPressed)
+              IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF5722).withOpacity(0.6),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFFFF5722).withOpacity(0.3),
+                        blurRadius: 50,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
