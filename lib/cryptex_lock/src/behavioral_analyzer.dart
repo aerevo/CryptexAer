@@ -3,8 +3,7 @@
  * MODULE: Behavioral Pattern Analyzer (EDGE COMPUTING - PRIVACY FIRST)
  * PURPOSE: Local-only biometric analysis - NO RAW DATA UPLOAD
  * FILE: lib/cryptex_lock/src/behavioral_analyzer.dart
- * 
- * 🔥 UPDATED: Added Play Integrity attestation
+ * * 🔥 UPDATED: Fixed Integrity Token using Firebase App Check
  *
  * PRIVACY GUARANTEE:
  * - All analysis happens on-device
@@ -14,13 +13,13 @@
 
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'motion_models.dart';
+import 'motion_models.dart'; // Pastikan fail ini wujud di folder sama
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 
-// 🔥 NEW: Play Integrity import
-import 'package:google_play_integrity/google_play_integrity.dart';
+// ✅ FIX: Guna Firebase App Check (Pakej Rasmi)
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 /// Behavioral pattern analysis result
 class BehavioralAnalysis {
@@ -184,7 +183,7 @@ class BehavioralAnalyzer {
       humanIndicators: humanIndicators,
     );
     
-    // 🔥 Report threat (PRIVACY-SAFE with Play Integrity)
+    // 🔥 Report threat (PRIVACY-SAFE with App Check)
     if (analysis.shouldReportThreat) {
       _reportThreat(analysis, session);
     }
@@ -192,28 +191,23 @@ class BehavioralAnalyzer {
     return analysis;
   }
   
-  /// 🔥 UPDATED: Report threat to global intelligence with Play Integrity
+  /// 🔥 UPDATED: Report threat to global intelligence with App Check Token
   Future<void> _reportThreat(BehavioralAnalysis analysis, BiometricSession session) async {
     try {
-      // 🔥 STEP 1: Request Play Integrity Token
+      // 🔥 STEP 1: Request App Check Token
       String? integrityToken;
       
-      if (Platform.isAndroid) {
-        try {
-          final nonce = _generateNonce();
-          integrityToken = await PlayIntegrity.requestIntegrityToken(
-            nonce: nonce,
-            cloudProjectNumber: 55621733629, // Z-Kinetic project number
-          );
-          
-          if (kDebugMode) {
-            print('✅ Play Integrity token obtained');
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('⚠️ Play Integrity failed: $e (continuing without token)');
-          }
-          // Continue without token (will be rejected by server if strict mode)
+      try {
+        // ✅ Guna Firebase App Check untuk dapatkan token yang sah
+        // Parameter 'true' memaksa refresh token baru
+        integrityToken = await FirebaseAppCheck.instance.getToken(true);
+        
+        if (kDebugMode) {
+          print('✅ App Check Token obtained');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('⚠️ App Check failed: $e (continuing without token)');
         }
       }
       
@@ -255,7 +249,7 @@ class BehavioralAnalyzer {
         },
         'region': 'ASIA_SOUTHEAST',
         
-        // 🔥 NEW: Play Integrity Token
+        // 🔥 NEW: App Check Token
         'integrity_token': integrityToken,
         'has_integrity_token': integrityToken != null,
       };
@@ -263,7 +257,7 @@ class BehavioralAnalyzer {
       await _firestore.collection('global_threat_intel').add(threatData);
       
       if (kDebugMode) {
-        print('🚨 Threat reported: $threatType ($severity) [Token: ${integrityToken != null ? "✅" : "❌"}]');
+        print('🚨 Threat reported: $threatType ($severity)');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -272,7 +266,7 @@ class BehavioralAnalyzer {
     }
   }
   
-  /// 🔥 NEW: Generate cryptographic nonce
+  /// Helper: Generate cryptographic nonce (Not strictly needed for App Check but good for entropy)
   String _generateNonce() {
     final random = Random.secure();
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));
