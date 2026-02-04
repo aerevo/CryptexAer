@@ -1,18 +1,25 @@
 /*
  * PROJECT: CryptexLock Security Suite V3.0
  * MODULE: Server Communication (Mirror Service)
- * NEW: Incident Reporting Integration
+ * PURPOSE: Incident Reporting Integration
+ * VERSION: Production Ready (Cleaned)
+ * 
  * SECURITY: HTTPS + Certificate Pinning + Rate Limiting
+ * 
+ * FIXES:
+ * - All debug print statements removed
+ * - TODO comments removed
+ * - Silent operation in production
  */
 
 import 'dart:async';
-import 'dart:convert'; // âœ… FIX: Wajib ada untuk jsonEncode/Decode
+import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/secure_payload.dart';
 import 'package:flutter/foundation.dart';
 
-// âœ… FIX: Definisi Model Lengkap SecurityIncidentReport (Shared Model)
+// ✅ FIX: Complete Model Definition (Shared Model)
 class SecurityIncidentReport {
   final String incidentId;
   final String timestamp;
@@ -32,7 +39,7 @@ class SecurityIncidentReport {
     required this.action,
   });
 
-  // Convert ke JSON untuk dihantar ke server
+  // Convert to JSON for server transmission
   Map<String, dynamic> toJson() => {
     'incident_id': incidentId,
     'timestamp': timestamp,
@@ -46,9 +53,9 @@ class SecurityIncidentReport {
     'status': action,
   };
 
-  // Convert dari JSON (Wajib untuk IncidentReporter baca balik data offline)
+  // Convert from JSON (Required for offline queue processing)
   factory SecurityIncidentReport.fromJson(Map<String, dynamic> json) {
-    // Handle struktur nested jika datang dari storage vs fresh creation
+    // Handle nested structure from storage vs fresh creation
     final threatIntel = json['threat_intel'] ?? {};
     
     return SecurityIncidentReport(
@@ -82,14 +89,12 @@ class MirrorService {
     try {
       return await _verifyWithRetry(payload, retries: MAX_RETRIES);
     } catch (e) {
-      if (kDebugMode) {
-        print('Mirror Service Error: $e');
-      }
+      // Silent error handling in production
       return ServerVerdict.offlineFallback();
     }
   }
   
-  /// ðŸ”¥ NEW: Report security incident to server
+  /// Report security incident to server
   /// Returns incident receipt with server actions
   Future<IncidentReceipt> reportIncident(SecurityIncidentReport incident) async {
     try {
@@ -150,7 +155,7 @@ class MirrorService {
   }
 }
 
-// Model untuk Respon Server (Verdict)
+// Server response model (Verdict)
 class ServerVerdict {
   final bool allowed;
   final String token;
