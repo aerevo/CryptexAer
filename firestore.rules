@@ -1,164 +1,124 @@
-// FILE: firestore.rules
-// Z-KINETIC FIRESTORE SECURITY RULES (HARDENED)
-// 🔥 UPDATED: App Check enforcement + strict validation
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     
     // ============================================
-    // 🔥 HELPER FUNCTIONS
+    // HELPER FUNCTIONS
     // ============================================
     
-    // Check if request has valid App Check token
-    function hasValidAppCheck() {
-      return request.auth != null && request.app != null;
+    function isAuthenticated() {
+      return request.auth != null;
     }
     
-    // Check if user is admin
-    function isAdmin() {
-      return request.auth != null && request.auth.token.admin == true;
+    function hasValidDeviceId() {
+      return request.resource.data.device_id is string 
+             && request.resource.data.device_id.size() > 10;
+    }
+    
+    function hasValidNonce() {
+      return request.resource.data.session_id is string
+             && request.resource.data.session_id.size() > 10;
+    }
+    
+    function isNotRateLimited() {
+      let deviceId = request.resource.data.device_id;
+      let rateLimitDoc = get(/databases/$(database)/documents/rate_limits/$(deviceId));
+      
+      // Allow if no rate limit doc exists (first report)
+      return !exists(/databases/$(database)/documents/rate_limits/$(deviceId))
+             || (rateLimitDoc.data.last_report.toMillis() + 300000) < request.time.toMillis();
+      // 300000ms = 5 minutes
+    }
+    
+    function isNotBlacklisted() {
+      let deviceId = request.resource.data.device_id;
+      return !exists(/databases/$(database)/documents/blacklisted_devices/$(deviceId));
+    }
+    
+    function hasValidIntegrityToken() {
+      return request.resource.data.integrity_token is string
+             && request.resource.data.integrity_token.size() > 50;
     }
     
     // ============================================
-    // GLOBAL THREAT INTELLIGENCE COLLECTION
+    // GLOBAL THREAT INTELLIGENCE (Main Collection)
     // ============================================
+    
     match /global_threat_intel/{threatId} {
-      // 🔥 UPDATED: Require App Check + strict validation
-      allow create: if hasValidAppCheck()
+      // ✅ WRITE: Only authenticated users with valid conditions
+      allow create: if isAuthenticated()
+                    && hasValidDeviceId()
+                    && hasValidNonce()
+                    && isNotRateLimited()
+                    && isNotBlacklisted()
+                    && hasValidIntegrityToken()
                     && request.resource.data.keys().hasAll([
-                      'threat_type', 
-                      'severity', 
-                      'device_os', 
-                      'timestamp',
-                      'integrity_token', // 🔥 NEW: Must have token
-                      'has_integrity_token' // 🔥 NEW: Token presence flag
-                    ])
-                    && request.resource.data.severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
-                    && request.resource.data.threat_type is string
-                    // 🔥 Ensure NO raw biometric data
-                    && !request.resource.data.keys().hasAny([
-                      'motion_events', 
-                      'touch_events', 
-                      'raw_data',
-                      'biometric_data'
-                    ])
-                    // 🔥 Rate limiting: Max 1 report per minute per device
-                    && (!exists(/databases/$(database)/documents/global_threat_intel/$(request.auth.uid)) ||
-                        resource.data.timestamp < request.time - duration.value(1, 'm'));
+                         'threat_type', 'severity', 'device_id', 
+                         'session_id', 'integrity_token', 'timestamp'
+                       ]);
       
-      // Only admins can read threat reports
-      allow read: if isAdmin();
-      
-      // No updates allowed (immutable threat logs)
+      // ❌ NO UPDATE/DELETE from clients
       allow update, delete: if false;
-    }
-    
-    // ============================================
-    // THREAT STATISTICS (Aggregated Data)
-    // ============================================
-    match /threat_statistics/{statId} {
-      // Public read for dashboard
-      allow read: if request.auth != null;
       
-      // Only Cloud Functions can write
-      allow write: if false;
+      // ✅ READ: Admin dashboard only (server-side)
+      allow read: if false; // Clients should NOT read this
     }
     
     // ============================================
-    // THREAT ANALYTICS (Dashboard Data)
+    // RATE LIMITS COLLECTION
     // ============================================
-    match /threat_analytics/{analyticsId} {
-      // Admins only
-      allow read: if isAdmin();
-      
-      // Only Cloud Functions can write
-      allow write: if false;
+    
+    match /rate_limits/{deviceId} {
+      // Server-only: Cloud Functions update this
+      allow read, write: if false;
     }
     
     // ============================================
-    // BANK ALERTS (Partner Notifications)
+    // USED NONCES COLLECTION (Replay Protection)
     // ============================================
-    match /bank_alerts/{alertId} {
-      // Bank partners can read their alerts
-      allow read: if request.auth != null 
-                  && (isAdmin() || request.auth.token.bank_partner == true);
-      
-      // Only Cloud Functions can write
-      allow write: if false;
-    }
     
-    // ============================================
-    // USER BASELINES (Legacy - Optional)
-    // ============================================
-    match /user_baselines/{deviceId} {
-      // Allow users to read/write their own baseline
-      allow read, write: if request.auth != null;
-    }
-    
-    // ============================================
-    // SYSTEM ERRORS (Internal Logging)
-    // ============================================
-    match /system_errors/{errorId} {
-      // Admins only
-      allow read: if isAdmin();
-      
-      // Only Cloud Functions can write
-      allow write: if false;
+    match /used_nonces/{nonceId} {
+      // Server-only: Cloud Functions manage this
+      allow read, write: if false;
     }
     
     // ============================================
     // BLACKLISTED DEVICES
     // ============================================
+    
     match /blacklisted_devices/{deviceId} {
-      // Users can check if their device is blacklisted
-      allow read: if request.auth != null;
-      
-      // Only Cloud Functions can blacklist
+      // Server-only writes
+      allow read: if isAuthenticated() 
+                  && request.auth.uid == deviceId;
       allow write: if false;
     }
     
     // ============================================
-    // 🔥 NEW: USED NONCES (Replay Attack Prevention)
+    // THREAT STATISTICS (Analytics Dashboard)
     // ============================================
-    match /used_nonces/{nonceId} {
-      // Cloud Functions only
-      allow read, write: if false;
-    }
     
-    // ============================================
-    // 🔥 NEW: SUSPICIOUS ACTIVITY LOG
-    // ============================================
-    match /suspicious_activity/{activityId} {
-      // Admins only
-      allow read: if isAdmin();
-      
-      // Cloud Functions only
+    match /threat_statistics/{docId} {
+      allow read: if isAuthenticated();
       allow write: if false;
     }
     
     // ============================================
-    // SECURITY INCIDENTS (Legacy - Deprecated)
+    // BANK ALERTS
     // ============================================
-    match /security_incidents/{incidentId} {
-      // Deprecated - Use global_threat_intel instead
-      allow read: if isAdmin();
-      allow create: if false; // Force migration to new model
+    
+    match /bank_alerts/{alertId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
     }
     
     // ============================================
-    // VERIFICATION LOGS (Legacy - Deprecated)
+    // THREAT ANALYTICS
     // ============================================
-    match /verification_logs/{logId} {
-      // Deprecated - No longer storing verification logs
-      allow read, write: if false;
-    }
     
-    // ============================================
-    // DEFAULT DENY ALL
-    // ============================================
-    match /{document=**} {
-      allow read, write: if false;
+    match /threat_analytics/{analyticsId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
     }
   }
 }
