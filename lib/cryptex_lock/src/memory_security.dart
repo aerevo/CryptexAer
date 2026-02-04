@@ -2,6 +2,7 @@
  * PROJECT: Z-KINETIC SECURITY CORE
  * MODULE: Memory Security & Leak Prevention
  * PURPOSE: Prevent sensitive data from lingering in memory
+ * VERSION: Production Ready (Cleaned)
  * 
  * THREATS:
  * 1. Memory Dumps (attacker dumps RAM)
@@ -20,20 +21,19 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
-/// Memory leak detector
+/// Memory leak detector (Debug only)
 class MemoryLeakDetector {
   static final Map<String, int> _allocations = {};
   static final Map<String, DateTime> _timestamps = {};
 
-  /// Track allocation
+  /// Track allocation (debug builds only)
   static void trackAllocation(String objectType) {
     if (!kDebugMode) return;
-
     _allocations[objectType] = (_allocations[objectType] ?? 0) + 1;
     _timestamps[objectType] = DateTime.now();
   }
 
-  /// Track deallocation
+  /// Track deallocation (debug builds only)
   static void trackDeallocation(String objectType) {
     if (!kDebugMode) return;
 
@@ -52,7 +52,7 @@ class MemoryLeakDetector {
     return Map.from(_allocations);
   }
 
-  /// Detect potential leaks
+  /// Detect potential leaks (debug only)
   static List<String> detectLeaks({Duration threshold = const Duration(minutes: 5)}) {
     if (!kDebugMode) return [];
 
@@ -71,25 +71,22 @@ class MemoryLeakDetector {
     return leaks;
   }
 
-  /// Print leak report
+  /// Get leak report (debug only, use logger in production)
   static void printReport() {
     if (!kDebugMode) return;
 
     final leaks = detectLeaks();
     
     if (leaks.isEmpty) {
-      debugPrint('✅ No memory leaks detected');
+      // Silent in production
     } else {
-      debugPrint('⚠️ Potential memory leaks:');
-      for (final leak in leaks) {
-        debugPrint('  - $leak');
-      }
+      // In production: use proper logging framework
+      assert(() {
+        // ignore: avoid_print
+        print('Memory leaks detected: ${leaks.length}');
+        return true;
+      }());
     }
-
-    debugPrint('Current allocations:');
-    _allocations.forEach((type, count) {
-      debugPrint('  - $type: $count');
-    });
   }
 }
 
@@ -369,9 +366,7 @@ class LifecycleSecureStorage {
 
     toRemove.forEach(_storage.remove);
 
-    if (kDebugMode && toRemove.isNotEmpty) {
-      debugPrint('🧹 Cleaned up ${toRemove.length} disposed containers');
-    }
+    // Silent cleanup in production (use logger if needed)
   }
 
   /// Dispose all
@@ -405,22 +400,15 @@ class MemoryPressureMonitor {
   /// Check memory pressure
   static void _checkMemoryPressure() {
     // In production: Use platform channels to check actual memory usage
-    // For now: Check leak detector
-    
     final leaks = MemoryLeakDetector.detectLeaks();
     
     if (leaks.isNotEmpty) {
-      if (kDebugMode) {
-        debugPrint('⚠️ Memory pressure detected:');
-        leaks.forEach(debugPrint);
-      }
-
-      // Trigger callbacks
+      // Trigger callbacks (silent in release)
       for (final callback in _pressureCallbacks) {
         try {
           callback();
         } catch (e) {
-          if (kDebugMode) debugPrint('Error in pressure callback: $e');
+          // Silent error handling in production
         }
       }
     }
@@ -504,14 +492,9 @@ class SecureBiometricSession {
  *    ✅ Set TTLs for sensitive data
  *    ✅ Monitor memory pressure
  * 
- * 4. DEBUGGING:
- *    ✅ Enable MemoryLeakDetector in dev
- *    ✅ Print reports regularly
- *    ✅ Fix leaks before release
- * 
- * 5. PRODUCTION:
- *    ✅ Disable debug tracking (kReleaseMode check)
- *    ✅ Use platform channels for native memory control
+ * 4. PRODUCTION:
+ *    ✅ Debug tracking auto-disabled in release builds
+ *    ✅ Use logger package instead of print
  *    ✅ Test with memory profiler
  * 
  * EXAMPLE USAGE IN CONTROLLER:
