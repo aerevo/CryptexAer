@@ -2,11 +2,14 @@
  * PROJECT: CryptexLock Security Suite V4.0
  * MODULE: Incident Reporter (ENTERPRISE READY)
  * STATUS: PRODUCTION READY ✅
+ * VERSION: Cleaned (All Debug Statements Removed)
+ * 
  * FIXES:
  * - Dual method signature (Map + Model support)
  * - main.dart compatibility restored
  * - Memory leak guards enhanced
  * - Error handling improved
+ * - ALL debug print statements removed for production
  */
 
 import 'dart:async';
@@ -144,7 +147,7 @@ class IncidentReporter {
 
   Future<IncidentReportResult> _reportInternal(SecurityIncidentReport incident) async {
     if (!_config.enableIncidentReporting) {
-      if (kDebugMode) print('🛡️ [INTEL] Reporting protocol is disabled.');
+      // Silent operation in production
       return IncidentReportResult.disabled();
     }
 
@@ -165,17 +168,17 @@ class IncidentReporter {
       return IncidentReportResult.success(receipt);
 
     } on SocketException catch (e) {
-      if (kDebugMode) print('🌐 [OFFLINE] Queuing $incidentId.');
+      // Network error - queue for retry (silent operation)
       await IncidentStorage.addToPendingReports(jsonEncode(incidentData));
       return IncidentReportResult.queuedForRetry(incidentId);
 
     } on TimeoutException catch (e) {
-      if (kDebugMode) print('⏳ [TIMEOUT] Queuing $incidentId.');
+      // Timeout - queue for retry (silent operation)
       await IncidentStorage.addToPendingReports(jsonEncode(incidentData));
       return IncidentReportResult.queuedForRetry(incidentId);
 
     } catch (e) {
-      if (kDebugMode) print('❌ [ERROR] Critical failure: $e');
+      // Critical failure - queue and return error (silent operation)
       await IncidentStorage.addToPendingReports(jsonEncode(incidentData));
       return IncidentReportResult.failed(incidentId, e.toString());
     }
@@ -246,8 +249,6 @@ class IncidentReporter {
     _backgroundSyncTimer?.cancel();
     _backgroundSyncTimer = null;
 
-    if (kDebugMode) {
-      debugPrint('🛡️ [INCIDENT_REPORTER] Disposed safely. Background sync terminated.');
-    }
+    // Silent disposal in production
   }
 }
