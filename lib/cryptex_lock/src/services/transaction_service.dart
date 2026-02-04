@@ -1,9 +1,12 @@
 // 🏦 TRANSACTION SERVICE V2.2 (REMOTE CONFIG ENHANCED)
 // Status: CONNECTED 🟢
+// Version: Production Ready (Cleaned)
+// 
 // Updates:
-// 1. Integrasi Firestore (Audit Trail & Blacklist Check)
-// 2. Real SHA-256 Hashing dengan Dynamic Salt (Remote Config)
+// 1. Firestore Integration (Audit Trail & Blacklist Check)
+// 2. Real SHA-256 Hashing with Dynamic Salt (Remote Config)
 // 3. Firebase Auth Session Validation
+// 4. All debug print statements removed
 
 import 'dart:async';
 import 'dart:convert';
@@ -20,7 +23,7 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 // ============================================
 class TransactionData {
   final String amount;           // Display value (RM 50,000.00)
-  final String securityHash;     // SHA-256 hash untuk verification
+  final String securityHash;     // SHA-256 hash for verification
   final String transactionId;    // Unique TXN ID
   final DateTime timestamp;      // Server timestamp
   final String checksum;         // Extra integrity layer
@@ -34,7 +37,7 @@ class TransactionData {
   }) : timestamp = timestamp ?? DateTime.now(),
        checksum = checksum ?? _generateChecksum(amount, transactionId);
 
-  // Generate checksum untuk extra validation
+  // Generate checksum for extra validation
   static String _generateChecksum(String amount, String txnId) {
     final input = '$amount:$txnId';
     return md5.convert(utf8.encode(input)).toString().substring(0, 8);
@@ -114,7 +117,7 @@ class TransactionService {
       }
     } catch (e) {
       _secretSalt = 'Z_KINETIC_OFFLINE_SALT_V2';
-      print('⚠️ Remote Config Error: $e');
+      // Silent error handling in production
     }
   }
 
@@ -147,7 +150,7 @@ class TransactionService {
 
     } catch (e) {
       if (e is SecurityException) rethrow;
-      print('⚠️ Firebase Check Warning: $e'); 
+      // Silent error handling for other exceptions
     }
   }
 
