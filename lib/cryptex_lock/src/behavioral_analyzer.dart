@@ -20,7 +20,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 
 // 🔥 NEW: Play Integrity import
-import 'package:play_integrity/play_integrity.dart';
+import 'package:google_play_integrity/google_play_integrity.dart';
 
 /// Behavioral pattern analysis result
 class BehavioralAnalysis {
