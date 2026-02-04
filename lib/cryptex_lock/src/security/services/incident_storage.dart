@@ -3,11 +3,14 @@
  * MODULE: Local Incident Storage (ENTERPRISE READY)
  * PURPOSE: High-performance forensic logging
  * STATUS: PRODUCTION READY ✅
+ * VERSION: Cleaned (All Debug Statements Removed)
+ * 
  * FIXES:
  * - Dual method signature (Map + Model support)
  * - SQL schema hardened
  * - Thread-safe operations
  * - Auto-cleanup optimized
+ * - ALL debug print statements removed for production
  */
 
 import 'dart:convert';
@@ -120,11 +123,9 @@ class IncidentStorage {
       // Auto-cleanup
       await _purgeOldRecords(db);
 
-      if (kDebugMode) {
-        print('🛡️ [FORENSICS] Incident logged to SQL: ${incidentData['incident_id']}');
-      }
+      // Silent operation in production
     } catch (e) {
-      if (kDebugMode) print('❌ [STORAGE ERROR] Failed to save: $e');
+      // Silent error handling - use logger in production if needed
     }
   }
 
@@ -174,7 +175,7 @@ class IncidentStorage {
 
       return maps.map((m) => m['raw_json'] as String).toList();
     } catch (e) {
-      if (kDebugMode) print('❌ [PENDING] Error fetching: $e');
+      // Silent error - return empty list
       return [];
     }
   }
