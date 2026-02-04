@@ -2,6 +2,7 @@
  * PROJECT: Z-KINETIC SECURITY CORE
  * MODULE: Adaptive Threshold Engine
  * PURPOSE: Learn from user behavior and adapt security thresholds
+ * VERSION: Production Ready (Cleaned)
  * 
  * VALUE PROPOSITION:
  * - Reduce false positives over time
@@ -403,7 +404,7 @@ class AdaptiveThresholdEngine {
     };
   }
 
-  /// Export features for machine learning (future use)
+  /// Export features for machine learning
   Map<String, double> extractMLFeatures({
     required BiometricSession session,
     required UserBaseline? baseline,
