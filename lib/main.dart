@@ -855,57 +855,71 @@ class EnterpriseController {
   }
 
   Future<Map<String, dynamic>> verify(List<int> code) async {
-    // Panic mode check
     String inputStr = code.join();
-    String correctStr = correctCode.join();
     String reversedStr = correctCode.reversed.join();
     
+    // --- PANIC MODE CHECK (Local - Security Feature) ---
     if (inputStr == reversedStr) {
       print('🚨 PANIC MODE ACTIVATED');
       return {'allowed': true, 'isPanicMode': true};
     }
     
-    // Local checks
+    // --- BIOMETRIC VERIFICATION (Z-Kinetic's ONLY Job) ---
+    print('🔄 Analyzing behavioral biometrics...');
+    
     bool motionOK = motionScore.value > 0.15;
     bool touchOK = touchScore.value > 0.15;
     bool patternOK = patternScore.value > 0.10;
-    
-    bool codeCorrect = inputStr == correctStr;
     int sensorsActive = [motionOK, touchOK, patternOK].where((x) => x).length;
-    bool localPass = codeCorrect && sensorsActive >= 2;
     
-    if (!localPass) {
-      print('❌ Local check failed');
-      // ✅ RANDOMIZE on fail
+    if (sensorsActive < 2) {
+      print('❌ Biometric Failed: Insufficient human signals');
+      print('   Motion: ${motionOK ? "OK" : "FAIL"}, Touch: ${touchOK ? "OK" : "FAIL"}, Pattern: ${patternOK ? "OK" : "FAIL"}');
       randomizeWheels();
       return {'allowed': false, 'isPanicMode': false};
     }
     
-    // Server check (Z-Kinetic "Cuci Tangan")
-    print('🔄 Contacting Z-Kinetic Cloud...');
+    // --- CONTACT Z-KINETIC SERVER (Verify Human Identity) ---
+    print('🔄 Contacting Z-Kinetic Cloud for identity verification...');
     String? token = await _checkWithServer(code);
     
     if (token != null) {
-      print('✅ Verification Complete. Passing token to host app.');
+      print('✅ Identity Verified. Issuing authentication token.');
+      print('📤 Passing credentials to host application for authorization.');
+      
+      // ⭐ SPLIT-PATH: Return BOTH token AND code to host app
+      // Z-Kinetic verifies identity (biometric)
+      // Host app verifies credentials (password with bank)
       return {
         'allowed': true,
         'isPanicMode': false,
-        'verificationToken': token
+        'verificationToken': token,      // ← Z-Kinetic's proof of human
+        'userInputCode': inputStr,       // ← Password for host app to verify
+        'biometricScore': {
+          'motion': motionScore.value,
+          'touch': touchScore.value,
+          'pattern': patternScore.value,
+        }
       };
     } else {
       if (isCompromisedDevice) {
-        print('❌ Server Reject: Suspicious Activity');
-        // ✅ RANDOMIZE on fail
+        print('❌ Server Reject: Suspicious Activity Detected');
         randomizeWheels();
         return {'allowed': false, 'isPanicMode': false};
       }
       
-      // Offline fallback (for demo purposes)
-      print('⚠️ Server offline, granting offline pass');
+      // Offline fallback
+      print('⚠️ Server offline - Offline verification mode');
       return {
         'allowed': true,
         'isPanicMode': false,
-        'verificationToken': 'OFFLINE-PASS'
+        'verificationToken': 'OFFLINE-PASS',
+        'userInputCode': inputStr,
+        'biometricScore': {
+          'motion': motionScore.value,
+          'touch': touchScore.value,
+          'pattern': patternScore.value,
+        }
       };
     }
   }
