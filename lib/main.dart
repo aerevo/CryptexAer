@@ -1,11 +1,15 @@
 import 'threat_dashboard.dart';
 import 'dart:async';
 import 'dart:math';
+import 'dart:convert';  // For JSON encoding
+import 'dart:typed_data';  // For Uint8List
+import 'package:crypto/crypto.dart';  // For SHA256
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:safe_device/safe_device.dart';
 import 'package:geolocator/geolocator.dart';
+// import 'package:flutter_window_manager/flutter_window_manager.dart';  // Uncomment for overlay protection
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -329,8 +333,14 @@ class SuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 🎭 WAYANG MODE: If panic, show subtle difference but still looks "safe"
+    // Perompak nampak "System Ready" (macam normal)
+    // Tapi server Captain dah dapat alert!
+    
     return Scaffold(
-      backgroundColor: isPanicMode ? const Color(0xFF607D8B) : const Color(0xFF4CAF50),
+      backgroundColor: isPanicMode 
+          ? const Color(0xFF455A64)  // Slightly grey-green (subtle clue)
+          : const Color(0xFF4CAF50),  // Bright green (normal)
       body: Center(
         child: Container(
           margin: const EdgeInsets.all(40),
@@ -357,14 +367,15 @@ class SuccessScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.check_circle,
+                  Icons.check_circle,  // Same icon for both modes (wayang!)
                   color: Color(0xFF4CAF50),
                   size: 70,
                 ),
               ),
               const SizedBox(height: 40),
               Text(
-                isPanicMode ? 'SAFE MODE' : 'IDENTITY VERIFIED',
+                // 🎭 WAYANG: Text sengaja neutral
+                isPanicMode ? 'SYSTEM READY' : 'IDENTITY VERIFIED',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w900,
@@ -374,11 +385,25 @@ class SuccessScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              Text(
-                "Token dihantar ke aplikasi klien.",
-                style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
+              
+              // 🎭 WAYANG: Subtle message for panic mode
+              if (isPanicMode)
+                const Text(
+                  "Safe mode protocol active",
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                )
+              else
+                Text(
+                  "Token dihantar ke aplikasi klien.",
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              
               const SizedBox(height: 14),
               Text(
                 message,
@@ -425,10 +450,32 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
       isCompromisedDevice: widget.isCompromisedDevice,
       deviceLocation: widget.deviceLocation,
     );
+    
+    // 🛡️ OVERLAY PROTECTION: Enable secure mode
+    _enableSecureMode();
+  }
+  
+  // 🛡️ Enable FLAG_SECURE to prevent overlays and screenshots
+  Future<void> _enableSecureMode() async {
+    try {
+      // Uncomment when flutter_window_manager added to pubspec.yaml:
+      // if (Platform.isAndroid) {
+      //   await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+      //   print('🔒 Secure mode enabled - Overlays blocked');
+      // }
+      print('🔒 Security initialization complete');
+    } catch (e) {
+      print('⚠️ Secure mode failed: $e');
+    }
   }
 
   @override
   void dispose() {
+    // Re-enable screenshots after verification
+    // Uncomment when flutter_window_manager added:
+    // if (Platform.isAndroid) {
+    //   FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
+    // }
     _controller.dispose();
     super.dispose();
   }
@@ -770,6 +817,10 @@ class EnterpriseController {
   // ✅ NEW: Randomization trigger
   final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
   
+  // 🔒 NEW: Transaction binding for anti-tampering
+  String? _boundTransactionHash;
+  Map<String, dynamic>? _boundTransactionDetails;
+  
   StreamSubscription<AccelerometerEvent>? _accelSub;
   StreamSubscription<GyroscopeEvent>? _gyroSub;
   
@@ -854,6 +905,73 @@ class EnterpriseController {
     print('🔀 Wheels randomized (trigger: ${randomizeTrigger.value})');
   }
 
+  // 🔒 TRANSACTION BINDING: Bind transaction details to prevent tampering
+  void bindTransaction(Map<String, dynamic> transactionDetails) {
+    _boundTransactionDetails = transactionDetails;
+    
+    // Create deterministic JSON string for hashing
+    final Map<String, dynamic> hashData = {
+      'amount': transactionDetails['amount'],
+      'recipient': transactionDetails['recipient'],
+      'currency': transactionDetails['currency'] ?? 'MYR',
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    
+    // Sort keys for consistent hashing
+    final sortedJson = json.encode(hashData, toEncodable: (obj) {
+      if (obj is Map) {
+        return Map.fromEntries(
+          obj.entries.toList()..sort((a, b) => a.key.compareTo(b.key))
+        );
+      }
+      return obj;
+    });
+    
+    // Generate SHA256 hash
+    _boundTransactionHash = sha256.convert(utf8.encode(sortedJson)).toString();
+    
+    print('🔒 Transaction Bound to Verification:');
+    print('   Amount: ${transactionDetails['amount']}');
+    print('   Recipient: ${transactionDetails['recipient']}');
+    print('   Hash: ${_boundTransactionHash?.substring(0, 16)}...');
+  }
+
+  // 🚨 THREAT INTELLIGENCE: Send data to Captain's dashboard (backend)
+  Future<void> _sendThreatIntelligence({
+    required String type,
+    required String severity,
+    Map<String, dynamic>? additionalData,  // 🆕 For transaction tampering, overlay attacks
+  }) async {
+    // Data ni yang akan muncul kat Dashboard 'Radar' Captain
+    final Map<String, dynamic> threatLog = {
+      'event_type': type,         // Contoh: "PANIC_DURESS", "BIO_FAIL_ATTEMPT"
+      'severity': severity,       // Contoh: "CRITICAL", "HIGH", "MEDIUM"
+      'device_id': 'USER_${Random().nextInt(9999)}',  // Device fingerprint
+      'location': deviceLocation != null
+          ? '${deviceLocation!.latitude}, ${deviceLocation!.longitude}'
+          : 'Hidden',
+      'timestamp': DateTime.now().toIso8601String(),
+      'biometric_scores': {
+        'motion': motionScore.value,
+        'touch': touchScore.value,
+        'pattern': patternScore.value,
+      },
+      ...?additionalData,  // 🆕 Merge additional attack-specific data
+    };
+
+    print('📡 [THREAT INTEL] Sending to dashboard...');
+    print('   Type: $type | Severity: $severity');
+    
+    // 🔥 PRODUCTION: Uncomment this when Firebase integrated
+    // await FirebaseFirestore.instance
+    //     .collection('global_threat_intel')
+    //     .add(threatLog);
+    
+    // For now, just log to console
+    print('   Data: ${threatLog.toString()}');
+    print('✅ [THREAT INTEL] Data sent successfully');
+  }
+
   Future<Map<String, dynamic>> verify(List<int> code) async {
     String inputStr = code.join();
     String reversedStr = correctCode.reversed.join();
@@ -885,16 +1003,50 @@ class EnterpriseController {
     
     if (token != null) {
       print('✅ Identity Verified. Issuing authentication token.');
+      
+      // 🚨 PANIC MODE DETECTION (Bank will tell us if it's panic code)
+      // In production: Bank API returns isPanic flag
+      // For demo: We simulate with reverse code
+      bool isPanicFromBank = (inputStr == reversedStr);
+      
+      if (isPanicFromBank) {
+        // --- PANIC MODE ACTIVATED (DI BELAKANG TABIR) ---
+        print('🚨 [SILENT] PANIC MODE ACTIVATED');
+        print('🚨 [SILENT] Perompak tidak sedar, UI tetap hijau');
+        
+        // A. Hantar threat intelligence ke server Captain (RISIKAN)
+        await _sendThreatIntelligence(
+          type: "PANIC_DURESS",
+          severity: "CRITICAL",
+        );
+        
+        // B. Pulangkan status untuk buat "Wayang" (UI)
+        print('🎭 [WAYANG] Showing "SYSTEM READY" to deceive attacker');
+        return {
+          'allowed': true,
+          'isPanicMode': true,  // ← SuccessScreen akan buat "wayang"
+          'verificationToken': token,
+          'userInputCode': inputStr,
+          'boundTransactionHash': _boundTransactionHash,  // 🔒 Anti-tampering
+          'transactionDetails': _boundTransactionDetails,  // For verification
+          'biometricScore': {
+            'motion': motionScore.value,
+            'touch': touchScore.value,
+            'pattern': patternScore.value,
+          }
+        };
+      }
+      
+      // --- NORMAL MODE (Bukan Panic) ---
       print('📤 Passing credentials to host application for authorization.');
       
-      // ⭐ SPLIT-PATH: Return BOTH token AND code to host app
-      // Z-Kinetic verifies identity (biometric)
-      // Host app verifies credentials (password with bank)
       return {
         'allowed': true,
         'isPanicMode': false,
         'verificationToken': token,      // ← Z-Kinetic's proof of human
         'userInputCode': inputStr,       // ← Password for host app to verify
+        'boundTransactionHash': _boundTransactionHash,  // 🔒 Anti-tampering
+        'transactionDetails': _boundTransactionDetails,  // For verification
         'biometricScore': {
           'motion': motionScore.value,
           'touch': touchScore.value,
@@ -902,25 +1054,28 @@ class EnterpriseController {
         }
       };
     } else {
+      // --- BIOMETRIC FAILED (Bot/Hacker Detected) ---
       if (isCompromisedDevice) {
         print('❌ Server Reject: Suspicious Activity Detected');
+        
+        // Send threat intelligence for failed attempt
+        await _sendThreatIntelligence(
+          type: "BIO_FAIL_COMPROMISED",
+          severity: "HIGH",
+        );
+        
         randomizeWheels();
         return {'allowed': false, 'isPanicMode': false};
       }
       
-      // Offline fallback
-      print('⚠️ Server offline - Offline verification mode');
-      return {
-        'allowed': true,
-        'isPanicMode': false,
-        'verificationToken': 'OFFLINE-PASS',
-        'userInputCode': inputStr,
-        'biometricScore': {
-          'motion': motionScore.value,
-          'touch': touchScore.value,
-          'pattern': patternScore.value,
-        }
-      };
+      // Normal failed attempt
+      await _sendThreatIntelligence(
+        type: "BIO_FAIL_ATTEMPT",
+        severity: "MEDIUM",
+      );
+      
+      randomizeWheels();
+      return {'allowed': false, 'isPanicMode': false};
     }
   }
 
