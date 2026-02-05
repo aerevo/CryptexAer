@@ -364,15 +364,22 @@ class SuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 40),
               Text(
-                isPanicMode ? 'SAFE MODE' : 'ACCESS GRANTED',
+                isPanicMode ? 'SAFE MODE' : 'IDENTITY VERIFIED',
                 style: TextStyle(
-                  fontSize: 36,
+                  fontSize: 32,
                   fontWeight: FontWeight.w900,
                   color: Colors.green[700],
-                  letterSpacing: 2,
+                  letterSpacing: 1,
                 ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 10),
+              Text(
+                "Token dihantar ke aplikasi klien.",
+                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 14),
               Text(
                 message,
                 style: TextStyle(
@@ -874,24 +881,51 @@ class EnterpriseController {
       return {'allowed': false, 'isPanicMode': false};
     }
     
-    // Server check
-    print('🔄 Contacting server...');
-    bool serverPass = await _checkWithServer(code);
+    // Server check (Z-Kinetic "Cuci Tangan")
+    print('🔄 Contacting Z-Kinetic Cloud...');
+    String? token = await _checkWithServer(code);
     
-    if (!serverPass && isCompromisedDevice) {
-      print('❌ Compromised device requires server');
-      // ✅ RANDOMIZE on fail
-      randomizeWheels();
-      return {'allowed': false, 'isPanicMode': false};
+    if (token != null) {
+      print('✅ Verification Complete. Passing token to host app.');
+      return {
+        'allowed': true,
+        'isPanicMode': false,
+        'verificationToken': token
+      };
+    } else {
+      if (isCompromisedDevice) {
+        print('❌ Server Reject: Suspicious Activity');
+        // ✅ RANDOMIZE on fail
+        randomizeWheels();
+        return {'allowed': false, 'isPanicMode': false};
+      }
+      
+      // Offline fallback (for demo purposes)
+      print('⚠️ Server offline, granting offline pass');
+      return {
+        'allowed': true,
+        'isPanicMode': false,
+        'verificationToken': 'OFFLINE-PASS'
+      };
     }
-    
-    print('✅ Access granted');
-    return {'allowed': true, 'isPanicMode': false};
   }
 
-  Future<bool> _checkWithServer(List<int> code) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    return false;
+  Future<String?> _checkWithServer(List<int> code) async {
+    await Future.delayed(const Duration(milliseconds: 1500));
+    
+    // Simulasi: Server Z-Kinetic approve identity
+    bool serverApprove = true;
+    
+    if (serverApprove) {
+      String token = "ZK-TOKEN-${Random().nextInt(999999)}";
+      print('✅ Z-Kinetic Server: Identity Verified');
+      print('🔑 Token Generated: $token');
+      print('☁️  Waiting for client app to verify this token...');
+      return token;
+    } else {
+      print('❌ Server Rejected');
+      return null;
+    }
   }
 
   void dispose() {
@@ -1275,4 +1309,3 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
-
