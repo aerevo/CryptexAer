@@ -1,4 +1,4 @@
-name: Z-Kinetic Final Release (Auto-Config FIXED)
+name: "Z-Kinetic Final Release (Auto-Config FIXED)"
 on:
   workflow_dispatch:
   push:
@@ -46,11 +46,14 @@ jobs:
       - name: "📦 Install Dependencies"
         run: flutter pub get
 
-      - name: "🛠️ NUCLEAR PATCH: Fix device_apps Namespace"
+      - name: "🛠️ NUCLEAR PATCH: Fix device_apps & SDK Versions"
         run: |
           echo "==> Patching broken device_apps plugin in pub-cache..."
+          # Fix 1: Inject Namespace
           find /home/runner/.pub-cache -name "build.gradle" -path "*/device_apps*/android/build.gradle" -exec sed -i '/android {/a \    namespace "fr.g123k.deviceapps"' {} \;
-          echo "✅ Patch applied to cached library."
+          # Fix 2: Force compileSdkVersion 34 to fix lStar error
+          find /home/runner/.pub-cache -name "build.gradle" -path "*/device_apps*/android/build.gradle" -exec sed -i 's/compileSdkVersion .*/compileSdkVersion 34/' {} \;
+          echo "✅ Nuclear patches applied."
 
       - name: "🔐 Inject google-services.json"
         run: |
@@ -85,9 +88,9 @@ jobs:
           }
           EOF
 
-      - name: "🔧 Inject Project build.gradle"
+      - name: "🔧 Inject Project build.gradle (Global SDK Force)"
         run: |
-          echo "==> Configuring Root build.gradle..."
+          echo "==> Configuring Root build.gradle with Sub-project Overrides..."
           cat > android/build.gradle << 'EOF'
           buildscript {
               repositories {
@@ -109,6 +112,15 @@ jobs:
           rootProject.buildDir = '../build'
           subprojects {
               project.buildDir = "${rootProject.buildDir}/${project.name}"
+              
+              // 🔥 FORCED OVERRIDE: Fixes lStar and other resource linking errors
+              afterEvaluate { project ->
+                  if (project.hasProperty('android')) {
+                      project.android {
+                          compileSdkVersion 34
+                      }
+                  }
+              }
           }
           subprojects {
               project.evaluationDependsOn(':app')
@@ -118,9 +130,9 @@ jobs:
           }
           EOF
 
-      - name: "🔧 Inject App build.gradle (FIXED JVM + SDK 36)"
+      - name: "🔧 Inject App build.gradle (JVM 17 + SDK 36)"
         run: |
-          echo "==> Configuring App-level build.gradle with SDK 36 and JVM 17..."
+          echo "==> Configuring App-level build.gradle..."
           cat > android/app/build.gradle << 'EOF'
           plugins {
               id "com.android.application"
@@ -131,7 +143,7 @@ jobs:
           
           android {
               namespace "com.aer.zkinetic"
-              compileSdk 36  // ✅ FIXED: Raised to 36 (was 34)
+              compileSdk 36
               
               defaultConfig {
                   applicationId "com.aer.zkinetic"
@@ -141,13 +153,11 @@ jobs:
                   versionName "3.0.0"
               }
               
-              // ✅ FIXED: Force Java 17 compatibility
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
               
-              // ✅ FIXED: Force Kotlin JVM target to 17
               kotlinOptions {
                   jvmTarget = "17"
               }
@@ -162,7 +172,6 @@ jobs:
           }
           
           dependencies {
-              // Explicit Kotlin stdlib (match JVM 17)
               implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22"
           }
           EOF
