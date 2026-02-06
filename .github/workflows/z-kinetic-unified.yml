@@ -1,4 +1,4 @@
-name: Z-Kinetic Final Release (Auto-Config)
+name: Z-Kinetic Final Release (Auto-Config FIXED)
 on:
   workflow_dispatch:
   push:
@@ -118,9 +118,9 @@ jobs:
           }
           EOF
 
-      - name: "🔧 Inject App build.gradle"
+      - name: "🔧 Inject App build.gradle (FIXED JVM + SDK 36)"
         run: |
-          echo "==> Configuring App-level build.gradle..."
+          echo "==> Configuring App-level build.gradle with SDK 36 and JVM 17..."
           cat > android/app/build.gradle << 'EOF'
           plugins {
               id "com.android.application"
@@ -128,9 +128,11 @@ jobs:
               id "dev.flutter.flutter-gradle-plugin"
               id "com.google.gms.google-services"
           }
+          
           android {
               namespace "com.aer.zkinetic"
-              compileSdk 34
+              compileSdk 36  // ✅ FIXED: Raised to 36 (was 34)
+              
               defaultConfig {
                   applicationId "com.aer.zkinetic"
                   minSdk 23
@@ -138,6 +140,18 @@ jobs:
                   versionCode 1
                   versionName "3.0.0"
               }
+              
+              // ✅ FIXED: Force Java 17 compatibility
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              
+              // ✅ FIXED: Force Kotlin JVM target to 17
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+              
               buildTypes {
                   release {
                       signingConfig signingConfigs.debug
@@ -145,6 +159,11 @@ jobs:
                       minifyEnabled false
                   }
               }
+          }
+          
+          dependencies {
+              // Explicit Kotlin stdlib (match JVM 17)
+              implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22"
           }
           EOF
 
