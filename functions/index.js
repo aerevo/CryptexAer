@@ -1,217 +1,325 @@
 /**
- * FILE: functions/index.js
- * Z-KINETIC CLOUD FUNCTIONS (APP CHECK VERIFICATION + NONCE PROTECTION)
- * POLISHED VERSION: Device-based rate limiting + Replay attack prevention
+ * Z-KINETIC SERVER - MINIMUM VIABLE PRODUCTION
+ * 
+ * 3 Jantung Utama:
+ * 1. getChallenge - Generate nonce (anti-replay)
+ * 2. attest - Verify biometric & issue session token
+ * 3. verify - Bank/Partner validation endpoint
+ * 
+ * Firebase Functions v2
+ * Node.js 18
  */
 
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
+const admin = require("firebase-admin");
+const crypto = require("crypto");
 
+// Initialize Firebase Admin
 admin.initializeApp();
 
+// Firestore reference
 const db = admin.firestore();
-const region = 'asia-southeast1';
 
-/**
- * 🚨 MAIN PROCESSOR: Threat Intelligence with App Check + Nonce Verification
- */
-exports.processThreatIntel = functions
-  .region(region)
-  .firestore
-  .document('global_threat_intel/{threatId}')
-  .onCreate(async (snap, context) => {
-    
-    const threatData = snap.data();
-    const threatId = context.params.threatId;
-    
-    console.log('🚨 New threat detected:', { 
-      id: threatId, 
-      type: threatData.threat_type,
-      device: threatData.device_id 
-    });
-    
+// ============================================
+// ENDPOINT 1: GET CHALLENGE (Generate Nonce)
+// ============================================
+exports.getChallenge = onCall(
+  {
+    region: "asia-southeast1",
+    timeoutSeconds: 10,
+    memory: "256MiB",
+  },
+  async (request) => {
     try {
-      // ============================================
-      // STEP 1: Verify App Check Token
-      // ============================================
-      if (!threatData.integrity_token) {
-        console.warn('⚠️ Missing integrity token. Deleting report.');
-        await snap.ref.delete();
-        return;
-      }
-      
-      try {
-        const decodedToken = await admin.appCheck().verifyToken(threatData.integrity_token);
-        console.log('✅ App Check Valid. App ID:', decodedToken.appId);
-        
-      } catch (err) {
-        console.error('❌ Invalid App Check Token:', err.message);
-        await snap.ref.delete();
-        await blacklistDevice(threatData.device_id || 'UNKNOWN', {
-          reason: 'INVALID_APP_CHECK', 
-          severity: 'HIGH', 
-          incidentId: threatId 
-        });
-        return;
-      }
-      
-      // ============================================
-      // STEP 2: Check Nonce (Prevent Replay Attacks)
-      // ============================================
-      const nonceKey = `${threatData.device_id}:${threatData.session_id}`;
-      const nonceRef = db.collection('used_nonces').doc(nonceKey);
-      const nonceDoc = await nonceRef.get();
-      
-      if (nonceDoc.exists) {
-        console.warn('⚠️ Duplicate nonce detected (replay attack):', nonceKey);
-        await snap.ref.delete();
-        await blacklistDevice(threatData.device_id, {
-          reason: 'REPLAY_ATTACK',
-          severity: 'CRITICAL',
-          incidentId: threatId
-        });
-        return;
-      }
-      
-      // Mark nonce as used (expires in 1 hour)
-      await nonceRef.set({
-        used_at: admin.firestore.FieldValue.serverTimestamp(),
-        threat_id: threatId,
-        expires_at: new Date(Date.now() + 3600000) // 1 hour
+      // Generate cryptographically secure nonce
+      const nonce = crypto.randomBytes(32).toString("hex");
+      const now = Date.now();
+      const expiry = now + 60000; // 60 seconds TTL
+
+      // Store nonce in Firestore (temporary)
+      await db.collection("challenges").doc(nonce).set({
+        created: admin.firestore.FieldValue.serverTimestamp(),
+        expiry: expiry,
+        used: false,
+        ip: request.rawRequest.ip || "unknown",
       });
-      
-      // ============================================
-      // STEP 3: Update Rate Limit Timestamp
-      // ============================================
-      await db.collection('rate_limits').doc(threatData.device_id).set({
-        last_report: admin.firestore.FieldValue.serverTimestamp(),
-        device_id: threatData.device_id
-      }, { merge: true });
-      
-      // ============================================
-      // STEP 4: Process Verified Threat
-      // ============================================
-      await updateGlobalStats(threatData);
-      
-      if (threatData.severity === 'HIGH' || threatData.severity === 'CRITICAL') {
-        await alertBankPartners(threatData, threatId);
-      }
-      
-      // Dashboard analytics
-      await db.collection('threat_analytics').add({
-        threat_id: threatId,
-        threat_type: threatData.threat_type,
-        severity: threatData.severity,
-        device_id: threatData.device_id,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        verified: true
-      });
-      
-      console.log('✅ Threat processed successfully:', threatId);
-      
+
+      console.log(`✅ Nonce generated: ${nonce.substring(0, 16)}...`);
+
+      return {
+        success: true,
+        nonce: nonce,
+        expiry: expiry,
+        message: "Challenge generated successfully",
+      };
     } catch (error) {
-      console.error('❌ Error processing threat:', error);
+      console.error("❌ getChallenge error:", error);
+      throw new HttpsError("internal", "Failed to generate challenge");
     }
-  });
-
-/**
- * 🧹 SCHEDULED CLEANUP: Remove expired nonces (runs every hour)
- */
-exports.cleanupExpiredNonces = functions
-  .region(region)
-  .pubsub
-  .schedule('0 * * * *') // Every hour at :00
-  .timeZone('Asia/Kuala_Lumpur')
-  .onRun(async (context) => {
-    
-    console.log('🧹 Starting nonce cleanup...');
-    
-    const now = admin.firestore.Timestamp.now();
-    const expiredNonces = await db.collection('used_nonces')
-      .where('expires_at', '<', now.toDate())
-      .limit(500)
-      .get();
-    
-    if (expiredNonces.empty) {
-      console.log('✅ No expired nonces to clean');
-      return null;
-    }
-    
-    const batch = db.batch();
-    let count = 0;
-    
-    expiredNonces.forEach(doc => {
-      batch.delete(doc.ref);
-      count++;
-    });
-    
-    await batch.commit();
-    console.log(`✅ Deleted ${count} expired nonces`);
-    
-    return null;
-  });
+  }
+);
 
 // ============================================
-// HELPER FUNCTIONS
+// ENDPOINT 2: ATTEST (Verify & Issue Token)
 // ============================================
+exports.attest = onCall(
+  {
+    region: "asia-southeast1",
+    timeoutSeconds: 30,
+    memory: "512MiB",
+  },
+  async (request) => {
+    try {
+      const {nonce, biometricData, deviceId} = request.data;
 
-/**
- * Update global threat statistics
- */
-async function updateGlobalStats(threatData) {
-  const statsRef = db.collection('threat_statistics').doc('global');
-  
-  await db.runTransaction(async (transaction) => {
-    const statsDoc = await transaction.get(statsRef);
-    
-    if (!statsDoc.exists) {
-      transaction.set(statsRef, {
-        total_threats: 1,
-        by_severity: { [threatData.severity]: 1 },
-        by_type: { [threatData.threat_type]: 1 },
-        last_updated: admin.firestore.FieldValue.serverTimestamp(),
+      // Validation: Required fields
+      if (!nonce || !biometricData || !deviceId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Missing required fields: nonce, biometricData, deviceId"
+        );
+      }
+
+      // ─────────────────────────────────────────
+      // STEP 1: Verify Nonce (Anti-Replay)
+      // ─────────────────────────────────────────
+      const challengeRef = db.collection("challenges").doc(nonce);
+      const challengeDoc = await challengeRef.get();
+
+      if (!challengeDoc.exists) {
+        throw new HttpsError("not-found", "Invalid nonce");
+      }
+
+      const challenge = challengeDoc.data();
+
+      // Check if already used
+      if (challenge.used) {
+        throw new HttpsError("already-exists", "Nonce already used (replay attack detected)");
+      }
+
+      // Check if expired
+      if (challenge.expiry < Date.now()) {
+        throw new HttpsError("deadline-exceeded", "Nonce expired");
+      }
+
+      // Mark nonce as used (prevent replay)
+      await challengeRef.update({used: true});
+
+      // ─────────────────────────────────────────
+      // STEP 2: Verify Biometric Data
+      // ─────────────────────────────────────────
+      const {motion, touch, pattern} = biometricData;
+
+      // Simple threshold check (production-grade logic)
+      const motionOK = motion > 0.15;
+      const touchOK = touch > 0.15;
+      const patternOK = pattern > 0.10;
+
+      const sensorsActive = [motionOK, touchOK, patternOK].filter(Boolean).length;
+
+      // Require at least 2 sensors passing
+      if (sensorsActive < 2) {
+        console.log(`❌ Biometric failed for device ${deviceId}: motion=${motion}, touch=${touch}, pattern=${pattern}`);
+
+        // Log failed attempt (for analytics, not blocking)
+        await db.collection("failed_attestations").add({
+          deviceId: deviceId,
+          reason: "insufficient_biometric_signals",
+          scores: {motion, touch, pattern},
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        throw new HttpsError(
+          "permission-denied",
+          "Biometric verification failed: insufficient human signals"
+        );
+      }
+
+      // ─────────────────────────────────────────
+      // STEP 3: Generate Session Token
+      // ─────────────────────────────────────────
+      const sessionToken = crypto.randomBytes(64).toString("hex");
+      const tokenExpiry = Date.now() + 300000; // 5 minutes validity
+
+      // Calculate risk score (0-100)
+      const avgScore = (motion + touch + pattern) / 3;
+      let riskScore;
+      if (avgScore > 0.7) {
+        riskScore = "LOW";
+      } else if (avgScore > 0.4) {
+        riskScore = "MEDIUM";
+      } else {
+        riskScore = "HIGH";
+      }
+
+      // Store session in Firestore
+      await db.collection("sessions").doc(sessionToken).set({
+        deviceId: deviceId,
+        status: "VERIFIED",
+        riskScore: riskScore,
+        biometricScores: {motion, touch, pattern},
+        created: admin.firestore.FieldValue.serverTimestamp(),
+        expiry: tokenExpiry,
+        nonce: nonce, // Audit trail
       });
-    } else {
-      transaction.update(statsRef, {
-        total_threats: admin.firestore.FieldValue.increment(1),
-        [`by_severity.${threatData.severity}`]: admin.firestore.FieldValue.increment(1),
-        [`by_type.${threatData.threat_type}`]: admin.firestore.FieldValue.increment(1),
-        last_updated: admin.firestore.FieldValue.serverTimestamp(),
-      });
+
+      console.log(`✅ Attestation successful for device ${deviceId}: Token=${sessionToken.substring(0, 16)}..., Risk=${riskScore}`);
+
+      return {
+        success: true,
+        sessionToken: sessionToken,
+        expiry: tokenExpiry,
+        riskScore: riskScore,
+        message: "Biometric verification passed",
+      };
+    } catch (error) {
+      // Re-throw HttpsError as-is
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      // Log unexpected errors
+      console.error("❌ attest error:", error);
+      throw new HttpsError("internal", "Attestation failed");
     }
-  });
-}
+  }
+);
 
-/**
- * Alert bank partners about critical threats
- */
-async function alertBankPartners(threatData, threatId) {
-  await db.collection('bank_alerts').add({
-    alert_id: `ALERT_${Date.now()}`,
-    threat_id: threatId,
-    threat_type: threatData.threat_type,
-    severity: threatData.severity,
-    device_id: threatData.device_id,
-    message: `VERIFIED THREAT: ${threatData.threat_type}`,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    requires_action: true
-  });
-  
-  console.log('🚨 Bank alert created for threat:', threatId);
-}
+// ============================================
+// ENDPOINT 3: VERIFY (Bank/Partner Check)
+// ============================================
+exports.verify = onCall(
+  {
+    region: "asia-southeast1",
+    timeoutSeconds: 10,
+    memory: "256MiB",
+  },
+  async (request) => {
+    try {
+      const {sessionToken} = request.data;
 
-/**
- * Blacklist malicious device
- */
-async function blacklistDevice(deviceId, options) {
-  await db.collection('blacklisted_devices').doc(deviceId).set({
-    device_id: deviceId,
-    reason: options.reason,
-    severity: options.severity || 'MEDIUM',
-    incident_id: options.incidentId || null,
-    blacklisted_at: admin.firestore.FieldValue.serverTimestamp(),
-    auto_generated: true
-  }, { merge: true });
-  
-  console.log('🚫 Device blacklisted:', deviceId, '| Reason:', options.reason);
-}
+      // Validation
+      if (!sessionToken) {
+        throw new HttpsError("invalid-argument", "Missing sessionToken");
+      }
+
+      // Retrieve session from Firestore
+      const sessionRef = db.collection("sessions").doc(sessionToken);
+      const sessionDoc = await sessionRef.get();
+
+      if (!sessionDoc.exists) {
+        console.log(`❌ Invalid token verification attempt: ${sessionToken.substring(0, 16)}...`);
+        return {
+          valid: false,
+          status: "INVALID",
+          message: "Token not found",
+        };
+      }
+
+      const session = sessionDoc.data();
+
+      // Check if expired
+      if (session.expiry < Date.now()) {
+        console.log(`❌ Expired token verification attempt: ${sessionToken.substring(0, 16)}...`);
+        return {
+          valid: false,
+          status: "EXPIRED",
+          message: "Token expired",
+        };
+      }
+
+      // Token is valid
+      console.log(`✅ Token verified: ${sessionToken.substring(0, 16)}..., Risk=${session.riskScore}`);
+
+      return {
+        valid: true,
+        status: "VALID",
+        riskScore: session.riskScore,
+        deviceId: session.deviceId,
+        verifiedAt: session.created,
+        expiresAt: session.expiry,
+        message: "Token is valid",
+      };
+    } catch (error) {
+      // Re-throw HttpsError as-is
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      console.error("❌ verify error:", error);
+      throw new HttpsError("internal", "Verification failed");
+    }
+  }
+);
+
+// ============================================
+// SCHEDULED CLEANUP (Every 5 minutes)
+// ============================================
+exports.cleanupExpired = onSchedule(
+  {
+    schedule: "*/5 * * * *", // Every 5 minutes
+    region: "asia-southeast1",
+    timeoutSeconds: 60,
+    memory: "256MiB",
+  },
+  async (event) => {
+    const now = Date.now();
+    let deletedChallenges = 0;
+    let deletedSessions = 0;
+
+    try {
+      // Cleanup expired challenges
+      const expiredChallenges = await db
+        .collection("challenges")
+        .where("expiry", "<", now)
+        .limit(500)
+        .get();
+
+      const challengeBatch = db.batch();
+      expiredChallenges.forEach((doc) => {
+        challengeBatch.delete(doc.ref);
+        deletedChallenges++;
+      });
+      await challengeBatch.commit();
+
+      // Cleanup expired sessions
+      const expiredSessions = await db
+        .collection("sessions")
+        .where("expiry", "<", now)
+        .limit(500)
+        .get();
+
+      const sessionBatch = db.batch();
+      expiredSessions.forEach((doc) => {
+        sessionBatch.delete(doc.ref);
+        deletedSessions++;
+      });
+      await sessionBatch.commit();
+
+      console.log(`🧹 Cleanup complete: ${deletedChallenges} challenges, ${deletedSessions} sessions deleted`);
+    } catch (error) {
+      console.error("❌ Cleanup error:", error);
+    }
+  }
+);
+
+// ============================================
+// HEALTH CHECK (For Monitoring)
+// ============================================
+exports.health = onCall(
+  {
+    region: "asia-southeast1",
+    timeoutSeconds: 5,
+    memory: "128MiB",
+  },
+  async (request) => {
+    return {
+      status: "OK",
+      server: "Z-Kinetic Attestation Authority",
+      version: "1.0.0",
+      region: "asia-southeast1",
+      timestamp: Date.now(),
+    };
+  }
+);
