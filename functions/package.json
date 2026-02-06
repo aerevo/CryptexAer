@@ -1,10 +1,18 @@
 {
   "name": "z-kinetic-functions",
-  "version": "3.0.0",
-  "description": "Z-Kinetic Cloud Functions with Play Integrity",
-  "main": "index.js",
+  "description": "Z-Kinetic Behavioral Attestation Authority",
+  "version": "1.0.0",
   "engines": {
     "node": "18"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0"
   },
   "scripts": {
     "serve": "firebase emulators:start --only functions",
@@ -12,14 +20,6 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
-  },
-  "dependencies": {
-    "firebase-admin": "^12.0.0",
-    "firebase-functions": "^5.0.0",
-    "@google-cloud/recaptcha-enterprise": "^5.8.0"
-  },
-  "devDependencies": {
-    "firebase-functions-test": "^3.1.0"
   },
   "private": true
 }
