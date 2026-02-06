@@ -76,9 +76,9 @@ jobs:
           }
           EOF
 
-      - name: 🔧 Inject Project build.gradle (With Legacy Namespace Patch)
+      - name: 🔧 Inject Project build.gradle (Robust Patch)
         run: |
-          echo "==> Applying Android Gradle Plugin 8.2.1 and Namespace Patch..."
+          echo "==> Applying Android Gradle Plugin and Robust Namespace Patch..."
           cat > android/build.gradle << 'EOF'
           buildscript {
               repositories {
@@ -105,22 +105,13 @@ jobs:
               project.evaluationDependsOn(':app')
           }
           
-          // 🔥 HOT-FIX: Solve 'device_apps' Namespace Issue
-          subprojects {
-              afterEvaluate { project ->
-                  if (project.hasProperty('android')) {
-                      if (project.name == 'device_apps') {
-                          project.android {
-                              namespace = 'fr.g123k.deviceapps'
-                          }
-                      }
-                      // Auto-fix for any other missing namespaces
-                      if (project.android.namespace == null) {
-                          def manifestFile = project.file("src/main/AndroidManifest.xml")
-                          if (manifestFile.exists()) {
-                              def manifest = new XmlParser().parse(manifestFile)
-                              project.android.namespace = manifest.@package
-                          }
+          // 🔥 ROBUST HOT-FIX: Solve 'device_apps' Namespace Issue
+          // Menggunakan hook gradle.projectsEvaluated untuk mengelakkan ralat 'already evaluated'
+          gradle.projectsEvaluated {
+              allprojects { p ->
+                  if (p.hasProperty('android') && p.name == 'device_apps') {
+                      p.android {
+                          namespace = 'fr.g123k.deviceapps'
                       }
                   }
               }
