@@ -29,19 +29,23 @@ jobs:
 
       - name: 🔥 Nuclear Clean (Remove Old Android Folder)
         run: |
-          echo "==> Destroying old Android folder..."
+          echo "==> Destroying old Android folder and locks..."
           rm -rf android/ ios/ build/ .dart_tool/ pubspec.lock
           echo "✅ Clean complete."
 
       - name: 🏗️ Create Fresh Project (com.aer.zkinetic)
         run: |
-          echo "==> Creating fresh project structure..."
-          # Pastikan org dan project-name bergabung jadi com.aer.zkinetic
+          echo "==> Recreating project structure on-the-fly..."
           flutter create --platforms android --org com.aer --project-name zkinetic .
 
-      - name: 🔐 Inject google-services.json (Real Data)
+      - name: 🩹 Fix Dependency Versions (screen_protector)
         run: |
-          echo "==> Injecting Real google-services.json..."
+          echo "==> Forcing screen_protector to stable version ^1.5.1..."
+          sed -i 's/screen_protector: .*/screen_protector: ^1.5.1/' pubspec.yaml
+
+      - name: 🔐 Inject google-services.json
+        run: |
+          echo "==> Injecting Firebase Security Configuration..."
           cat > android/app/google-services.json << 'EOF'
           {
             "project_info": {
@@ -57,87 +61,24 @@ jobs:
                     "package_name": "com.aer.zkinetic"
                   }
                 },
-                "oauth_client": [],
                 "api_key": [
                   {
                     "current_key": "AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w"
                   }
                 ],
                 "services": {
-                  "appinvite_service": {
-                    "other_platform_oauth_client": []
-                  }
+                  "appinvite_service": { "status": 1 },
+                  "ads_service": { "status": 1 }
                 }
               }
             ],
             "configuration_version": "1"
           }
           EOF
-          echo "✅ google-services.json injected."
 
-      - name: 🔧 Inject App build.gradle (Hardened)
+      - name: 🔧 Inject Project build.gradle (With Legacy Namespace Patch)
         run: |
-          echo "==> Overwriting android/app/build.gradle..."
-          cat > android/app/build.gradle << 'EOF'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
-          }
-
-          android {
-              namespace "com.aer.zkinetic"
-              compileSdk flutter.compileSdkVersion
-              ndkVersion flutter.ndkVersion
-
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-
-              kotlinOptions {
-                  jvmTarget = '1.8'
-              }
-
-              sourceSets {
-                  main.java.srcDirs += 'src/main/kotlin'
-              }
-
-              defaultConfig {
-                  applicationId "com.aer.zkinetic"
-                  minSdkVersion flutter.minSdkVersion
-                  targetSdkVersion flutter.targetSdkVersion
-                  versionCode flutter.versionCode
-                  versionName flutter.versionName
-              }
-
-              buildTypes {
-                  release {
-                      // Security: Obfuscate code to hide logic from hackers
-                      minifyEnabled true
-                      shrinkResources true
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-                      signingConfig signingConfigs.debug
-                  }
-              }
-          }
-
-          flutter {
-              source '../..'
-          }
-
-          dependencies {
-              implementation platform('com.google.firebase:firebase-bom:33.7.0')
-              implementation 'com.google.firebase:firebase-analytics'
-              // 🔥 WAJIB: App Check Play Integrity
-              implementation 'com.google.firebase:firebase-appcheck-playintegrity'
-          }
-          EOF
-
-      - name: 🔧 Inject Project build.gradle
-        run: |
-          echo "==> Overwriting android/build.gradle..."
+          echo "==> Applying Android Gradle Plugin 8.2.1 and Namespace Patch..."
           cat > android/build.gradle << 'EOF'
           buildscript {
               repositories {
@@ -163,15 +104,66 @@ jobs:
           subprojects {
               project.evaluationDependsOn(':app')
           }
+          
+          // 🔥 HOT-FIX: Solve 'device_apps' Namespace Issue
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.hasProperty('android')) {
+                      if (project.name == 'device_apps') {
+                          project.android {
+                              namespace = 'fr.g123k.deviceapps'
+                          }
+                      }
+                      // Auto-fix for any other missing namespaces
+                      if (project.android.namespace == null) {
+                          def manifestFile = project.file("src/main/AndroidManifest.xml")
+                          if (manifestFile.exists()) {
+                              def manifest = new XmlParser().parse(manifestFile)
+                              project.android.namespace = manifest.@package
+                          }
+                      }
+                  }
+              }
+          }
+
           tasks.register("clean", Delete) {
               delete rootProject.buildDir
           }
           EOF
 
-      - name: 🔥 Generate Dummy firebase_options.dart (Bypass)
+      - name: 🔧 Inject App build.gradle
         run: |
-          # Kalau main.dart perlukan fail ni, kita create dummy supaya compile tak error.
-          # Android akan guna google-services.json, jadi fail ni cuma placeholder untuk Flutter.
+          echo "==> Configuring App-level build.gradle..."
+          cat > android/app/build.gradle << 'EOF'
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+              id "com.google.gms.google-services"
+          }
+          android {
+              namespace "com.aer.zkinetic"
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.aer.zkinetic"
+                  minSdk 23
+                  targetSdk 34
+                  versionCode 1
+                  versionName "3.0.0"
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                      shrinkResources false
+                      minifyEnabled false
+                  }
+              }
+          }
+          EOF
+
+      - name: 🧪 Generate Firebase Options
+        run: |
+          echo "==> Injecting firebase_options.dart..."
           mkdir -p lib
           cat > lib/firebase_options.dart << 'EOF'
           import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
@@ -183,16 +175,8 @@ jobs:
               switch (defaultTargetPlatform) {
                 case TargetPlatform.android:
                   return android;
-                case TargetPlatform.iOS:
-                  throw UnsupportedError('iOS not configured');
-                case TargetPlatform.macOS:
-                  throw UnsupportedError('MacOS not configured');
-                case TargetPlatform.windows:
-                  throw UnsupportedError('Windows not configured');
-                case TargetPlatform.linux:
-                  throw UnsupportedError('Linux not configured');
                 default:
-                  throw UnsupportedError('Unknown platform');
+                  throw UnsupportedError('Platform not supported');
               }
             }
 
@@ -209,12 +193,12 @@ jobs:
       - name: 📦 Install Dependencies
         run: flutter pub get
 
-      - name: 🚀 Build APK
-        run: flutter build apk --release
+      - name: 🚀 Build APK (Release Mode)
+        run: flutter build apk --release --no-tree-shake-icons
 
-      - name: 📤 Upload Artifact
+      - name: 📤 Upload Z-Kinetic Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: z-kinetic-release-signed
+          name: z-kinetic-v3-build
           path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 7
+          retention-days: 5
