@@ -38,10 +38,19 @@ jobs:
           echo "==> Recreating project structure on-the-fly..."
           flutter create --platforms android --org com.aer --project-name zkinetic .
 
-      - name: 🩹 Fix Dependency Versions (screen_protector)
+      - name: 🩹 Fix Dependency Versions
         run: |
           echo "==> Forcing screen_protector to stable version ^1.5.1..."
           sed -i 's/screen_protector: .*/screen_protector: ^1.5.1/' pubspec.yaml
+
+      - name: 📦 Install Dependencies
+        run: flutter pub get
+
+      - name: 🛠️ NUCLEAR PATCH: Fix device_apps Namespace
+        run: |
+          echo "==> Patching broken device_apps plugin in pub-cache..."
+          find /home/runner/.pub-cache -name "build.gradle" -path "*/device_apps*/android/build.gradle" -exec sed -i '/android {/a \    namespace "fr.g123k.deviceapps"' {} \;
+          echo "✅ Patch applied to cached library."
 
       - name: 🔐 Inject google-services.json
         run: |
@@ -76,9 +85,9 @@ jobs:
           }
           EOF
 
-      - name: 🔧 Inject Project build.gradle (Robust Patch)
+      - name: 🔧 Inject Project build.gradle
         run: |
-          echo "==> Applying Android Gradle Plugin and Robust Namespace Patch..."
+          echo "==> Configuring Root build.gradle..."
           cat > android/build.gradle << 'EOF'
           buildscript {
               repositories {
@@ -104,19 +113,6 @@ jobs:
           subprojects {
               project.evaluationDependsOn(':app')
           }
-          
-          // 🔥 ROBUST HOT-FIX: Solve 'device_apps' Namespace Issue
-          // Menggunakan hook gradle.projectsEvaluated untuk mengelakkan ralat 'already evaluated'
-          gradle.projectsEvaluated {
-              allprojects { p ->
-                  if (p.hasProperty('android') && p.name == 'device_apps') {
-                      p.android {
-                          namespace = 'fr.g123k.deviceapps'
-                      }
-                  }
-              }
-          }
-
           tasks.register("clean", Delete) {
               delete rootProject.buildDir
           }
@@ -180,9 +176,6 @@ jobs:
             );
           }
           EOF
-
-      - name: 📦 Install Dependencies
-        run: flutter pub get
 
       - name: 🚀 Build APK (Release Mode)
         run: flutter build apk --release --no-tree-shake-icons
