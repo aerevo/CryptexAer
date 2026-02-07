@@ -1,17 +1,22 @@
 /**
- * Z-KINETIC SERVER - MINIMUM VIABLE PRODUCTION
+ * Z-KINETIC SERVER - SPARK PLAN COMPATIBLE
  * 
  * 3 Jantung Utama:
  * 1. getChallenge - Generate nonce (anti-replay)
  * 2. attest - Verify biometric & issue session token
  * 3. verify - Bank/Partner validation endpoint
  * 
+ * SPARK PLAN SAFE:
+ * - No external HTTP calls
+ * - No scheduled functions (removed cleanupExpired)
+ * - Only Firebase services (Firestore)
+ * - 100% FREE TIER COMPATIBLE
+ * 
  * Firebase Functions v2
  * Node.js 18
  */
 
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {onSchedule} = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 
@@ -254,21 +259,27 @@ exports.verify = onCall(
 );
 
 // ============================================
-// SCHEDULED CLEANUP (Every 5 minutes)
+// MANUAL CLEANUP (Callable Function)
 // ============================================
-exports.cleanupExpired = onSchedule(
+/**
+ * Manual cleanup function - call this periodically
+ * Can be triggered from Firebase Console or admin panel
+ * SPARK PLAN COMPATIBLE (no scheduled trigger)
+ */
+exports.manualCleanup = onCall(
   {
-    schedule: "*/5 * * * *", // Every 5 minutes
     region: "asia-southeast1",
     timeoutSeconds: 60,
     memory: "256MiB",
   },
-  async (event) => {
+  async (request) => {
     const now = Date.now();
     let deletedChallenges = 0;
     let deletedSessions = 0;
 
     try {
+      console.log("🧹 Manual cleanup started...");
+
       // Cleanup expired challenges
       const expiredChallenges = await db
         .collection("challenges")
@@ -297,9 +308,17 @@ exports.cleanupExpired = onSchedule(
       });
       await sessionBatch.commit();
 
-      console.log(`🧹 Cleanup complete: ${deletedChallenges} challenges, ${deletedSessions} sessions deleted`);
+      console.log(`✅ Cleanup complete: ${deletedChallenges} challenges, ${deletedSessions} sessions deleted`);
+
+      return {
+        success: true,
+        deletedChallenges: deletedChallenges,
+        deletedSessions: deletedSessions,
+        message: "Cleanup completed successfully",
+      };
     } catch (error) {
       console.error("❌ Cleanup error:", error);
+      throw new HttpsError("internal", "Cleanup failed");
     }
   }
 );
@@ -317,8 +336,9 @@ exports.health = onCall(
     return {
       status: "OK",
       server: "Z-Kinetic Attestation Authority",
-      version: "1.0.0",
+      version: "1.0.0 (Spark Compatible)",
       region: "asia-southeast1",
+      plan: "SPARK (Free)",
       timestamp: Date.now(),
     };
   }
