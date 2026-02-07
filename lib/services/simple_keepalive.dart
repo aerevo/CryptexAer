@@ -6,9 +6,7 @@ class SimpleKeepAlive {
   Timer? _keepAliveTimer;
   int? _mySlot;
   
-  // ⚠️ PENTING: Tukar URL ni bila dah deploy ke Render nanti
-  // Buat masa ni biarkan begini atau letak URL dummy
-  final String _serverUrl = 'https://z-kinetic.onrender.com';
+  final String _serverUrl = 'https://z-kinetic-server.onrender.com';
   
   // Initialize keep-alive system
   void initialize() {
