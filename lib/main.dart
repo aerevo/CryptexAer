@@ -1079,24 +1079,46 @@ class EnterpriseController {
     }
   }
 
+  
+
+// ⚠️ GANTI KOD SIMULASI DENGAN KOD INI UNTUK REAL SERVER CONNECTION
   Future<String?> _checkWithServer(List<int> code) async {
-    await Future.delayed(const Duration(milliseconds: 1500));
-    
-    // Simulasi: Server Z-Kinetic approve identity
-    bool serverApprove = true;
-    
-    if (serverApprove) {
-      String token = "ZK-TOKEN-${Random().nextInt(999999)}";
-      print('✅ Z-Kinetic Server: Identity Verified');
-      print('🔑 Token Generated: $token');
-      print('☁️  Waiting for client app to verify this token...');
-      return token;
-    } else {
-      print('❌ Server Rejected');
+    try {
+      // 1. Minta Challenge (Nonce)
+      final nonceResponse = await http.post(
+        Uri.parse('https://z-kinetic-server.onrender.com/getChallenge'), // ⚠️ Pastikan URL ni betul!
+      ).timeout(const Duration(seconds: 10));
+
+      if (nonceResponse.statusCode != 200) return null;
+      final nonce = jsonDecode(nonceResponse.body)['nonce'];
+
+      // 2. Hantar Data Biometrik untuk Diadili (Attestation)
+      final attestResponse = await http.post(
+        Uri.parse('https://z-kinetic-server.onrender.com/attest'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'nonce': nonce,
+          'deviceId': 'DEVICE_${DateTime.now().millisecondsSinceEpoch}',
+          'biometricData': [
+            motionScore.value,
+            touchScore.value,
+            patternScore.value
+          ], // Hantar skor sebenar
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (attestResponse.statusCode == 200) {
+        final data = jsonDecode(attestResponse.body);
+        return data['sessionToken']; // ✅ Server LULUSKAN
+      } else {
+        print('❌ Server Reject: ${attestResponse.body}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Connection Error: $e');
       return null;
     }
   }
-
   void dispose() {
     _accelSub?.cancel();
     _gyroSub?.cancel();
