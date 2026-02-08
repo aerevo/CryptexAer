@@ -1,6 +1,5 @@
-// ❌ REMOVED: import simple_keepalive - Server kept alive by UptimeRobot (external)
-import 'package:http/http.dart' as http; // ✅ ADDED: For server communication
-import 'threat_dashboard.dart';
+// Production build - ZERO user ping!
+import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:math';
 import 'dart:convert';  // For JSON encoding
@@ -443,12 +442,10 @@ class ZKineticLockScreen extends StatefulWidget {
 
 class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
   late EnterpriseController _controller;
-  final _keepAlive = SimpleKeepAlive();
 
   @override
   void initState() {
     super.initState();
-    _keepAlive.initialize();
     _controller = EnterpriseController(
       correctCode: [1, 2, 3, 4, 5],
       isCompromisedDevice: widget.isCompromisedDevice,
@@ -475,7 +472,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 
   @override
   void dispose() {
-    _keepAlive.dispose();
     // Re-enable screenshots after verification
     // Uncomment when flutter_window_manager added:
     // if (Platform.isAndroid) {
@@ -675,7 +671,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ThreatDashboard()),
                       );
                     },
                     icon: const Icon(Icons.radar, color: Colors.greenAccent),
