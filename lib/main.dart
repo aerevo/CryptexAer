@@ -657,28 +657,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                       );
                     },
                   ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.05),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        side: BorderSide(color: Colors.white.withOpacity(0.1)),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                      );
-                    },
-                    icon: const Icon(Icons.radar, color: Colors.greenAccent),
-                    label: const Text(
-                      "BUKA RADAR ANCAMAN", 
-                      style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold)
-                    ),
-                  ),
                 ],
               ),
             ),
