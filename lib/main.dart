@@ -397,7 +397,7 @@ class SuccessScreen extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
-                )
+                ),
               
               const SizedBox(height: 14),
               Text(
@@ -1472,4 +1472,5 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
+
 
