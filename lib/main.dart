@@ -398,12 +398,6 @@ class SuccessScreen extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 )
-              else
-                Text(
-                  "Token dihantar ke aplikasi klien.",
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
               
               const SizedBox(height: 14),
               Text(
@@ -1344,9 +1338,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           ListWheelScrollView.useDelegate(
             controller: _scrollControllers[index],
             itemExtent: itemExtent,
-            perspective: 0.003,
-            diameterRatio: 1.5,
-            physics: const FixedExtentScrollPhysics(),
+            perspective: 0.001,
+            diameterRatio: 2.0,
+            physics: const BouncingScrollPhysics(),
             onSelectedItemChanged: (_) {
               HapticFeedback.selectionClick();
             },
@@ -1478,3 +1472,4 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
+
