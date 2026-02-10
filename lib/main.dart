@@ -1,4 +1,4 @@
-7// Production build - ZERO user ping!
+// Production build - ZERO user ping!
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:math';
@@ -610,7 +610,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 30)
+                  const SizedBox(height: 30),
                   
                   const SizedBox(height: 20),
 
@@ -1354,6 +1354,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
+
 
 
 
