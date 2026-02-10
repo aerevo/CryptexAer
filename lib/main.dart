@@ -441,7 +441,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
   void initState() {
     super.initState();
     _controller = EnterpriseController(
-      correctCode: [1, 2, 3, 4, 5],
       isCompromisedDevice: widget.isCompromisedDevice,
       deviceLocation: widget.deviceLocation,
     );
@@ -1314,6 +1313,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
+
 
 
 
