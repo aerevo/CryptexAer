@@ -848,14 +848,10 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 }
 
 // ============================================
-// ✅ ENTERPRISE CONTROLLER (WITH RANDOMIZATION)
-// ============================================
-
-// ============================================
-// ✅ ENTERPRISE CONTROLLER (DENGAN SIMON SAYS)
+// ✅ ENTERPRISE CONTROLLER (FINAL: SIMON SAYS + THREAT INTEL)
 // ============================================
 class EnterpriseController {
-  // Ganti 'correctCode' statik dengan Dynamic Challenge
+  // 1. SIMON SAYS: Ganti 'correctCode' statik dengan Dynamic Challenge
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
   
   final bool isCompromisedDevice;
@@ -865,8 +861,12 @@ class EnterpriseController {
   final ValueNotifier<double> touchScore = ValueNotifier(0.0);
   final ValueNotifier<double> patternScore = ValueNotifier(0.0);
   
-  // Trigger untuk UI update
+  // Trigger untuk UI update (Roda bergegar/tukar soalan)
   final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
+
+  // Transaction Binding (Anti-Tamper)
+  String? _boundTransactionHash;
+  Map<String, dynamic>? _boundTransactionDetails;
   
   StreamSubscription<AccelerometerEvent>? _accelSub;
   double _lastMagnitude = 9.8;
@@ -883,11 +883,18 @@ class EnterpriseController {
     generateNewChallenge(); // <--- JANA KOD MASA START
   }
 
-  // 🔥 LOGIC BARU: Jana Nombor Rawak (Simon Says)
+  // 🔥 LOGIC: Jana Nombor Rawak (Simon Says)
   void generateNewChallenge() {
     // Jana 5 digit rawak (0-9)
     challengeCode.value = List.generate(5, (_) => Random().nextInt(10));
-    print('🔐 NEW CHALLENGE CODE: ${challengeCode.value}'); // Untuk debug
+    print('🔐 NEW CHALLENGE CODE: ${challengeCode.value}'); 
+  }
+
+  // 🔄 LOGIC: Tukar soalan bila gagal
+  void randomizeWheels() {
+    randomizeTrigger.value++;
+    generateNewChallenge(); // Tukar kod baru!
+    print('🔀 Wheels randomized & New Code Generated');
   }
 
   void _initSensors() {
@@ -914,27 +921,92 @@ class EnterpriseController {
   }
 
   void registerTouch() => touchScore.value = Random().nextDouble() * 0.3 + 0.7;
-  void registerScroll() => patternScore.value = 0.8; // Simplify logic
+  void registerScroll() => patternScore.value = 0.8; 
 
-  void randomizeWheels() {
-    randomizeTrigger.value++;
-    generateNewChallenge(); // <--- TUKAR KOD BILA GAGAL
+  // 🔒 TRANSACTION BINDING
+  void bindTransaction(Map<String, dynamic> transactionDetails) {
+    _boundTransactionDetails = transactionDetails;
+    
+    final Map<String, dynamic> hashData = {
+      'amount': transactionDetails['amount'],
+      'recipient': transactionDetails['recipient'],
+      'currency': transactionDetails['currency'] ?? 'MYR',
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    
+    // Simple sort & hash
+    final sortedJson = json.encode(hashData);
+    _boundTransactionHash = sha256.convert(utf8.encode(sortedJson)).toString();
+    print('🔒 Transaction Bound: ${_boundTransactionHash?.substring(0, 16)}...');
   }
 
+  // 🚨 THREAT INTELLIGENCE REPORTING
+  Future<void> _sendThreatIntelligence({
+    required String type,
+    required String severity,
+  }) async {
+    final Map<String, dynamic> threatLog = {
+      'event_type': type,
+      'severity': severity,
+      'device_id': 'USER_${Random().nextInt(9999)}',
+      'location': deviceLocation != null ? '${deviceLocation!.latitude},${deviceLocation!.longitude}' : 'Hidden',
+      'timestamp': DateTime.now().toIso8601String(),
+      'biometric_scores': {
+        'motion': motionScore.value,
+        'touch': touchScore.value,
+      },
+    };
+    print('📡 [THREAT INTEL] Sending: $type ($severity)');
+    // await FirebaseFirestore.instance.collection('logs').add(threatLog); // Uncomment for prod
+  }
+
+  // ✅ CORE VERIFICATION LOGIC
   Future<Map<String, dynamic>> verify(List<int> inputCode) async {
     String inputStr = inputCode.join();
     String targetStr = challengeCode.value.join(); // Banding dengan nombor skrin
-    
-    // Logic Biometrik
+    String panicStr = challengeCode.value.reversed.join(); // Kod Terbalik = Panic
+
+    // 1. PANIC MODE CHECK
+    if (inputStr == panicStr) {
+      print('🚨 PANIC MODE ACTIVATED (Reverse Code Entered)');
+      await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
+      
+      // Wayang: Bagi masuk, tapi flag panic
+      return {
+        'allowed': true, 
+        'isPanicMode': true,
+        'verificationToken': 'PANIC_TOKEN_${DateTime.now().millisecondsSinceEpoch}'
+      };
+    }
+
+    // 2. BIOMETRIC CHECK
     bool motionOK = motionScore.value > 0.15;
     bool codeCorrect = inputStr == targetStr;
     
     if (codeCorrect && motionOK) {
-      return {'allowed': true, 'isPanicMode': false};
+      // SUCCESS
+      return {
+        'allowed': true, 
+        'isPanicMode': false,
+        'verificationToken': 'VALID_TOKEN_${DateTime.now().millisecondsSinceEpoch}',
+        'boundTransactionHash': _boundTransactionHash
+      };
     } else {
+      // FAILED
+      if (!motionOK) print('❌ Biometric Fail: No Motion Detected');
+      if (!codeCorrect) print('❌ Code Fail: Wrong Sequence');
+      
+      await _sendThreatIntelligence(type: "AUTH_FAIL", severity: "MEDIUM");
       randomizeWheels(); // Gagal? Tukar soalan!
       return {'allowed': false, 'isPanicMode': false};
     }
+  }
+
+  // SERVER CHECK SIMULATION
+  Future<String?> _checkWithServer(List<int> code) async {
+    // Simulasi server call
+    await Future.delayed(const Duration(seconds: 1));
+    return "SERVER_TOKEN_OK"; 
   }
 
   void dispose() {
@@ -1549,6 +1621,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
+
 
 
 
