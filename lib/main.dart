@@ -611,7 +611,81 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 30)
+                  
+                  const SizedBox(height: 20),
+
+                  // 🔥 UI BARU: SIMON SAYS DISPLAY (KOTAK OREN)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 40),
+                    padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.orangeAccent.withOpacity(0.5), 
+                        width: 2
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.2),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        )
+                      ]
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          "SECURITY CHALLENGE",
+                          style: TextStyle(
+                            color: Colors.orangeAccent,
+                            fontSize: 10,
+                            letterSpacing: 2,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        // Papar Nombor Rawak dari Controller
+                        ValueListenableBuilder<List<int>>(
+                          valueListenable: _controller.challengeCode,
+                          builder: (context, code, _) {
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: code.map((digit) {
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Text(
+                                    "$digit",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Courier', // Font gaya mesin
+                                      shadows: [
+                                        BoxShadow(
+                                          color: Colors.orange, 
+                                          blurRadius: 10, 
+                                          spreadRadius: 2
+                                        )
+                                      ]
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          "MATCH CODE TO VERIFY",
+                          style: TextStyle(color: Colors.white38, fontSize: 9),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 20),
                   
                   // ✅ Cryptex with randomization
                   ValueListenableBuilder<int>(
@@ -777,8 +851,13 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 // ✅ ENTERPRISE CONTROLLER (WITH RANDOMIZATION)
 // ============================================
 
+// ============================================
+// ✅ ENTERPRISE CONTROLLER (DENGAN SIMON SAYS)
+// ============================================
 class EnterpriseController {
-  final List<int> correctCode;
+  // Ganti 'correctCode' statik dengan Dynamic Challenge
+  final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
+  
   final bool isCompromisedDevice;
   final Position? deviceLocation;
   
@@ -786,30 +865,29 @@ class EnterpriseController {
   final ValueNotifier<double> touchScore = ValueNotifier(0.0);
   final ValueNotifier<double> patternScore = ValueNotifier(0.0);
   
-  // ✅ NEW: Randomization trigger
+  // Trigger untuk UI update
   final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
   
-  // 🔒 NEW: Transaction binding for anti-tampering
-  String? _boundTransactionHash;
-  Map<String, dynamic>? _boundTransactionDetails;
-  
   StreamSubscription<AccelerometerEvent>? _accelSub;
-  StreamSubscription<GyroscopeEvent>? _gyroSub;
-  
   double _lastMagnitude = 9.8;
   DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
   
-  final List<int> _scrollTimings = [];
-  DateTime _lastScrollTime = DateTime.now();
-
+  // Constructor
   EnterpriseController({
-    required this.correctCode,
     this.isCompromisedDevice = false,
     this.deviceLocation,
   }) {
     _initSensors();
     _startDecayTimer();
+    generateNewChallenge(); // <--- JANA KOD MASA START
+  }
+
+  // 🔥 LOGIC BARU: Jana Nombor Rawak (Simon Says)
+  void generateNewChallenge() {
+    // Jana 5 digit rawak (0-9)
+    challengeCode.value = List.generate(5, (_) => Random().nextInt(10));
+    print('🔐 NEW CHALLENGE CODE: ${challengeCode.value}'); // Untuk debug
   }
 
   void _initSensors() {
@@ -820,56 +898,55 @@ class EnterpriseController {
       double delta = (magnitude - _lastMagnitude).abs();
       
       if (delta > 0.3) {
-        DateTime now = DateTime.now();
-        double score = (delta / 3.0).clamp(0.0, 1.0);
-        motionScore.value = score;
-        _lastMotionTime = now;
+        motionScore.value = (delta / 3.0).clamp(0.0, 1.0);
+        _lastMotionTime = DateTime.now();
       }
-      
       _lastMagnitude = magnitude;
-    });
-
-    _gyroSub = gyroscopeEventStream(
-      samplingPeriod: const Duration(milliseconds: 100),
-    ).listen((event) {
-      // Gyro tracking
     });
   }
 
   void _startDecayTimer() {
     _decayTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      DateTime now = DateTime.now();
-      int timeSinceLastMotion = now.difference(_lastMotionTime).inMilliseconds;
-      
-      if (timeSinceLastMotion > 500) {
-        double decay = (timeSinceLastMotion / 1000.0) * 0.05;
-        motionScore.value = (motionScore.value - decay).clamp(0.0, 1.0);
+      if (DateTime.now().difference(_lastMotionTime).inMilliseconds > 500) {
+        motionScore.value = (motionScore.value - 0.05).clamp(0.0, 1.0);
       }
     });
   }
 
-  void registerTouch() {
-    touchScore.value = Random().nextDouble() * 0.3 + 0.7;
+  void registerTouch() => touchScore.value = Random().nextDouble() * 0.3 + 0.7;
+  void registerScroll() => patternScore.value = 0.8; // Simplify logic
+
+  void randomizeWheels() {
+    randomizeTrigger.value++;
+    generateNewChallenge(); // <--- TUKAR KOD BILA GAGAL
   }
 
-  void registerScroll() {
-    DateTime now = DateTime.now();
-    int delta = now.difference(_lastScrollTime).inMilliseconds;
-    _scrollTimings.add(delta);
-    _lastScrollTime = now;
-
-    if (_scrollTimings.length > 10) _scrollTimings.removeAt(0);
-
-    if (_scrollTimings.length >= 3) {
-      double avg = _scrollTimings.reduce((a, b) => a + b) / _scrollTimings.length;
-      double variance = _scrollTimings
-          .map((e) => pow(e - avg, 2))
-          .reduce((a, b) => a + b) / _scrollTimings.length;
-      
-      double humanness = (variance / 10000).clamp(0.0, 1.0);
-      patternScore.value = humanness;
+  Future<Map<String, dynamic>> verify(List<int> inputCode) async {
+    String inputStr = inputCode.join();
+    String targetStr = challengeCode.value.join(); // Banding dengan nombor skrin
+    
+    // Logic Biometrik
+    bool motionOK = motionScore.value > 0.15;
+    bool codeCorrect = inputStr == targetStr;
+    
+    if (codeCorrect && motionOK) {
+      return {'allowed': true, 'isPanicMode': false};
+    } else {
+      randomizeWheels(); // Gagal? Tukar soalan!
+      return {'allowed': false, 'isPanicMode': false};
     }
   }
+
+  void dispose() {
+    _accelSub?.cancel();
+    _decayTimer?.cancel();
+    motionScore.dispose();
+    touchScore.dispose();
+    patternScore.dispose();
+    randomizeTrigger.dispose();
+    challengeCode.dispose();
+  }
+}
 
   // ✅ NEW: Randomize wheels on fail
   void randomizeWheels() {
@@ -1472,5 +1549,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
+
 
 
