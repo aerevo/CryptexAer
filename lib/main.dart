@@ -668,10 +668,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     );
   }
 
-        ],
-      ),
-    );
-  }
 
   Widget _buildStatusItem(IconData icon, String label, double score) {
     bool isActive = score > 0.15;
