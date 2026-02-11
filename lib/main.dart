@@ -265,6 +265,7 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
 
 // ============================================
 // PAINTERS & WIDGETS
+// ============================================
 class ModernShieldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -480,83 +481,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                     color: Colors.black.withOpacity(0.3),
                     blurRadius: 30,
                     spreadRadius: 5,
-// ============================================
-// MAIN LOCK SCREEN (Enhanced with all 6 requirements!)
-// ============================================
-class ZKineticLockScreen extends StatefulWidget {
-  final bool isCompromisedDevice;
-  final Position? deviceLocation;
-  
-  const ZKineticLockScreen({
-    super.key,
-    this.isCompromisedDevice = false,
-    this.deviceLocation,
-  });
-
-  @override
-  State<ZKineticLockScreen> createState() => _ZKineticLockScreenState();
-}
-
-class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
-  late EnterpriseController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = EnterpriseController(
-      isCompromisedDevice: widget.isCompromisedDevice,
-      deviceLocation: widget.deviceLocation,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onSuccess(bool isPanicMode) {
-    HapticFeedback.heavyImpact();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SuccessScreen(
-          message: isPanicMode ? "Panic mode activated" : "Welcome back",
-          isPanicMode: isPanicMode,
-        ),
-      ),
-    );
-  }
-
-  void _onFail() {
-    HapticFeedback.vibrate();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('❌ ACCESS DENIED'),
-        backgroundColor: Colors.red,
-        duration: Duration(seconds: 1),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Center(
-            child: Container(
-              padding: const EdgeInsets.only(top: 24, bottom: 24, left: 0, right: 0),
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF5722),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 30,
-                    spreadRadius: 5,
                     offset: const Offset(0, 10),
                   ),
                 ],
@@ -564,9 +488,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ❌ REMOVED: Logo (Requirement 1i) - saves space!
                   
-                  // Z-KINETIC Title
                   Stack(
                     alignment: Alignment.center,
                     children: [
@@ -606,7 +528,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 12),
                   
-                  // ✅ INTELLIGENT-GRADE (Requirement 1ii)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
@@ -647,14 +568,17 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                     ),
                   ),
                   
+                  const SizedBox(height: 30),
+                  
+                  
                   const SizedBox(height: 25),
                   
-                  // ✅ THE RING / X-FILES Animation (Requirement 3)
+                  // ✅ THE RING / X-FILES Animation Challenge Box
                   RingStyleChallengeDisplay(controller: _controller),
                   
                   const SizedBox(height: 15),
                   
-                  // ✅ "Please match the code" (Requirement 2)
+                  // ✅ "Please match the code"
                   const Text(
                     'Please match the code',
                     style: TextStyle(
@@ -667,7 +591,9 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 10),
                   
-                  // ✅ Cryptex with Slot Machine (Requirement 6)
+                  
+                  const SizedBox(height: 20),
+                  
                   ValueListenableBuilder<int>(
                     valueListenable: _controller.randomizeTrigger,
                     builder: (context, trigger, _) {
@@ -744,7 +670,10 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     );
   }
 
-  // ❌ REMOVED: _buildModernLogo() - No longer needed (Requirement 1i)
+        ],
+      ),
+    );
+  }
 
   Widget _buildStatusItem(IconData icon, String label, double score) {
     bool isActive = score > 0.15;
@@ -769,9 +698,12 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     );
   }
 }
+
 // ============================================
-// ✅ THE RING / X-FILES CHALLENGE ANIMATION
-// Numbers emerge from static like ghost crawling from TV!
+// ✅ ENTERPRISE CONTROLLER (SECURE HYBRID MODE)
+
+// ============================================
+// THE RING / X-FILES CHALLENGE ANIMATION
 // ============================================
 class RingStyleChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
@@ -801,13 +733,11 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   void initState() {
     super.initState();
     
-    // Animation controller for emergence
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     );
     
-    // Static phase (0.0 - 0.4)
     _staticAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animController,
@@ -815,7 +745,6 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
       ),
     );
     
-    // Emergence phase (0.4 - 1.0)
     _emergeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animController,
@@ -823,10 +752,8 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
       ),
     );
     
-    // Listen for challenge code changes
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
-    // Start initial animation if code exists
     if (widget.controller.challengeCode.value.isNotEmpty) {
       _playEmergenceAnimation();
     }
@@ -839,7 +766,6 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   void _playEmergenceAnimation() async {
     setState(() => _showingStatic = true);
     
-    // Phase 1: X-Files style static (700ms)
     _staticTimer?.cancel();
     _staticTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
       if (mounted) {
@@ -852,7 +778,6 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     await Future.delayed(const Duration(milliseconds: 700));
     _staticTimer?.cancel();
     
-    // Phase 2: The Ring emergence (numbers crawl out!)
     _animController.forward(from: 0.0);
     
     await Future.delayed(const Duration(milliseconds: 300));
@@ -905,7 +830,6 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
                 );
               }
               
-              // Show static or emerged numbers
               List<String> displayNumbers = _showingStatic 
                   ? _staticNumbers 
                   : code.map((e) => e.toString()).toList();
@@ -916,13 +840,11 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
                   return AnimatedBuilder(
                     animation: _emergeAnimation,
                     builder: (context, child) {
-                      // Staggered emergence effect
                       double stagger = index * 0.15;
                       double opacity = _showingStatic 
                           ? (_staticAnimation.value * 0.4) 
                           : ((_emergeAnimation.value - stagger).clamp(0.0, 1.0));
                       
-                      // Ghost-like vertical emergence
                       double yOffset = _showingStatic 
                           ? 0 
                           : (1.0 - (_emergeAnimation.value - stagger).clamp(0.0, 1.0)) * 30;
@@ -972,11 +894,7 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     );
   }
 }
-  }
-}
 
-// ============================================
-// ✅ ENTERPRISE CONTROLLER (SECURE HYBRID MODE)
 // ============================================
 class EnterpriseController {
   // Challenge Code dari Server
@@ -1171,6 +1089,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   late List<FixedExtentScrollController> _scrollControllers;
 
   int? _activeWheelIndex;
+  bool _isRandomizing = false;  // Slot machine flag
   Timer? _wheelActiveTimer;
   bool _isButtonPressed = false;
   
@@ -1390,462 +1309,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                           opacity: isActive ? 1.0 : _opacityAnimations[index].value,
                           child: Text(
                             '$displayNumber',
-                            style: TextStyle(
-                              fontSize: wheelHeight * 0.30,
-                              fontWeight: FontWeight.w900,
-                              color: isActive 
-                                  ? const Color(0xFFFF5722)
-                                  : const Color(0xFF263238),
-                              shadows: isActive
-                                  ? [
-                                      Shadow(
-                                        color: const Color(0xFFFF5722).withOpacity(0.8),
-                                        blurRadius: 20,
-                                      ),
-                                      Shadow(
-                                        color: const Color(0xFFFF5722).withOpacity(0.5),
-                                        blurRadius: 40,
-                                      ),
-                                    ]
-                                  : [
-                                      Shadow(
-                                        offset: const Offset(1, 1),
-                                        blurRadius: 1,
-                                        color: Colors.white.withOpacity(0.4),
-                                      ),
-                                      Shadow(
-                                        offset: const Offset(-1, -1),
-                                        blurRadius: 1,
-                                        color: Colors.black.withOpacity(0.6),
-                                      ),
-                                    ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-
-          if (isActive)
-            IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFF5722).withOpacity(0.5),
-                      blurRadius: 25,
-                      spreadRadius: 3,
-                    ),
-                    BoxShadow(
-                      color: const Color(0xFFFF5722).withOpacity(0.3),
-                      blurRadius: 40,
-                      spreadRadius: 6,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGlowingButton(double screenWidth, double screenHeight) {
-    double left = buttonCoords[0];
-    double top = buttonCoords[1];
-    double right = buttonCoords[2];
-    double bottom = buttonCoords[3];
-
-    double actualLeft = screenWidth * (left / imageWidth);
-    double actualTop = screenHeight * (top / imageHeight);
-    double actualWidth = screenWidth * ((right - left) / imageWidth);
-    double actualHeight = screenHeight * ((bottom - top) / imageHeight);
-
-    return Positioned(
-      left: actualLeft,
-      top: actualTop,
-      width: actualWidth,
-      height: actualHeight,
-      child: GestureDetector(
-        onTap: _onButtonTap,
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          children: [
-            Container(color: Colors.transparent),
-            
-            if (_isButtonPressed)
-              IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF5722).withOpacity(0.6),
-                        blurRadius: 30,
-                        spreadRadius: 5,
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFFFF5722).withOpacity(0.3),
-                        blurRadius: 50,
-                        spreadRadius: 10,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}// ============================================
-// CRYPTEX LOCK (Enhanced with Slot Machine + Number Glow Only)
-// ============================================
-class CryptexLock extends StatefulWidget {
-  final EnterpriseController controller;
-  final Function(bool isPanicMode) onSuccess;
-  final VoidCallback onFail;
-
-  const CryptexLock({
-    super.key,
-    required this.controller,
-    required this.onSuccess,
-    required this.onFail,
-  });
-
-  @override
-  State<CryptexLock> createState() => _CryptexLockState();
-}
-
-class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
-  static const double imageWidth = 706.0;
-  static const double imageHeight = 610.0;
-
-  static const List<List<double>> wheelCoords = [
-    [25, 159, 113, 378],
-    [165, 160, 257, 379],
-    [308, 160, 396, 379],
-    [448, 159, 541, 378],
-    [591, 159, 681, 379],
-  ];
-
-  static const List<double> buttonCoords = [123, 433, 594, 545];
-
-  late List<FixedExtentScrollController> _scrollControllers;
-
-  int? _activeWheelIndex;
-  Timer? _wheelActiveTimer;
-  bool _isButtonPressed = false;
-  
-  final Random _random = Random();
-  late Timer _driftTimer;
-  final List<Offset> _textDriftOffsets = List.generate(5, (_) => Offset.zero);
-  
-  late List<AnimationController> _opacityControllers;
-  late List<Animation<double>> _opacityAnimations;
-  
-  // ✅ Requirement 6: Slot machine randomization
-  bool _isRandomizing = false;
-  List<AnimationController>? _slotControllers;
-  List<Animation<double>>? _slotAnimations;
-
-  @override
-  void initState() {
-    super.initState();
-    
-    _scrollControllers = List.generate(
-      5,
-      (i) => FixedExtentScrollController(
-        initialItem: _random.nextInt(10),
-      ),
-    );
-    
-    _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
-      if (mounted && _activeWheelIndex == null && !_isRandomizing) {
-        setState(() {
-          for (int i = 0; i < 5; i++) {
-            _textDriftOffsets[i] = Offset(
-              (_random.nextDouble() - 0.5) * 2.5,
-              (_random.nextDouble() - 0.5) * 2.5,
-            );
-          }
-        });
-      }
-    });
-    
-    _opacityControllers = List.generate(5, (i) {
-      final controller = AnimationController(
-        vsync: this,
-        duration: Duration(milliseconds: 1800 + (_random.nextInt(400))),
-      );
-      
-      Future.delayed(Duration(milliseconds: _random.nextInt(1000)), () {
-        if (mounted) controller.repeat(reverse: true);
-      });
-      
-      return controller;
-    });
-    
-    _opacityAnimations = _opacityControllers.map((c) {
-      return Tween<double>(begin: 0.75, end: 1.0).animate(
-        CurvedAnimation(parent: c, curve: Curves.easeInOut),
-      );
-    }).toList();
-  }
-
-  @override
-  void dispose() {
-    for (var controller in _scrollControllers) {
-      controller.dispose();
-    }
-    for (var controller in _opacityControllers) {
-      controller.dispose();
-    }
-    _slotControllers?.forEach((c) => c.dispose());
-    _wheelActiveTimer?.cancel();
-    _driftTimer.cancel();
-    super.dispose();
-  }
-
-  void _onWheelScrollStart(int index) {
-    if (_isRandomizing) return;
-    setState(() => _activeWheelIndex = index);
-    _wheelActiveTimer?.cancel();
-    HapticFeedback.selectionClick();
-    widget.controller.registerTouch();
-  }
-
-  void _onWheelScrollEnd(int index) {
-    if (_isRandomizing) return;
-    _wheelActiveTimer?.cancel();
-    _wheelActiveTimer = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        setState(() => _activeWheelIndex = null);
-      }
-    });
-  }
-
-  // ✅ Requirement 6: SLOT MACHINE RANDOMIZATION!
-  Future<void> _playSlotMachineRandomization() async {
-    if (_isRandomizing) return;
-    
-    setState(() => _isRandomizing = true);
-    
-    // Create slot machine animations for each wheel
-    _slotControllers = List.generate(5, (i) {
-      return AnimationController(
-        vsync: this,
-        duration: Duration(milliseconds: 800 + (i * 200)), // Staggered stopping!
-      );
-    });
-    
-    _slotAnimations = _slotControllers!.map((c) {
-      return CurvedAnimation(parent: c, curve: Curves.easeOutCubic);
-    }).toList();
-    
-    // Start all wheels spinning
-    for (int i = 0; i < 5; i++) {
-      _slotControllers![i].forward();
-    }
-    
-    // Spin each wheel during animation
-    for (int i = 0; i < 5; i++) {
-      _slotAnimations![i].addListener(() {
-        if (mounted && _scrollControllers[i].hasClients) {
-          // Continuous spinning effect
-          int targetPosition = (_random.nextInt(10) + (_slotAnimations![i].value * 50).toInt()) % 10;
-          try {
-            _scrollControllers[i].jumpTo(
-              _scrollControllers[i].position.maxScrollExtent * 
-              (_slotAnimations![i].value * 5)
-            );
-          } catch (e) {
-            // Ignore scroll errors during animation
-          }
-        }
-      });
-    }
-    
-    // Wait for longest animation (wheel 5)
-    await Future.delayed(const Duration(milliseconds: 1600));
-    
-    // Set final random positions one by one (slot machine effect!)
-    for (int i = 0; i < 5; i++) {
-      if (mounted && _scrollControllers[i].hasClients) {
-        int finalPosition = _random.nextInt(10);
-        _scrollControllers[i].animateToItem(
-          finalPosition,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-        HapticFeedback.mediumImpact();
-        await Future.delayed(const Duration(milliseconds: 150));
-      }
-    }
-    
-    // Cleanup
-    await Future.delayed(const Duration(milliseconds: 200));
-    _slotControllers?.forEach((c) => c.dispose());
-    _slotControllers = null;
-    _slotAnimations = null;
-    
-    if (mounted) {
-      setState(() => _isRandomizing = false);
-    }
-  }
-
-  Future<void> _onButtonTap() async {
-    if (_isRandomizing) return;
-    
-    setState(() => _isButtonPressed = true);
-    HapticFeedback.mediumImpact();
-    
-    await Future.delayed(const Duration(milliseconds: 100));
-    
-    if (mounted) {
-      setState(() => _isButtonPressed = false);
-    }
-    
-    List<int> currentCode = [];
-    for (var controller in _scrollControllers) {
-      int selectedIndex = controller.selectedItem;
-      currentCode.add(selectedIndex % 10);
-    }
-    
-    final result = await widget.controller.verify(currentCode);
-    
-    if (result['allowed']) {
-      widget.onSuccess(result['isPanicMode'] ?? false);
-    } else {
-      widget.onFail();
-      // ✅ Trigger slot machine randomization on fail!
-      await _playSlotMachineRandomization();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        double availableWidth = constraints.maxWidth;
-        double aspectRatio = imageWidth / imageHeight;
-        double calculatedHeight = availableWidth / aspectRatio;
-
-        return SizedBox(
-          width: availableWidth,
-          height: calculatedHeight,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/z_wheel.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.red,
-                      child: const Center(
-                        child: Icon(Icons.error, color: Colors.white, size: 60),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              ..._buildWheelOverlays(availableWidth, calculatedHeight),
-              _buildGlowingButton(availableWidth, calculatedHeight),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight) {
-    List<Widget> overlays = [];
-
-    for (int i = 0; i < wheelCoords.length; i++) {
-      double left = wheelCoords[i][0];
-      double top = wheelCoords[i][1];
-      double right = wheelCoords[i][2];
-      double bottom = wheelCoords[i][3];
-
-      double actualLeft = screenWidth * (left / imageWidth);
-      double actualTop = screenHeight * (top / imageHeight);
-      double actualWidth = screenWidth * ((right - left) / imageWidth);
-      double actualHeight = screenHeight * ((bottom - top) / imageHeight);
-
-      overlays.add(
-        Positioned(
-          left: actualLeft,
-          top: actualTop,
-          width: actualWidth,
-          height: actualHeight,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (_isRandomizing) return false;
-              
-              if (notification is ScrollStartNotification) {
-                if (_scrollControllers[i].position == notification.metrics) {
-                  _onWheelScrollStart(i);
-                }
-              } else if (notification is ScrollUpdateNotification) {
-                widget.controller.registerScroll();
-              } else if (notification is ScrollEndNotification) {
-                _onWheelScrollEnd(i);
-              }
-              return false;
-            },
-            child: _buildInteractiveWheel(i, actualHeight),
-          ),
-        ),
-      );
-    }
-
-    return overlays;
-  }
-
-  Widget _buildInteractiveWheel(int index, double wheelHeight) {
-    bool isActive = _activeWheelIndex == index;
-    double itemExtent = wheelHeight * 0.40;
-
-    return GestureDetector(
-      onTapDown: (_isRandomizing) ? null : (_) => _onWheelScrollStart(index),
-      onTapUp: (_isRandomizing) ? null : (_) => _onWheelScrollEnd(index),
-      onTapCancel: (_isRandomizing) ? null : () => _onWheelScrollEnd(index),
-      behavior: HitTestBehavior.opaque,
-      child: Stack(
-        children: [
-          ListWheelScrollView.useDelegate(
-            controller: _scrollControllers[index],
-            itemExtent: itemExtent,
-            perspective: 0.001,
-            diameterRatio: 2.0,
-            physics: _isRandomizing ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
-            onSelectedItemChanged: (_) {
-              if (!_isRandomizing) {
-                HapticFeedback.selectionClick();
-              }
-            },
-            childDelegate: ListWheelChildBuilderDelegate(
-              builder: (context, wheelIndex) {
-                int displayNumber = wheelIndex % 10;
-                
-                return Center(
-                  child: AnimatedBuilder(
-                    animation: _opacityAnimations[index],
-                    builder: (context, child) {
-                      return Transform.translate(
-                        offset: (isActive || _isRandomizing) ? Offset.zero : _textDriftOffsets[index],
-                        child: Opacity(
-                          opacity: (isActive || _isRandomizing) ? 1.0 : _opacityAnimations[index].value,
-                          child: Text(
-                            '$displayNumber',
-                            // ✅ Requirement 5: Auto-aligned center
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: wheelHeight * 0.30,
@@ -1853,7 +1316,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                               color: isActive 
                                   ? const Color(0xFFFF5722)
                                   : const Color(0xFF263238),
-                              // ✅ Requirement 4: Glow on NUMBER only (not wheel container)
                               shadows: isActive
                                   ? [
                                       Shadow(
@@ -1888,59 +1350,28 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
             ),
           ),
 
-          // ❌ REMOVED: Wheel container glow (Requirement 4)
-          // Only NUMBER glows now, not the wheel!
-        ],
-      ),
-    );
+
+  // ✅ Req 6: Slot Machine Animation
+  Future<void> _playSlotMachineAnimation() async {
+    setState(() => _isRandomizing = true);
+    
+    for (int i = 0; i < 5; i++) {
+      if (mounted && _scrollControllers[i].hasClients) {
+        int finalPos = _random.nextInt(10);
+        _scrollControllers[i].animateToItem(
+          finalPos,
+          duration: Duration(milliseconds: 300 + (i * 200)),
+          curve: Curves.easeOut,
+        );
+        HapticFeedback.mediumImpact();
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    }
+    
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) {
+      setState(() => _isRandomizing = false);
+    }
   }
 
-  Widget _buildGlowingButton(double screenWidth, double screenHeight) {
-    double left = buttonCoords[0];
-    double top = buttonCoords[1];
-    double right = buttonCoords[2];
-    double bottom = buttonCoords[3];
-
-    double actualLeft = screenWidth * (left / imageWidth);
-    double actualTop = screenHeight * (top / imageHeight);
-    double actualWidth = screenWidth * ((right - left) / imageWidth);
-    double actualHeight = screenHeight * ((bottom - top) / imageHeight);
-
-    return Positioned(
-      left: actualLeft,
-      top: actualTop,
-      width: actualWidth,
-      height: actualHeight,
-      child: GestureDetector(
-        onTap: _isRandomizing ? null : _onButtonTap,
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          children: [
-            Container(color: Colors.transparent),
-            
-            if (_isButtonPressed && !_isRandomizing)
-              IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF5722).withOpacity(0.6),
-                        blurRadius: 30,
-                        spreadRadius: 5,
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFFFF5722).withOpacity(0.3),
-                        blurRadius: 50,
-                        spreadRadius: 10,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
 }
