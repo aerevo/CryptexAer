@@ -1,13 +1,15 @@
 /**
- * Z-KINETIC AUTHORITY SERVER
- * Production-ready Express.js implementation
+ * Z-KINETIC AUTHORITY SERVER - SECURE MODE
+ * Production-ready Express.js with Server-Side Challenge
  * 
  * Features:
+ * - Server-side challenge generation (Simon Says)
  * - Nonce generation (anti-replay)
  * - Session management (stateless)
+ * - Panic mode detection (reverse code)
  * - Risk scoring (biometric analysis)
- * - Token issuance (signed verdict)
  * - Rate limiting (abuse prevention)
+ * - Auto-cleanup (memory management)
  * 
  * Deploy to: Render.com (FREE tier)
  * Keep-alive: UptimeRobot (external, FREE)
@@ -26,7 +28,7 @@ app.use(cors());
 // IN-MEMORY STORAGE
 // ============================================
 
-const nonces = new Map();
+const activeChallenges = new Map(); // Server-generated challenges
 const sessions = new Map();
 
 const stats = {
@@ -34,35 +36,40 @@ const stats = {
   totalAttestations: 0,
   successfulAttestations: 0,
   failedAttestations: 0,
+  panicModeActivations: 0,
   totalVerifications: 0,
   serverStartTime: Date.now(),
 };
 
 // ============================================
-// AUTO-CLEANUP (Every 5 minutes)
+// AUTO-CLEANUP (Every minute)
 // ============================================
 
 setInterval(() => {
   const now = Date.now();
-  let deletedNonces = 0;
+  let deletedChallenges = 0;
   let deletedSessions = 0;
   
-  for (const [key, value] of nonces.entries()) {
-    if (value.expiry < now) {
-      nonces.delete(key);
-      deletedNonces++;
+  // Clean expired challenges
+  for (const [nonce, data] of activeChallenges.entries()) {
+    if (data.expiry < now) {
+      activeChallenges.delete(nonce);
+      deletedChallenges++;
     }
   }
   
-  for (const [key, value] of sessions.entries()) {
-    if (value.expiry < now) {
-      sessions.delete(key);
+  // Clean expired sessions
+  for (const [token, data] of sessions.entries()) {
+    if (data.expiry < now) {
+      sessions.delete(token);
       deletedSessions++;
     }
   }
   
-  console.log(`🧹 Cleanup: ${deletedNonces} nonces, ${deletedSessions} sessions deleted`);
-}, 5 * 60 * 1000);
+  if (deletedChallenges > 0 || deletedSessions > 0) {
+    console.log(`🧹 Cleanup: ${deletedChallenges} challenges, ${deletedSessions} sessions deleted`);
+  }
+}, 60 * 1000);
 
 // ============================================
 // RATE LIMITING
@@ -87,16 +94,22 @@ const verifyLimiter = rateLimit({
 });
 
 // ============================================
-// ENDPOINT 1: GET CHALLENGE
+// ENDPOINT 1: GET CHALLENGE (Server-Side Generation!)
 // ============================================
 
 app.post('/getChallenge', challengeLimiter, (req, res) => {
   try {
-    const nonce = crypto.randomBytes(32).toString('hex');
+    // 1. Generate 5-digit random code (0-9)
+    const secretCode = Array.from({length: 5}, () => Math.floor(Math.random() * 10));
+    
+    // 2. Generate unique nonce
+    const nonce = crypto.randomBytes(16).toString('hex');
     const now = Date.now();
     const expiry = now + (60 * 1000); // 60 seconds TTL
     
-    nonces.set(nonce, {
+    // 3. Store challenge on server (Server holds the answer!)
+    activeChallenges.set(nonce, {
+      code: secretCode,
       expiry: expiry,
       used: false,
       createdAt: now,
@@ -104,11 +117,13 @@ app.post('/getChallenge', challengeLimiter, (req, res) => {
     
     stats.totalChallenges++;
     
-    console.log(`✅ Challenge generated: ${nonce.substring(0, 16)}...`);
+    console.log(`🔑 Challenge Generated: ${nonce.substring(0, 16)}... | Code: ${secretCode.join('')}`);
     
+    // 4. Send challenge to app (App only displays, cannot modify!)
     res.json({
       success: true,
       nonce: nonce,
+      challengeCode: secretCode,
       expiry: expiry,
       serverTime: now,
     });
@@ -123,108 +138,151 @@ app.post('/getChallenge', challengeLimiter, (req, res) => {
 });
 
 // ============================================
-// ENDPOINT 2: ATTEST
+// ENDPOINT 2: ATTEST (Verify User Response)
 // ============================================
 
 app.post('/attest', attestLimiter, (req, res) => {
   try {
-    const { nonce, biometricData, deviceId } = req.body;
+    const { nonce, deviceId, userResponse, biometricData } = req.body;
     
-    if (!nonce || !biometricData || !deviceId) {
+    // A. Validate required fields
+    if (!nonce || !deviceId || !userResponse || !biometricData) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields',
       });
     }
     
-    const challenge = nonces.get(nonce);
+    // B. Retrieve challenge from server
+    const challengeData = activeChallenges.get(nonce);
     
-    if (!challenge) {
-      return res.status(400).json({
+    if (!challengeData) {
+      return res.status(403).json({
         success: false,
-        error: 'Invalid nonce',
+        error: 'Invalid or expired nonce',
       });
     }
     
-    if (challenge.used) {
+    // C. Check if already used (prevent replay attacks)
+    if (challengeData.used) {
       console.log(`🚨 REPLAY ATTACK detected: ${nonce.substring(0, 16)}...`);
       stats.failedAttestations++;
-      return res.status(400).json({
+      return res.status(403).json({
         success: false,
         error: 'Nonce already used (replay attack detected)',
       });
     }
     
+    // D. Check expiry
     const now = Date.now();
-    if (challenge.expiry < now) {
+    if (challengeData.expiry < now) {
+      activeChallenges.delete(nonce);
       stats.failedAttestations++;
-      return res.status(400).json({
+      return res.status(403).json({
         success: false,
-        error: 'Nonce expired',
+        error: 'Challenge expired',
       });
     }
     
-    challenge.used = true;
+    // E. Mark as used (one-time use)
+    challengeData.used = true;
+    activeChallenges.delete(nonce);
     
-    const { motion, touch, pattern } = biometricData;
+    // F. Prepare codes for comparison
+    const serverCode = challengeData.code.join('');
+    const userCode = Array.isArray(userResponse) ? userResponse.join('') : '';
+    const panicCode = challengeData.code.slice().reverse().join('');
     
+    console.log(`📡 Attestation: ${deviceId}`);
+    console.log(`   Expected: ${serverCode} | Got: ${userCode}`);
+    
+    // G. PANIC MODE CHECK (Reverse code)
+    if (userCode === panicCode) {
+      const panicToken = `DURESS_${crypto.randomBytes(24).toString('hex')}`;
+      stats.panicModeActivations++;
+      
+      console.log(`🚨 PANIC MODE TRIGGERED!`);
+      
+      return res.json({
+        success: true,
+        sessionToken: panicToken,
+        verdict: 'APPROVED_SILENT_ALARM',
+        riskScore: 'CRITICAL',
+      });
+    }
+    
+    // H. NORMAL MODE CHECK
+    const codeMatch = userCode === serverCode;
+    const { motion, touch, pattern } = biometricData || {};
+    
+    // Validate biometric data types
     if (typeof motion !== 'number' || typeof touch !== 'number' || typeof pattern !== 'number') {
+      stats.failedAttestations++;
       return res.status(400).json({
         success: false,
         error: 'Invalid biometric data format',
       });
     }
     
+    // Biometric thresholds
     const motionOK = motion > 0.15;
     const touchOK = touch > 0.15;
     const patternOK = pattern > 0.10;
-    
     const sensorsActive = [motionOK, touchOK, patternOK].filter(Boolean).length;
     
-    if (sensorsActive < 2) {
-      console.log(`❌ Biometric failed for ${deviceId}`);
+    // I. Final verification
+    if (codeMatch && sensorsActive >= 2) {
+      const validToken = `VALID_${crypto.randomBytes(24).toString('hex')}`;
+      const tokenExpiry = now + (5 * 60 * 1000); // 5 minutes
+      
+      // Calculate risk score
+      const avgScore = (motion + touch + pattern) / 3;
+      let riskScore;
+      if (avgScore > 0.7) riskScore = 'LOW';
+      else if (avgScore > 0.4) riskScore = 'MEDIUM';
+      else riskScore = 'HIGH';
+      
+      // Store session
+      sessions.set(validToken, {
+        deviceId: deviceId,
+        status: 'VERIFIED',
+        riskScore: riskScore,
+        biometricScores: { motion, touch, pattern },
+        expiry: tokenExpiry,
+        createdAt: now,
+        nonce: nonce,
+      });
+      
+      stats.totalAttestations++;
+      stats.successfulAttestations++;
+      
+      console.log(`✅ ACCESS GRANTED | Token=${validToken.substring(0, 16)}..., Risk=${riskScore}`);
+      
+      return res.json({
+        success: true,
+        sessionToken: validToken,
+        verdict: 'APPROVED',
+        riskScore: riskScore,
+        expiry: tokenExpiry,
+      });
+      
+    } else {
+      // J. Verification failed
+      const reasons = [];
+      if (!codeMatch) reasons.push('Wrong code');
+      if (!motionOK) reasons.push('No motion');
+      if (!touchOK) reasons.push('No touch');
+      if (!patternOK) reasons.push('No pattern');
+      
+      console.log(`❌ ACCESS DENIED: ${reasons.join(', ')}`);
       stats.failedAttestations++;
       
-      return res.status(403).json({
+      return res.status(401).json({
         success: false,
-        error: 'Biometric verification failed',
+        error: 'Verification failed',
+        reasons: reasons,
       });
     }
-    
-    const sessionToken = crypto.randomBytes(64).toString('hex');
-    const tokenExpiry = now + (5 * 60 * 1000); // 5 minutes
-    
-    const avgScore = (motion + touch + pattern) / 3;
-    let riskScore;
-    if (avgScore > 0.7) {
-      riskScore = 'LOW';
-    } else if (avgScore > 0.4) {
-      riskScore = 'MEDIUM';
-    } else {
-      riskScore = 'HIGH';
-    }
-    
-    sessions.set(sessionToken, {
-      deviceId: deviceId,
-      status: 'VERIFIED',
-      riskScore: riskScore,
-      biometricScores: { motion, touch, pattern },
-      expiry: tokenExpiry,
-      createdAt: now,
-      nonce: nonce,
-    });
-    
-    stats.totalAttestations++;
-    stats.successfulAttestations++;
-    
-    console.log(`✅ Attestation SUCCESS: Token=${sessionToken.substring(0, 16)}..., Risk=${riskScore}`);
-    
-    res.json({
-      success: true,
-      sessionToken: sessionToken,
-      expiry: tokenExpiry,
-      riskScore: riskScore,
-    });
     
   } catch (error) {
     console.error('❌ attest error:', error);
@@ -237,7 +295,7 @@ app.post('/attest', attestLimiter, (req, res) => {
 });
 
 // ============================================
-// ENDPOINT 3: VERIFY
+// ENDPOINT 3: VERIFY SESSION TOKEN
 // ============================================
 
 app.post('/verify', verifyLimiter, (req, res) => {
@@ -263,6 +321,7 @@ app.post('/verify', verifyLimiter, (req, res) => {
     
     const now = Date.now();
     if (session.expiry < now) {
+      sessions.delete(sessionToken);
       stats.totalVerifications++;
       return res.json({
         valid: false,
@@ -301,12 +360,12 @@ app.get('/health', (req, res) => {
   
   res.json({
     status: 'OK',
-    server: 'Z-Kinetic Authority',
-    version: '1.0.0',
+    server: 'Z-Kinetic Authority (Secure Mode)',
+    version: '2.0.0',
     timestamp: now,
     uptime: uptime,
     storage: {
-      nonces: nonces.size,
+      activeChallenges: activeChallenges.size,
       sessions: sessions.size,
     },
     stats: stats,
@@ -319,23 +378,46 @@ app.get('/health', (req, res) => {
 
 app.get('/docs', (req, res) => {
   res.json({
-    name: 'Z-Kinetic Authority API',
-    version: '1.0.0',
+    name: 'Z-Kinetic Authority API (Secure)',
+    version: '2.0.0',
     endpoints: [
       {
         path: '/getChallenge',
         method: 'POST',
-        description: 'Generate challenge nonce',
+        description: 'Generate server-side challenge code',
+        response: {
+          nonce: 'string',
+          challengeCode: '[number]',
+          expiry: 'timestamp',
+        },
       },
       {
         path: '/attest',
         method: 'POST',
-        description: 'Verify biometric and issue token',
+        description: 'Verify user response and biometric data',
+        body: {
+          nonce: 'string',
+          deviceId: 'string',
+          userResponse: '[number]',
+          biometricData: { motion: 'number', touch: 'number', pattern: 'number' },
+        },
+        response: {
+          sessionToken: 'string',
+          verdict: 'APPROVED | APPROVED_SILENT_ALARM',
+          riskScore: 'LOW | MEDIUM | HIGH | CRITICAL',
+        },
       },
       {
         path: '/verify',
         method: 'POST',
         description: 'Validate session token',
+        body: {
+          sessionToken: 'string',
+        },
+        response: {
+          valid: 'boolean',
+          status: 'VALID | INVALID | EXPIRED',
+        },
       },
     ],
   });
@@ -349,9 +431,10 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log('═══════════════════════════════════════════');
-  console.log('  Z-KINETIC AUTHORITY SERVER');
+  console.log('  Z-KINETIC AUTHORITY SERVER (SECURE)');
   console.log('═══════════════════════════════════════════');
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 Health: http://localhost:${PORT}/health`);
+  console.log(`📚 Docs: http://localhost:${PORT}/docs`);
   console.log('═══════════════════════════════════════════');
 });
