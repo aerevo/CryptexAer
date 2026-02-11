@@ -877,18 +877,88 @@ class EnterpriseController {
     _initSensors();
     _startDecayTimer();
     generateNewChallenge(); // <--- JANA KOD MASA START
+// ============================================
+// ✅ ENTERPRISE CONTROLLER (SECURE: SERVER-SIDE CHALLENGE)
+// ============================================
+class EnterpriseController {
+  // 1. SIMON SAYS: Challenge Code from Server
+  final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
+  String? _currentNonce; // Server nonce for verification
+  
+  final bool isCompromisedDevice;
+  final Position? deviceLocation;
+  
+  final ValueNotifier<double> motionScore = ValueNotifier(0.0);
+  final ValueNotifier<double> touchScore = ValueNotifier(0.0);
+  final ValueNotifier<double> patternScore = ValueNotifier(0.0);
+  final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
+
+  // Anti-Tamper & Transaction Binding
+  String? _boundTransactionHash;
+  Map<String, dynamic>? _boundTransactionDetails;
+  
+  // Server URL - UPDATE THIS with your Render URL!
+  final String _serverUrl = 'https://z-kinetic-server.onrender.com';
+  
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+  double _lastMagnitude = 9.8;
+  DateTime _lastMotionTime = DateTime.now();
+  Timer? _decayTimer;
+  
+  EnterpriseController({
+    this.isCompromisedDevice = false,
+    this.deviceLocation,
+  }) {
+    _initSensors();
+    _startDecayTimer();
+    fetchChallengeFromServer(); // 🚀 PRE-FETCH during init!
   }
 
-  // 🔥 LOGIC: Jana Nombor Rawak (Simon Says)
-  void generateNewChallenge() {
+  // 🔥 FETCH CHALLENGE FROM SERVER (Secure Mode)
+  Future<void> fetchChallengeFromServer() async {
+    try {
+      print('🔄 Fetching secure challenge from server...');
+      
+      final response = await http.post(
+        Uri.parse('$_serverUrl/getChallenge'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 3));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['success'] == true) {
+          _currentNonce = data['nonce'];
+          
+          // Convert List<dynamic> to List<int>
+          List<dynamic> rawCode = data['challengeCode'];
+          challengeCode.value = rawCode.map((e) => e as int).toList();
+          
+          print('✅ Secure Challenge Received: ${challengeCode.value}');
+          print('   Nonce: ${_currentNonce?.substring(0, 16)}...');
+        } else {
+          throw Exception('Server returned success=false');
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('⚠️ Server offline/slow. Using Fallback Mode. Error: $e');
+      _generateLocalChallenge(); // Fallback for offline mode
+    }
+  }
+
+  // Fallback (Local) - Used only when server unreachable
+  void _generateLocalChallenge() {
     challengeCode.value = List.generate(5, (_) => Random().nextInt(10));
-    print('🔐 NEW CHALLENGE CODE: ${challengeCode.value}'); 
+    _currentNonce = "OFFLINE_MODE"; // Server will reject this if strict
+    print('⚠️ LOCAL CHALLENGE: ${challengeCode.value} (Low Security Mode)');
   }
 
   void randomizeWheels() {
     randomizeTrigger.value++;
-    generateNewChallenge(); // Tukar kod baru bila gagal!
-    print('🔀 Wheels randomized & New Code Generated');
+    fetchChallengeFromServer(); // Request new challenge from server!
+    print('🔀 Wheels randomized & fetching new server challenge');
   }
 
   void _initSensors() {
@@ -935,40 +1005,95 @@ class EnterpriseController {
     print('📡 [THREAT INTEL] Sending: $type ($severity) | Loc: ${deviceLocation?.latitude ?? 'N/A'}');
   }
 
-  // ✅ VERIFICATION LOGIC (Panic Mode + Biometric)
+  // ✅ VERIFICATION LOGIC (Server-Side Verification)
   Future<Map<String, dynamic>> verify(List<int> inputCode) async {
-    String inputStr = inputCode.join();
-    String targetStr = challengeCode.value.join(); 
-    String panicStr = challengeCode.value.reversed.join(); // Kod Terbalik = Panic
+    // 1. If Offline Mode, use local verification (fallback)
+    if (_currentNonce == "OFFLINE_MODE") {
+      print('⚠️ OFFLINE VERIFICATION (Low Security)');
+      
+      String inputStr = inputCode.join();
+      String targetStr = challengeCode.value.join();
+      String panicStr = challengeCode.value.reversed.join();
 
-    // 1. PANIC MODE CHECK
-    if (inputStr == panicStr) {
-      print('🚨 PANIC MODE ACTIVATED (Reverse Code Entered)');
-      await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
-      return {
-        'allowed': true, 
-        'isPanicMode': true, // UI akan buat "Wayang" (pura-pura okay)
-        'verificationToken': 'PANIC_TOKEN_${DateTime.now().millisecondsSinceEpoch}'
-      };
+      // Check panic mode
+      if (inputStr == panicStr) {
+        print('🚨 PANIC MODE (Offline)');
+        await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
+        return {
+          'allowed': true,
+          'isPanicMode': true,
+          'verificationToken': 'PANIC_OFFLINE_${DateTime.now().millisecondsSinceEpoch}'
+        };
+      }
+
+      // Check code + biometric
+      bool motionOK = motionScore.value > 0.15;
+      bool codeCorrect = inputStr == targetStr;
+
+      if (codeCorrect && motionOK) {
+        return {
+          'allowed': true,
+          'isPanicMode': false,
+          'verificationToken': 'OFFLINE_${DateTime.now().millisecondsSinceEpoch}'
+        };
+      } else {
+        randomizeWheels();
+        return {'allowed': false, 'isPanicMode': false};
+      }
     }
 
-    // 2. BIOMETRIC CHECK
-    bool motionOK = motionScore.value > 0.15;
-    bool codeCorrect = inputStr == targetStr;
-    
-    if (codeCorrect && motionOK) {
-      return {
-        'allowed': true, 
-        'isPanicMode': false,
-        'verificationToken': 'VALID_TOKEN_${DateTime.now().millisecondsSinceEpoch}',
-        'boundTransactionHash': _boundTransactionHash
-      };
-    } else {
-      if (!motionOK) print('❌ Biometric Fail: No Motion');
-      if (!codeCorrect) print('❌ Code Fail: Wrong Sequence');
+    // 2. ONLINE MODE: Server verification (Secure!)
+    try {
+      print('🔄 Sending attestation to server...');
       
-      await _sendThreatIntelligence(type: "AUTH_FAIL", severity: "MEDIUM");
-      randomizeWheels(); // Gagal? Tukar soalan!
+      final response = await http.post(
+        Uri.parse('$_serverUrl/attest'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'nonce': _currentNonce,
+          'deviceId': 'device_${deviceLocation?.latitude ?? Random().nextInt(99999)}',
+          'userResponse': inputCode,
+          'biometricData': {
+            'motion': motionScore.value,
+            'touch': touchScore.value,
+            'pattern': patternScore.value,
+          }
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final verdict = data['verdict'];
+        
+        print('✅ Server Response: $verdict');
+        
+        if (verdict == "APPROVED_SILENT_ALARM") {
+          await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
+          return {
+            'allowed': true,
+            'isPanicMode': true,
+            'verificationToken': data['sessionToken'],
+            'riskScore': data['riskScore'],
+          };
+        } else if (verdict == "APPROVED") {
+          return {
+            'allowed': true,
+            'isPanicMode': false,
+            'verificationToken': data['sessionToken'],
+            'riskScore': data['riskScore'],
+            'boundTransactionHash': _boundTransactionHash
+          };
+        }
+      }
+      
+      // Server rejected
+      print('❌ Server Reject: ${response.body}');
+      randomizeWheels(); // Get new challenge
+      return {'allowed': false, 'isPanicMode': false};
+      
+    } catch (e) {
+      print('⚠️ Verification Error: $e');
+      randomizeWheels();
       return {'allowed': false, 'isPanicMode': false};
     }
   }
@@ -983,6 +1108,7 @@ class EnterpriseController {
     challengeCode.dispose();
   }
 }
+
 
 // ============================================
 // CRYPTEX LOCK (with random initial positions)
@@ -1354,7 +1480,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
-
 
 
 
