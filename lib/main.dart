@@ -573,12 +573,10 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 25),
                   
-                  // ✅ THE RING / X-FILES Animation Challenge Box
                   RingStyleChallengeDisplay(controller: _controller),
                   
                   const SizedBox(height: 15),
                   
-                  // ✅ "Please match the code"
                   const Text(
                     'Please match the code',
                     style: TextStyle(
@@ -701,17 +699,13 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 
 // ============================================
 // ✅ ENTERPRISE CONTROLLER (SECURE HYBRID MODE)
+// ============================================
 
-// ============================================
-// THE RING / X-FILES CHALLENGE ANIMATION
-// ============================================
+// THE RING / X-FILES ANIMATION
 class RingStyleChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
   
-  const RingStyleChallengeDisplay({
-    super.key,
-    required this.controller,
-  });
+  const RingStyleChallengeDisplay({super.key, required this.controller});
 
   @override
   State<RingStyleChallengeDisplay> createState() => _RingStyleChallengeDisplayState();
@@ -721,7 +715,6 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     with SingleTickerProviderStateMixin {
   
   late AnimationController _animController;
-  late Animation<double> _staticAnimation;
   late Animation<double> _emergeAnimation;
   
   final Random _random = Random();
@@ -735,21 +728,11 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    );
-    
-    _staticAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animController,
-        curve: const Interval(0.0, 0.4, curve: Curves.easeIn),
-      ),
+      duration: const Duration(milliseconds: 1300),
     );
     
     _emergeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animController,
-        curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
-      ),
+      CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
     
     widget.controller.challengeCode.addListener(_onChallengeChanged);
@@ -800,16 +783,9 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.7),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.orangeAccent.withOpacity(0.5),
-          width: 2,
-        ),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.5), width: 2),
         boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.3),
-            blurRadius: 15,
-            spreadRadius: 2,
-          ),
+          BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 15, spreadRadius: 2),
         ],
       ),
       child: AnimatedBuilder(
@@ -821,12 +797,7 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
               if (code.isEmpty) {
                 return const SizedBox(
                   height: 50,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.orangeAccent,
-                      strokeWidth: 2,
-                    ),
-                  ),
+                  child: Center(child: CircularProgressIndicator(color: Colors.orangeAccent, strokeWidth: 2)),
                 );
               }
               
@@ -837,53 +808,37 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(displayNumbers.length, (index) {
-                  return AnimatedBuilder(
-                    animation: _emergeAnimation,
-                    builder: (context, child) {
-                      double stagger = index * 0.15;
-                      double opacity = _showingStatic 
-                          ? (_staticAnimation.value * 0.4) 
-                          : ((_emergeAnimation.value - stagger).clamp(0.0, 1.0));
-                      
-                      double yOffset = _showingStatic 
-                          ? 0 
-                          : (1.0 - (_emergeAnimation.value - stagger).clamp(0.0, 1.0)) * 30;
-                      
-                      return Transform.translate(
-                        offset: Offset(0, yOffset),
-                        child: Opacity(
-                          opacity: opacity.clamp(0.0, 1.0),
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 5),
-                            child: Text(
-                              displayNumbers.length > index ? displayNumbers[index] : '0',
-                              style: TextStyle(
-                                color: _showingStatic 
-                                    ? Colors.greenAccent.withOpacity(0.6)
-                                    : Colors.white,
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Courier',
-                                shadows: _showingStatic
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.green.withOpacity(0.5),
-                                          blurRadius: 10,
-                                        ),
-                                      ]
-                                    : [
-                                        const BoxShadow(
-                                          color: Colors.orange,
-                                          blurRadius: 15,
-                                          spreadRadius: 3,
-                                        ),
-                                      ],
-                              ),
-                            ),
+                  double stagger = index * 0.15;
+                  double opacity = _showingStatic 
+                      ? 0.4 
+                      : ((_emergeAnimation.value - stagger).clamp(0.0, 1.0));
+                  
+                  double yOffset = _showingStatic 
+                      ? 0 
+                      : (1.0 - (_emergeAnimation.value - stagger).clamp(0.0, 1.0)) * 30;
+                  
+                  return Transform.translate(
+                    offset: Offset(0, yOffset),
+                    child: Opacity(
+                      opacity: opacity.clamp(0.0, 1.0),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 5),
+                        child: Text(
+                          displayNumbers.length > index ? displayNumbers[index] : '0',
+                          style: TextStyle(
+                            color: _showingStatic 
+                                ? Colors.greenAccent.withOpacity(0.6)
+                                : Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Courier',
+                            shadows: _showingStatic
+                                ? [BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 10)]
+                                : [const BoxShadow(color: Colors.orange, blurRadius: 15, spreadRadius: 3)],
                           ),
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   );
                 }),
               );
@@ -895,7 +850,6 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   }
 }
 
-// ============================================
 class EnterpriseController {
   // Challenge Code dari Server
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
@@ -1089,7 +1043,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   late List<FixedExtentScrollController> _scrollControllers;
 
   int? _activeWheelIndex;
-  bool _isRandomizing = false;  // Slot machine flag
   Timer? _wheelActiveTimer;
   bool _isButtonPressed = false;
   
@@ -1350,14 +1303,65 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
             ),
           ),
 
+        ],
+      ),
+    );
+  }
 
-  // ✅ Req 6: Slot Machine Animation
+  Widget _buildGlowingButton(double screenWidth, double screenHeight) {
+    double left = buttonCoords[0];
+    double top = buttonCoords[1];
+    double right = buttonCoords[2];
+    double bottom = buttonCoords[3];
+
+    double actualLeft = screenWidth * (left / imageWidth);
+    double actualTop = screenHeight * (top / imageHeight);
+    double actualWidth = screenWidth * ((right - left) / imageWidth);
+    double actualHeight = screenHeight * ((bottom - top) / imageHeight);
+
+    return Positioned(
+      left: actualLeft,
+      top: actualTop,
+      width: actualWidth,
+      height: actualHeight,
+      child: GestureDetector(
+        onTap: _onButtonTap,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          children: [
+            Container(color: Colors.transparent),
+            
+            if (_isButtonPressed)
+              IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF5722).withOpacity(0.6),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFFFF5722).withOpacity(0.3),
+                        blurRadius: 50,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Slot Machine Animation (Req 6)
   Future<void> _playSlotMachineAnimation() async {
-    setState(() => _isRandomizing = true);
-    
     for (int i = 0; i < 5; i++) {
       if (mounted && _scrollControllers[i].hasClients) {
-        int finalPos = _random.nextInt(10);
+        int finalPos = Random().nextInt(10);
         _scrollControllers[i].animateToItem(
           finalPos,
           duration: Duration(milliseconds: 300 + (i * 200)),
@@ -1367,11 +1371,5 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         await Future.delayed(const Duration(milliseconds: 200));
       }
     }
-    
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (mounted) {
-      setState(() => _isRandomizing = false);
-    }
   }
-
 }
