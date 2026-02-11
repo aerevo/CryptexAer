@@ -1,52 +1,28 @@
-name: z_kinetic_pro
-description: Military-grade biometric security suite (Master Build)
-version: 3.0.0+1
+name: z_kinetic_secure
+description: Z-Kinetic Biometric Lock - Server Authority Mode (SECURE!)
+publish_to: 'none'
+version: 2.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.2.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
   
-  # 🔥 FIREBASE INFRASTRUCTURE (Pusat Risikan & Server Captain)
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
-  cloud_firestore: ^5.4.4
-  firebase_app_check: ^0.3.1+4  # WAJIB: Halang orang clone SDK Captain
-  firebase_crashlytics: ^4.1.3   # Kesan jika app crash masa serangan
-  firebase_analytics: ^11.3.3    # Pantau tingkah laku user
-  cloud_functions: ^5.1.3        # Untuk proses Token Signature (Cuci Tangan)
-  
-  # 🔐 SECURITY HARDENING (Perisai Claude)
-  screen_protector: ^1.5.1      # Anti-Screenshot/Recording
-  device_apps: ^2.2.0           # Kesan TeamViewer/Hacker Remote Tools
-  crypto: ^3.0.5                # SHA256 Hashing
-  encrypt: ^5.0.3               # Encrypt metadata sebelum hantar ke Cloud
-  flutter_secure_storage: ^9.2.2 # Simpan Device Key secara selamat
-  
-  # 🛡️ DEVICE INTEGRITY & LOCATION
-  safe_device: ^1.2.3           # Check Root/Jailbreak
-  geolocator: ^10.1.0           # GPS untuk Radar Serangan
-  
-  # 📱 SENSORS (Jantung Z-Kinetic)
-  sensors_plus: ^6.0.0
-  device_info_plus: ^11.0.0
-  
-  # 💾 LOCAL STORAGE
-  shared_preferences: ^2.3.2
-  http: ^1.2.0
+  http: ^1.1.0
+  sensors_plus: ^4.0.2
+  safe_device: ^1.1.8
+  geolocator: ^11.0.0
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
+  
   assets:
     - assets/z_wheel.png
-
-
-
-
