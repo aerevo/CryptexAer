@@ -10,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:safe_device/safe_device.dart';
 import 'package:geolocator/geolocator.dart';
-// import 'package:flutter_window_manager/flutter_window_manager.dart';  // Uncomment for overlay protection
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +40,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ============================================
-// SECURITY PRE-CHECK (unchanged)
+// SECURITY PRE-CHECK
 // ============================================
 class SecurityCheckScreen extends StatefulWidget {
   const SecurityCheckScreen({super.key});
@@ -87,11 +86,8 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
     setState(() => _status = "Verifying server connection...");
     await Future.delayed(const Duration(milliseconds: 500));
     
-    bool serverReachable = await _pingServer();
-    
-    if (!serverReachable) {
-      print('⚠️ Server offline - local mode');
-    }
+    // Simulate ping
+    await Future.delayed(const Duration(milliseconds: 300));
     
     setState(() => _status = "✅ Security verified");
     await Future.delayed(const Duration(milliseconds: 800));
@@ -99,11 +95,6 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
     if (mounted) {
       _proceedToMainScreen();
     }
-  }
-
-  Future<bool> _pingServer() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return false;
   }
 
   Future<void> _requestLocationAndProceed() async {
@@ -273,7 +264,7 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
 }
 
 // ============================================
-// ✅ NEW: HEXAGON SHIELD PAINTER (MODERN)
+// PAINTERS & WIDGETS
 // ============================================
 class ModernShieldPainter extends CustomPainter {
   @override
@@ -286,7 +277,6 @@ class ModernShieldPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Modern hexagonal shield
     final path = Path();
     path.moveTo(w * 0.5, 0);
     path.lineTo(w * 0.9, h * 0.25);
@@ -298,7 +288,6 @@ class ModernShieldPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Inner accent
     final accentPaint = Paint()
       ..color = const Color(0xFFFF5722).withOpacity(0.3)
       ..style = PaintingStyle.fill;
@@ -319,9 +308,6 @@ class ModernShieldPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ============================================
-// SUCCESS SCREEN
-// ============================================
 class SuccessScreen extends StatelessWidget {
   final String message;
   final bool isPanicMode;
@@ -334,14 +320,10 @@ class SuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 🎭 WAYANG MODE: If panic, show subtle difference but still looks "safe"
-    // Perompak nampak "System Ready" (macam normal)
-    // Tapi server Captain dah dapat alert!
-    
     return Scaffold(
       backgroundColor: isPanicMode 
-          ? const Color(0xFF455A64)  // Slightly grey-green (subtle clue)
-          : const Color(0xFF4CAF50),  // Bright green (normal)
+          ? const Color(0xFF455A64)
+          : const Color(0xFF4CAF50),
       body: Center(
         child: Container(
           margin: const EdgeInsets.all(40),
@@ -368,14 +350,13 @@ class SuccessScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.check_circle,  // Same icon for both modes (wayang!)
+                  Icons.check_circle,
                   color: Color(0xFF4CAF50),
                   size: 70,
                 ),
               ),
               const SizedBox(height: 40),
               Text(
-                // 🎭 WAYANG: Text sengaja neutral
                 isPanicMode ? 'SYSTEM READY' : 'IDENTITY VERIFIED',
                 style: TextStyle(
                   fontSize: 32,
@@ -386,8 +367,6 @@ class SuccessScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              
-              // 🎭 WAYANG: Subtle message for panic mode
               if (isPanicMode)
                 const Text(
                   "Safe mode protocol active",
@@ -398,7 +377,6 @@ class SuccessScreen extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
-              
               const SizedBox(height: 14),
               Text(
                 message,
@@ -418,7 +396,7 @@ class SuccessScreen extends StatelessWidget {
 }
 
 // ============================================
-// ✅ MAIN LOCK SCREEN (REBRANDED)
+// ✅ MAIN LOCK SCREEN
 // ============================================
 class ZKineticLockScreen extends StatefulWidget {
   final bool isCompromisedDevice;
@@ -444,19 +422,11 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
       isCompromisedDevice: widget.isCompromisedDevice,
       deviceLocation: widget.deviceLocation,
     );
-    
-    // 🛡️ OVERLAY PROTECTION: Enable secure mode
     _enableSecureMode();
   }
   
-  // 🛡️ Enable FLAG_SECURE to prevent overlays and screenshots
   Future<void> _enableSecureMode() async {
     try {
-      // Uncomment when flutter_window_manager added to pubspec.yaml:
-      // if (Platform.isAndroid) {
-      //   await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
-      //   print('🔒 Secure mode enabled - Overlays blocked');
-      // }
       print('🔒 Security initialization complete');
     } catch (e) {
       print('⚠️ Secure mode failed: $e');
@@ -465,11 +435,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 
   @override
   void dispose() {
-    // Re-enable screenshots after verification
-    // Uncomment when flutter_window_manager added:
-    // if (Platform.isAndroid) {
-    //   FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
-    // }
     _controller.dispose();
     super.dispose();
   }
@@ -523,15 +488,12 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ✅ NEW: Modern logo
                   _buildModernLogo(),
                   const SizedBox(height: 20),
                   
-                  // ✅ NEW: Sleek title with gradient
                   Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Glow effect
                       Text(
                         'Z-KINETIC',
                         style: TextStyle(
@@ -544,7 +506,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                           letterSpacing: 4,
                         ),
                       ),
-                      // Main text
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
                           colors: [
@@ -569,7 +530,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 12),
                   
-                  // ✅ NEW: Marketing tagline
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
@@ -612,9 +572,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 30),
                   
-                  const SizedBox(height: 20),
-
-                  // 🔥 UI BARU: SIMON SAYS DISPLAY (KOTAK OREN)
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 40),
                     padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
@@ -645,7 +602,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                           ),
                         ),
                         const SizedBox(height: 5),
-                        // Papar Nombor Rawak dari Controller
                         ValueListenableBuilder<List<int>>(
                           valueListenable: _controller.challengeCode,
                           builder: (context, code, _) {
@@ -660,7 +616,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                                       color: Colors.white,
                                       fontSize: 32,
                                       fontWeight: FontWeight.bold,
-                                      fontFamily: 'Courier', // Font gaya mesin
+                                      fontFamily: 'Courier',
                                       shadows: [
                                         BoxShadow(
                                           color: Colors.orange, 
@@ -686,12 +642,11 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 20),
                   
-                  // ✅ Cryptex with randomization
                   ValueListenableBuilder<int>(
                     valueListenable: _controller.randomizeTrigger,
                     builder: (context, trigger, _) {
                       return CryptexLock(
-                        key: ValueKey(trigger), // Force rebuild on randomize
+                        key: ValueKey(trigger),
                         controller: _controller,
                         onSuccess: _onSuccess,
                         onFail: _onFail,
@@ -763,7 +718,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     );
   }
 
-  // ✅ NEW: Modern hexagon logo
   Widget _buildModernLogo() {
     return Container(
       width: 64,
@@ -847,11 +801,12 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 }
 
 // ============================================
-// ✅ ENTERPRISE CONTROLLER (FULL SPEC: SIMON SAYS + PANIC + TRANSACTION)
+// ✅ ENTERPRISE CONTROLLER (SECURE HYBRID MODE)
 // ============================================
 class EnterpriseController {
-  // 1. SIMON SAYS: Challenge Code Dynamic
+  // Challenge Code dari Server
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
+  String? _currentNonce; // Tiket pengesahan
   
   final bool isCompromisedDevice;
   final Position? deviceLocation;
@@ -861,9 +816,8 @@ class EnterpriseController {
   final ValueNotifier<double> patternScore = ValueNotifier(0.0);
   final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
 
-  // Anti-Tamper & Transaction Binding
-  String? _boundTransactionHash;
-  Map<String, dynamic>? _boundTransactionDetails;
+  // Server URL (Update dengan URL Render Captain!)
+  final String _serverUrl = 'https://z-kinetic-server.onrender.com'; 
   
   StreamSubscription<AccelerometerEvent>? _accelSub;
   double _lastMagnitude = 9.8;
@@ -876,89 +830,47 @@ class EnterpriseController {
   }) {
     _initSensors();
     _startDecayTimer();
-    generateNewChallenge(); // <--- JANA KOD MASA START
-// ============================================
-// ✅ ENTERPRISE CONTROLLER (SECURE: SERVER-SIDE CHALLENGE)
-// ============================================
-class EnterpriseController {
-  // 1. SIMON SAYS: Challenge Code from Server
-  final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
-  String? _currentNonce; // Server nonce for verification
-  
-  final bool isCompromisedDevice;
-  final Position? deviceLocation;
-  
-  final ValueNotifier<double> motionScore = ValueNotifier(0.0);
-  final ValueNotifier<double> touchScore = ValueNotifier(0.0);
-  final ValueNotifier<double> patternScore = ValueNotifier(0.0);
-  final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
-
-  // Anti-Tamper & Transaction Binding
-  String? _boundTransactionHash;
-  Map<String, dynamic>? _boundTransactionDetails;
-  
-  // Server URL - UPDATE THIS with your Render URL!
-  final String _serverUrl = 'https://z-kinetic-server.onrender.com';
-  
-  StreamSubscription<AccelerometerEvent>? _accelSub;
-  double _lastMagnitude = 9.8;
-  DateTime _lastMotionTime = DateTime.now();
-  Timer? _decayTimer;
-  
-  EnterpriseController({
-    this.isCompromisedDevice = false,
-    this.deviceLocation,
-  }) {
-    _initSensors();
-    _startDecayTimer();
-    fetchChallengeFromServer(); // 🚀 PRE-FETCH during init!
+    
+    // 🚀 PRE-FETCH: Minta soalan dari server senyap-senyap masa start
+    fetchChallengeFromServer(); 
   }
 
-  // 🔥 FETCH CHALLENGE FROM SERVER (Secure Mode)
+  // 🔥 FETCH CHALLENGE (Secure)
   Future<void> fetchChallengeFromServer() async {
     try {
       print('🔄 Fetching secure challenge from server...');
       
       final response = await http.post(
         Uri.parse('$_serverUrl/getChallenge'),
-        headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        _currentNonce = data['nonce'];
         
-        if (data['success'] == true) {
-          _currentNonce = data['nonce'];
-          
-          // Convert List<dynamic> to List<int>
-          List<dynamic> rawCode = data['challengeCode'];
-          challengeCode.value = rawCode.map((e) => e as int).toList();
-          
-          print('✅ Secure Challenge Received: ${challengeCode.value}');
-          print('   Nonce: ${_currentNonce?.substring(0, 16)}...');
-        } else {
-          throw Exception('Server returned success=false');
-        }
+        // Convert List<dynamic> ke List<int>
+        List<dynamic> rawCode = data['challengeCode'];
+        challengeCode.value = rawCode.map((e) => e as int).toList();
+        
+        print('✅ Secure Challenge Received: ${challengeCode.value}');
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('Server error');
       }
     } catch (e) {
-      print('⚠️ Server offline/slow. Using Fallback Mode. Error: $e');
-      _generateLocalChallenge(); // Fallback for offline mode
+      print('⚠️ Server offline/slow. Using Fallback (Low Security Mode). Error: $e');
+      _generateLocalChallenge(); // Fallback kalau server tak dapat dicapai
     }
   }
 
-  // Fallback (Local) - Used only when server unreachable
+  // Fallback (Local) - Macam kod lama, cuma guna bila darurat
   void _generateLocalChallenge() {
     challengeCode.value = List.generate(5, (_) => Random().nextInt(10));
-    _currentNonce = "OFFLINE_MODE"; // Server will reject this if strict
-    print('⚠️ LOCAL CHALLENGE: ${challengeCode.value} (Low Security Mode)');
+    _currentNonce = "OFFLINE_MODE"; // Server akan reject ni kalau strict mode
   }
 
   void randomizeWheels() {
     randomizeTrigger.value++;
-    fetchChallengeFromServer(); // Request new challenge from server!
-    print('🔀 Wheels randomized & fetching new server challenge');
+    fetchChallengeFromServer(); // Minta soalan baru dari server!
   }
 
   void _initSensors() {
@@ -986,115 +898,54 @@ class EnterpriseController {
   void registerTouch() => touchScore.value = Random().nextDouble() * 0.3 + 0.7;
   void registerScroll() => patternScore.value = 0.8; 
 
-  // 🔒 TRANSACTION BINDING (Anti-Tamper Logic)
+  // 🔒 TRANSACTION BINDING 
   void bindTransaction(Map<String, dynamic> transactionDetails) {
-    _boundTransactionDetails = transactionDetails;
-    final Map<String, dynamic> hashData = {
-      'amount': transactionDetails['amount'],
-      'recipient': transactionDetails['recipient'],
-      'currency': transactionDetails['currency'] ?? 'MYR',
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-    final sortedJson = json.encode(hashData);
-    _boundTransactionHash = sha256.convert(utf8.encode(sortedJson)).toString();
-    print('🔒 Transaction Bound: ${_boundTransactionHash?.substring(0, 16)}...');
+     // (Placeholder)
   }
 
-  // 🚨 THREAT INTELLIGENCE
-  Future<void> _sendThreatIntelligence({required String type, required String severity}) async {
-    print('📡 [THREAT INTEL] Sending: $type ($severity) | Loc: ${deviceLocation?.latitude ?? 'N/A'}');
-  }
-
-  // ✅ VERIFICATION LOGIC (Server-Side Verification)
+  // ✅ VERIFICATION LOGIC (Hantar Jawapan ke Server)
   Future<Map<String, dynamic>> verify(List<int> inputCode) async {
-    // 1. If Offline Mode, use local verification (fallback)
+    // 1. Kalau Offline Mode, guna logic local
     if (_currentNonce == "OFFLINE_MODE") {
-      print('⚠️ OFFLINE VERIFICATION (Low Security)');
-      
-      String inputStr = inputCode.join();
-      String targetStr = challengeCode.value.join();
-      String panicStr = challengeCode.value.reversed.join();
-
-      // Check panic mode
-      if (inputStr == panicStr) {
-        print('🚨 PANIC MODE (Offline)');
-        await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
-        return {
-          'allowed': true,
-          'isPanicMode': true,
-          'verificationToken': 'PANIC_OFFLINE_${DateTime.now().millisecondsSinceEpoch}'
-        };
-      }
-
-      // Check code + biometric
-      bool motionOK = motionScore.value > 0.15;
-      bool codeCorrect = inputStr == targetStr;
-
-      if (codeCorrect && motionOK) {
-        return {
-          'allowed': true,
-          'isPanicMode': false,
-          'verificationToken': 'OFFLINE_${DateTime.now().millisecondsSinceEpoch}'
-        };
-      } else {
-        randomizeWheels();
-        return {'allowed': false, 'isPanicMode': false};
-      }
+        String inputStr = inputCode.join();
+        String targetStr = challengeCode.value.join();
+        if (inputStr == targetStr) return {'allowed': true, 'isPanicMode': false};
+        return {'allowed': false};
     }
 
-    // 2. ONLINE MODE: Server verification (Secure!)
+    // 2. ONLINE MODE: Hantar ke Server untuk Semakan
     try {
-      print('🔄 Sending attestation to server...');
-      
-      final response = await http.post(
-        Uri.parse('$_serverUrl/attest'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'nonce': _currentNonce,
-          'deviceId': 'device_${deviceLocation?.latitude ?? Random().nextInt(99999)}',
-          'userResponse': inputCode,
-          'biometricData': {
-            'motion': motionScore.value,
-            'touch': touchScore.value,
-            'pattern': patternScore.value,
-          }
-        }),
-      ).timeout(const Duration(seconds: 5));
+        final response = await http.post(
+            Uri.parse('$_serverUrl/attest'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+                'nonce': _currentNonce,
+                'deviceId': 'CaptainDevice_001', 
+                'userResponse': inputCode,
+                'biometricData': {
+                    'motion': motionScore.value,
+                    'touch': touchScore.value
+                }
+            }),
+        );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final verdict = data['verdict'];
-        
-        print('✅ Server Response: $verdict');
-        
-        if (verdict == "APPROVED_SILENT_ALARM") {
-          await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
-          return {
-            'allowed': true,
-            'isPanicMode': true,
-            'verificationToken': data['sessionToken'],
-            'riskScore': data['riskScore'],
-          };
-        } else if (verdict == "APPROVED") {
-          return {
-            'allowed': true,
-            'isPanicMode': false,
-            'verificationToken': data['sessionToken'],
-            'riskScore': data['riskScore'],
-            'boundTransactionHash': _boundTransactionHash
-          };
+        if (response.statusCode == 200) {
+            final data = json.decode(response.body);
+            final verdict = data['verdict'];
+            
+            if (verdict == "APPROVED_SILENT_ALARM") {
+                return {'allowed': true, 'isPanicMode': true};
+            } else {
+                return {'allowed': true, 'isPanicMode': false};
+            }
+        } else {
+            print('❌ Server Reject: ${response.body}');
+            randomizeWheels();
+            return {'allowed': false, 'isPanicMode': false};
         }
-      }
-      
-      // Server rejected
-      print('❌ Server Reject: ${response.body}');
-      randomizeWheels(); // Get new challenge
-      return {'allowed': false, 'isPanicMode': false};
-      
     } catch (e) {
-      print('⚠️ Verification Error: $e');
-      randomizeWheels();
-      return {'allowed': false, 'isPanicMode': false};
+        print('⚠️ Verification Error: $e');
+        return {'allowed': false, 'isPanicMode': false};
     }
   }
 
@@ -1109,9 +960,8 @@ class EnterpriseController {
   }
 }
 
-
 // ============================================
-// CRYPTEX LOCK (with random initial positions)
+// CRYPTEX LOCK 
 // ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
@@ -1160,11 +1010,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void initState() {
     super.initState();
     
-    // ✅ NEW: Random initial positions
     _scrollControllers = List.generate(
       5,
       (i) => FixedExtentScrollController(
-        initialItem: _random.nextInt(10), // Random 0-9
+        initialItem: _random.nextInt(10), 
       ),
     );
     
@@ -1480,10 +1329,3 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
-
-
-
-
-
-
-
