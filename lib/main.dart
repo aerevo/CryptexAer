@@ -806,6 +806,7 @@ class EnterpriseController {
   double _lastMagnitude = 9.8;
   DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
+  Timer? _animationTimer;
   
   EnterpriseController({
     this.isCompromisedDevice = false,
@@ -854,10 +855,27 @@ class EnterpriseController {
     print('⚠️ LOCAL CHALLENGE: ${challengeCode.value} (Low Security Mode)');
   }
 
+  // --- KOD BARU (GLITCH MODE) ---
   void randomizeWheels() {
     randomizeTrigger.value++;
-    fetchChallengeFromServer();
-    print('🔀 Wheels randomized & fetching new server challenge');
+    
+    int ticks = 0;
+    _animationTimer?.cancel();
+    
+    // Tukar nombor setiap 50ms (Sangat Laju!)
+    _animationTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      // Generate nombor sampah
+      challengeCode.value = List.generate(5, (_) => Random().nextInt(10));
+      ticks++;
+      
+      // Selepas 25 kali kelip (1.2 saat), baru stop & minta server
+      if (ticks > 25) {
+        timer.cancel();
+        fetchChallengeFromServer(); 
+      }
+    });
+    
+    print('🔀 Glitch Goblin Activated!');
   }
 
   void _initSensors() {
@@ -1365,3 +1383,4 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     }
   }
 }
+
