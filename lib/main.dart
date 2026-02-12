@@ -1253,8 +1253,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         itemExtent: itemExtent,
         perspective: 0.001,
         diameterRatio: 2.0,
-        physics: const BouncingScrollPhysics(),
-        onSelectedItemChanged: (_) {
+            physics: const FixedExtentScrollPhysics(), 
+            onSelectedItemChanged: (_) {
           HapticFeedback.selectionClick();
         },
         childDelegate: ListWheelChildBuilderDelegate(
@@ -1370,17 +1370,29 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   Future<void> _playSlotMachineAnimation() async {
     for (int i = 0; i < 5; i++) {
-      if (mounted && _scrollControllers[i].hasClients) {
-        int finalPos = Random().nextInt(10);
-        _scrollControllers[i].animateToItem(
-          finalPos,
-          duration: Duration(milliseconds: 300 + (i * 200)),
-          curve: Curves.easeOut,
-        );
-        HapticFeedback.mediumImpact();
-        await Future.delayed(const Duration(milliseconds: 200));
-      }
+      _spinSingleWheel(i);
     }
   }
+
+  Future<void> _spinSingleWheel(int index) async {
+    if (!mounted || !_scrollControllers[index].hasClients) return;
+    
+    // Putar jauh sikit (current + 20 hingga 50 pusingan)
+    int randomRounds = 20 + Random().nextInt(30); 
+    int targetItem = _scrollControllers[index].selectedItem + randomRounds;
+
+    // Roda 1: 1.0 saat
+    // Roda 5: 2.6 saat
+    int duration = 1000 + (index * 400); 
+
+    await _scrollControllers[index].animateToItem(
+      targetItem,
+      duration: Duration(milliseconds: duration),
+      curve: Curves.easeOutBack, // Efek "terlajak sikit" pastu masuk balik (Brake effect)
+    );
+    
+    HapticFeedback.heavyImpact();
+  }
 }
+
 
