@@ -218,38 +218,6 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
 }
 
 // ============================================
-// MODERN SHIELD PAINTER
-// ============================================
-class ModernShieldPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFFF5722)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-
-    final path = Path();
-    
-    path.moveTo(size.width * 0.5, 0);
-    path.lineTo(size.width * 0.85, size.height * 0.25);
-    path.lineTo(size.width * 0.85, size.height * 0.65);
-    path.lineTo(size.width * 0.5, size.height);
-    path.lineTo(size.width * 0.15, size.height * 0.65);
-    path.lineTo(size.width * 0.15, size.height * 0.25);
-    path.close();
-
-    canvas.drawPath(path, paint);
-    
-    paint.style = PaintingStyle.fill;
-    paint.color = const Color(0xFFFF5722).withOpacity(0.1);
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ============================================
 // SUCCESS SCREEN
 // ============================================
 class SuccessScreen extends StatelessWidget {
@@ -484,6 +452,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 25),
                   
+                  // 🔥 INI BAHAGIAN NOMBOR ATAS (SIMON SAYS)
                   VintageFilmChallengeDisplay(controller: _controller),
                   
                   const SizedBox(height: 15),
@@ -500,6 +469,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 10),
                   
+                  // 🔥 INI BAHAGIAN RODA BAWAH (KASINO)
                   ValueListenableBuilder<int>(
                     valueListenable: _controller.randomizeTrigger,
                     builder: (context, trigger, _) {
@@ -601,7 +571,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 }
 
 // ============================================
-// VISUAL: Zig Zag GLITCH (SIMON SAYS)
+// VISUAL: LINKIN PARK GLITCH (SIMON SAYS) - FORCE ACTIVE!
 // ============================================
 class VintageFilmChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
@@ -619,24 +589,26 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
   final Random _random = Random();
   
   // State untuk 'Simon Says' Sequence
-  int _activeGlitchIndex = -1; // -1 maksudnya semua diam
-  List<String> _displayNumbers = ['-', '-', '-', '-', '-'];
+  int _activeGlitchIndex = -1; 
+  List<String> _displayNumbers = ['0', '0', '0', '0', '0']; // Default Placeholder
   Timer? _sequenceTimer;
   
   @override
   void initState() {
     super.initState();
+    // 1. Controller untuk gegaran sentiasa aktif
     _glitchController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100), // Kelip laju
+      duration: const Duration(milliseconds: 80), // Sangat Laju (Linkin Park style)
     )..repeat(reverse: true);
     
+    // 2. Dengar perubahan code
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
-    // Intro Animation
-    if (widget.controller.challengeCode.value.isNotEmpty) {
-      _startSimonSaysSequence();
-    }
+    // 3. FORCE START! Jangan tunggu server. Terus jalan dulu.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+       _startSimonSaysSequence();
+    });
   }
   
   void _onChallengeChanged() {
@@ -647,14 +619,13 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
   
   // 🔥 FUNGSI 'SIMON SAYS' (GLITCH IKUT URUTAN)
   void _startSimonSaysSequence() async {
-    // 1. Reset: Tunjuk sengkang dulu atau nombor lama
     _sequenceTimer?.cancel();
     if (mounted) setState(() => _activeGlitchIndex = 0);
 
+    // Ambil kod sebenar. Kalau kosong, guna dummy dulu supaya animasi nampak
     List<int> targetCode = widget.controller.challengeCode.value;
-    if (targetCode.isEmpty) targetCode = [0,0,0,0,0];
+    if (targetCode.isEmpty) targetCode = [8, 3, 9, 1, 4]; // Dummy sementara
 
-    // 2. Mula Sequence: Glitch dari kiri ke kanan (0 -> 4)
     int step = 0;
     
     _sequenceTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
@@ -670,19 +641,16 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
         }
       });
 
-      // Bunyi 'Beep' Digital setiap kali pindah nombor
       if (step < 5) HapticFeedback.selectionClick();
 
       step++;
 
-      // 3. Tamat Sequence
       if (step > 5) {
         timer.cancel();
         setState(() {
           _activeGlitchIndex = -1; // Stop glitch
           _displayNumbers = targetCode.map((e) => e.toString()).toList();
         });
-        // Bunyi 'Success' bila semua dah tunjuk
         HapticFeedback.heavyImpact();
       }
     });
@@ -702,18 +670,18 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
       margin: const EdgeInsets.symmetric(horizontal: 40),
       padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.8), // Background Gelap
+        color: Colors.black.withOpacity(0.8),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          // Border berkelip ikut status
+          // Border merah masa glitch, cyan masa rehat
           color: _activeGlitchIndex != -1 
-              ? Colors.redAccent.withOpacity(0.8) 
+              ? Colors.redAccent.withOpacity(0.9) 
               : Colors.cyanAccent.withOpacity(0.5), 
           width: 2
         ),
         boxShadow: [
           BoxShadow(
-            color: _activeGlitchIndex != -1 ? Colors.red.withOpacity(0.3) : Colors.cyan.withOpacity(0.2), 
+            color: _activeGlitchIndex != -1 ? Colors.red.withOpacity(0.4) : Colors.cyan.withOpacity(0.2), 
             blurRadius: 20, 
             spreadRadius: 2
           ),
@@ -722,7 +690,6 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(5, (index) {
-          // Logic: Adakah nombor ini sedang di-Glitch-kan?
           bool isGlitching = index == _activeGlitchIndex;
           bool hasRevealed = index < _activeGlitchIndex || _activeGlitchIndex == -1;
           
@@ -735,23 +702,23 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
     );
   }
 
-  // 🔥 WIDGET KHAS: RGB SPLIT TEXT (LINKIN PARK STYLE)
+  // 🔥 RGB SPLIT TEXT (LINKIN PARK STYLE) - LEBIH GANAS
   Widget _buildLinkinParkDigit({required String text, required bool isGlitching}) {
     return AnimatedBuilder(
       animation: _glitchController,
       builder: (context, child) {
-        // Kalau tengah glitch, offset dia ganas (random). Kalau tak, diam (0).
-        double randomX = isGlitching ? (_random.nextDouble() - 0.5) * 6.0 : 0.0;
-        double randomY = isGlitching ? (_random.nextDouble() - 0.5) * 6.0 : 0.0;
+        // Offset lebih besar (8.0) supaya nampak pecah
+        double randomX = isGlitching ? (_random.nextDouble() - 0.5) * 8.0 : 0.0;
+        double randomY = isGlitching ? (_random.nextDouble() - 0.5) * 8.0 : 0.0;
         
-        // RGB Offset (Warna lari)
-        double rX = isGlitching ? 3.0 : 0.0;
-        double bX = isGlitching ? -3.0 : 0.0;
+        // Warna lari jauh sikit
+        double rX = isGlitching ? 4.0 : 0.0;
+        double bX = isGlitching ? -4.0 : 0.0;
 
         return Stack(
           alignment: Alignment.center,
           children: [
-            // Layer 1: RED (Geser Kiri)
+            // Layer 1: RED
             Transform.translate(
               offset: Offset(randomX + rX, randomY),
               child: Text(
@@ -764,7 +731,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
                 ),
               ),
             ),
-            // Layer 2: BLUE (Geser Kanan)
+            // Layer 2: BLUE
             Transform.translate(
               offset: Offset(randomX + bX, randomY),
               child: Text(
@@ -777,7 +744,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
                 ),
               ),
             ),
-            // Layer 3: MAIN (White/Cyan)
+            // Layer 3: MAIN
             Transform.translate(
               offset: Offset(randomX, randomY),
               child: Text(
@@ -786,12 +753,11 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
                   fontSize: 36,
                   fontFamily: 'Courier',
                   fontWeight: FontWeight.w900,
-                  // Kalau glitch: Putih. Kalau dah reveal: Cyan. Kalau belum: Kelabu.
                   color: isGlitching 
                       ? Colors.white 
                       : (text == '-' ? Colors.grey[800] : Colors.cyanAccent),
                   shadows: isGlitching
-                      ? [BoxShadow(color: Colors.white, blurRadius: 10)]
+                      ? [BoxShadow(color: Colors.white, blurRadius: 15)]
                       : [BoxShadow(color: Colors.cyanAccent, blurRadius: 8)],
                 ),
               ),
@@ -827,7 +793,6 @@ class EnterpriseController {
   double _lastMagnitude = 9.8;
   DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
-  Timer? _animationTimer; 
   
   EnterpriseController({
     this.isCompromisedDevice = false,
@@ -857,7 +822,6 @@ class EnterpriseController {
           challengeCode.value = rawCode.map((e) => e as int).toList();
           
           print('✅ Secure Challenge Received: ${challengeCode.value}');
-          print('   Nonce: ${_currentNonce?.substring(0, 16)}...');
         } else {
           throw Exception('Server returned success=false');
         }
@@ -877,7 +841,7 @@ class EnterpriseController {
   }
 
   void randomizeWheels() {
-    randomizeTrigger.value++; // Ini picu glitch kat atas
+    randomizeTrigger.value++; // Ini picu reload widget
     fetchChallengeFromServer(); // Ini tarik data baru
     print('🔀 Trigger Glitch & Fetch New Data');
   }
@@ -917,7 +881,6 @@ class EnterpriseController {
     };
     final sortedJson = json.encode(hashData);
     _boundTransactionHash = sha256.convert(utf8.encode(sortedJson)).toString();
-    print('🔒 Transaction Bound: ${_boundTransactionHash?.substring(0, 16)}...');
   }
 
   Future<void> _sendThreatIntelligence({required String type, required String severity}) async {
@@ -938,7 +901,6 @@ class EnterpriseController {
         return {
           'allowed': true,
           'isPanicMode': true,
-          'verificationToken': 'PANIC_OFFLINE_${DateTime.now().millisecondsSinceEpoch}'
         };
       }
 
@@ -949,7 +911,6 @@ class EnterpriseController {
         return {
           'allowed': true,
           'isPanicMode': false,
-          'verificationToken': 'OFFLINE_${DateTime.now().millisecondsSinceEpoch}'
         };
       } else {
         randomizeWheels();
@@ -986,15 +947,11 @@ class EnterpriseController {
           return {
             'allowed': true,
             'isPanicMode': true,
-            'verificationToken': data['sessionToken'],
-            'riskScore': data['riskScore'],
           };
         } else if (verdict == "APPROVED") {
           return {
             'allowed': true,
             'isPanicMode': false,
-            'verificationToken': data['sessionToken'],
-            'riskScore': data['riskScore'],
             'boundTransactionHash': _boundTransactionHash
           };
         }
@@ -1014,7 +971,6 @@ class EnterpriseController {
   void dispose() {
     _accelSub?.cancel();
     _decayTimer?.cancel();
-    _animationTimer?.cancel();
     motionScore.dispose();
     touchScore.dispose();
     patternScore.dispose();
@@ -1024,7 +980,7 @@ class EnterpriseController {
 }
 
 // ============================================
-// CRYPTEX LOCK (RODA INTERAKTIF - CASINO EDITION)
+// CRYPTEX LOCK (RODA BAWAH: CASINO STYLE)
 // ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
@@ -1074,15 +1030,11 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void initState() {
     super.initState();
     
-    // 1. Setup Controllers
     _scrollControllers = List.generate(
       5,
-      (i) => FixedExtentScrollController(
-        initialItem: _random.nextInt(10),
-      ),
+      (i) => FixedExtentScrollController(initialItem: _random.nextInt(10)),
     );
     
-    // 2. Setup Drift Animation
     _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
       if (mounted && _activeWheelIndex == null) {
         setState(() {
@@ -1096,17 +1048,14 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       }
     });
     
-    // 3. Setup Opacity Animation
     _opacityControllers = List.generate(5, (i) {
       final controller = AnimationController(
         vsync: this,
         duration: Duration(milliseconds: 1800 + (_random.nextInt(400))),
       );
-      
       Future.delayed(Duration(milliseconds: _random.nextInt(1000)), () {
         if (mounted) controller.repeat(reverse: true);
       });
-      
       return controller;
     });
     
@@ -1116,7 +1065,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       );
     }).toList();
 
-    // 🔥 4. INTRO ANIMATION: Pusing roda sebaik sahaja widget dibina
+    // 🔥 AUTO START RODA BAWAH (INTRO)
     WidgetsBinding.instance.addPostFrameCallback((_) {
        _playSlotMachineAnimation(); 
     });
@@ -1124,12 +1073,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   @override
   void dispose() {
-    for (var controller in _scrollControllers) {
-      controller.dispose();
-    }
-    for (var controller in _opacityControllers) {
-      controller.dispose();
-    }
+    for (var c in _scrollControllers) c.dispose();
+    for (var c in _opacityControllers) c.dispose();
     _wheelActiveTimer?.cancel();
     _driftTimer.cancel();
     super.dispose();
@@ -1145,26 +1090,19 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void _onWheelScrollEnd(int index) {
     _wheelActiveTimer?.cancel();
     _wheelActiveTimer = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        setState(() => _activeWheelIndex = null);
-      }
+      if (mounted) setState(() => _activeWheelIndex = null);
     });
   }
 
   Future<void> _onButtonTap() async {
     setState(() => _isButtonPressed = true);
     HapticFeedback.mediumImpact();
-    
     await Future.delayed(const Duration(milliseconds: 100));
-    
-    if (mounted) {
-      setState(() => _isButtonPressed = false);
-    }
+    if (mounted) setState(() => _isButtonPressed = false);
     
     List<int> currentCode = [];
     for (var controller in _scrollControllers) {
-      int selectedIndex = controller.selectedItem;
-      currentCode.add(selectedIndex % 10);
+      currentCode.add(controller.selectedItem % 10);
     }
     
     final result = await widget.controller.verify(currentCode);
@@ -1173,22 +1111,16 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       widget.onSuccess(result['isPanicMode'] ?? false);
     } else {
       widget.onFail();
-      // 🔥 SALAH PASSWORD: Pusing semula!
+      // 🔥 SALAH PASS: PUSING LAGI
       await _playSlotMachineAnimation();
     }
   }
 
-  // 🔥🔥🔥 ENGINE SLOT MACHINE (KASINO STYLE V2) 🔥🔥🔥
-  // Ini beza dengan yang tadi. Yang ni pusing laju sekata, baru berhenti mengejut.
+  // 🔥 ENGINE SLOT MACHINE (KASINO)
   Future<void> _playSlotMachineAnimation() async {
-    // 1. Pusingkan SEMUA roda serentak (Laju & Lama)
-    // Ini meniru gaya mesin slot yang sedang 'rolling'
+    // 1. Pusing serentak (Laju)
     for (int i = 0; i < 5; i++) {
       if (!mounted) continue;
-      
-      // Kita suruh dia pusing ke sasaran yang SANGAT JAUH (+500 item)
-      // Duration 10 saat (tapi kita akan potong nanti)
-      // Curve Linear supaya kelajuan dia sekata (tak perlahan)
       _scrollControllers[i].animateToItem(
         _scrollControllers[i].selectedItem + 500, 
         duration: const Duration(seconds: 10), 
@@ -1196,11 +1128,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       );
     }
 
-    // 2. Berhentikan satu per satu (Waterfall Snap)
+    // 2. Berhenti satu per satu (Waterfall Snap)
     for (int i = 0; i < 5; i++) {
-      // Roda 1 berhenti lepas 0.5s, Roda 2 lepas 1.0s, dst...
       int stopDelay = 500 + (i * 500); 
-      
       Future.delayed(Duration(milliseconds: stopDelay), () {
         if(mounted) _stopWheelAtRandom(i);
       });
@@ -1209,22 +1139,15 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   Future<void> _stopWheelAtRandom(int index) async {
     if (!mounted) return;
-
-    // Ambil posisi semasa (yang sedang laju pusing)
     int currentItem = _scrollControllers[index].selectedItem;
-    
-    // Tambah sikit je lagi (10-20 item) untuk pendaratan
     int targetItem = currentItem + 20 + Random().nextInt(10); 
 
-    // FORCE STOP dengan efek 'Sentak' (EaseOutBack)
-    // Ini yang bagi bunyi "KTAK!" dan visual "terlajak sikit masuk balik"
+    // FORCE STOP (KTAK!)
     await _scrollControllers[index].animateToItem(
       targetItem,
       duration: const Duration(milliseconds: 800), 
       curve: Curves.easeOutBack, 
     );
-    
-    // Bunyi impak besi
     HapticFeedback.heavyImpact();
   }
 
@@ -1255,7 +1178,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                   },
                 ),
               ),
-
               ..._buildWheelOverlays(availableWidth, calculatedHeight),
               _buildGlowingButton(availableWidth, calculatedHeight),
             ],
@@ -1267,7 +1189,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight) {
     List<Widget> overlays = [];
-
     for (int i = 0; i < wheelCoords.length; i++) {
       double left = wheelCoords[i][0];
       double top = wheelCoords[i][1];
@@ -1301,7 +1222,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         ),
       );
     }
-
     return overlays;
   }
 
@@ -1326,7 +1246,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         childDelegate: ListWheelChildBuilderDelegate(
           builder: (context, wheelIndex) {
             int displayNumber = wheelIndex % 10;
-            
             return Center(
               child: AnimatedBuilder(
                 animation: _opacityAnimations[index],
@@ -1344,14 +1263,10 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                           style: TextStyle(
                             fontSize: wheelHeight * 0.30,
                             fontWeight: FontWeight.w900,
-                            color: isActive 
-                                ? const Color(0xFFFF5722)
-                                : const Color(0xFF263238),
+                            color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
                             height: 1.0,
                             shadows: isActive
-                                ? [
-                                    Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20),
-                                  ]
+                                ? [Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20)]
                                 : [
                                     Shadow(offset: const Offset(1, 1), blurRadius: 1, color: Colors.white.withOpacity(0.4)),
                                     Shadow(offset: const Offset(-1, -1), blurRadius: 1, color: Colors.black.withOpacity(0.6)),
