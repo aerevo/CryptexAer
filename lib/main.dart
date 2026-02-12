@@ -633,42 +633,37 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
     if (widget.controller.challengeCode.value.isNotEmpty) {
-      _playVintageFilmAnimation();
-    }
-  }
-  
-  void _onChallengeChanged() {
-    if (mounted) {
-      _playVintageFilmAnimation();
-    }
-  }
-  
+      // 🔥 INI UNTUK NOMBOR ATAS (CHALLENGE)
+  // Bila refresh, dia berkelip laju (Glitch visual)
   void _playVintageFilmAnimation() async {
     setState(() => _isRolling = true);
     
     _filmTimer?.cancel();
-    _filmTimer = Timer.periodic(const Duration(milliseconds: 35), (_) {
+    // Timer laju 30ms (Sangat laju!)
+    _filmTimer = Timer.periodic(const Duration(milliseconds: 30), (_) {
       if (mounted) {
         setState(() {
+          // Paparkan nombor sampah rawak
           _scrambledNumbers = List.generate(5, (_) => _random.nextInt(10).toString());
+          // Gegar skrin atas bawah sikit
+          _verticalShake = (_random.nextDouble() - 0.5) * 5.0;
         });
       }
     });
     
-    await Future.delayed(const Duration(milliseconds: 850));
+    // Biarkan dia 'menggila' selama 1.5 saat
+    await Future.delayed(const Duration(milliseconds: 1500));
+    
     _filmTimer?.cancel();
     
-    if (mounted) {
-      _filmController.forward(from: 0.0);
-    }
-    
-    await Future.delayed(const Duration(milliseconds: 400));
-    
+    // Tunjukkan nombor sebenar & Reset gegaran
     if (mounted) {
       setState(() {
         _isRolling = false;
         _verticalShake = 0.0;
       });
+      // Efek visual 'masuk'
+      _filmController.forward(from: 0.0);
     }
   }
   
@@ -1368,31 +1363,35 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
+  // 🔥 INI UNTUK RODA BAWAH (INTERACTIVE WHEELS)
+  // Bila salah, dia pusing macam mesin judi
   Future<void> _playSlotMachineAnimation() async {
+    // Pusingkan semua 5 roda serentak
     for (int i = 0; i < 5; i++) {
-      _spinSingleWheel(i);
+      _spinWheel(i);
     }
   }
 
-  Future<void> _spinSingleWheel(int index) async {
-    if (!mounted || !_scrollControllers[index].hasClients) return;
-    
-    // Putar jauh sikit (current + 20 hingga 50 pusingan)
-    int randomRounds = 20 + Random().nextInt(30); 
-    int targetItem = _scrollControllers[index].selectedItem + randomRounds;
+  Future<void> _spinWheel(int index) async {
+    if (!mounted) return;
 
-    // Roda 1: 1.0 saat
-    // Roda 5: 2.6 saat
-    int duration = 1000 + (index * 400); 
+    // 1. Kira sasaran jauh ke bawah (supaya nampak pusing banyak kali)
+    // Current Position + (20 hingga 40 pusingan tambahan)
+    int randomSpin = 20 + Random().nextInt(20);
+    int targetItem = _scrollControllers[index].selectedItem + randomSpin;
 
+    // 2. Tempoh masa berbeza (Waterfall effect)
+    // Roda 1 berhenti dulu, Roda 5 berhenti paling lambat
+    int duration = 1000 + (index * 300); // 1s, 1.3s, 1.6s...
+
+    // 3. Gerakkan RODA FIZIKAL (ScrollController)
     await _scrollControllers[index].animateToItem(
       targetItem,
       duration: Duration(milliseconds: duration),
-      curve: Curves.easeOutBack, // Efek "terlajak sikit" pastu masuk balik (Brake effect)
+      curve: Curves.easeOutBack, // Efek lajak sikit bila berhenti
     );
     
+    // 4. Bunyi 'Ktak!' bila berhenti
     HapticFeedback.heavyImpact();
   }
 }
-
-
