@@ -600,13 +600,12 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     with SingleTickerProviderStateMixin {
   
   late AnimationController _animController;
-  late Animation<double> _staticAnimation;
-  late Animation<double> _emergeAnimation;
+  late Animation<double> _glitchAnimation;
   
   final Random _random = Random();
-  List<String> _staticNumbers = [];
-  Timer? _staticTimer;
-  bool _showingStatic = true;
+  List<String> _glitchNumbers = [];
+  Timer? _glitchTimer;
+  bool _isGlitching = true;
   
   @override
   void initState() {
@@ -614,65 +613,55 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 1500),
     );
     
-    _staticAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animController,
-        curve: const Interval(0.0, 0.4, curve: Curves.easeIn),
-      ),
-    );
-    
-    _emergeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animController,
-        curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
-      ),
+    _glitchAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
     );
     
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
     if (widget.controller.challengeCode.value.isNotEmpty) {
-      _playEmergenceAnimation();
+      _playGlitchAnimation();
     }
   }
   
   void _onChallengeChanged() {
     if (mounted) {
-      _playEmergenceAnimation();
+      _playGlitchAnimation();
     }
   }
   
-  void _playEmergenceAnimation() async {
-    setState(() => _showingStatic = true);
+  void _playGlitchAnimation() async {
+    setState(() => _isGlitching = true);
     
-    _staticTimer?.cancel();
-    _staticTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+    _glitchTimer?.cancel();
+    _glitchTimer = Timer.periodic(const Duration(milliseconds: 40), (_) {
       if (mounted) {
         setState(() {
-          _staticNumbers = List.generate(5, (_) => _random.nextInt(10).toString());
+          _glitchNumbers = List.generate(5, (_) => _random.nextInt(10).toString());
         });
       }
     });
     
-    await Future.delayed(const Duration(milliseconds: 700));
-    _staticTimer?.cancel();
+    await Future.delayed(const Duration(milliseconds: 600));
+    _glitchTimer?.cancel();
     
     if (mounted) {
       _animController.forward(from: 0.0);
     }
     
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 200));
     
     if (mounted) {
-      setState(() => _showingStatic = false);
+      setState(() => _isGlitching = false);
     }
   }
   
   @override
   void dispose() {
-    _staticTimer?.cancel();
+    _glitchTimer?.cancel();
     _animController.dispose();
     widget.controller.challengeCode.removeListener(_onChallengeChanged);
     super.dispose();
@@ -681,8 +670,8 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 40),
-      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+      margin: const EdgeInsets.symmetric(horizontal: 50),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.7),
         borderRadius: BorderRadius.circular(12),
@@ -699,7 +688,7 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
             builder: (context, code, _) {
               if (code.isEmpty) {
                 return const SizedBox(
-                  height: 45,
+                  height: 38,
                   child: Center(
                     child: CircularProgressIndicator(
                       color: Colors.orangeAccent,
@@ -709,46 +698,44 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
                 );
               }
               
-              List<String> displayNumbers = _showingStatic 
-                  ? _staticNumbers 
+              List<String> displayNumbers = _isGlitching 
+                  ? _glitchNumbers 
                   : code.map((e) => e.toString()).toList();
               
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  displayNumbers.length > 5 ? 5 : displayNumbers.length,
-                  (index) {
-                    double stagger = index * 0.15;
-                    
-                    double opacity = _showingStatic 
-                        ? (_staticAnimation.value * 0.5)
-                        : ((_emergeAnimation.value - stagger).clamp(0.0, 1.0));
-                    
-                    double yOffset = _showingStatic 
-                        ? 0 
-                        : (1.0 - (_emergeAnimation.value - stagger).clamp(0.0, 1.0)) * 30;
-                    
-                    return Transform.translate(
-                      offset: Offset(0, yOffset),
-                      child: Opacity(
-                        opacity: opacity.clamp(0.0, 1.0),
+              return SizedBox(
+                height: 38,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: List.generate(
+                    displayNumbers.length > 5 ? 5 : displayNumbers.length,
+                    (index) {
+                      double opacity = _isGlitching 
+                          ? (_random.nextDouble() * 0.5 + 0.3)
+                          : 1.0;
+                      
+                      return Opacity(
+                        opacity: opacity,
                         child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: 28,
+                          alignment: Alignment.center,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
                           child: Text(
                             displayNumbers.length > index ? displayNumbers[index] : '0',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: _showingStatic 
-                                  ? Colors.greenAccent.withOpacity(0.8)
+                              color: _isGlitching 
+                                  ? Colors.greenAccent.withOpacity(0.9)
                                   : Colors.white,
-                              fontSize: 32,
+                              fontSize: 28,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'Courier',
-                              shadows: _showingStatic
+                              height: 1.0,
+                              shadows: _isGlitching
                                   ? [
                                       BoxShadow(
-                                        color: Colors.green.withOpacity(0.6),
-                                        blurRadius: 12,
+                                        color: Colors.green.withOpacity(0.7),
+                                        blurRadius: 15,
                                       ),
                                     ]
                                   : [
@@ -761,9 +748,9 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               );
             },
@@ -1219,72 +1206,72 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       onTapUp: (_) => _onWheelScrollEnd(index),
       onTapCancel: () => _onWheelScrollEnd(index),
       behavior: HitTestBehavior.opaque,
-      child: Stack(
-        children: [
-          ListWheelScrollView.useDelegate(
-            controller: _scrollControllers[index],
-            itemExtent: itemExtent,
-            perspective: 0.001,
-            diameterRatio: 2.0,
-            physics: const BouncingScrollPhysics(),
-            onSelectedItemChanged: (_) {
-              HapticFeedback.selectionClick();
-            },
-            childDelegate: ListWheelChildBuilderDelegate(
-              builder: (context, wheelIndex) {
-                int displayNumber = wheelIndex % 10;
-                
-                return Center(
-                  child: AnimatedBuilder(
-                    animation: _opacityAnimations[index],
-                    builder: (context, child) {
-                      return Transform.translate(
-                        offset: isActive ? Offset.zero : _textDriftOffsets[index],
-                        child: Opacity(
-                          opacity: isActive ? 1.0 : _opacityAnimations[index].value,
-                          child: Text(
-                            '$displayNumber',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: wheelHeight * 0.30,
-                              fontWeight: FontWeight.w900,
-                              color: isActive 
-                                  ? const Color(0xFFFF5722)
-                                  : const Color(0xFF263238),
-                              shadows: isActive
-                                  ? [
-                                      Shadow(
-                                        color: const Color(0xFFFF5722).withOpacity(0.8),
-                                        blurRadius: 20,
-                                      ),
-                                      Shadow(
-                                        color: const Color(0xFFFF5722).withOpacity(0.5),
-                                        blurRadius: 40,
-                                      ),
-                                    ]
-                                  : [
-                                      Shadow(
-                                        offset: const Offset(1, 1),
-                                        blurRadius: 1,
-                                        color: Colors.white.withOpacity(0.4),
-                                      ),
-                                      Shadow(
-                                        offset: const Offset(-1, -1),
-                                        blurRadius: 1,
-                                        color: Colors.black.withOpacity(0.6),
-                                      ),
-                                    ],
-                            ),
+      child: ListWheelScrollView.useDelegate(
+        controller: _scrollControllers[index],
+        itemExtent: itemExtent,
+        perspective: 0.001,
+        diameterRatio: 2.0,
+        physics: const BouncingScrollPhysics(),
+        onSelectedItemChanged: (_) {
+          HapticFeedback.selectionClick();
+        },
+        childDelegate: ListWheelChildBuilderDelegate(
+          builder: (context, wheelIndex) {
+            int displayNumber = wheelIndex % 10;
+            
+            return Center(
+              child: AnimatedBuilder(
+                animation: _opacityAnimations[index],
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: isActive ? Offset.zero : _textDriftOffsets[index],
+                    child: Opacity(
+                      opacity: isActive ? 1.0 : _opacityAnimations[index].value,
+                      child: SizedBox(
+                        width: wheelHeight * 0.35,
+                        child: Text(
+                          '$displayNumber',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: wheelHeight * 0.30,
+                            fontWeight: FontWeight.w900,
+                            color: isActive 
+                                ? const Color(0xFFFF5722)
+                                : const Color(0xFF263238),
+                            height: 1.0,
+                            shadows: isActive
+                                ? [
+                                    Shadow(
+                                      color: const Color(0xFFFF5722).withOpacity(0.8),
+                                      blurRadius: 20,
+                                    ),
+                                    Shadow(
+                                      color: const Color(0xFFFF5722).withOpacity(0.5),
+                                      blurRadius: 40,
+                                    ),
+                                  ]
+                                : [
+                                    Shadow(
+                                      offset: const Offset(1, 1),
+                                      blurRadius: 1,
+                                      color: Colors.white.withOpacity(0.4),
+                                    ),
+                                    Shadow(
+                                      offset: const Offset(-1, -1),
+                                      blurRadius: 1,
+                                      color: Colors.black.withOpacity(0.6),
+                                    ),
+                                  ],
                           ),
                         ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
