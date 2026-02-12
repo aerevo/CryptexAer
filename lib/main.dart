@@ -1023,7 +1023,7 @@ class EnterpriseController {
   }
 }
 
-  // ============================================
+// ============================================
 // CRYPTEX LOCK (RODA INTERAKTIF - CASINO EDITION)
 // ============================================
 class CryptexLock extends StatefulWidget {
@@ -1178,7 +1178,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     }
   }
 
-  // 🔥🔥🔥 ENGINE SLOT MACHINE (KASINO STYLE) 🔥🔥🔥
+  // 🔥🔥🔥 ENGINE SLOT MACHINE (KASINO STYLE V2) 🔥🔥🔥
+  // Ini beza dengan yang tadi. Yang ni pusing laju sekata, baru berhenti mengejut.
   Future<void> _playSlotMachineAnimation() async {
     // 1. Pusingkan SEMUA roda serentak (Laju & Lama)
     // Ini meniru gaya mesin slot yang sedang 'rolling'
@@ -1408,78 +1409,3 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
-
-  Widget _buildGlowingButton(double screenWidth, double screenHeight) {
-    double left = buttonCoords[0];
-    double top = buttonCoords[1];
-    double right = buttonCoords[2];
-    double bottom = buttonCoords[3];
-
-    double actualLeft = screenWidth * (left / imageWidth);
-    double actualTop = screenHeight * (top / imageHeight);
-    double actualWidth = screenWidth * ((right - left) / imageWidth);
-    double actualHeight = screenHeight * ((bottom - top) / imageHeight);
-
-    return Positioned(
-      left: actualLeft,
-      top: actualTop,
-      width: actualWidth,
-      height: actualHeight,
-      child: GestureDetector(
-        onTap: _onButtonTap,
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          children: [
-            Container(color: Colors.transparent),
-            if (_isButtonPressed)
-              IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFFFF5722).withOpacity(0.6), blurRadius: 30, spreadRadius: 5),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-  // 🔥 INI UNTUK RODA BAWAH (INTERACTIVE WHEELS)
-  // Bila salah, dia pusing macam mesin judi
-  Future<void> _playSlotMachineAnimation() async {
-    // Pusingkan semua 5 roda serentak
-    for (int i = 0; i < 5; i++) {
-      _spinWheel(i);
-    }
-  }
-
-  Future<void> _spinWheel(int index) async {
-    if (!mounted) return;
-
-    // 1. Kira sasaran jauh ke bawah (supaya nampak pusing banyak kali)
-    // Current Position + (20 hingga 40 pusingan tambahan)
-    int randomSpin = 20 + Random().nextInt(20);
-    int targetItem = _scrollControllers[index].selectedItem + randomSpin;
-
-    // 2. Tempoh masa berbeza (Waterfall effect)
-    // Roda 1 berhenti dulu, Roda 5 berhenti paling lambat
-    int duration = 1000 + (index * 300); // 1s, 1.3s, 1.6s...
-
-    // 3. Gerakkan RODA FIZIKAL (ScrollController)
-    await _scrollControllers[index].animateToItem(
-      targetItem,
-      duration: Duration(milliseconds: duration),
-      curve: Curves.easeOutBack, // Efek lajak sikit bila berhenti
-    );
-    
-    // 4. Bunyi 'Ktak!' bila berhenti
-    HapticFeedback.heavyImpact();
-  }
-}
-
-
