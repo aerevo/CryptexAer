@@ -1,9 +1,9 @@
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:math';
-import 'dart:convert';  // For JSON encoding
-import 'dart:typed_data';  // For Uint8List
-import 'package:crypto/crypto.dart';  // For SHA256
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -38,9 +38,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ============================================
-// SECURITY PRE-CHECK
-// ============================================
 class SecurityCheckScreen extends StatefulWidget {
   const SecurityCheckScreen({super.key});
 
@@ -85,7 +82,6 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
     setState(() => _status = "Verifying server connection...");
     await Future.delayed(const Duration(milliseconds: 500));
     
-    // Simulate ping
     await Future.delayed(const Duration(milliseconds: 300));
     
     setState(() => _status = "✅ Security verified");
@@ -217,9 +213,6 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
   }
 }
 
-// ============================================
-// MODERN SHIELD PAINTER
-// ============================================
 class ModernShieldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -249,9 +242,6 @@ class ModernShieldPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ============================================
-// SUCCESS SCREEN
-// ============================================
 class SuccessScreen extends StatelessWidget {
   final String message;
   final bool isPanicMode;
@@ -319,9 +309,6 @@ class SuccessScreen extends StatelessWidget {
   }
 }
 
-// ============================================
-// MAIN LOCK SCREEN
-// ============================================
 class ZKineticLockScreen extends StatefulWidget {
   final bool isCompromisedDevice;
   final Position? deviceLocation;
@@ -576,7 +563,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     );
   }
 
-
   Widget _buildStatusItem(IconData icon, String label, double score) {
     bool isActive = score > 0.15;
     return Column(
@@ -601,7 +587,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
   }
 }
 
-// THE RING / X-FILES ANIMATION
 class RingStyleChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
   
@@ -615,6 +600,7 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     with SingleTickerProviderStateMixin {
   
   late AnimationController _animController;
+  late Animation<double> _staticAnimation;
   late Animation<double> _emergeAnimation;
   
   final Random _random = Random();
@@ -628,11 +614,21 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1300),
+      duration: const Duration(milliseconds: 2000),
+    );
+    
+    _staticAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animController,
+        curve: const Interval(0.0, 0.4, curve: Curves.easeIn),
+      ),
     );
     
     _emergeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+      CurvedAnimation(
+        parent: _animController,
+        curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
+      ),
     );
     
     widget.controller.challengeCode.addListener(_onChallengeChanged);
@@ -643,7 +639,9 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   }
   
   void _onChallengeChanged() {
-    _playEmergenceAnimation();
+    if (mounted) {
+      _playEmergenceAnimation();
+    }
   }
   
   void _playEmergenceAnimation() async {
@@ -661,10 +659,15 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
     await Future.delayed(const Duration(milliseconds: 700));
     _staticTimer?.cancel();
     
-    _animController.forward(from: 0.0);
+    if (mounted) {
+      _animController.forward(from: 0.0);
+    }
     
     await Future.delayed(const Duration(milliseconds: 300));
-    setState(() => _showingStatic = false);
+    
+    if (mounted) {
+      setState(() => _showingStatic = false);
+    }
   }
   
   @override
@@ -679,7 +682,7 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 40),
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.7),
         borderRadius: BorderRadius.circular(12),
@@ -696,8 +699,13 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
             builder: (context, code, _) {
               if (code.isEmpty) {
                 return const SizedBox(
-                  height: 50,
-                  child: Center(child: CircularProgressIndicator(color: Colors.orangeAccent, strokeWidth: 2)),
+                  height: 45,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.orangeAccent,
+                      strokeWidth: 2,
+                    ),
+                  ),
                 );
               }
               
@@ -707,40 +715,56 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
               
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(displayNumbers.length, (index) {
-                  double stagger = index * 0.15;
-                  double opacity = _showingStatic 
-                      ? 0.4 
-                      : ((_emergeAnimation.value - stagger).clamp(0.0, 1.0));
-                  
-                  double yOffset = _showingStatic 
-                      ? 0 
-                      : (1.0 - (_emergeAnimation.value - stagger).clamp(0.0, 1.0)) * 30;
-                  
-                  return Transform.translate(
-                    offset: Offset(0, yOffset),
-                    child: Opacity(
-                      opacity: opacity.clamp(0.0, 1.0),
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 5),
-                        child: Text(
-                          displayNumbers.length > index ? displayNumbers[index] : '0',
-                          style: TextStyle(
-                            color: _showingStatic 
-                                ? Colors.greenAccent.withOpacity(0.6)
-                                : Colors.white,
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Courier',
-                            shadows: _showingStatic
-                                ? [BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 10)]
-                                : [const BoxShadow(color: Colors.orange, blurRadius: 15, spreadRadius: 3)],
+                children: List.generate(
+                  displayNumbers.length > 5 ? 5 : displayNumbers.length,
+                  (index) {
+                    double stagger = index * 0.15;
+                    
+                    double opacity = _showingStatic 
+                        ? (_staticAnimation.value * 0.5)
+                        : ((_emergeAnimation.value - stagger).clamp(0.0, 1.0));
+                    
+                    double yOffset = _showingStatic 
+                        ? 0 
+                        : (1.0 - (_emergeAnimation.value - stagger).clamp(0.0, 1.0)) * 30;
+                    
+                    return Transform.translate(
+                      offset: Offset(0, yOffset),
+                      child: Opacity(
+                        opacity: opacity.clamp(0.0, 1.0),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          child: Text(
+                            displayNumbers.length > index ? displayNumbers[index] : '0',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _showingStatic 
+                                  ? Colors.greenAccent.withOpacity(0.8)
+                                  : Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Courier',
+                              shadows: _showingStatic
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.green.withOpacity(0.6),
+                                        blurRadius: 12,
+                                      ),
+                                    ]
+                                  : [
+                                      const BoxShadow(
+                                        color: Colors.orange,
+                                        blurRadius: 15,
+                                        spreadRadius: 3,
+                                      ),
+                                    ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
               );
             },
           );
@@ -750,9 +774,6 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   }
 }
 
-// ============================================
-// ENTERPRISE CONTROLLER
-// ============================================
 class EnterpriseController {
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
   String? _currentNonce;
@@ -851,7 +872,7 @@ class EnterpriseController {
   }
 
   void registerTouch() => touchScore.value = Random().nextDouble() * 0.3 + 0.7;
-  void registerScroll() => patternScore.value = 0.8; 
+  void registerScroll() => patternScore.value = 0.8;
 
   void bindTransaction(Map<String, dynamic> transactionDetails) {
     _boundTransactionDetails = transactionDetails;
@@ -968,9 +989,6 @@ class EnterpriseController {
   }
 }
 
-// ============================================
-// CRYPTEX LOCK
-// ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
   final Function(bool isPanicMode) onSuccess;
@@ -1320,7 +1338,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 
-  // Slot Machine Animation (Req 6)
   Future<void> _playSlotMachineAnimation() async {
     for (int i = 0; i < 5; i++) {
       if (mounted && _scrollControllers[i].hasClients) {
