@@ -1,4 +1,3 @@
-// Production build - ZERO user ping!
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:math';
@@ -98,57 +97,58 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
   }
 
   Future<void> _requestLocationAndProceed() async {
-    setState(() => _status = "Requesting location...");
-    
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
+      setState(() => _status = "📍 Requesting location...");
       
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      
-      if (permission == LocationPermission.denied || 
-          permission == LocationPermission.deniedForever) {
-        setState(() {
-          _status = "⛔ Location required for rooted devices";
-        });
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _status = "❌ Location services disabled");
         return;
       }
-      
-      setState(() => _status = "Capturing location...");
-      _capturedLocation = await Geolocator.getCurrentPosition(
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _status = "❌ Location permission denied");
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() => _status = "❌ Location permission permanently denied");
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+
+      setState(() {
+        _capturedLocation = position;
+        _status = "✅ Location captured";
+      });
+
+      await Future.delayed(const Duration(milliseconds: 500));
       
-      await _logRootedDeviceAccess();
-      
-      setState(() => _status = "✅ Location verified");
-      await Future.delayed(const Duration(milliseconds: 1000));
-      
-      _proceedToMainScreen(isCompromised: true);
-      
+      if (mounted) {
+        _proceedToMainScreen();
+      }
     } catch (e) {
-      setState(() => _status = "❌ Location failed: $e");
+      setState(() => _status = "❌ Location error: $e");
     }
   }
 
-  Future<void> _logRootedDeviceAccess() async {
-    print('📍 Rooted access: ${_capturedLocation?.latitude}, ${_capturedLocation?.longitude}');
-    await Future.delayed(const Duration(milliseconds: 500));
-  }
-
-  void _proceedToMainScreen({bool isCompromised = false}) {
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ZKineticLockScreen(
-            isCompromisedDevice: isCompromised,
-            deviceLocation: _capturedLocation,
-          ),
+  void _proceedToMainScreen() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ZKineticLockScreen(
+          isCompromisedDevice: _isRooted || _isDeveloperMode,
+          deviceLocation: _capturedLocation,
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -156,107 +156,61 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                (_isRooted || _isDeveloperMode) ? Icons.warning_amber_rounded : Icons.shield,
-                color: (_isRooted || _isDeveloperMode) ? Colors.orange : const Color(0xFFFF5722),
-                size: 80,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.shield, size: 80, color: Color(0xFFFF5722)),
+            const SizedBox(height: 20),
+            Text(
+              _status,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            if (_needsLocationConsent && !_checkComplete) ...[
+              const SizedBox(height: 40),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  border: Border.all(color: Colors.orange, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, size: 50, color: Colors.orange),
+                    const SizedBox(height: 15),
+                    const Text(
+                      'Perangkat Tidak Selamat',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Untuk melanjutkan dengan perangkat yang dikompromikan, kami perlu lokasi peranti anda (satu kali).',
+                      style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _requestLocationAndProceed,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                      ),
+                      child: const Text(
+                        'Berikan Izin Lokasi',
+                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              
-              const SizedBox(height: 30),
-              
-              Text(
-                _status,
-                style: TextStyle(
-                  color: (_isRooted || _isDeveloperMode) ? Colors.orange : Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              
-              const SizedBox(height: 20),
-              
-              if (!_checkComplete && !_needsLocationConsent)
-                const SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: CircularProgressIndicator(
-                    color: Color(0xFFFF5722),
-                    strokeWidth: 3,
-                  ),
-                ),
-              
-              if (_needsLocationConsent) ...[
-                const SizedBox(height: 30),
-                
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.developer_mode, color: Colors.orange, size: 40),
-                      const SizedBox(height: 16),
-                      
-                      Text(
-                        _isDeveloperMode ? 'DEVELOPER MODE' : 'ROOTED DEVICE',
-                        style: const TextStyle(
-                          color: Colors.orange,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      const Text(
-                        'Sila matikan Developer Options. Untuk keselamatan, '
-                        'kami perlu lokasi peranti anda (satu kali).',
-                        style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
-                        textAlign: TextAlign.center,
-                      ),
-                      
-                      const SizedBox(height: 24),
-                      
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => SystemNavigator.pop(),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white70,
-                                side: const BorderSide(color: Colors.white30),
-                              ),
-                              child: const Text('BATAL'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _requestLocationAndProceed,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.black,
-                              ),
-                              child: const Text('TERUSKAN', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -264,7 +218,7 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
 }
 
 // ============================================
-// PAINTERS & WIDGETS
+// MODERN SHIELD PAINTER
 // ============================================
 class ModernShieldPainter extends CustomPainter {
   @override
@@ -272,42 +226,32 @@ class ModernShieldPainter extends CustomPainter {
     final paint = Paint()
       ..color = const Color(0xFFFF5722)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    final w = size.width;
-    final h = size.height;
+      ..strokeWidth = 2.5;
 
     final path = Path();
-    path.moveTo(w * 0.5, 0);
-    path.lineTo(w * 0.9, h * 0.25);
-    path.lineTo(w * 0.9, h * 0.6);
-    path.lineTo(w * 0.5, h * 0.95);
-    path.lineTo(w * 0.1, h * 0.6);
-    path.lineTo(w * 0.1, h * 0.25);
+    
+    path.moveTo(size.width * 0.5, 0);
+    path.lineTo(size.width * 0.85, size.height * 0.25);
+    path.lineTo(size.width * 0.85, size.height * 0.65);
+    path.lineTo(size.width * 0.5, size.height);
+    path.lineTo(size.width * 0.15, size.height * 0.65);
+    path.lineTo(size.width * 0.15, size.height * 0.25);
     path.close();
 
     canvas.drawPath(path, paint);
-
-    final accentPaint = Paint()
-      ..color = const Color(0xFFFF5722).withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-
-    final innerPath = Path();
-    innerPath.moveTo(w * 0.5, h * 0.15);
-    innerPath.lineTo(w * 0.75, h * 0.35);
-    innerPath.lineTo(w * 0.75, h * 0.55);
-    innerPath.lineTo(w * 0.5, h * 0.75);
-    innerPath.lineTo(w * 0.25, h * 0.55);
-    innerPath.lineTo(w * 0.25, h * 0.35);
-    innerPath.close();
-
-    canvas.drawPath(innerPath, accentPaint);
+    
+    paint.style = PaintingStyle.fill;
+    paint.color = const Color(0xFFFF5722).withOpacity(0.1);
+    canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+// ============================================
+// SUCCESS SCREEN
+// ============================================
 class SuccessScreen extends StatelessWidget {
   final String message;
   final bool isPanicMode;
@@ -321,74 +265,54 @@ class SuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: isPanicMode 
-          ? const Color(0xFF455A64)
-          : const Color(0xFF4CAF50),
+      backgroundColor: Colors.black,
       body: Center(
-        child: Container(
-          margin: const EdgeInsets.all(40),
-          padding: const EdgeInsets.all(48),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 40,
-                offset: const Offset(0, 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isPanicMode ? Icons.warning_amber_rounded : Icons.check_circle,
+              size: 100,
+              color: isPanicMode ? Colors.orange : Colors.greenAccent,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              style: TextStyle(
+                color: isPanicMode ? Colors.orange : Colors.greenAccent,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: Color(0xFF4CAF50),
-                  size: 70,
-                ),
-              ),
-              const SizedBox(height: 40),
-              Text(
-                isPanicMode ? 'SYSTEM READY' : 'IDENTITY VERIFIED',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.green[700],
-                  letterSpacing: 1,
-                ),
-                textAlign: TextAlign.center,
-              ),
+            ),
+            if (isPanicMode) ...[
               const SizedBox(height: 10),
-              if (isPanicMode)
-                const Text(
-                  "Safe mode protocol active",
-                  style: TextStyle(
-                    color: Colors.black54,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              const SizedBox(height: 14),
-              Text(
-                message,
+              const Text(
+                'Silent alert has been triggered',
                 style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
+                  color: Colors.white70,
+                  fontSize: 14,
                 ),
-                textAlign: TextAlign.center,
               ),
             ],
-          ),
+            const SizedBox(height: 40),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isPanicMode ? Colors.orange : Colors.greenAccent,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+              ),
+              child: Text(
+                'Go Back',
+                style: TextStyle(
+                  color: isPanicMode ? Colors.black : Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -396,7 +320,7 @@ class SuccessScreen extends StatelessWidget {
 }
 
 // ============================================
-// ✅ MAIN LOCK SCREEN
+// MAIN LOCK SCREEN
 // ============================================
 class ZKineticLockScreen extends StatefulWidget {
   final bool isCompromisedDevice;
@@ -422,15 +346,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
       isCompromisedDevice: widget.isCompromisedDevice,
       deviceLocation: widget.deviceLocation,
     );
-    _enableSecureMode();
-  }
-  
-  Future<void> _enableSecureMode() async {
-    try {
-      print('🔒 Security initialization complete');
-    } catch (e) {
-      print('⚠️ Secure mode failed: $e');
-    }
   }
 
   @override
@@ -488,7 +403,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  
                   Stack(
                     alignment: Alignment.center,
                     children: [
@@ -568,9 +482,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 30),
-                  
-                  
                   const SizedBox(height: 25),
                   
                   RingStyleChallengeDisplay(controller: _controller),
@@ -588,9 +499,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   ),
                   
                   const SizedBox(height: 10),
-                  
-                  
-                  const SizedBox(height: 20),
                   
                   ValueListenableBuilder<int>(
                     valueListenable: _controller.randomizeTrigger,
@@ -692,10 +600,6 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     );
   }
 }
-
-// ============================================
-// ✅ ENTERPRISE CONTROLLER (SECURE HYBRID MODE)
-// ============================================
 
 // THE RING / X-FILES ANIMATION
 class RingStyleChallengeDisplay extends StatefulWidget {
@@ -846,10 +750,12 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   }
 }
 
+// ============================================
+// ENTERPRISE CONTROLLER
+// ============================================
 class EnterpriseController {
-  // Challenge Code dari Server
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
-  String? _currentNonce; // Tiket pengesahan
+  String? _currentNonce;
   
   final bool isCompromisedDevice;
   final Position? deviceLocation;
@@ -859,8 +765,10 @@ class EnterpriseController {
   final ValueNotifier<double> patternScore = ValueNotifier(0.0);
   final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
 
-  // Server URL (Update dengan URL Render Captain!)
-  final String _serverUrl = 'https://z-kinetic-server.onrender.com'; 
+  String? _boundTransactionHash;
+  Map<String, dynamic>? _boundTransactionDetails;
+  
+  final String _serverUrl = 'https://z-kinetic-server.onrender.com';
   
   StreamSubscription<AccelerometerEvent>? _accelSub;
   double _lastMagnitude = 9.8;
@@ -873,47 +781,51 @@ class EnterpriseController {
   }) {
     _initSensors();
     _startDecayTimer();
-    
-    // 🚀 PRE-FETCH: Minta soalan dari server senyap-senyap masa start
-    fetchChallengeFromServer(); 
+    fetchChallengeFromServer();
   }
 
-  // 🔥 FETCH CHALLENGE (Secure)
   Future<void> fetchChallengeFromServer() async {
     try {
       print('🔄 Fetching secure challenge from server...');
       
       final response = await http.post(
         Uri.parse('$_serverUrl/getChallenge'),
+        headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _currentNonce = data['nonce'];
         
-        // Convert List<dynamic> ke List<int>
-        List<dynamic> rawCode = data['challengeCode'];
-        challengeCode.value = rawCode.map((e) => e as int).toList();
-        
-        print('✅ Secure Challenge Received: ${challengeCode.value}');
+        if (data['success'] == true) {
+          _currentNonce = data['nonce'];
+          
+          List<dynamic> rawCode = data['challengeCode'];
+          challengeCode.value = rawCode.map((e) => e as int).toList();
+          
+          print('✅ Secure Challenge Received: ${challengeCode.value}');
+          print('   Nonce: ${_currentNonce?.substring(0, 16)}...');
+        } else {
+          throw Exception('Server returned success=false');
+        }
       } else {
-        throw Exception('Server error');
+        throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('⚠️ Server offline/slow. Using Fallback (Low Security Mode). Error: $e');
-      _generateLocalChallenge(); // Fallback kalau server tak dapat dicapai
+      print('⚠️ Server offline/slow. Using Fallback Mode. Error: $e');
+      _generateLocalChallenge();
     }
   }
 
-  // Fallback (Local) - Macam kod lama, cuma guna bila darurat
   void _generateLocalChallenge() {
     challengeCode.value = List.generate(5, (_) => Random().nextInt(10));
-    _currentNonce = "OFFLINE_MODE"; // Server akan reject ni kalau strict mode
+    _currentNonce = "OFFLINE_MODE";
+    print('⚠️ LOCAL CHALLENGE: ${challengeCode.value} (Low Security Mode)');
   }
 
   void randomizeWheels() {
     randomizeTrigger.value++;
-    fetchChallengeFromServer(); // Minta soalan baru dari server!
+    fetchChallengeFromServer();
+    print('🔀 Wheels randomized & fetching new server challenge');
   }
 
   void _initSensors() {
@@ -941,54 +853,107 @@ class EnterpriseController {
   void registerTouch() => touchScore.value = Random().nextDouble() * 0.3 + 0.7;
   void registerScroll() => patternScore.value = 0.8; 
 
-  // 🔒 TRANSACTION BINDING 
   void bindTransaction(Map<String, dynamic> transactionDetails) {
-     // (Placeholder)
+    _boundTransactionDetails = transactionDetails;
+    final Map<String, dynamic> hashData = {
+      'amount': transactionDetails['amount'],
+      'recipient': transactionDetails['recipient'],
+      'currency': transactionDetails['currency'] ?? 'MYR',
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    final sortedJson = json.encode(hashData);
+    _boundTransactionHash = sha256.convert(utf8.encode(sortedJson)).toString();
+    print('🔒 Transaction Bound: ${_boundTransactionHash?.substring(0, 16)}...');
   }
 
-  // ✅ VERIFICATION LOGIC (Hantar Jawapan ke Server)
+  Future<void> _sendThreatIntelligence({required String type, required String severity}) async {
+    print('📡 [THREAT INTEL] Sending: $type ($severity) | Loc: ${deviceLocation?.latitude ?? 'N/A'}');
+  }
+
   Future<Map<String, dynamic>> verify(List<int> inputCode) async {
-    // 1. Kalau Offline Mode, guna logic local
     if (_currentNonce == "OFFLINE_MODE") {
-        String inputStr = inputCode.join();
-        String targetStr = challengeCode.value.join();
-        if (inputStr == targetStr) return {'allowed': true, 'isPanicMode': false};
-        return {'allowed': false};
+      print('⚠️ OFFLINE VERIFICATION (Low Security)');
+      
+      String inputStr = inputCode.join();
+      String targetStr = challengeCode.value.join();
+      String panicStr = challengeCode.value.reversed.join();
+
+      if (inputStr == panicStr) {
+        print('🚨 PANIC MODE (Offline)');
+        await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
+        return {
+          'allowed': true,
+          'isPanicMode': true,
+          'verificationToken': 'PANIC_OFFLINE_${DateTime.now().millisecondsSinceEpoch}'
+        };
+      }
+
+      bool motionOK = motionScore.value > 0.15;
+      bool codeCorrect = inputStr == targetStr;
+
+      if (codeCorrect && motionOK) {
+        return {
+          'allowed': true,
+          'isPanicMode': false,
+          'verificationToken': 'OFFLINE_${DateTime.now().millisecondsSinceEpoch}'
+        };
+      } else {
+        randomizeWheels();
+        return {'allowed': false, 'isPanicMode': false};
+      }
     }
 
-    // 2. ONLINE MODE: Hantar ke Server untuk Semakan
     try {
-        final response = await http.post(
-            Uri.parse('$_serverUrl/attest'),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode({
-                'nonce': _currentNonce,
-                'deviceId': 'CaptainDevice_001', 
-                'userResponse': inputCode,
-                'biometricData': {
-                    'motion': motionScore.value,
-                    'touch': touchScore.value
-                }
-            }),
-        );
+      print('🔄 Sending attestation to server...');
+      
+      final response = await http.post(
+        Uri.parse('$_serverUrl/attest'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'nonce': _currentNonce,
+          'deviceId': 'device_${deviceLocation?.latitude ?? Random().nextInt(99999)}',
+          'userResponse': inputCode,
+          'biometricData': {
+            'motion': motionScore.value,
+            'touch': touchScore.value,
+            'pattern': patternScore.value,
+          }
+        }),
+      ).timeout(const Duration(seconds: 5));
 
-        if (response.statusCode == 200) {
-            final data = json.decode(response.body);
-            final verdict = data['verdict'];
-            
-            if (verdict == "APPROVED_SILENT_ALARM") {
-                return {'allowed': true, 'isPanicMode': true};
-            } else {
-                return {'allowed': true, 'isPanicMode': false};
-            }
-        } else {
-            print('❌ Server Reject: ${response.body}');
-            randomizeWheels();
-            return {'allowed': false, 'isPanicMode': false};
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final verdict = data['verdict'];
+        
+        print('✅ Server Response: $verdict');
+        
+        if (verdict == "APPROVED_SILENT_ALARM") {
+          await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
+          return {
+            'allowed': true,
+            'isPanicMode': true,
+            'verificationToken': data['sessionToken'],
+            'riskScore': data['riskScore'],
+          };
+        } else if (verdict == "APPROVED") {
+          return {
+            'allowed': true,
+            'isPanicMode': false,
+            'verificationToken': data['sessionToken'],
+            'riskScore': data['riskScore'],
+            'boundTransactionHash': _boundTransactionHash
+          };
         }
+      }
+      
+      print('❌ Server Reject: ${response.body}');
+      randomizeWheels();
+      return {'allowed': false, 'isPanicMode': false};
+      
     } catch (e) {
-        print('⚠️ Verification Error: $e');
-        return {'allowed': false, 'isPanicMode': false};
+      print('⚠️ Verification Error: $e');
+      randomizeWheels();
+      return {'allowed': false, 'isPanicMode': false};
     }
   }
 
@@ -1004,7 +969,7 @@ class EnterpriseController {
 }
 
 // ============================================
-// CRYPTEX LOCK 
+// CRYPTEX LOCK
 // ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
@@ -1056,7 +1021,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     _scrollControllers = List.generate(
       5,
       (i) => FixedExtentScrollController(
-        initialItem: _random.nextInt(10), 
+        initialItem: _random.nextInt(10),
       ),
     );
     
@@ -1122,19 +1087,21 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     });
   }
 
-  void _onButtonTap() async {
+  Future<void> _onButtonTap() async {
+    setState(() => _isButtonPressed = true);
     HapticFeedback.mediumImpact();
     
-    setState(() => _isButtonPressed = true);
-    Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _isButtonPressed = false);
-    });
+    await Future.delayed(const Duration(milliseconds: 100));
     
-    widget.controller.registerTouch();
+    if (mounted) {
+      setState(() => _isButtonPressed = false);
+    }
     
-    List<int> currentCode = _scrollControllers
-        .map((c) => c.selectedItem % 10)
-        .toList();
+    List<int> currentCode = [];
+    for (var controller in _scrollControllers) {
+      int selectedIndex = controller.selectedItem;
+      currentCode.add(selectedIndex % 10);
+    }
     
     final result = await widget.controller.verify(currentCode);
     
@@ -1142,6 +1109,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       widget.onSuccess(result['isPanicMode'] ?? false);
     } else {
       widget.onFail();
+      await _playSlotMachineAnimation();
     }
   }
 
@@ -1298,7 +1266,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
               },
             ),
           ),
-
         ],
       ),
     );
