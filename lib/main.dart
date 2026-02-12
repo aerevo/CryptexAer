@@ -571,7 +571,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 }
 
 // ============================================
-// VISUAL: LINKIN PARK GLITCH (SIMON SAYS) - FORCE ACTIVE!
+// VISUAL: LINKIN PARK GLITCH (LOOPING) & SMALLER BOX
 // ============================================
 class VintageFilmChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
@@ -588,24 +588,20 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
   late AnimationController _glitchController;
   final Random _random = Random();
   
-  // State untuk 'Simon Says' Sequence
   int _activeGlitchIndex = -1; 
-  List<String> _displayNumbers = ['0', '0', '0', '0', '0']; // Default Placeholder
+  List<String> _displayNumbers = ['0', '0', '0', '0', '0']; 
   Timer? _sequenceTimer;
   
   @override
   void initState() {
     super.initState();
-    // 1. Controller untuk gegaran sentiasa aktif
     _glitchController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 80), // Sangat Laju (Linkin Park style)
+      duration: const Duration(milliseconds: 80),
     )..repeat(reverse: true);
     
-    // 2. Dengar perubahan code
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
-    // 3. FORCE START! Jangan tunggu server. Terus jalan dulu.
     WidgetsBinding.instance.addPostFrameCallback((_) {
        _startSimonSaysSequence();
     });
@@ -617,14 +613,13 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
     }
   }
   
-  // 🔥 FUNGSI 'SIMON SAYS' (GLITCH IKUT URUTAN)
+  // 🔥 FUNGSI 'SIMON SAYS' - LOOPING NON-STOP
   void _startSimonSaysSequence() async {
     _sequenceTimer?.cancel();
     if (mounted) setState(() => _activeGlitchIndex = 0);
 
-    // Ambil kod sebenar. Kalau kosong, guna dummy dulu supaya animasi nampak
     List<int> targetCode = widget.controller.challengeCode.value;
-    if (targetCode.isEmpty) targetCode = [8, 3, 9, 1, 4]; // Dummy sementara
+    if (targetCode.isEmpty) targetCode = [8, 3, 9, 1, 4]; 
 
     int step = 0;
     
@@ -632,26 +627,25 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
       if (!mounted) return;
       
       setState(() {
-        // Pindah 'Highlight' glitch ke nombor seterusnya
         _activeGlitchIndex = step;
         
-        // Update nombor yang dah lepas glitch jadi nombor sebenar
+        // Kemaskini nombor
         if (step > 0 && step <= 5) {
           _displayNumbers[step - 1] = targetCode[step - 1].toString();
         }
       });
 
-      if (step < 5) HapticFeedback.selectionClick();
+      // Bunyi glitch hanya bila ada nombor
+      if (step >= 0 && step < 5) HapticFeedback.selectionClick();
 
       step++;
 
-      if (step > 5) {
-        timer.cancel();
-        setState(() {
-          _activeGlitchIndex = -1; // Stop glitch
-          _displayNumbers = targetCode.map((e) => e.toString()).toList();
-        });
-        HapticFeedback.heavyImpact();
+      // 🔥 LOOPING LOGIC (Tak berhenti)
+      // Step 0-4: Glitch nombor
+      // Step 5-7: Rehat sekejap (tunjuk semua nombor)
+      // Step 8: Reset balik ke -2 (persediaan loop baru)
+      if (step > 8) {
+        step = -2; // Reset
       }
     });
   }
@@ -666,85 +660,68 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 40),
-      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          // Border merah masa glitch, cyan masa rehat
-          color: _activeGlitchIndex != -1 
-              ? Colors.redAccent.withOpacity(0.9) 
-              : Colors.cyanAccent.withOpacity(0.5), 
-          width: 2
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _activeGlitchIndex != -1 ? Colors.red.withOpacity(0.4) : Colors.cyan.withOpacity(0.2), 
-            blurRadius: 20, 
-            spreadRadius: 2
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(5, (index) {
-          bool isGlitching = index == _activeGlitchIndex;
-          bool hasRevealed = index < _activeGlitchIndex || _activeGlitchIndex == -1;
+    // 1) KECILKAN SAIZ 15% (Scale 0.85)
+    return Transform.scale(
+      scale: 0.85, 
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 40),
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(8),
           
-          return _buildLinkinParkDigit(
-            text: hasRevealed ? _displayNumbers[index] : _random.nextInt(10).toString(),
-            isGlitching: isGlitching,
-          );
-        }),
+          // 2) WARNA BERLAPIS (HIJAU + PURPLE)
+          border: Border.all(
+            color: Colors.greenAccent, // Garis Hijau
+            width: 2
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.deepPurpleAccent.withOpacity(0.6), // Glow Purple
+              blurRadius: 15, 
+              spreadRadius: 3
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(5, (index) {
+            bool isGlitching = index == _activeGlitchIndex;
+            bool hasRevealed = index < _activeGlitchIndex || _activeGlitchIndex < 0; // Tunjuk sentiasa kalau tak glitch
+            
+            // Logic sikit: Kalau index negatif (masa rehat loop), tunjuk semua nombor
+            if (_activeGlitchIndex < 0) hasRevealed = true;
+
+            return _buildLinkinParkDigit(
+              text: hasRevealed ? _displayNumbers[index] : _random.nextInt(10).toString(),
+              isGlitching: isGlitching,
+            );
+          }),
+        ),
       ),
     );
   }
 
-  // 🔥 RGB SPLIT TEXT (LINKIN PARK STYLE) - LEBIH GANAS
   Widget _buildLinkinParkDigit({required String text, required bool isGlitching}) {
     return AnimatedBuilder(
       animation: _glitchController,
       builder: (context, child) {
-        // Offset lebih besar (8.0) supaya nampak pecah
         double randomX = isGlitching ? (_random.nextDouble() - 0.5) * 8.0 : 0.0;
         double randomY = isGlitching ? (_random.nextDouble() - 0.5) * 8.0 : 0.0;
-        
-        // Warna lari jauh sikit
         double rX = isGlitching ? 4.0 : 0.0;
         double bX = isGlitching ? -4.0 : 0.0;
 
         return Stack(
           alignment: Alignment.center,
           children: [
-            // Layer 1: RED
             Transform.translate(
               offset: Offset(randomX + rX, randomY),
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 36,
-                  fontFamily: 'Courier',
-                  fontWeight: FontWeight.w900,
-                  color: isGlitching ? Colors.red.withOpacity(0.8) : Colors.transparent,
-                ),
-              ),
+              child: Text(text, style: TextStyle(fontSize: 36, fontFamily: 'Courier', fontWeight: FontWeight.w900, color: isGlitching ? Colors.red.withOpacity(0.8) : Colors.transparent)),
             ),
-            // Layer 2: BLUE
             Transform.translate(
               offset: Offset(randomX + bX, randomY),
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 36,
-                  fontFamily: 'Courier',
-                  fontWeight: FontWeight.w900,
-                  color: isGlitching ? Colors.blue.withOpacity(0.8) : Colors.transparent,
-                ),
-              ),
+              child: Text(text, style: TextStyle(fontSize: 36, fontFamily: 'Courier', fontWeight: FontWeight.w900, color: isGlitching ? Colors.blue.withOpacity(0.8) : Colors.transparent)),
             ),
-            // Layer 3: MAIN
             Transform.translate(
               offset: Offset(randomX, randomY),
               child: Text(
@@ -841,8 +818,8 @@ class EnterpriseController {
   }
 
   void randomizeWheels() {
-    randomizeTrigger.value++; // Ini picu reload widget
-    fetchChallengeFromServer(); // Ini tarik data baru
+    randomizeTrigger.value++; 
+    fetchChallengeFromServer();
     print('🔀 Trigger Glitch & Fetch New Data');
   }
 
