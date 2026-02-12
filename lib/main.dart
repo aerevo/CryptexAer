@@ -601,7 +601,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 }
 
 // ============================================
-// VISUAL: VINTAGE FILM / GLITCH CHALLENGE
+// VISUAL: Zig Zag GLITCH (SIMON SAYS)
 // ============================================
 class VintageFilmChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
@@ -615,81 +615,83 @@ class VintageFilmChallengeDisplay extends StatefulWidget {
 class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDisplay> 
     with TickerProviderStateMixin {
   
-  late AnimationController _filmController;
-  late AnimationController _jitterController;
-  
+  late AnimationController _glitchController;
   final Random _random = Random();
-  List<String> _scrambledNumbers = [];
-  Timer? _filmTimer;
-  bool _isRolling = true;
-  double _verticalShake = 0.0;
+  
+  // State untuk 'Simon Says' Sequence
+  int _activeGlitchIndex = -1; // -1 maksudnya semua diam
+  List<String> _displayNumbers = ['-', '-', '-', '-', '-'];
+  Timer? _sequenceTimer;
   
   @override
   void initState() {
     super.initState();
-    
-    _filmController = AnimationController(
+    _glitchController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    );
-    
-    _jitterController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 60),
-    )..repeat();
+      duration: const Duration(milliseconds: 100), // Kelip laju
+    )..repeat(reverse: true);
     
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
+    // Intro Animation
     if (widget.controller.challengeCode.value.isNotEmpty) {
-      _playVintageFilmAnimation();
+      _startSimonSaysSequence();
     }
   }
   
   void _onChallengeChanged() {
     if (mounted) {
-      _playVintageFilmAnimation();
+      _startSimonSaysSequence();
     }
   }
   
-  // 🔥 INI UNTUK NOMBOR ATAS (CHALLENGE)
-  // Bila refresh, dia berkelip laju (Glitch visual)
-  void _playVintageFilmAnimation() async {
-    setState(() => _isRolling = true);
+  // 🔥 FUNGSI 'SIMON SAYS' (GLITCH IKUT URUTAN)
+  void _startSimonSaysSequence() async {
+    // 1. Reset: Tunjuk sengkang dulu atau nombor lama
+    _sequenceTimer?.cancel();
+    if (mounted) setState(() => _activeGlitchIndex = 0);
+
+    List<int> targetCode = widget.controller.challengeCode.value;
+    if (targetCode.isEmpty) targetCode = [0,0,0,0,0];
+
+    // 2. Mula Sequence: Glitch dari kiri ke kanan (0 -> 4)
+    int step = 0;
     
-    _filmTimer?.cancel();
-    // Timer laju 30ms (Sangat laju!)
-    _filmTimer = Timer.periodic(const Duration(milliseconds: 30), (_) {
-      if (mounted) {
+    _sequenceTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
+      if (!mounted) return;
+      
+      setState(() {
+        // Pindah 'Highlight' glitch ke nombor seterusnya
+        _activeGlitchIndex = step;
+        
+        // Update nombor yang dah lepas glitch jadi nombor sebenar
+        if (step > 0 && step <= 5) {
+          _displayNumbers[step - 1] = targetCode[step - 1].toString();
+        }
+      });
+
+      // Bunyi 'Beep' Digital setiap kali pindah nombor
+      if (step < 5) HapticFeedback.selectionClick();
+
+      step++;
+
+      // 3. Tamat Sequence
+      if (step > 5) {
+        timer.cancel();
         setState(() {
-          // Paparkan nombor sampah rawak
-          _scrambledNumbers = List.generate(5, (_) => _random.nextInt(10).toString());
-          // Gegar skrin atas bawah sikit
-          _verticalShake = (_random.nextDouble() - 0.5) * 5.0;
+          _activeGlitchIndex = -1; // Stop glitch
+          _displayNumbers = targetCode.map((e) => e.toString()).toList();
         });
+        // Bunyi 'Success' bila semua dah tunjuk
+        HapticFeedback.heavyImpact();
       }
     });
-    
-    // Biarkan dia 'menggila' selama 1.5 saat
-    await Future.delayed(const Duration(milliseconds: 1500));
-    
-    _filmTimer?.cancel();
-    
-    // Tunjukkan nombor sebenar & Reset gegaran
-    if (mounted) {
-      setState(() {
-        _isRolling = false;
-        _verticalShake = 0.0;
-      });
-      // Efek visual 'masuk'
-      _filmController.forward(from: 0.0);
-    }
   }
   
   @override
   void dispose() {
-    _filmTimer?.cancel();
-    _filmController.dispose();
-    _jitterController.dispose();
+    _sequenceTimer?.cancel();
+    _glitchController.dispose();
     widget.controller.challengeCode.removeListener(_onChallengeChanged);
     super.dispose();
   }
@@ -697,107 +699,106 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 55),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.75),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.6), width: 2),
+        color: Colors.black.withOpacity(0.8), // Background Gelap
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          // Border berkelip ikut status
+          color: _activeGlitchIndex != -1 
+              ? Colors.redAccent.withOpacity(0.8) 
+              : Colors.cyanAccent.withOpacity(0.5), 
+          width: 2
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 12, spreadRadius: 1),
+          BoxShadow(
+            color: _activeGlitchIndex != -1 ? Colors.red.withOpacity(0.3) : Colors.cyan.withOpacity(0.2), 
+            blurRadius: 20, 
+            spreadRadius: 2
+          ),
         ],
       ),
-      child: AnimatedBuilder(
-        animation: _filmController,
-        builder: (context, child) {
-          return ValueListenableBuilder<List<int>>(
-            valueListenable: widget.controller.challengeCode,
-            builder: (context, code, _) {
-              if (code.isEmpty) {
-                return const SizedBox(
-                  height: 32,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.orangeAccent,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                );
-              }
-              
-              List<String> displayNumbers = _isRolling 
-                  ? _scrambledNumbers 
-                  : code.map((e) => e.toString()).toList();
-              
-              return Transform.translate(
-                offset: Offset(0, _verticalShake),
-                child: SizedBox(
-                  height: 32,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: List.generate(
-                      displayNumbers.length > 5 ? 5 : displayNumbers.length,
-                      (index) {
-                        return Container(
-                          width: 24,
-                          alignment: Alignment.center,
-                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                          child: Text(
-                            displayNumbers.length > index ? displayNumbers[index] : '0',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'Courier',
-                              height: 1.0,
-                              // Kalau tengah rolling, warna Putih. Kalau tak, Cyan.
-                              color: _isRolling ? Colors.white : Colors.cyanAccent,
-                              
-                              shadows: _isRolling
-                                // MASA GLITCH (Bergerak): Efek Matrix Hijau/Putih
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.white.withOpacity(0.8),
-                                      blurRadius: 10,
-                                      spreadRadius: 2,
-                                    ),
-                                    const Shadow(
-                                      offset: Offset(-2, 0),
-                                      color: Colors.red,
-                                      blurRadius: 5,
-                                    )
-                                  ]
-                                // MASA DIAM (Static): Efek Neon Blue + Red Shift
-                                : [
-                                    BoxShadow(
-                                      color: Colors.cyanAccent.withOpacity(0.6),
-                                      blurRadius: 15,
-                                      spreadRadius: 2,
-                                    ),
-                                    const Shadow(
-                                      offset: Offset(2, 0),
-                                      color: Colors.blueAccent,
-                                      blurRadius: 2,
-                                    ),
-                                    const Shadow(
-                                      offset: Offset(-2, 0),
-                                      color: Colors.redAccent,
-                                      blurRadius: 2,
-                                    ),
-                                  ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              );
-            },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(5, (index) {
+          // Logic: Adakah nombor ini sedang di-Glitch-kan?
+          bool isGlitching = index == _activeGlitchIndex;
+          bool hasRevealed = index < _activeGlitchIndex || _activeGlitchIndex == -1;
+          
+          return _buildLinkinParkDigit(
+            text: hasRevealed ? _displayNumbers[index] : _random.nextInt(10).toString(),
+            isGlitching: isGlitching,
           );
-        },
+        }),
       ),
+    );
+  }
+
+  // 🔥 WIDGET KHAS: RGB SPLIT TEXT (LINKIN PARK STYLE)
+  Widget _buildLinkinParkDigit({required String text, required bool isGlitching}) {
+    return AnimatedBuilder(
+      animation: _glitchController,
+      builder: (context, child) {
+        // Kalau tengah glitch, offset dia ganas (random). Kalau tak, diam (0).
+        double randomX = isGlitching ? (_random.nextDouble() - 0.5) * 6.0 : 0.0;
+        double randomY = isGlitching ? (_random.nextDouble() - 0.5) * 6.0 : 0.0;
+        
+        // RGB Offset (Warna lari)
+        double rX = isGlitching ? 3.0 : 0.0;
+        double bX = isGlitching ? -3.0 : 0.0;
+
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // Layer 1: RED (Geser Kiri)
+            Transform.translate(
+              offset: Offset(randomX + rX, randomY),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 36,
+                  fontFamily: 'Courier',
+                  fontWeight: FontWeight.w900,
+                  color: isGlitching ? Colors.red.withOpacity(0.8) : Colors.transparent,
+                ),
+              ),
+            ),
+            // Layer 2: BLUE (Geser Kanan)
+            Transform.translate(
+              offset: Offset(randomX + bX, randomY),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 36,
+                  fontFamily: 'Courier',
+                  fontWeight: FontWeight.w900,
+                  color: isGlitching ? Colors.blue.withOpacity(0.8) : Colors.transparent,
+                ),
+              ),
+            ),
+            // Layer 3: MAIN (White/Cyan)
+            Transform.translate(
+              offset: Offset(randomX, randomY),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 36,
+                  fontFamily: 'Courier',
+                  fontWeight: FontWeight.w900,
+                  // Kalau glitch: Putih. Kalau dah reveal: Cyan. Kalau belum: Kelabu.
+                  color: isGlitching 
+                      ? Colors.white 
+                      : (text == '-' ? Colors.grey[800] : Colors.cyanAccent),
+                  shadows: isGlitching
+                      ? [BoxShadow(color: Colors.white, blurRadius: 10)]
+                      : [BoxShadow(color: Colors.cyanAccent, blurRadius: 8)],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1022,8 +1023,8 @@ class EnterpriseController {
   }
 }
 
-// ============================================
-// CRYPTEX LOCK
+  // ============================================
+// CRYPTEX LOCK (RODA INTERAKTIF)
 // ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
@@ -1045,6 +1046,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   static const double imageWidth = 706.0;
   static const double imageHeight = 610.0;
 
+  // Koordinat Roda (Pixel dari gambar asal)
   static const List<List<double>> wheelCoords = [
     [25, 159, 113, 378],
     [165, 160, 257, 379],
@@ -1072,6 +1074,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void initState() {
     super.initState();
     
+    // 1. Setup Controllers dengan nombor rawak
     _scrollControllers = List.generate(
       5,
       (i) => FixedExtentScrollController(
@@ -1079,6 +1082,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       ),
     );
     
+    // 2. Setup Animasi Drift (Terapung)
     _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
       if (mounted && _activeWheelIndex == null) {
         setState(() {
@@ -1092,6 +1096,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       }
     });
     
+    // 3. Setup Animasi Kelip (Opacity)
     _opacityControllers = List.generate(5, (i) {
       final controller = AnimationController(
         vsync: this,
@@ -1110,6 +1115,11 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         CurvedAnimation(parent: c, curve: Curves.easeInOut),
       );
     }).toList();
+
+    // 🔥 4. AUTO-PLAY (INTRO): Pusing roda bila paparan muncul!
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+       _playSlotMachineAnimation(); 
+    });
   }
 
   @override
@@ -1125,6 +1135,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     super.dispose();
   }
 
+  // --- LOGIC GUNA JARI ---
   void _onWheelScrollStart(int index) {
     setState(() => _activeWheelIndex = index);
     _wheelActiveTimer?.cancel();
@@ -1141,6 +1152,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     });
   }
 
+  // --- LOGIC TEKAN BUTANG ---
   Future<void> _onButtonTap() async {
     setState(() => _isButtonPressed = true);
     HapticFeedback.mediumImpact();
@@ -1163,8 +1175,56 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       widget.onSuccess(result['isPanicMode'] ?? false);
     } else {
       widget.onFail();
+      // 🔥 TRIGGER: Kalau salah, pusing lagi!
       await _playSlotMachineAnimation();
     }
+  }
+
+  // 🔥🔥🔥 SLOT MACHINE ENGINE (KASINO STYLE) 🔥🔥🔥
+  // Berfungsi untuk INTRO dan SALAH PASSWORD
+  Future<void> _playSlotMachineAnimation() async {
+    // 1. Pusingkan semua roda serentak (Laju!)
+    for (int i = 0; i < 5; i++) {
+      if (!mounted) continue;
+      
+      // Target jauh (100 pusingan)
+      // Gunakan curve Linear supaya nampak macam enjin berputar ligat
+      _scrollControllers[i].animateToItem(
+        _scrollControllers[i].selectedItem + 500, 
+        duration: const Duration(seconds: 10), // Set masa panjang, kita akan potong nanti
+        curve: Curves.linear, 
+      );
+    }
+
+    // 2. Berhentikan satu per satu (Waterfall Effect)
+    for (int i = 0; i < 5; i++) {
+      // Delay berhenti: Roda 1 (0.5s), Roda 2 (1.0s), ...
+      int stopDelay = 500 + (i * 400); 
+      
+      Future.delayed(Duration(milliseconds: stopDelay), () {
+        if(mounted) _stopWheelAtRandom(i);
+      });
+    }
+  }
+
+  Future<void> _stopWheelAtRandom(int index) async {
+    if (!mounted) return;
+
+    // Ambil posisi semasa yang tengah laju tu
+    int currentItem = _scrollControllers[index].selectedItem;
+    
+    // Tambah sikit untuk landing (10-20 item lagi)
+    int targetItem = currentItem + 20 + Random().nextInt(10); 
+
+    // FORCE STOP dengan efek 'Sentak' (EaseOutBack)
+    await _scrollControllers[index].animateToItem(
+      targetItem,
+      duration: const Duration(milliseconds: 800), 
+      curve: Curves.easeOutBack, // Ini yang buat bunyi KTAK!
+    );
+    
+    // Bunyi mekanikal
+    HapticFeedback.heavyImpact();
   }
 
   @override
@@ -1180,6 +1240,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           height: calculatedHeight,
           child: Stack(
             children: [
+              // Gambar Background (Z_Wheel)
               Positioned.fill(
                 child: Image.asset(
                   'assets/z_wheel.png',
@@ -1226,12 +1287,11 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           height: actualHeight,
           child: NotificationListener<ScrollNotification>(
             onNotification: (notification) {
+              // Logic detect user sentuh
               if (notification is ScrollStartNotification) {
-                if (_scrollControllers[i].position == notification.metrics) {
-                  _onWheelScrollStart(i);
-                }
-              } else if (notification is ScrollUpdateNotification) {
-                widget.controller.registerScroll();
+                 if (_scrollControllers[i].position == notification.metrics) {
+                   _onWheelScrollStart(i);
+                 }
               } else if (notification is ScrollEndNotification) {
                 _onWheelScrollEnd(i);
               }
@@ -1260,7 +1320,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         itemExtent: itemExtent,
         perspective: 0.003,
         diameterRatio: 2.0,
-        // 🔥 INI YANG BUAT DIA "AUTO-CENTER" (MAGNET)
+        // 🔥 AUTO-CENTER (MAGNET)
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (_) {
           HapticFeedback.selectionClick();
@@ -1292,26 +1352,11 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                             height: 1.0,
                             shadows: isActive
                                 ? [
-                                    Shadow(
-                                      color: const Color(0xFFFF5722).withOpacity(0.8),
-                                      blurRadius: 20,
-                                    ),
-                                    Shadow(
-                                      color: const Color(0xFFFF5722).withOpacity(0.5),
-                                      blurRadius: 40,
-                                    ),
+                                    Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20),
                                   ]
                                 : [
-                                    Shadow(
-                                      offset: const Offset(1, 1),
-                                      blurRadius: 1,
-                                      color: Colors.white.withOpacity(0.4),
-                                    ),
-                                    Shadow(
-                                      offset: const Offset(-1, -1),
-                                      blurRadius: 1,
-                                      color: Colors.black.withOpacity(0.6),
-                                    ),
+                                    Shadow(offset: const Offset(1, 1), blurRadius: 1, color: Colors.white.withOpacity(0.4)),
+                                    Shadow(offset: const Offset(-1, -1), blurRadius: 1, color: Colors.black.withOpacity(0.6)),
                                   ],
                           ),
                         ),
@@ -1349,23 +1394,13 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         child: Stack(
           children: [
             Container(color: Colors.transparent),
-            
             if (_isButtonPressed)
               IgnorePointer(
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF5722).withOpacity(0.6),
-                        blurRadius: 30,
-                        spreadRadius: 5,
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFFFF5722).withOpacity(0.3),
-                        blurRadius: 50,
-                        spreadRadius: 10,
-                      ),
+                      BoxShadow(color: const Color(0xFFFF5722).withOpacity(0.6), blurRadius: 30, spreadRadius: 5),
                     ],
                   ),
                 ),
@@ -1375,6 +1410,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       ),
     );
   }
+}
 
   // 🔥 INI UNTUK RODA BAWAH (INTERACTIVE WHEELS)
   // Bila salah, dia pusing macam mesin judi
@@ -1408,3 +1444,4 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     HapticFeedback.heavyImpact();
   }
 }
+
