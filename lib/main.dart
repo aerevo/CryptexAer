@@ -471,7 +471,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 25),
                   
-                  RingStyleChallengeDisplay(controller: _controller),
+                  VintageFilmChallengeDisplay(controller: _controller),
                   
                   const SizedBox(height: 15),
                   
@@ -587,82 +587,96 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
   }
 }
 
-class RingStyleChallengeDisplay extends StatefulWidget {
+class VintageFilmChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
   
-  const RingStyleChallengeDisplay({super.key, required this.controller});
+  const VintageFilmChallengeDisplay({super.key, required this.controller});
 
   @override
-  State<RingStyleChallengeDisplay> createState() => _RingStyleChallengeDisplayState();
+  State<VintageFilmChallengeDisplay> createState() => _VintageFilmChallengeDisplayState();
 }
 
-class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay> 
-    with SingleTickerProviderStateMixin {
+class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDisplay> 
+    with TickerProviderStateMixin {
   
-  late AnimationController _animController;
-  late Animation<double> _glitchAnimation;
+  late AnimationController _filmController;
+  late AnimationController _jitterController;
   
   final Random _random = Random();
-  List<String> _glitchNumbers = [];
-  Timer? _glitchTimer;
-  bool _isGlitching = true;
+  List<String> _scrambledNumbers = [];
+  Timer? _filmTimer;
+  bool _isRolling = true;
+  double _verticalShake = 0.0;
   
   @override
   void initState() {
     super.initState();
     
-    _animController = AnimationController(
+    _filmController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1800),
     );
     
-    _glitchAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
+    _jitterController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 60),
+    )..repeat();
+    
+    _jitterController.addListener(() {
+      if (_isRolling) {
+        setState(() {
+          _verticalShake = (_random.nextDouble() - 0.5) * 4;
+        });
+      }
+    });
     
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
     if (widget.controller.challengeCode.value.isNotEmpty) {
-      _playGlitchAnimation();
+      _playVintageFilmAnimation();
     }
   }
   
   void _onChallengeChanged() {
     if (mounted) {
-      _playGlitchAnimation();
+      _playVintageFilmAnimation();
     }
   }
   
-  void _playGlitchAnimation() async {
-    setState(() => _isGlitching = true);
+  void _playVintageFilmAnimation() async {
+    setState(() => _isRolling = true);
     
-    _glitchTimer?.cancel();
-    _glitchTimer = Timer.periodic(const Duration(milliseconds: 40), (_) {
+    _filmTimer?.cancel();
+    _filmTimer = Timer.periodic(const Duration(milliseconds: 35), (_) {
       if (mounted) {
         setState(() {
-          _glitchNumbers = List.generate(5, (_) => _random.nextInt(10).toString());
+          _scrambledNumbers = List.generate(5, (_) => _random.nextInt(10).toString());
         });
       }
     });
     
-    await Future.delayed(const Duration(milliseconds: 600));
-    _glitchTimer?.cancel();
+    await Future.delayed(const Duration(milliseconds: 850));
+    _filmTimer?.cancel();
     
     if (mounted) {
-      _animController.forward(from: 0.0);
+      _filmController.forward(from: 0.0);
     }
     
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 400));
     
     if (mounted) {
-      setState(() => _isGlitching = false);
+      setState(() {
+        _isRolling = false;
+        _verticalShake = 0.0;
+      });
     }
   }
   
   @override
   void dispose() {
-    _glitchTimer?.cancel();
-    _animController.dispose();
+    _filmTimer?.cancel();
+    _filmController.dispose();
+    _jitterController.dispose();
     widget.controller.challengeCode.removeListener(_onChallengeChanged);
     super.dispose();
   }
@@ -670,25 +684,25 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 50),
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 55),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withOpacity(0.75),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.5), width: 2),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.6), width: 2),
         boxShadow: [
-          BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 15, spreadRadius: 2),
+          BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 12, spreadRadius: 1),
         ],
       ),
       child: AnimatedBuilder(
-        animation: _animController,
+        animation: _filmController,
         builder: (context, child) {
           return ValueListenableBuilder<List<int>>(
             valueListenable: widget.controller.challengeCode,
             builder: (context, code, _) {
               if (code.isEmpty) {
                 return const SizedBox(
-                  height: 38,
+                  height: 32,
                   child: Center(
                     child: CircularProgressIndicator(
                       color: Colors.orangeAccent,
@@ -698,58 +712,68 @@ class _RingStyleChallengeDisplayState extends State<RingStyleChallengeDisplay>
                 );
               }
               
-              List<String> displayNumbers = _isGlitching 
-                  ? _glitchNumbers 
+              List<String> displayNumbers = _isRolling 
+                  ? _scrambledNumbers 
                   : code.map((e) => e.toString()).toList();
               
-              return SizedBox(
-                height: 38,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: List.generate(
-                    displayNumbers.length > 5 ? 5 : displayNumbers.length,
-                    (index) {
-                      double opacity = _isGlitching 
-                          ? (_random.nextDouble() * 0.5 + 0.3)
-                          : 1.0;
-                      
-                      return Opacity(
-                        opacity: opacity,
-                        child: Container(
-                          width: 28,
-                          alignment: Alignment.center,
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Text(
-                            displayNumbers.length > index ? displayNumbers[index] : '0',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _isGlitching 
-                                  ? Colors.greenAccent.withOpacity(0.9)
-                                  : Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Courier',
-                              height: 1.0,
-                              shadows: _isGlitching
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.green.withOpacity(0.7),
-                                        blurRadius: 15,
-                                      ),
-                                    ]
-                                  : [
-                                      const BoxShadow(
-                                        color: Colors.orange,
-                                        blurRadius: 15,
-                                        spreadRadius: 3,
-                                      ),
-                                    ],
+              return Transform.translate(
+                offset: Offset(0, _verticalShake),
+                child: SizedBox(
+                  height: 32,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: List.generate(
+                      displayNumbers.length > 5 ? 5 : displayNumbers.length,
+                      (index) {
+                        double flickerOpacity = _isRolling 
+                            ? (0.4 + _random.nextDouble() * 0.5)
+                            : 1.0;
+                        
+                        double horizontalJitter = _isRolling 
+                            ? (_random.nextDouble() - 0.5) * 2
+                            : 0.0;
+                        
+                        return Transform.translate(
+                          offset: Offset(horizontalJitter, 0),
+                          child: Opacity(
+                            opacity: flickerOpacity,
+                            child: Container(
+                              width: 24,
+                              alignment: Alignment.center,
+                              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                              child: Text(
+                                displayNumbers.length > index ? displayNumbers[index] : '0',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _isRolling 
+                                      ? Colors.grey.withOpacity(0.8)
+                                      : Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Courier',
+                                  height: 1.0,
+                                  shadows: _isRolling
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.white.withOpacity(0.3),
+                                            blurRadius: 6,
+                                          ),
+                                        ]
+                                      : [
+                                          const BoxShadow(
+                                            color: Colors.orange,
+                                            blurRadius: 12,
+                                            spreadRadius: 2,
+                                          ),
+                                        ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
               );
@@ -1227,8 +1251,9 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
                     offset: isActive ? Offset.zero : _textDriftOffsets[index],
                     child: Opacity(
                       opacity: isActive ? 1.0 : _opacityAnimations[index].value,
-                      child: SizedBox(
-                        width: wheelHeight * 0.35,
+                      child: Container(
+                        width: double.infinity,
+                        alignment: Alignment.center,
                         child: Text(
                           '$displayNumber',
                           textAlign: TextAlign.center,
