@@ -38,6 +38,9 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// ============================================
+// SECURITY PRE-CHECK
+// ============================================
 class SecurityCheckScreen extends StatefulWidget {
   const SecurityCheckScreen({super.key});
 
@@ -82,6 +85,7 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
     setState(() => _status = "Verifying server connection...");
     await Future.delayed(const Duration(milliseconds: 500));
     
+    // Simulate ping
     await Future.delayed(const Duration(milliseconds: 300));
     
     setState(() => _status = "✅ Security verified");
@@ -213,6 +217,9 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
   }
 }
 
+// ============================================
+// MODERN SHIELD PAINTER
+// ============================================
 class ModernShieldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -242,6 +249,9 @@ class ModernShieldPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+// ============================================
+// SUCCESS SCREEN
+// ============================================
 class SuccessScreen extends StatelessWidget {
   final String message;
   final bool isPanicMode;
@@ -309,6 +319,9 @@ class SuccessScreen extends StatelessWidget {
   }
 }
 
+// ============================================
+// MAIN LOCK SCREEN
+// ============================================
 class ZKineticLockScreen extends StatefulWidget {
   final bool isCompromisedDevice;
   final Position? deviceLocation;
@@ -587,6 +600,9 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
   }
 }
 
+// ============================================
+// VISUAL: VINTAGE FILM / GLITCH CHALLENGE
+// ============================================
 class VintageFilmChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
   
@@ -622,18 +638,20 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
       duration: const Duration(milliseconds: 60),
     )..repeat();
     
-    _jitterController.addListener(() {
-      if (_isRolling) {
-        setState(() {
-          _verticalShake = (_random.nextDouble() - 0.5) * 4;
-        });
-      }
-    });
-    
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
     if (widget.controller.challengeCode.value.isNotEmpty) {
-      // 🔥 INI UNTUK NOMBOR ATAS (CHALLENGE)
+      _playVintageFilmAnimation();
+    }
+  }
+  
+  void _onChallengeChanged() {
+    if (mounted) {
+      _playVintageFilmAnimation();
+    }
+  }
+  
+  // 🔥 INI UNTUK NOMBOR ATAS (CHALLENGE)
   // Bila refresh, dia berkelip laju (Glitch visual)
   void _playVintageFilmAnimation() async {
     setState(() => _isRolling = true);
@@ -721,49 +739,53 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
                     children: List.generate(
                       displayNumbers.length > 5 ? 5 : displayNumbers.length,
                       (index) {
-                        double flickerOpacity = _isRolling 
-                            ? (0.4 + _random.nextDouble() * 0.5)
-                            : 1.0;
-                        
-                        double horizontalJitter = _isRolling 
-                            ? (_random.nextDouble() - 0.5) * 2
-                            : 0.0;
-                        
-                        return Transform.translate(
-                          offset: Offset(horizontalJitter, 0),
-                          child: Opacity(
-                            opacity: flickerOpacity,
-                            child: Container(
-                              width: 24,
-                              alignment: Alignment.center,
-                              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                              child: Text(
-                                displayNumbers.length > index ? displayNumbers[index] : '0',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _isRolling 
-                                      ? Colors.grey.withOpacity(0.8)
-                                      : Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Courier',
-                                  height: 1.0,
-                                  shadows: _isRolling
-                                      ? [
-                                          BoxShadow(
-                                            color: Colors.white.withOpacity(0.3),
-                                            blurRadius: 6,
-                                          ),
-                                        ]
-                                      : [
-                                          const BoxShadow(
-                                            color: Colors.orange,
-                                            blurRadius: 12,
-                                            spreadRadius: 2,
-                                          ),
-                                        ],
-                                ),
-                              ),
+                        return Container(
+                          width: 24,
+                          alignment: Alignment.center,
+                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                          child: Text(
+                            displayNumbers.length > index ? displayNumbers[index] : '0',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'Courier',
+                              height: 1.0,
+                              // Kalau tengah rolling, warna Putih. Kalau tak, Cyan.
+                              color: _isRolling ? Colors.white : Colors.cyanAccent,
+                              
+                              shadows: _isRolling
+                                // MASA GLITCH (Bergerak): Efek Matrix Hijau/Putih
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.white.withOpacity(0.8),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                    const Shadow(
+                                      offset: Offset(-2, 0),
+                                      color: Colors.red,
+                                      blurRadius: 5,
+                                    )
+                                  ]
+                                // MASA DIAM (Static): Efek Neon Blue + Red Shift
+                                : [
+                                    BoxShadow(
+                                      color: Colors.cyanAccent.withOpacity(0.6),
+                                      blurRadius: 15,
+                                      spreadRadius: 2,
+                                    ),
+                                    const Shadow(
+                                      offset: Offset(2, 0),
+                                      color: Colors.blueAccent,
+                                      blurRadius: 2,
+                                    ),
+                                    const Shadow(
+                                      offset: Offset(-2, 0),
+                                      color: Colors.redAccent,
+                                      blurRadius: 2,
+                                    ),
+                                  ],
                             ),
                           ),
                         );
@@ -780,6 +802,9 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
   }
 }
 
+// ============================================
+// ENTERPRISE CONTROLLER
+// ============================================
 class EnterpriseController {
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
   String? _currentNonce;
@@ -801,7 +826,7 @@ class EnterpriseController {
   double _lastMagnitude = 9.8;
   DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
-  Timer? _animationTimer;
+  Timer? _animationTimer; 
   
   EnterpriseController({
     this.isCompromisedDevice = false,
@@ -850,27 +875,10 @@ class EnterpriseController {
     print('⚠️ LOCAL CHALLENGE: ${challengeCode.value} (Low Security Mode)');
   }
 
-  // --- KOD BARU (GLITCH MODE) ---
   void randomizeWheels() {
-    randomizeTrigger.value++;
-    
-    int ticks = 0;
-    _animationTimer?.cancel();
-    
-    // Tukar nombor setiap 50ms (Sangat Laju!)
-    _animationTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      // Generate nombor sampah
-      challengeCode.value = List.generate(5, (_) => Random().nextInt(10));
-      ticks++;
-      
-      // Selepas 25 kali kelip (1.2 saat), baru stop & minta server
-      if (ticks > 25) {
-        timer.cancel();
-        fetchChallengeFromServer(); 
-      }
-    });
-    
-    print('🔀 Glitch Goblin Activated!');
+    randomizeTrigger.value++; // Ini picu glitch kat atas
+    fetchChallengeFromServer(); // Ini tarik data baru
+    print('🔀 Trigger Glitch & Fetch New Data');
   }
 
   void _initSensors() {
@@ -896,7 +904,7 @@ class EnterpriseController {
   }
 
   void registerTouch() => touchScore.value = Random().nextDouble() * 0.3 + 0.7;
-  void registerScroll() => patternScore.value = 0.8;
+  void registerScroll() => patternScore.value = 0.8; 
 
   void bindTransaction(Map<String, dynamic> transactionDetails) {
     _boundTransactionDetails = transactionDetails;
@@ -1005,6 +1013,7 @@ class EnterpriseController {
   void dispose() {
     _accelSub?.cancel();
     _decayTimer?.cancel();
+    _animationTimer?.cancel();
     motionScore.dispose();
     touchScore.dispose();
     patternScore.dispose();
@@ -1013,6 +1022,9 @@ class EnterpriseController {
   }
 }
 
+// ============================================
+// CRYPTEX LOCK
+// ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
   final Function(bool isPanicMode) onSuccess;
@@ -1246,10 +1258,11 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       child: ListWheelScrollView.useDelegate(
         controller: _scrollControllers[index],
         itemExtent: itemExtent,
-        perspective: 0.001,
+        perspective: 0.003,
         diameterRatio: 2.0,
-            physics: const FixedExtentScrollPhysics(), 
-            onSelectedItemChanged: (_) {
+        // 🔥 INI YANG BUAT DIA "AUTO-CENTER" (MAGNET)
+        physics: const FixedExtentScrollPhysics(),
+        onSelectedItemChanged: (_) {
           HapticFeedback.selectionClick();
         },
         childDelegate: ListWheelChildBuilderDelegate(
