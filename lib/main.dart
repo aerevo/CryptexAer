@@ -1024,7 +1024,7 @@ class EnterpriseController {
 }
 
   // ============================================
-// CRYPTEX LOCK (RODA INTERAKTIF)
+// CRYPTEX LOCK (RODA INTERAKTIF - CASINO EDITION)
 // ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
@@ -1046,7 +1046,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   static const double imageWidth = 706.0;
   static const double imageHeight = 610.0;
 
-  // Koordinat Roda (Pixel dari gambar asal)
+  // Koordinat Roda
   static const List<List<double>> wheelCoords = [
     [25, 159, 113, 378],
     [165, 160, 257, 379],
@@ -1074,7 +1074,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void initState() {
     super.initState();
     
-    // 1. Setup Controllers dengan nombor rawak
+    // 1. Setup Controllers
     _scrollControllers = List.generate(
       5,
       (i) => FixedExtentScrollController(
@@ -1082,7 +1082,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       ),
     );
     
-    // 2. Setup Animasi Drift (Terapung)
+    // 2. Setup Drift Animation
     _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
       if (mounted && _activeWheelIndex == null) {
         setState(() {
@@ -1096,7 +1096,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       }
     });
     
-    // 3. Setup Animasi Kelip (Opacity)
+    // 3. Setup Opacity Animation
     _opacityControllers = List.generate(5, (i) {
       final controller = AnimationController(
         vsync: this,
@@ -1116,7 +1116,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       );
     }).toList();
 
-    // 🔥 4. AUTO-PLAY (INTRO): Pusing roda bila paparan muncul!
+    // 🔥 4. INTRO ANIMATION: Pusing roda sebaik sahaja widget dibina
     WidgetsBinding.instance.addPostFrameCallback((_) {
        _playSlotMachineAnimation(); 
     });
@@ -1135,7 +1135,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     super.dispose();
   }
 
-  // --- LOGIC GUNA JARI ---
   void _onWheelScrollStart(int index) {
     setState(() => _activeWheelIndex = index);
     _wheelActiveTimer?.cancel();
@@ -1152,7 +1151,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     });
   }
 
-  // --- LOGIC TEKAN BUTANG ---
   Future<void> _onButtonTap() async {
     setState(() => _isButtonPressed = true);
     HapticFeedback.mediumImpact();
@@ -1175,31 +1173,32 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       widget.onSuccess(result['isPanicMode'] ?? false);
     } else {
       widget.onFail();
-      // 🔥 TRIGGER: Kalau salah, pusing lagi!
+      // 🔥 SALAH PASSWORD: Pusing semula!
       await _playSlotMachineAnimation();
     }
   }
 
-  // 🔥🔥🔥 SLOT MACHINE ENGINE (KASINO STYLE) 🔥🔥🔥
-  // Berfungsi untuk INTRO dan SALAH PASSWORD
+  // 🔥🔥🔥 ENGINE SLOT MACHINE (KASINO STYLE) 🔥🔥🔥
   Future<void> _playSlotMachineAnimation() async {
-    // 1. Pusingkan semua roda serentak (Laju!)
+    // 1. Pusingkan SEMUA roda serentak (Laju & Lama)
+    // Ini meniru gaya mesin slot yang sedang 'rolling'
     for (int i = 0; i < 5; i++) {
       if (!mounted) continue;
       
-      // Target jauh (100 pusingan)
-      // Gunakan curve Linear supaya nampak macam enjin berputar ligat
+      // Kita suruh dia pusing ke sasaran yang SANGAT JAUH (+500 item)
+      // Duration 10 saat (tapi kita akan potong nanti)
+      // Curve Linear supaya kelajuan dia sekata (tak perlahan)
       _scrollControllers[i].animateToItem(
         _scrollControllers[i].selectedItem + 500, 
-        duration: const Duration(seconds: 10), // Set masa panjang, kita akan potong nanti
+        duration: const Duration(seconds: 10), 
         curve: Curves.linear, 
       );
     }
 
-    // 2. Berhentikan satu per satu (Waterfall Effect)
+    // 2. Berhentikan satu per satu (Waterfall Snap)
     for (int i = 0; i < 5; i++) {
-      // Delay berhenti: Roda 1 (0.5s), Roda 2 (1.0s), ...
-      int stopDelay = 500 + (i * 400); 
+      // Roda 1 berhenti lepas 0.5s, Roda 2 lepas 1.0s, dst...
+      int stopDelay = 500 + (i * 500); 
       
       Future.delayed(Duration(milliseconds: stopDelay), () {
         if(mounted) _stopWheelAtRandom(i);
@@ -1210,20 +1209,21 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   Future<void> _stopWheelAtRandom(int index) async {
     if (!mounted) return;
 
-    // Ambil posisi semasa yang tengah laju tu
+    // Ambil posisi semasa (yang sedang laju pusing)
     int currentItem = _scrollControllers[index].selectedItem;
     
-    // Tambah sikit untuk landing (10-20 item lagi)
+    // Tambah sikit je lagi (10-20 item) untuk pendaratan
     int targetItem = currentItem + 20 + Random().nextInt(10); 
 
     // FORCE STOP dengan efek 'Sentak' (EaseOutBack)
+    // Ini yang bagi bunyi "KTAK!" dan visual "terlajak sikit masuk balik"
     await _scrollControllers[index].animateToItem(
       targetItem,
       duration: const Duration(milliseconds: 800), 
-      curve: Curves.easeOutBack, // Ini yang buat bunyi KTAK!
+      curve: Curves.easeOutBack, 
     );
     
-    // Bunyi mekanikal
+    // Bunyi impak besi
     HapticFeedback.heavyImpact();
   }
 
@@ -1240,7 +1240,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           height: calculatedHeight,
           child: Stack(
             children: [
-              // Gambar Background (Z_Wheel)
               Positioned.fill(
                 child: Image.asset(
                   'assets/z_wheel.png',
@@ -1287,7 +1286,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
           height: actualHeight,
           child: NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              // Logic detect user sentuh
               if (notification is ScrollStartNotification) {
                  if (_scrollControllers[i].position == notification.metrics) {
                    _onWheelScrollStart(i);
@@ -1320,7 +1318,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
         itemExtent: itemExtent,
         perspective: 0.003,
         diameterRatio: 2.0,
-        // 🔥 AUTO-CENTER (MAGNET)
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (_) {
           HapticFeedback.selectionClick();
@@ -1412,6 +1409,46 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 }
 
+  Widget _buildGlowingButton(double screenWidth, double screenHeight) {
+    double left = buttonCoords[0];
+    double top = buttonCoords[1];
+    double right = buttonCoords[2];
+    double bottom = buttonCoords[3];
+
+    double actualLeft = screenWidth * (left / imageWidth);
+    double actualTop = screenHeight * (top / imageHeight);
+    double actualWidth = screenWidth * ((right - left) / imageWidth);
+    double actualHeight = screenHeight * ((bottom - top) / imageHeight);
+
+    return Positioned(
+      left: actualLeft,
+      top: actualTop,
+      width: actualWidth,
+      height: actualHeight,
+      child: GestureDetector(
+        onTap: _onButtonTap,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          children: [
+            Container(color: Colors.transparent),
+            if (_isButtonPressed)
+              IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(color: const Color(0xFFFF5722).withOpacity(0.6), blurRadius: 30, spreadRadius: 5),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
   // 🔥 INI UNTUK RODA BAWAH (INTERACTIVE WHEELS)
   // Bila salah, dia pusing macam mesin judi
   Future<void> _playSlotMachineAnimation() async {
@@ -1444,4 +1481,5 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     HapticFeedback.heavyImpact();
   }
 }
+
 
