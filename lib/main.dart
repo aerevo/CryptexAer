@@ -12,11 +12,9 @@ import 'package:geolocator/geolocator.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
-  
   runApp(const MyApp());
 }
 
@@ -39,6 +37,37 @@ class MyApp extends StatelessWidget {
 }
 
 // ============================================
+// CONFIGURATION: DUAL MODE DATA
+// ============================================
+enum WheelMode { threeWheel, fiveWheel }
+
+class ZKineticConfig {
+  static const double imageWidth3 = 712.0;
+  static const double imageHeight3 = 600.0;
+  
+  static const double imageWidth5 = 706.0;
+  static const double imageHeight5 = 610.0;
+
+  // Koordinat 3 Roda (Baru)
+  static const List<List<double>> coords3 = [
+    [168, 158, 262, 384], 
+    [309, 154, 403, 376], 
+    [454, 150, 549, 379], 
+  ];
+  static const List<double> btnCoords3 = [113, 430, 605, 545];
+
+  // Koordinat 5 Roda (Lama)
+  static const List<List<double>> coords5 = [
+    [25, 159, 113, 378],
+    [165, 160, 257, 379],
+    [308, 160, 396, 379],
+    [448, 159, 541, 378],
+    [591, 159, 681, 379],
+  ];
+  static const List<double> btnCoords5 = [123, 433, 594, 545];
+}
+
+// ============================================
 // SECURITY PRE-CHECK
 // ============================================
 class SecurityCheckScreen extends StatefulWidget {
@@ -49,7 +78,7 @@ class SecurityCheckScreen extends StatefulWidget {
 }
 
 class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
-  String _status = "Initializing security checks...";
+  String _status = "Initializing dual-mode system...";
   bool _isRooted = false;
   bool _isDeveloperMode = false;
   bool _checkComplete = false;
@@ -82,13 +111,7 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
       print('⚠️ Root detection error: $e');
     }
     
-    setState(() => _status = "Verifying server connection...");
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // Simulate ping
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    setState(() => _status = "✅ Security verified");
+    setState(() => _status = "Loading engine...");
     await Future.delayed(const Duration(milliseconds: 800));
     
     if (mounted) {
@@ -168,45 +191,15 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
             ),
             if (_needsLocationConsent && !_checkComplete) ...[
               const SizedBox(height: 40),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  border: Border.all(color: Colors.orange, width: 2),
-                  borderRadius: BorderRadius.circular(12),
+              ElevatedButton(
+                onPressed: _requestLocationAndProceed,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
                 ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.warning_amber_rounded, size: 50, color: Colors.orange),
-                    const SizedBox(height: 15),
-                    const Text(
-                      'Perangkat Tidak Selamat',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Untuk melanjutkan dengan perangkat yang dikompromikan, kami perlu lokasi peranti anda (satu kali).',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: _requestLocationAndProceed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                      ),
-                      child: const Text(
-                        'Berikan Izin Lokasi',
-                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
+                child: const Text(
+                  'Authorize & Proceed',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -218,7 +211,7 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
 }
 
 // ============================================
-// SUCCESS SCREEN (PROFESSIONAL GREEN CONTAINER)
+// SUCCESS SCREEN
 // ============================================
 class SuccessScreen extends StatelessWidget {
   final String message;
@@ -232,7 +225,6 @@ class SuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Tentukan warna tema: Hijau Neon (Success) atau Oren (Panic)
     final Color themeColor = isPanicMode ? Colors.orange : const Color(0xFF00E676);
     final IconData iconData = isPanicMode ? Icons.warning_amber_rounded : Icons.lock_open_rounded;
     final String titleText = isPanicMode ? 'SILENT ALARM' : 'ACCESS GRANTED';
@@ -241,15 +233,12 @@ class SuccessScreen extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Center(
         child: Container(
-          // Margin kiri kanan supaya tak rapat dinding
           margin: const EdgeInsets.symmetric(horizontal: 30),
           padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 25),
           decoration: BoxDecoration(
-            color: Colors.black, // Dasar hitam
+            color: Colors.black,
             borderRadius: BorderRadius.circular(24),
-            // Border menyala
             border: Border.all(color: themeColor, width: 2),
-            // Background dalam sikit pudar + Glow luar
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -259,7 +248,6 @@ class SuccessScreen extends StatelessWidget {
               ],
             ),
             boxShadow: [
-              // Glow Effect
               BoxShadow(
                 color: themeColor.withOpacity(0.3),
                 blurRadius: 30,
@@ -270,7 +258,6 @@ class SuccessScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Bulatan Icon
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -278,16 +265,9 @@ class SuccessScreen extends StatelessWidget {
                   color: themeColor.withOpacity(0.1),
                   border: Border.all(color: themeColor.withOpacity(0.5), width: 1),
                 ),
-                child: Icon(
-                  iconData,
-                  size: 60,
-                  color: themeColor,
-                ),
+                child: Icon(iconData, size: 60, color: themeColor),
               ),
-              
               const SizedBox(height: 30),
-              
-              // Tajuk Besar
               Text(
                 titleText,
                 style: TextStyle(
@@ -300,10 +280,7 @@ class SuccessScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              
               const SizedBox(height: 10),
-              
-              // Mesej Kecil (Welcome Back etc)
               Text(
                 message.toUpperCase(),
                 textAlign: TextAlign.center,
@@ -314,10 +291,7 @@ class SuccessScreen extends StatelessWidget {
                   letterSpacing: 1,
                 ),
               ),
-              
               const SizedBox(height: 35),
-              
-              // Tombol Continue
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -331,16 +305,10 @@ class SuccessScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    elevation: 5,
-                    shadowColor: themeColor.withOpacity(0.5),
                   ),
                   child: const Text(
                     'PROCEED',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
               ),
@@ -353,7 +321,7 @@ class SuccessScreen extends StatelessWidget {
 }
 
 // ============================================
-// MAIN LOCK SCREEN (3-WHEEL VERSION)
+// MAIN LOCK SCREEN (DUAL MODE)
 // ============================================
 class ZKineticLockScreen extends StatefulWidget {
   final bool isCompromisedDevice;
@@ -387,6 +355,23 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     super.dispose();
   }
 
+  void _toggleMode() {
+    _controller.toggleWheelMode();
+    setState(() {}); // Rebuild UI
+    HapticFeedback.heavyImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _controller.currentMode == WheelMode.threeWheel 
+            ? 'SWITCHED TO 3-WHEEL MODE (FAST)' 
+            : 'SWITCHED TO 5-WHEEL MODE (SECURE)'
+        ),
+        duration: const Duration(seconds: 1),
+        backgroundColor: const Color(0xFFFF5722),
+      ),
+    );
+  }
+
   void _onSuccess(bool isPanicMode) {
     HapticFeedback.heavyImpact();
     Navigator.pushReplacement(
@@ -417,9 +402,19 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          // GEAR ICON FOR MODE SWITCHING
+          Positioned(
+            top: 50,
+            right: 20,
+            child: IconButton(
+              icon: const Icon(Icons.settings, color: Colors.white70, size: 28),
+              onPressed: _toggleMode,
+            ),
+          ),
+
           Center(
             child: Container(
-              padding: const EdgeInsets.only(top: 24, bottom: 24, left: 0, right: 0),
+              padding: const EdgeInsets.only(top: 24, bottom: 24),
               margin: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
                 color: const Color(0xFFFF5722),
@@ -436,6 +431,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // TITLE HEADER
                   Stack(
                     alignment: Alignment.center,
                     children: [
@@ -453,10 +449,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                       ),
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
-                          colors: [
-                            Color(0xFFFFFFFF),
-                            Color(0xFFFFCCBC),
-                          ],
+                          colors: [Color(0xFFFFFFFF), Color(0xFFFFCCBC)],
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                         ).createShader(bounds),
@@ -475,6 +468,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 12),
                   
+                  // SUBTITLE PILL
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
@@ -494,17 +488,18 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 6,
-                          height: 6,
+                          width: 6, height: 6,
                           decoration: const BoxDecoration(
                             color: Colors.greenAccent,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
-                          'INTELLIGENT-GRADE BIOMETRIC LOCK',
-                          style: TextStyle(
+                        Text(
+                          _controller.currentMode == WheelMode.threeWheel
+                              ? '3-FACTOR BIOMETRIC LOCK'
+                              : '5-FACTOR ENTERPRISE LOCK',
+                          style: const TextStyle(
                             fontSize: 9,
                             color: Colors.white,
                             letterSpacing: 1.5,
@@ -517,7 +512,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 25),
                   
-                  // 🔥 INI BAHAGIAN NOMBOR ATAS (SIMON SAYS - CHAOS - 3 DIGITS)
+                  // 🔥 DYNAMIC CHALLENGE DISPLAY (3 OR 5 DIGITS)
                   VintageFilmChallengeDisplay(controller: _controller),
                   
                   const SizedBox(height: 15),
@@ -534,12 +529,12 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 10),
                   
-                  // 🔥 INI BAHAGIAN RODA BAWAH (KASINO - 3 WHEELS)
+                  // 🔥 DYNAMIC WHEEL LOCK (3 OR 5 WHEELS)
                   ValueListenableBuilder<int>(
                     valueListenable: _controller.randomizeTrigger,
                     builder: (context, trigger, _) {
                       return CryptexLock(
-                        key: ValueKey(trigger),
+                        key: ValueKey("${_controller.currentMode}_$trigger"), // Force rebuild on mode switch
                         controller: _controller,
                         onSuccess: _onSuccess,
                         onFail: _onFail,
@@ -549,6 +544,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 24),
                   
+                  // STATUS INDICATORS
                   ValueListenableBuilder<double>(
                     valueListenable: _controller.motionScore,
                     builder: (context, motion, _) {
@@ -636,7 +632,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 }
 
 // ============================================
-// VISUAL: LINKIN PARK GLITCH (RANDOM CHAOS MODE - 3 DIGITS)
+// VISUAL: LINKIN PARK GLITCH (DUAL MODE SUPPORT)
 // ============================================
 class VintageFilmChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
@@ -654,7 +650,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
   final Random _random = Random();
   
   int _activeGlitchIndex = -1; 
-  List<String> _displayNumbers = ['0', '0', '0']; // 3 Digits
+  List<String> _displayNumbers = []; 
   Timer? _sequenceTimer;
   
   @override
@@ -665,6 +661,10 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
       duration: const Duration(milliseconds: 80),
     )..repeat(reverse: true);
     
+    // Init display numbers based on current mode length
+    int length = widget.controller.currentMode == WheelMode.threeWheel ? 3 : 5;
+    _displayNumbers = List.generate(length, (index) => '0');
+
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -674,27 +674,40 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
   
   void _onChallengeChanged() {
     if (mounted) {
+      // Update display list size if mode changed
+      int requiredLen = widget.controller.currentMode == WheelMode.threeWheel ? 3 : 5;
+      if (_displayNumbers.length != requiredLen) {
+        setState(() {
+          _displayNumbers = List.generate(requiredLen, (index) => '0');
+        });
+      }
       _startChaosSequence();
     }
   }
   
-  // 🔥 FUNGSI CHAOS (Lompat-lompat tak ikut urutan)
   void _startChaosSequence() async {
     _sequenceTimer?.cancel();
     if (mounted) setState(() => _activeGlitchIndex = -1);
 
     List<int> targetCode = widget.controller.challengeCode.value;
-    if (targetCode.isEmpty) targetCode = [8, 2, 9]; // Dummy 3 digits
+    int digitCount = widget.controller.currentMode == WheelMode.threeWheel ? 3 : 5;
+
+    // Fallback if empty
+    if (targetCode.isEmpty) {
+       targetCode = widget.controller.currentMode == WheelMode.threeWheel 
+           ? [8, 2, 9] 
+           : [8, 3, 9, 1, 4];
+    }
 
     _sequenceTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
       if (!mounted) return;
       
       setState(() {
-        // 1. Pilih SATU index secara RAWAK (0 sampai 2)
-        _activeGlitchIndex = _random.nextInt(3);
-        
-        // 2. Tunjukkan nombor sebenar pada index yang kena 'hit'
-        _displayNumbers[_activeGlitchIndex] = targetCode[_activeGlitchIndex].toString();
+        _activeGlitchIndex = _random.nextInt(digitCount);
+        // Safety check index bounds
+        if (_activeGlitchIndex < targetCode.length) {
+            _displayNumbers[_activeGlitchIndex] = targetCode[_activeGlitchIndex].toString();
+        }
       });
 
       HapticFeedback.selectionClick();
@@ -711,18 +724,16 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
 
   @override
   Widget build(BuildContext context) {
-    // 1) KECILKAN SAIZ: Scale 0.85 
+    int digitCount = widget.controller.currentMode == WheelMode.threeWheel ? 3 : 5;
+
     return Transform.scale(
       scale: 0.85, 
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 40),
-        // 2) KECILKAN HEIGHT: Vertical Padding = 6 (Nipis)
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.8),
           borderRadius: BorderRadius.circular(8),
-          
-          // WARNA BERLAPIS (HIJAU + PURPLE)
           border: Border.all(
             color: Colors.greenAccent, 
             width: 2
@@ -737,13 +748,17 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(3, (index) { // 3 DIGITS
+          children: List.generate(digitCount, (index) { 
             bool isGlitching = index == _activeGlitchIndex;
-            // Logic Chaos: Kita tunjuk semua nombor sentiasa, cuma satu je gegar
             bool hasRevealed = true; 
 
+            // Safety check for display numbers list
+            String textToDisplay = (index < _displayNumbers.length) 
+                ? _displayNumbers[index] 
+                : '0';
+
             return _buildLinkinParkDigit(
-              text: hasRevealed ? _displayNumbers[index] : _random.nextInt(10).toString(),
+              text: hasRevealed ? textToDisplay : _random.nextInt(10).toString(),
               isGlitching: isGlitching,
             );
           }),
@@ -797,9 +812,11 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
 }
 
 // ============================================
-// ENTERPRISE CONTROLLER (3-DIGIT LOGIC)
+// ENTERPRISE CONTROLLER (DUAL MODE LOGIC)
 // ============================================
 class EnterpriseController {
+  WheelMode currentMode = WheelMode.threeWheel; // Default start with 3-wheel
+
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
   String? _currentNonce;
   
@@ -830,9 +847,18 @@ class EnterpriseController {
     fetchChallengeFromServer();
   }
 
+  void toggleWheelMode() {
+    currentMode = (currentMode == WheelMode.threeWheel) 
+        ? WheelMode.fiveWheel 
+        : WheelMode.threeWheel;
+    
+    // Refresh challenge immediately
+    randomizeWheels();
+  }
+
   Future<void> fetchChallengeFromServer() async {
     try {
-      print('🔄 Fetching secure challenge from server...');
+      print('🔄 Fetching challenge for mode: $currentMode');
       
       final response = await http.post(
         Uri.parse('$_serverUrl/getChallenge'),
@@ -841,15 +867,15 @@ class EnterpriseController {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
         if (data['success'] == true) {
           _currentNonce = data['nonce'];
           
-          // AMBIL 3 DIGIT SAHAJA
           List<dynamic> rawCode = data['challengeCode'];
-          challengeCode.value = rawCode.take(3).map((e) => e as int).toList();
+          // Adapt to mode
+          int count = currentMode == WheelMode.threeWheel ? 3 : 5;
+          challengeCode.value = rawCode.take(count).map((e) => e as int).toList();
           
-          print('✅ Secure Challenge Received: ${challengeCode.value}');
+          print('✅ Challenge: ${challengeCode.value}');
         } else {
           throw Exception('Server returned success=false');
         }
@@ -857,22 +883,20 @@ class EnterpriseController {
         throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('⚠️ Server offline/slow. Using Fallback Mode. Error: $e');
+      print('⚠️ Fallback Local Challenge');
       _generateLocalChallenge();
     }
   }
 
   void _generateLocalChallenge() {
-    // GENERATE 3 DIGIT SAHAJA
-    challengeCode.value = List.generate(3, (_) => Random().nextInt(10));
+    int count = currentMode == WheelMode.threeWheel ? 3 : 5;
+    challengeCode.value = List.generate(count, (_) => Random().nextInt(10));
     _currentNonce = "OFFLINE_MODE";
-    print('⚠️ LOCAL CHALLENGE: ${challengeCode.value} (Low Security Mode)');
   }
 
   void randomizeWheels() {
     randomizeTrigger.value++; 
     fetchChallengeFromServer(); 
-    print('🔀 Trigger Glitch & Fetch New Data');
   }
 
   void _initSensors() {
@@ -900,98 +924,22 @@ class EnterpriseController {
   void registerTouch() => touchScore.value = Random().nextDouble() * 0.3 + 0.7;
   void registerScroll() => patternScore.value = 0.8; 
 
-  void bindTransaction(Map<String, dynamic> transactionDetails) {
-    _boundTransactionDetails = transactionDetails;
-    final Map<String, dynamic> hashData = {
-      'amount': transactionDetails['amount'],
-      'recipient': transactionDetails['recipient'],
-      'currency': transactionDetails['currency'] ?? 'MYR',
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-    final sortedJson = json.encode(hashData);
-    _boundTransactionHash = sha256.convert(utf8.encode(sortedJson)).toString();
-  }
-
-  Future<void> _sendThreatIntelligence({required String type, required String severity}) async {
-    print('📡 [THREAT INTEL] Sending: $type ($severity) | Loc: ${deviceLocation?.latitude ?? 'N/A'}');
-  }
-
   Future<Map<String, dynamic>> verify(List<int> inputCode) async {
-    if (_currentNonce == "OFFLINE_MODE") {
-      print('⚠️ OFFLINE VERIFICATION (Low Security)');
-      
-      String inputStr = inputCode.join();
-      String targetStr = challengeCode.value.join();
-      String panicStr = challengeCode.value.reversed.join();
+    // Basic verification
+    String inputStr = inputCode.join();
+    String targetStr = challengeCode.value.join();
+    String panicStr = challengeCode.value.reversed.join();
 
-      if (inputStr == panicStr) {
-        print('🚨 PANIC MODE (Offline)');
-        await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
-        return {
-          'allowed': true,
-          'isPanicMode': true,
-        };
-      }
-
-      bool motionOK = motionScore.value > 0.15;
-      bool codeCorrect = inputStr == targetStr;
-
-      if (codeCorrect && motionOK) {
-        return {
-          'allowed': true,
-          'isPanicMode': false,
-        };
-      } else {
-        randomizeWheels();
-        return {'allowed': false, 'isPanicMode': false};
-      }
+    if (inputStr == panicStr) {
+      return {'allowed': true, 'isPanicMode': true};
     }
 
-    try {
-      print('🔄 Sending attestation to server...');
-      
-      final response = await http.post(
-        Uri.parse('$_serverUrl/attest'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'nonce': _currentNonce,
-          'deviceId': 'device_${deviceLocation?.latitude ?? Random().nextInt(99999)}',
-          'userResponse': inputCode,
-          'biometricData': {
-            'motion': motionScore.value,
-            'touch': touchScore.value,
-            'pattern': patternScore.value,
-          }
-        }),
-      ).timeout(const Duration(seconds: 5));
+    bool motionOK = motionScore.value > 0.15;
+    bool codeCorrect = inputStr == targetStr;
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final verdict = data['verdict'];
-        
-        print('✅ Server Response: $verdict');
-        
-        if (verdict == "APPROVED_SILENT_ALARM") {
-          await _sendThreatIntelligence(type: "PANIC_DURESS", severity: "CRITICAL");
-          return {
-            'allowed': true,
-            'isPanicMode': true,
-          };
-        } else if (verdict == "APPROVED") {
-          return {
-            'allowed': true,
-            'isPanicMode': false,
-            'boundTransactionHash': _boundTransactionHash
-          };
-        }
-      }
-      
-      print('❌ Server Reject: ${response.body}');
-      randomizeWheels();
-      return {'allowed': false, 'isPanicMode': false};
-      
-    } catch (e) {
-      print('⚠️ Verification Error: $e');
+    if (codeCorrect && motionOK) {
+      return {'allowed': true, 'isPanicMode': false};
+    } else {
       randomizeWheels();
       return {'allowed': false, 'isPanicMode': false};
     }
@@ -1009,7 +957,7 @@ class EnterpriseController {
 }
 
 // ============================================
-// CRYPTEX LOCK (RODA BAWAH: 3-WHEEL VERSION)
+// CRYPTEX LOCK (DUAL MODE ENGINE)
 // ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
@@ -1028,19 +976,6 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
-  // CONFIG 3-WHEEL
-  static const double imageWidth = 712.0;
-  static const double imageHeight = 600.0;
-
-  // Koordinat Roda (3 RODA)
-  static const List<List<double>> wheelCoords = [
-    [168, 158, 262, 384], // Wheel 1
-    [309, 154, 403, 376], // Wheel 2
-    [454, 150, 549, 379], // Wheel 3
-  ];
-
-  static const List<double> buttonCoords = [113, 430, 605, 545];
-
   late List<FixedExtentScrollController> _scrollControllers;
 
   int? _activeWheelIndex;
@@ -1049,25 +984,36 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   
   final Random _random = Random();
   late Timer _driftTimer;
-  final List<Offset> _textDriftOffsets = List.generate(3, (_) => Offset.zero); // 3 DIGITS
+  late List<Offset> _textDriftOffsets;
   
   late List<AnimationController> _opacityControllers;
   late List<Animation<double>> _opacityAnimations;
+
+  // Helpers to get current config
+  WheelMode get mode => widget.controller.currentMode;
+  int get wheelCount => mode == WheelMode.threeWheel ? 3 : 5;
+  double get imgWidth => mode == WheelMode.threeWheel ? ZKineticConfig.imageWidth3 : ZKineticConfig.imageWidth5;
+  double get imgHeight => mode == WheelMode.threeWheel ? ZKineticConfig.imageHeight3 : ZKineticConfig.imageHeight5;
+  String get imgAsset => mode == WheelMode.threeWheel ? 'assets/z_wheel3.png' : 'assets/z_wheel.png';
+  List<List<double>> get coords => mode == WheelMode.threeWheel ? ZKineticConfig.coords3 : ZKineticConfig.coords5;
+  List<double> get btnCoords => mode == WheelMode.threeWheel ? ZKineticConfig.btnCoords3 : ZKineticConfig.btnCoords5;
 
   @override
   void initState() {
     super.initState();
     
-    // GENERATE 3 CONTROLLER
+    // Initialize list based on current mode
     _scrollControllers = List.generate(
-      3,
+      wheelCount,
       (i) => FixedExtentScrollController(initialItem: _random.nextInt(10)),
     );
     
+    _textDriftOffsets = List.generate(wheelCount, (_) => Offset.zero);
+
     _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
       if (mounted && _activeWheelIndex == null) {
         setState(() {
-          for (int i = 0; i < 3; i++) {
+          for (int i = 0; i < wheelCount; i++) {
             _textDriftOffsets[i] = Offset(
               (_random.nextDouble() - 0.5) * 2.5,
               (_random.nextDouble() - 0.5) * 2.5,
@@ -1077,7 +1023,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       }
     });
     
-    _opacityControllers = List.generate(3, (i) {
+    _opacityControllers = List.generate(wheelCount, (i) {
       final controller = AnimationController(
         vsync: this,
         duration: Duration(milliseconds: 1800 + (_random.nextInt(400))),
@@ -1094,7 +1040,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       );
     }).toList();
 
-    // 🔥 AUTO START RODA BAWAH (INTRO)
     WidgetsBinding.instance.addPostFrameCallback((_) {
        _playSlotMachineAnimation(); 
     });
@@ -1140,15 +1085,12 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       widget.onSuccess(result['isPanicMode'] ?? false);
     } else {
       widget.onFail();
-      // 🔥 SALAH PASS: PUSING LAGI
       await _playSlotMachineAnimation();
     }
   }
 
-  // 🔥 ENGINE SLOT MACHINE (KASINO)
   Future<void> _playSlotMachineAnimation() async {
-    // 1. Pusing serentak (Laju) - 3 Roda
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < wheelCount; i++) {
       if (!mounted) continue;
       _scrollControllers[i].animateToItem(
         _scrollControllers[i].selectedItem + 500, 
@@ -1157,8 +1099,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       );
     }
 
-    // 2. Berhenti satu per satu (Waterfall Snap) - 3 Roda
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < wheelCount; i++) {
       int stopDelay = 500 + (i * 500); 
       Future.delayed(Duration(milliseconds: stopDelay), () {
         if(mounted) _stopWheelAtRandom(i);
@@ -1171,7 +1112,6 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     int currentItem = _scrollControllers[index].selectedItem;
     int targetItem = currentItem + 20 + Random().nextInt(10); 
 
-    // FORCE STOP (KTAK!)
     await _scrollControllers[index].animateToItem(
       targetItem,
       duration: const Duration(milliseconds: 800), 
@@ -1185,7 +1125,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     return LayoutBuilder(
       builder: (context, constraints) {
         double availableWidth = constraints.maxWidth;
-        double aspectRatio = imageWidth / imageHeight;
+        // Calculate aspect ratio dynamically based on current image
+        double aspectRatio = imgWidth / imgHeight;
         double calculatedHeight = availableWidth / aspectRatio;
 
         return SizedBox(
@@ -1195,7 +1136,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
             children: [
               Positioned.fill(
                 child: Image.asset(
-                  'assets/z_wheel3.png', // PENTING: Guna 3 wheel image
+                  imgAsset, // Dynamic Image (3 or 5)
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
@@ -1218,16 +1159,19 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   List<Widget> _buildWheelOverlays(double screenWidth, double screenHeight) {
     List<Widget> overlays = [];
-    for (int i = 0; i < wheelCoords.length; i++) {
-      double left = wheelCoords[i][0];
-      double top = wheelCoords[i][1];
-      double right = wheelCoords[i][2];
-      double bottom = wheelCoords[i][3];
+    // Dynamic Coords
+    List<List<double>> currentCoords = coords;
 
-      double actualLeft = screenWidth * (left / imageWidth);
-      double actualTop = screenHeight * (top / imageHeight);
-      double actualWidth = screenWidth * ((right - left) / imageWidth);
-      double actualHeight = screenHeight * ((bottom - top) / imageHeight);
+    for (int i = 0; i < currentCoords.length; i++) {
+      double left = currentCoords[i][0];
+      double top = currentCoords[i][1];
+      double right = currentCoords[i][2];
+      double bottom = currentCoords[i][3];
+
+      double actualLeft = screenWidth * (left / imgWidth);
+      double actualTop = screenHeight * (top / imgHeight);
+      double actualWidth = screenWidth * ((right - left) / imgWidth);
+      double actualHeight = screenHeight * ((bottom - top) / imgHeight);
 
       overlays.add(
         Positioned(
@@ -1315,15 +1259,18 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   }
 
   Widget _buildGlowingButton(double screenWidth, double screenHeight) {
-    double left = buttonCoords[0];
-    double top = buttonCoords[1];
-    double right = buttonCoords[2];
-    double bottom = buttonCoords[3];
+    // Dynamic Button Coords
+    List<double> currentBtnCoords = btnCoords;
 
-    double actualLeft = screenWidth * (left / imageWidth);
-    double actualTop = screenHeight * (top / imageHeight);
-    double actualWidth = screenWidth * ((right - left) / imageWidth);
-    double actualHeight = screenHeight * ((bottom - top) / imageHeight);
+    double left = currentBtnCoords[0];
+    double top = currentBtnCoords[1];
+    double right = currentBtnCoords[2];
+    double bottom = currentBtnCoords[3];
+
+    double actualLeft = screenWidth * (left / imgWidth);
+    double actualTop = screenHeight * (top / imgHeight);
+    double actualWidth = screenWidth * ((right - left) / imgWidth);
+    double actualHeight = screenHeight * ((bottom - top) / imgHeight);
 
     return Positioned(
       left: actualLeft,
