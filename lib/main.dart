@@ -355,19 +355,20 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
     super.dispose();
   }
 
+  // 🔥 FUNGSI TUKAR MODE
   void _toggleMode() {
     _controller.toggleWheelMode();
-    setState(() {}); // Rebuild UI
-    HapticFeedback.heavyImpact();
+    setState(() {}); // Rebuild UI immediately
+    HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           _controller.currentMode == WheelMode.threeWheel 
-            ? 'SWITCHED TO 3-WHEEL MODE (FAST)' 
-            : 'SWITCHED TO 5-WHEEL MODE (SECURE)'
+            ? '🚀 MODE: 3-WHEEL (FAST)' 
+            : '🛡️ MODE: 5-WHEEL (SECURE)'
         ),
         duration: const Duration(seconds: 1),
-        backgroundColor: const Color(0xFFFF5722),
+        backgroundColor: Colors.blueAccent,
       ),
     );
   }
@@ -400,18 +401,20 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      
+      // 🔥 BUTTON BESAR UNTUK TUKAR MODE DI SINI
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _toggleMode,
+        backgroundColor: Colors.cyanAccent,
+        icon: const Icon(Icons.swap_horiz, color: Colors.black),
+        label: const Text(
+          "TUKAR MODE (3 ↔ 5)", 
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)
+        ),
+      ),
+      
       body: Stack(
         children: [
-          // GEAR ICON FOR MODE SWITCHING
-          Positioned(
-            top: 50,
-            right: 20,
-            child: IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white70, size: 28),
-              onPressed: _toggleMode,
-            ),
-          ),
-
           Center(
             child: Container(
               padding: const EdgeInsets.only(top: 24, bottom: 24),
