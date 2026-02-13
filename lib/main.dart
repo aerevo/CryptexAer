@@ -353,7 +353,7 @@ class SuccessScreen extends StatelessWidget {
 }
 
 // ============================================
-// MAIN LOCK SCREEN
+// MAIN LOCK SCREEN (3-WHEEL VERSION)
 // ============================================
 class ZKineticLockScreen extends StatefulWidget {
   final bool isCompromisedDevice;
@@ -517,7 +517,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 25),
                   
-                  // 🔥 INI BAHAGIAN NOMBOR ATAS (SIMON SAYS - CHAOS)
+                  // 🔥 INI BAHAGIAN NOMBOR ATAS (SIMON SAYS - CHAOS - 3 DIGITS)
                   VintageFilmChallengeDisplay(controller: _controller),
                   
                   const SizedBox(height: 15),
@@ -534,7 +534,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 10),
                   
-                  // 🔥 INI BAHAGIAN RODA BAWAH (KASINO)
+                  // 🔥 INI BAHAGIAN RODA BAWAH (KASINO - 3 WHEELS)
                   ValueListenableBuilder<int>(
                     valueListenable: _controller.randomizeTrigger,
                     builder: (context, trigger, _) {
@@ -636,7 +636,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 }
 
 // ============================================
-// VISUAL: LINKIN PARK GLITCH (RANDOM CHAOS MODE)
+// VISUAL: LINKIN PARK GLITCH (RANDOM CHAOS MODE - 3 DIGITS)
 // ============================================
 class VintageFilmChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
@@ -654,7 +654,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
   final Random _random = Random();
   
   int _activeGlitchIndex = -1; 
-  List<String> _displayNumbers = ['0', '0', '0', '0', '0']; 
+  List<String> _displayNumbers = ['0', '0', '0']; // 3 Digits
   Timer? _sequenceTimer;
   
   @override
@@ -684,14 +684,14 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
     if (mounted) setState(() => _activeGlitchIndex = -1);
 
     List<int> targetCode = widget.controller.challengeCode.value;
-    if (targetCode.isEmpty) targetCode = [8, 3, 9, 1, 4]; 
+    if (targetCode.isEmpty) targetCode = [8, 2, 9]; // Dummy 3 digits
 
     _sequenceTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
       if (!mounted) return;
       
       setState(() {
-        // 1. Pilih SATU index secara RAWAK (0 sampai 4)
-        _activeGlitchIndex = _random.nextInt(5);
+        // 1. Pilih SATU index secara RAWAK (0 sampai 2)
+        _activeGlitchIndex = _random.nextInt(3);
         
         // 2. Tunjukkan nombor sebenar pada index yang kena 'hit'
         _displayNumbers[_activeGlitchIndex] = targetCode[_activeGlitchIndex].toString();
@@ -737,7 +737,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(5, (index) {
+          children: List.generate(3, (index) { // 3 DIGITS
             bool isGlitching = index == _activeGlitchIndex;
             // Logic Chaos: Kita tunjuk semua nombor sentiasa, cuma satu je gegar
             bool hasRevealed = true; 
@@ -797,7 +797,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
 }
 
 // ============================================
-// ENTERPRISE CONTROLLER
+// ENTERPRISE CONTROLLER (3-DIGIT LOGIC)
 // ============================================
 class EnterpriseController {
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
@@ -845,8 +845,9 @@ class EnterpriseController {
         if (data['success'] == true) {
           _currentNonce = data['nonce'];
           
+          // AMBIL 3 DIGIT SAHAJA
           List<dynamic> rawCode = data['challengeCode'];
-          challengeCode.value = rawCode.map((e) => e as int).toList();
+          challengeCode.value = rawCode.take(3).map((e) => e as int).toList();
           
           print('✅ Secure Challenge Received: ${challengeCode.value}');
         } else {
@@ -862,7 +863,8 @@ class EnterpriseController {
   }
 
   void _generateLocalChallenge() {
-    challengeCode.value = List.generate(5, (_) => Random().nextInt(10));
+    // GENERATE 3 DIGIT SAHAJA
+    challengeCode.value = List.generate(3, (_) => Random().nextInt(10));
     _currentNonce = "OFFLINE_MODE";
     print('⚠️ LOCAL CHALLENGE: ${challengeCode.value} (Low Security Mode)');
   }
@@ -1007,7 +1009,7 @@ class EnterpriseController {
 }
 
 // ============================================
-// CRYPTEX LOCK (RODA BAWAH: CASINO STYLE)
+// CRYPTEX LOCK (RODA BAWAH: 3-WHEEL VERSION)
 // ============================================
 class CryptexLock extends StatefulWidget {
   final EnterpriseController controller;
@@ -1026,19 +1028,18 @@ class CryptexLock extends StatefulWidget {
 }
 
 class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin {
-  static const double imageWidth = 706.0;
-  static const double imageHeight = 610.0;
+  // CONFIG 3-WHEEL
+  static const double imageWidth = 712.0;
+  static const double imageHeight = 600.0;
 
-  // Koordinat Roda
+  // Koordinat Roda (3 RODA)
   static const List<List<double>> wheelCoords = [
-    [25, 159, 113, 378],
-    [165, 160, 257, 379],
-    [308, 160, 396, 379],
-    [448, 159, 541, 378],
-    [591, 159, 681, 379],
+    [168, 158, 262, 384], // Wheel 1
+    [309, 154, 403, 376], // Wheel 2
+    [454, 150, 549, 379], // Wheel 3
   ];
 
-  static const List<double> buttonCoords = [123, 433, 594, 545];
+  static const List<double> buttonCoords = [113, 430, 605, 545];
 
   late List<FixedExtentScrollController> _scrollControllers;
 
@@ -1048,7 +1049,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   
   final Random _random = Random();
   late Timer _driftTimer;
-  final List<Offset> _textDriftOffsets = List.generate(5, (_) => Offset.zero);
+  final List<Offset> _textDriftOffsets = List.generate(3, (_) => Offset.zero); // 3 DIGITS
   
   late List<AnimationController> _opacityControllers;
   late List<Animation<double>> _opacityAnimations;
@@ -1057,15 +1058,16 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
   void initState() {
     super.initState();
     
+    // GENERATE 3 CONTROLLER
     _scrollControllers = List.generate(
-      5,
+      3,
       (i) => FixedExtentScrollController(initialItem: _random.nextInt(10)),
     );
     
     _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
       if (mounted && _activeWheelIndex == null) {
         setState(() {
-          for (int i = 0; i < 5; i++) {
+          for (int i = 0; i < 3; i++) {
             _textDriftOffsets[i] = Offset(
               (_random.nextDouble() - 0.5) * 2.5,
               (_random.nextDouble() - 0.5) * 2.5,
@@ -1075,7 +1077,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       }
     });
     
-    _opacityControllers = List.generate(5, (i) {
+    _opacityControllers = List.generate(3, (i) {
       final controller = AnimationController(
         vsync: this,
         duration: Duration(milliseconds: 1800 + (_random.nextInt(400))),
@@ -1145,8 +1147,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
 
   // 🔥 ENGINE SLOT MACHINE (KASINO)
   Future<void> _playSlotMachineAnimation() async {
-    // 1. Pusing serentak (Laju)
-    for (int i = 0; i < 5; i++) {
+    // 1. Pusing serentak (Laju) - 3 Roda
+    for (int i = 0; i < 3; i++) {
       if (!mounted) continue;
       _scrollControllers[i].animateToItem(
         _scrollControllers[i].selectedItem + 500, 
@@ -1155,8 +1157,8 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
       );
     }
 
-    // 2. Berhenti satu per satu (Waterfall Snap)
-    for (int i = 0; i < 5; i++) {
+    // 2. Berhenti satu per satu (Waterfall Snap) - 3 Roda
+    for (int i = 0; i < 3; i++) {
       int stopDelay = 500 + (i * 500); 
       Future.delayed(Duration(milliseconds: stopDelay), () {
         if(mounted) _stopWheelAtRandom(i);
@@ -1193,7 +1195,7 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
             children: [
               Positioned.fill(
                 child: Image.asset(
-                  'assets/z_wheel.png',
+                  'assets/z_wheel3.png', // PENTING: Guna 3 wheel image
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
