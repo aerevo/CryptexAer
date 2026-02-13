@@ -218,7 +218,7 @@ class _SecurityCheckScreenState extends State<SecurityCheckScreen> {
 }
 
 // ============================================
-// SUCCESS SCREEN
+// SUCCESS SCREEN (PROFESSIONAL GREEN CONTAINER)
 // ============================================
 class SuccessScreen extends StatelessWidget {
   final String message;
@@ -232,55 +232,120 @@ class SuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Tentukan warna tema: Hijau Neon (Success) atau Oren (Panic)
+    final Color themeColor = isPanicMode ? Colors.orange : const Color(0xFF00E676);
+    final IconData iconData = isPanicMode ? Icons.warning_amber_rounded : Icons.lock_open_rounded;
+    final String titleText = isPanicMode ? 'SILENT ALARM' : 'ACCESS GRANTED';
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isPanicMode ? Icons.warning_amber_rounded : Icons.check_circle,
-              size: 100,
-              color: isPanicMode ? Colors.orange : Colors.greenAccent,
+        child: Container(
+          // Margin kiri kanan supaya tak rapat dinding
+          margin: const EdgeInsets.symmetric(horizontal: 30),
+          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 25),
+          decoration: BoxDecoration(
+            color: Colors.black, // Dasar hitam
+            borderRadius: BorderRadius.circular(24),
+            // Border menyala
+            border: Border.all(color: themeColor, width: 2),
+            // Background dalam sikit pudar + Glow luar
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                themeColor.withOpacity(0.15),
+                Colors.black.withOpacity(0.8),
+              ],
             ),
-            const SizedBox(height: 20),
-            Text(
-              message,
-              style: TextStyle(
-                color: isPanicMode ? Colors.orange : Colors.greenAccent,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+            boxShadow: [
+              // Glow Effect
+              BoxShadow(
+                color: themeColor.withOpacity(0.3),
+                blurRadius: 30,
+                spreadRadius: 2,
               ),
-            ),
-            if (isPanicMode) ...[
-              const SizedBox(height: 10),
-              const Text(
-                'Silent alert has been triggered',
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Bulatan Icon
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: themeColor.withOpacity(0.1),
+                  border: Border.all(color: themeColor.withOpacity(0.5), width: 1),
+                ),
+                child: Icon(
+                  iconData,
+                  size: 60,
+                  color: themeColor,
+                ),
+              ),
+              
+              const SizedBox(height: 30),
+              
+              // Tajuk Besar
+              Text(
+                titleText,
                 style: TextStyle(
+                  color: themeColor,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  shadows: [
+                    Shadow(color: themeColor.withOpacity(0.6), blurRadius: 10),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 10),
+              
+              // Mesej Kecil (Welcome Back etc)
+              Text(
+                message.toUpperCase(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 1,
+                ),
+              ),
+              
+              const SizedBox(height: 35),
+              
+              // Tombol Continue
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: themeColor,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 5,
+                    shadowColor: themeColor.withOpacity(0.5),
+                  ),
+                  child: const Text(
+                    'PROCEED',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
               ),
             ],
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isPanicMode ? Colors.orange : Colors.greenAccent,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-              ),
-              child: Text(
-                'Go Back',
-                style: TextStyle(
-                  color: isPanicMode ? Colors.black : Colors.black,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -328,7 +393,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => SuccessScreen(
-          message: isPanicMode ? "Panic mode activated" : "Welcome back",
+          message: isPanicMode ? "Panic mode activated" : "User Verified Successfully",
           isPanicMode: isPanicMode,
         ),
       ),
@@ -452,7 +517,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
                   
                   const SizedBox(height: 25),
                   
-                  // 🔥 INI BAHAGIAN NOMBOR ATAS (SIMON SAYS)
+                  // 🔥 INI BAHAGIAN NOMBOR ATAS (SIMON SAYS - CHAOS)
                   VintageFilmChallengeDisplay(controller: _controller),
                   
                   const SizedBox(height: 15),
@@ -613,7 +678,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
     }
   }
   
-  // 🔥 FUNGSI BARU: RANDOM CHAOS (Lompat-lompat tak ikut turutan)
+  // 🔥 FUNGSI CHAOS (Lompat-lompat tak ikut urutan)
   void _startChaosSequence() async {
     _sequenceTimer?.cancel();
     if (mounted) setState(() => _activeGlitchIndex = -1);
@@ -621,7 +686,6 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
     List<int> targetCode = widget.controller.challengeCode.value;
     if (targetCode.isEmpty) targetCode = [8, 3, 9, 1, 4]; 
 
-    // Timer laju sikit supaya nampak 'busy'
     _sequenceTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
       if (!mounted) return;
       
@@ -633,7 +697,6 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
         _displayNumbers[_activeGlitchIndex] = targetCode[_activeGlitchIndex].toString();
       });
 
-      // Bunyi 'tek' setiap kali glitch pindah
       HapticFeedback.selectionClick();
     });
   }
@@ -653,7 +716,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
       scale: 0.85, 
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 40),
-        // 2) KECILKAN HEIGHT: Vertical Padding dikurangkan dari 15 ke 6 (Jadi nipis)
+        // 2) KECILKAN HEIGHT: Vertical Padding = 6 (Nipis)
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.8),
@@ -676,9 +739,7 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: List.generate(5, (index) {
             bool isGlitching = index == _activeGlitchIndex;
-            
-            // Logic Chaos: Kalau tak tengah glitch, kita tunjuk je nombor (atau random sikit-sikit)
-            // Tapi sebab user nak nampak macam 'decoding', kita biar yang lain diam, yang aktif je gegar.
+            // Logic Chaos: Kita tunjuk semua nombor sentiasa, cuma satu je gegar
             bool hasRevealed = true; 
 
             return _buildLinkinParkDigit(
