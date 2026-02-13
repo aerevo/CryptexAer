@@ -571,7 +571,7 @@ class _ZKineticLockScreenState extends State<ZKineticLockScreen> {
 }
 
 // ============================================
-// VISUAL: LINKIN PARK GLITCH (LOOPING) & SMALLER BOX
+// VISUAL: LINKIN PARK GLITCH (RANDOM CHAOS MODE)
 // ============================================
 class VintageFilmChallengeDisplay extends StatefulWidget {
   final EnterpriseController controller;
@@ -603,50 +603,38 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
     widget.controller.challengeCode.addListener(_onChallengeChanged);
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
-       _startSimonSaysSequence();
+       _startChaosSequence();
     });
   }
   
   void _onChallengeChanged() {
     if (mounted) {
-      _startSimonSaysSequence();
+      _startChaosSequence();
     }
   }
   
-  // 🔥 FUNGSI 'SIMON SAYS' - LOOPING NON-STOP
-  void _startSimonSaysSequence() async {
+  // 🔥 FUNGSI BARU: RANDOM CHAOS (Lompat-lompat tak ikut turutan)
+  void _startChaosSequence() async {
     _sequenceTimer?.cancel();
-    if (mounted) setState(() => _activeGlitchIndex = 0);
+    if (mounted) setState(() => _activeGlitchIndex = -1);
 
     List<int> targetCode = widget.controller.challengeCode.value;
     if (targetCode.isEmpty) targetCode = [8, 3, 9, 1, 4]; 
 
-    int step = 0;
-    
+    // Timer laju sikit supaya nampak 'busy'
     _sequenceTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
       if (!mounted) return;
       
       setState(() {
-        _activeGlitchIndex = step;
+        // 1. Pilih SATU index secara RAWAK (0 sampai 4)
+        _activeGlitchIndex = _random.nextInt(5);
         
-        // Kemaskini nombor
-        if (step > 0 && step <= 5) {
-          _displayNumbers[step - 1] = targetCode[step - 1].toString();
-        }
+        // 2. Tunjukkan nombor sebenar pada index yang kena 'hit'
+        _displayNumbers[_activeGlitchIndex] = targetCode[_activeGlitchIndex].toString();
       });
 
-      // Bunyi glitch hanya bila ada nombor
-      if (step >= 0 && step < 5) HapticFeedback.selectionClick();
-
-      step++;
-
-      // 🔥 LOOPING LOGIC (Tak berhenti)
-      // Step 0-4: Glitch nombor
-      // Step 5-7: Rehat sekejap (tunjuk semua nombor)
-      // Step 8: Reset balik ke -2 (persediaan loop baru)
-      if (step > 8) {
-        step = -2; // Reset
-      }
+      // Bunyi 'tek' setiap kali glitch pindah
+      HapticFeedback.selectionClick();
     });
   }
   
@@ -660,24 +648,25 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
 
   @override
   Widget build(BuildContext context) {
-    // 1) KECILKAN SAIZ 15% (Scale 0.85)
+    // 1) KECILKAN SAIZ: Scale 0.85 
     return Transform.scale(
       scale: 0.85, 
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 40),
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+        // 2) KECILKAN HEIGHT: Vertical Padding dikurangkan dari 15 ke 6 (Jadi nipis)
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.8),
           borderRadius: BorderRadius.circular(8),
           
-          // 2) WARNA BERLAPIS (HIJAU + PURPLE)
+          // WARNA BERLAPIS (HIJAU + PURPLE)
           border: Border.all(
-            color: Colors.greenAccent, // Garis Hijau
+            color: Colors.greenAccent, 
             width: 2
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.deepPurpleAccent.withOpacity(0.6), // Glow Purple
+              color: Colors.deepPurpleAccent.withOpacity(0.6), 
               blurRadius: 15, 
               spreadRadius: 3
             ),
@@ -687,10 +676,10 @@ class _VintageFilmChallengeDisplayState extends State<VintageFilmChallengeDispla
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: List.generate(5, (index) {
             bool isGlitching = index == _activeGlitchIndex;
-            bool hasRevealed = index < _activeGlitchIndex || _activeGlitchIndex < 0; // Tunjuk sentiasa kalau tak glitch
             
-            // Logic sikit: Kalau index negatif (masa rehat loop), tunjuk semua nombor
-            if (_activeGlitchIndex < 0) hasRevealed = true;
+            // Logic Chaos: Kalau tak tengah glitch, kita tunjuk je nombor (atau random sikit-sikit)
+            // Tapi sebab user nak nampak macam 'decoding', kita biar yang lain diam, yang aktif je gegar.
+            bool hasRevealed = true; 
 
             return _buildLinkinParkDigit(
               text: hasRevealed ? _displayNumbers[index] : _random.nextInt(10).toString(),
@@ -819,7 +808,7 @@ class EnterpriseController {
 
   void randomizeWheels() {
     randomizeTrigger.value++; 
-    fetchChallengeFromServer();
+    fetchChallengeFromServer(); 
     print('🔀 Trigger Glitch & Fetch New Data');
   }
 
