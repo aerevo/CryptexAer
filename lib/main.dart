@@ -76,7 +76,7 @@ class _ZKineticProdukBDemoState extends State<ZKineticProdukBDemo> {
   void initState() {
     super.initState();
     _controller = WidgetController(
-      serverUrl: 'http://192.168.1.5:3000',  // ← GANTI URL CAPTAIN!
+      serverUrl: 'http://100.70.65.8:3000',  // ← GANTI URL CAPTAIN!
     );
   }
 
@@ -830,3 +830,4 @@ class _CryptexLockState extends State<CryptexLock> with TickerProviderStateMixin
     );
   }
 }
+
