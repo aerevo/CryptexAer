@@ -494,13 +494,14 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   @override
   void initState() {
     super.initState();
-    // ✅ OPTIMIZED: Slower glitch (200ms instead of 150ms) for better performance
-    _glitchTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
-      if (_rnd.nextDouble() > 0.75) {  // 25% chance instead of 30%
+    // ✅ Laju (50ms) dan kerap (0.3)
+    _glitchTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (_rnd.nextDouble() > 0.3) {  // 70% chance glitch
         setState(() {
           _isGlitching = true;
-          _xOffset = (_rnd.nextDouble() - 0.5) * 4;
-          _yOffset = (_rnd.nextDouble() - 0.5) * 3;
+          // ✅ Gegar kuat (darab 10)
+          _xOffset = (_rnd.nextDouble() - 0.5) * 10;
+          _yOffset = (_rnd.nextDouble() - 0.5) * 8;
         });
         Future.delayed(const Duration(milliseconds: 50), () {
           if (mounted) setState(() => _isGlitching = false);
@@ -518,7 +519,8 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 40),
+      // ✅ 1. Kurangkan margin supaya kotak lebih LEBAR
+      margin: const EdgeInsets.symmetric(horizontal: 20),
       height: 50,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.8),
@@ -543,8 +545,8 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
             );
           }
           
-          // ✅ FIXED: Tighter spacing (no extra spaces in join)
-          String codeStr = code.join(' ');  // Single space instead of double
+          // ✅ 2. Buang space dalam join, kita guna letterSpacing je
+          String codeStr = code.join('');
           
           return Stack(
             alignment: Alignment.center,
@@ -572,7 +574,7 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
       fontSize: 28,
       fontWeight: FontWeight.bold,
       fontFamily: 'Courier',
-      letterSpacing: 2,  // ✅ FIXED: Reduced from 3 to 2
+      letterSpacing: 10,  // ✅ 3. Jarakkan guna ini, lebih kemas
       color: color,
     );
   }
@@ -785,8 +787,14 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock> with TickerPr
     
     List<int> currentCode = [];
     for (var controller in _scrollControllers) {
-      currentCode.add(controller.selectedItem % 10);
+      // ✅ FORMULA AJAIB: Paksa jadi positif (0-9)
+      int rawIndex = controller.selectedItem;
+      int positiveDigit = (rawIndex % 10 + 10) % 10;
+      currentCode.add(positiveDigit);
     }
+    
+    // Debugging (Boleh tengok kat terminal apa nombor sebenar dihantar)
+    print("📤 Sending Code: $currentCode");
     
     final result = await widget.controller.verify(currentCode);
     
