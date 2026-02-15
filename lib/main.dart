@@ -219,8 +219,8 @@ class WidgetController {
       final response = await http.post(
         Uri.parse('$serverUrl/api/v1/challenge'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({}),  // ✅ FIXED: Send empty body
-      ).timeout(const Duration(seconds: 5));
+        body: json.encode({}),
+      ).timeout(const Duration(seconds: 3));  // ✅ OPTIMIZED: 3s instead of 5s
 
       print('📡 Response status: ${response.statusCode}');
       print('📡 Response body: ${response.body}');
@@ -273,7 +273,7 @@ class WidgetController {
             'pattern': patternScore.value,
           },
         }),
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 3));  // ✅ OPTIMIZED: 3s instead of 5s
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -494,8 +494,9 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   @override
   void initState() {
     super.initState();
-    _glitchTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
-      if (_rnd.nextDouble() > 0.7) {
+    // ✅ OPTIMIZED: Slower glitch (200ms instead of 150ms) for better performance
+    _glitchTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+      if (_rnd.nextDouble() > 0.75) {  // 25% chance instead of 30%
         setState(() {
           _isGlitching = true;
           _xOffset = (_rnd.nextDouble() - 0.5) * 4;
@@ -542,7 +543,8 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
             );
           }
           
-          String codeStr = code.join('  ');
+          // ✅ FIXED: Tighter spacing (no extra spaces in join)
+          String codeStr = code.join(' ');  // Single space instead of double
           
           return Stack(
             alignment: Alignment.center,
@@ -570,7 +572,7 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
       fontSize: 28,
       fontWeight: FontWeight.bold,
       fontFamily: 'Courier',
-      letterSpacing: 3,
+      letterSpacing: 2,  // ✅ FIXED: Reduced from 3 to 2
       color: color,
     );
   }
@@ -700,13 +702,14 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock> with TickerPr
     
     _textDriftOffsets = List.generate(3, (_) => Offset.zero);
 
-    _driftTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+    // ✅ OPTIMIZED: Slower drift (200ms instead of 150ms) for better performance
+    _driftTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (mounted && _activeWheelIndex == null) {
         setState(() {
           for (int i = 0; i < 3; i++) {
             _textDriftOffsets[i] = Offset(
-              (_random.nextDouble() - 0.5) * 2.5,
-              (_random.nextDouble() - 0.5) * 2.5,
+              (_random.nextDouble() - 0.5) * 2.0,  // Reduced from 2.5
+              (_random.nextDouble() - 0.5) * 2.0,
             );
           }
         });
@@ -790,7 +793,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock> with TickerPr
     if (result['allowed']) {
       widget.onSuccess(false);
     } else {
-      // Auto-respin on fail
+      // ✅ FIXED: Only respin & fetch NEW challenge on wrong password
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -799,8 +802,10 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock> with TickerPr
           duration: Duration(seconds: 1),
         ),
       );
+      
+      // Fetch NEW challenge FIRST, then respin
+      await widget.controller.fetchChallenge();
       _playSlotMachineIntro();
-      widget.controller.fetchChallenge();
     }
   }
 
@@ -895,8 +900,8 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock> with TickerPr
       child: ListWheelScrollView.useDelegate(
         controller: _scrollControllers[index],
         itemExtent: itemExtent,
-        perspective: 0.003,
-        diameterRatio: 2.0,
+        perspective: 0.001,  // ✅ OPTIMIZED: Lower = better performance
+        diameterRatio: 1.5,  // ✅ OPTIMIZED: Lower = flatter wheel = faster
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (_) {
           HapticFeedback.selectionClick();
