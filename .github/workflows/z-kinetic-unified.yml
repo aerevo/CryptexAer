@@ -1,4 +1,4 @@
-name: "Z-Kinetic Final Release (Auto-Config FIXED)"
+name: "Z-Kinetic Final Release (Auto-Fix HTTP)"
 on:
   workflow_dispatch:
   push:
@@ -27,6 +27,7 @@ jobs:
           channel: 'stable'
           cache: true
 
+      # ☢️ STEP BAHAYA (Tapi kita dah cover)
       - name: "🔥 Nuclear Clean (Remove Old Android Folder)"
         run: |
           echo "==> Destroying old Android folder and locks..."
@@ -38,147 +39,29 @@ jobs:
           echo "==> Recreating project structure on-the-fly..."
           flutter create --platforms android --org com.aer --project-name zkinetic .
 
+      # 🔥🔥🔥 INI STEP BARU YANG SAYA TAMBAH 🔥🔥🔥
+      # Dia akan paksa AndroidManifest terima HTTP (Localhost/IP)
+      - name: "🔓 Inject Network Permissions (Fix Loading Issue)"
+        run: |
+          echo "==> Injecting INTERNET & CLEARTEXT permissions..."
+          
+          # 1. Masukkan Permission Internet
+          sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' android/app/src/main/AndroidManifest.xml
+          
+          # 2. Masukkan CleartextTraffic (Supaya boleh baca HTTP IP Address)
+          sed -i 's|android:label=|android:usesCleartextTraffic="true"\n        android:label=|' android/app/src/main/AndroidManifest.xml
+          
+          echo "✅ Permissions Injected Successfully!"
+
       - name: "🩹 Fix Dependency Versions"
         run: |
           echo "==> Forcing screen_protector to stable version ^1.5.1..."
-          sed -i 's/screen_protector: .*/screen_protector: ^1.5.1/' pubspec.yaml
+          sed -i 's/screen_protector: .*/screen_protector: ^1.5.1/' pubspec.yaml || true
+          flutter pub get
 
-      - name: "📦 Install Dependencies"
-        run: flutter pub get
-
-      - name: "🛠️ NUCLEAR PATCH: Fix device_apps & SDK Versions"
+      - name: "🔥 Generate Firebase Options (Bypass Web Error)"
         run: |
-          echo "==> Patching broken device_apps plugin in pub-cache..."
-          # Fix 1: Inject Namespace
-          find /home/runner/.pub-cache -name "build.gradle" -path "*/device_apps*/android/build.gradle" -exec sed -i '/android {/a \    namespace "fr.g123k.deviceapps"' {} \;
-          # Fix 2: Force compileSdkVersion 34 to fix lStar error
-          find /home/runner/.pub-cache -name "build.gradle" -path "*/device_apps*/android/build.gradle" -exec sed -i 's/compileSdkVersion .*/compileSdkVersion 34/' {} \;
-          echo "✅ Nuclear patches applied."
-
-      - name: "🔐 Inject google-services.json"
-        run: |
-          echo "==> Injecting Firebase Security Configuration..."
-          cat > android/app/google-services.json << 'EOF'
-          {
-            "project_info": {
-              "project_number": "55621733629",
-              "project_id": "z-kinetic",
-              "storage_bucket": "z-kinetic.firebasestorage.app"
-            },
-            "client": [
-              {
-                "client_info": {
-                  "mobilesdk_app_id": "1:55621733629:android:ef51c1276ef226b0408294",
-                  "android_client_info": {
-                    "package_name": "com.aer.zkinetic"
-                  }
-                },
-                "api_key": [
-                  {
-                    "current_key": "AIzaSyDej3jrmqkUYyCs8CYepwdbrlInSBNWt_w"
-                  }
-                ],
-                "services": {
-                  "appinvite_service": { "status": 1 },
-                  "ads_service": { "status": 1 }
-                }
-              }
-            ],
-            "configuration_version": "1"
-          }
-          EOF
-
-      - name: "🔧 Inject Project build.gradle (Global SDK Force)"
-        run: |
-          echo "==> Configuring Root build.gradle with Sub-project Overrides..."
-          cat > android/build.gradle << 'EOF'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.2.1'
-                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22"
-                  classpath 'com.google.gms:google-services:4.4.0'
-              }
-          }
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          rootProject.buildDir = '../build'
-          subprojects {
-              project.buildDir = "${rootProject.buildDir}/${project.name}"
-              
-              // 🔥 FORCED OVERRIDE: Fixes lStar and other resource linking errors
-              afterEvaluate { project ->
-                  if (project.hasProperty('android')) {
-                      project.android {
-                          compileSdkVersion 34
-                      }
-                  }
-              }
-          }
-          subprojects {
-              project.evaluationDependsOn(':app')
-          }
-          tasks.register("clean", Delete) {
-              delete rootProject.buildDir
-          }
-          EOF
-
-      - name: "🔧 Inject App build.gradle (JVM 17 + SDK 36)"
-        run: |
-          echo "==> Configuring App-level build.gradle..."
-          cat > android/app/build.gradle << 'EOF'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-              id "com.google.gms.google-services"
-          }
-          
-          android {
-              namespace "com.aer.zkinetic"
-              compileSdk 36
-              
-              defaultConfig {
-                  applicationId "com.aer.zkinetic"
-                  minSdk 23
-                  targetSdk 34
-                  versionCode 1
-                  versionName "3.0.0"
-              }
-              
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-              
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
-              
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.debug
-                      shrinkResources false
-                      minifyEnabled false
-                  }
-              }
-          }
-          
-          dependencies {
-              implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22"
-          }
-          EOF
-
-      - name: "🧪 Generate Firebase Options"
-        run: |
-          echo "==> Injecting firebase_options.dart..."
+          echo "==> Injecting dummy firebase_options.dart..."
           mkdir -p lib
           cat > lib/firebase_options.dart << 'EOF'
           import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
@@ -213,4 +96,3 @@ jobs:
         with:
           name: z-kinetic-v3-build
           path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 5
