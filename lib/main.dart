@@ -61,7 +61,7 @@ class _ZKineticProdukBDemoState extends State<ZKineticProdukBDemo> {
     super.initState();
     // GANTI URL NI DENGAN SERVER CAPTAIN!
     _controller = WidgetController(
-      serverUrl: 'http://192.168.1.5:3000';
+      serverUrl: 'http://192.168.1.5:3000',
       // serverUrl: 'https://your-server.onrender.com', // Production
     );
   }
@@ -607,4 +607,5 @@ class _ZKineticCryptex3WheelState extends State<ZKineticCryptex3Wheel> {
     );
   }
 }
+
 
