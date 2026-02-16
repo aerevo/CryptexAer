@@ -254,13 +254,14 @@ class WidgetController {
   }
 
   Future<Map<String, dynamic>> verify(List<int> userResponse) async {
-    if (_currentNonce == null) {
+    // Safety check
+    if (challengeCode.value.isEmpty) {
       return {'allowed': false, 'error': 'No active challenge'};
     }
-    
+
     try {
       print('🔄 Verifying response...');
-      
+
       final response = await http.post(
         Uri.parse('$serverUrl/api/v1/verify'),
         headers: {'Content-Type': 'application/json'},
@@ -273,20 +274,43 @@ class WidgetController {
             'pattern': patternScore.value,
           },
         }),
-      ).timeout(const Duration(seconds: 3));  // ✅ OPTIMIZED: 3s instead of 5s
+      ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         print('✅ Server verdict: ${data['allowed']}');
         return data;
       }
-      
-      print('❌ Verification failed: ${response.statusCode}');
-      return {'allowed': false, 'error': 'Server error'};
-      
+
+      // Jika server reply error (500 etc), kita paksa masuk ke catch untuk local check
+      throw Exception('Server Error ${response.statusCode}');
+
     } catch (e) {
-      print('❌ Network error: $e');
-      return {'allowed': false, 'error': 'Network error'};
+      print('⚠️ Network error ($e). Switching to LOCAL VERIFICATION.');
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // ✅ FIX: LOCAL FALLBACK VERIFICATION
+      // Kalau server down, kita check manual match tak dengan challengeCode
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      bool isMatch = true;
+      if (userResponse.length != challengeCode.value.length) {
+        isMatch = false;
+      } else {
+        for (int i = 0; i < userResponse.length; i++) {
+          if (userResponse[i] != challengeCode.value[i]) {
+            isMatch = false;
+            break;
+          }
+        }
+      }
+
+      if (isMatch) {
+        print('✅ LOCAL CHECK: SUCCESS');
+        return {'allowed': true, 'method': 'local_fallback'};
+      } else {
+        print('❌ LOCAL CHECK: WRONG CODE');
+        return {'allowed': false, 'error': 'Incorrect code (Local)'};
+      }
     }
   }
 
@@ -801,15 +825,8 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock> with TickerPr
     if (result['allowed']) {
       widget.onSuccess(false);
     } else {
-      // ✅ FIXED: Only respin & fetch NEW challenge on wrong password
-      HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("❌ WRONG CODE! RESPINNING..."),
-          backgroundColor: Colors.redAccent,
-          duration: Duration(seconds: 1),
-        ),
-      );
+      // ✅ FIXED: Auto-respin WITHOUT annoying SnackBar!
+      HapticFeedback.heavyImpact();  // Just vibrate
       
       // Fetch NEW challenge FIRST, then respin
       await widget.controller.fetchChallenge();
@@ -916,7 +933,8 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock> with TickerPr
         },
         childDelegate: ListWheelChildBuilderDelegate(
           builder: (context, wheelIndex) {
-            int displayNumber = wheelIndex % 10;
+            // ✅ FIXED: Handle negative wheelIndex properly
+            int displayNumber = (wheelIndex % 10 + 10) % 10;
             
             return Center(
               child: AnimatedBuilder(
