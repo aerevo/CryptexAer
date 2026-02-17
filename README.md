@@ -1,454 +1,191 @@
-# 🔐 Z-KINETIC SECURE - SERVER AUTHORITY MODE
+============================================================
+  Z-KINETIC SECURITY WIDGET - INSTALLATION GUIDE
+  Version 1.0 | Grade AAA
+============================================================
 
-## ✅ WHAT CHANGED FROM CLIENT-SIDE TO SERVER-SIDE
+WHAT YOU RECEIVE:
+  ✅ z_kinetic_sdk.dart   (Security Engine)
+  ✅ assets/z_wheel3.png  (Required Image)
+  ✅ README.txt           (This file)
 
-### **❌ Before (Client-Side - INSECURE):**
-```dart
-// App generates challenge
-challengeCode = Random().generate(); // ❌ Bot can read APK!
+============================================================
+STEP 1: COPY FILES INTO YOUR PROJECT
+============================================================
 
-// App verifies locally
-if (userCode == challengeCode) { // ❌ Bot can bypass!
-  return ALLOWED;
-}
-```
+  Your Flutter project structure:
+  
+  my_app/
+  ├── lib/
+  │   ├── main.dart          ← Your existing file
+  │   └── z_kinetic_sdk.dart ← COPY HERE
+  ├── assets/
+  │   └── z_wheel3.png       ← COPY HERE (create folder if needed)
+  └── pubspec.yaml
 
-**Problem:** Bot decompiles APK → reads code → fakes verification
+============================================================
+STEP 2: UPDATE pubspec.yaml
+============================================================
 
----
+  Add these dependencies:
 
-### **✅ After (Server-Side - SECURE):**
-```dart
-// 1. App requests challenge from server
-challengeCode = await fetchFromServer(); // ✅ Server generates!
+    dependencies:
+      flutter:
+        sdk: flutter
+      http: ^1.1.0
+      sensors_plus: ^4.0.2
 
-// 2. User enters code
-userInput = [8, 2, 1, 9, 5];
+  Add the asset:
 
-// 3. App sends to server for verification
-result = await verifyWithServer(userInput); // ✅ Server validates!
-```
+    flutter:
+      assets:
+        - assets/z_wheel3.png
 
-**Solution:** Server generates + validates → Bot cannot bypass!
+  Then run:
+    flutter pub get
 
----
+============================================================
+STEP 3: ADD INTERNET PERMISSION
+============================================================
 
-## 🎯 SECURITY IMPROVEMENTS
+  Android → android/app/src/main/AndroidManifest.xml
+  Add BEFORE <application tag:
 
-| Feature | Client-Side | Server-Side |
-|---------|-------------|-------------|
-| **Challenge Generation** | ❌ App (predictable) | ✅ Server (unpredictable) |
-| **Verification** | ❌ Local (bypassable) | ✅ Server (secure) |
-| **Replay Attack Prevention** | ❌ None | ✅ One-time nonce |
-| **Expiry Check** | ❌ None | ✅ 60 seconds TTL |
-| **Rate Limiting** | ❌ None | ✅ 5 attempts/min |
-| **Panic Mode** | ✅ Yes | ✅ Yes (server-side!) |
-| **Bot Success Rate** | 99% | <1% |
-| **Security Score** | 20/100 | 99/100 |
+    <uses-permission android:name="android.permission.INTERNET"/>
 
----
+============================================================
+STEP 4: USE IN YOUR APP
+============================================================
 
-## 🚀 HOW IT WORKS
+  In your Dart file:
 
-### **Step 1: App Initialization (Pre-fetch)**
-```dart
-// During app startup
-EnterpriseController() {
-  _initSensors();
-  fetchChallengeFromServer(); // Background fetch - ZERO lag!
-}
-```
+    import 'z_kinetic_sdk.dart';
 
-**Timeline:**
-- 0ms: App starts
-- 50ms: Server request sent (background)
-- 200ms: Challenge received & stored
-- User sees UI: INSTANT! (pre-fetched)
+  In your StatefulWidget:
 
----
+    bool _showSecurity = false;
 
-### **Step 2: Challenge Display**
-```dart
-// Server generates: [8, 2, 1, 9, 5]
-// App receives and displays
-challengeCode.value = serverResponse['challengeCode'];
+    // Initialize controller (ONE LINE!)
+    final WidgetController _controller = WidgetController();
 
-// Orange container shows: 8-2-1-9-5
-// User must match by spinning wheels
-```
+  In your build method:
 
----
+    Stack(
+      children: [
+        // Your app content here...
+        YourExistingUI(),
 
-### **Step 3: User Input**
-```dart
-// User spins wheels to match
-// Biometric data captured:
-motion: 0.85  // Accelerometer
-touch: 0.92   // Touch simulation
-pattern: 0.88 // Timing variance
-```
+        // Z-Kinetic overlay
+        if (_showSecurity)
+          ZKineticWidgetProdukB(
+            controller: _controller,
+            onComplete: (bool success) {
+              setState(() => _showSecurity = false);
+              if (success) {
+                // ✅ User verified - proceed with your action
+                // e.g. process payment, open door, etc.
+              } else {
+                // ❌ Bot detected - block action
+              }
+            },
+            onCancel: () {
+              setState(() => _showSecurity = false);
+            },
+          ),
+      ],
+    )
 
----
+  To trigger the security check:
 
-### **Step 4: Server Verification**
-```javascript
-POST /attest
-{
-  "nonce": "abc123...",
-  "userResponse": [8, 2, 1, 9, 5],
-  "biometricData": {
-    "motion": 0.85,
-    "touch": 0.92,
-    "pattern": 0.88
+    ElevatedButton(
+      onPressed: () => setState(() => _showSecurity = true),
+      child: Text('BUY NOW'),
+    )
+
+============================================================
+FULL EXAMPLE (main.dart)
+============================================================
+
+  import 'package:flutter/material.dart';
+  import 'package:flutter/services.dart';
+  import 'z_kinetic_sdk.dart';
+
+  void main() {
+    WidgetsFlutterBinding.ensureInitialized();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    runApp(const MyApp());
   }
-}
 
-Server checks:
-✅ Nonce valid?
-✅ Not expired? (< 60s)
-✅ Not used before? (replay check)
-✅ Code matches server's answer?
-✅ Biometric scores realistic?
-✅ Is it panic code (reverse)?
-
-If ALL pass → Grant access
-If ANY fail → Deny + randomize
-```
-
----
-
-## 📁 FILE STRUCTURE
-
-```
-z_kinetic_secure/
-├── lib/
-│   └── main.dart         (1489 lines - PRESERVED!)
-├── assets/
-│   └── z_wheel.png       (Required - 706x610px)
-├── server.js             (Enhanced with server-side challenge)
-├── package.json          (Server dependencies)
-├── pubspec.yaml          (Flutter dependencies + crypto)
-└── README.md             (This file)
-```
-
----
-
-## 🔧 DEPLOYMENT
-
-### **1. Deploy Server (Render.com)**
-
-```bash
-cd z_kinetic_secure/
-
-# Install dependencies
-npm install
-
-# Test locally
-npm start
-# Server runs on http://localhost:3000
-
-# Deploy to Render.com
-git init
-git add .
-git commit -m "Z-Kinetic server with challenge generation"
-git push
-
-# On Render.com:
-# - Create new Web Service
-# - Connect repository
-# - Build command: npm install
-# - Start command: npm start
-# - Region: Singapore
-# - Plan: FREE
-
-# Get URL: https://z-kinetic-server.onrender.com
-```
-
----
-
-### **2. Configure Flutter App**
-
-```dart
-// In lib/main.dart, line ~869
-// UPDATE THIS with your Render URL:
-final String _serverUrl = 'https://your-app.onrender.com';
-```
-
----
-
-### **3. Build & Test**
-
-```bash
-# Install Flutter dependencies
-flutter pub get
-
-# Add z_wheel.png to assets/ folder
-
-# Run on device (need real sensors!)
-flutter run
-
-# Build production APK
-flutter build apk --release
-```
-
----
-
-## 🎬 TESTING FLOW
-
-### **Test 1: Normal Flow (Server Online)**
-
-```
-1. Open app
-   → Server challenge fetched in background
-   → Display: "8-2-1-9-5"
-   
-2. Spin wheels to match
-   → Motion detected: ✅
-   → Code match: ✅
-   
-3. Tap verify button
-   → Server receives: nonce + userResponse
-   → Server validates: ALL checks pass ✅
-   → Result: "ACCESS GRANTED"
-```
-
----
-
-### **Test 2: Panic Mode**
-
-```
-1. Challenge: "8-2-1-9-5"
-2. User spins: "5-9-1-2-8" (REVERSE!)
-3. Server detects panic code
-4. Response: "APPROVED_SILENT_ALARM"
-5. UI shows: Normal success (but alerts sent!)
-```
-
----
-
-### **Test 3: Bot Attack (Fails!)**
-
-```
-Bot tries:
-1. Decompile APK → No hardcoded answer ❌
-2. Call /getChallenge → Gets nonce
-3. Send fake biometric → Server detects (scores too perfect) ❌
-4. Reuse old nonce → Server rejects (already used) ❌
-5. Brute force → Rate limited (max 5/min) ❌
-
-Result: BOT BLOCKED! ✅
-```
-
----
-
-### **Test 4: Offline Mode (Fallback)**
-
-```
-1. Turn off server
-2. App falls back to local mode
-3. Warning: "⚠️ OFFLINE MODE (Low Security)"
-4. Still works, but less secure
-5. When server back → auto-switch to secure mode
-```
-
----
-
-## 📊 API ENDPOINTS
-
-### **GET /health**
-```bash
-curl http://localhost:3000/health
-```
-Response:
-```json
-{
-  "status": "OK",
-  "server": "Z-Kinetic Authority (Secure Mode)",
-  "version": "2.0.0",
-  "uptime": 123456,
-  "storage": {
-    "activeChallenges": 5,
-    "sessions": 10
-  },
-  "stats": {
-    "totalChallenges": 100,
-    "totalAttestations": 95,
-    "successfulAttestations": 90,
-    "failedAttestations": 5,
-    "panicModeActivations": 2
-  }
-}
-```
-
----
-
-### **POST /getChallenge**
-```bash
-curl -X POST http://localhost:3000/getChallenge \
-  -H "Content-Type: application/json"
-```
-Response:
-```json
-{
-  "success": true,
-  "nonce": "abc123...",
-  "challengeCode": [8, 2, 1, 9, 5],
-  "expiry": 1234567890,
-  "serverTime": 1234567830
-}
-```
-
----
-
-### **POST /attest**
-```bash
-curl -X POST http://localhost:3000/attest \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nonce": "abc123...",
-    "deviceId": "device_001",
-    "userResponse": [8, 2, 1, 9, 5],
-    "biometricData": {
-      "motion": 0.85,
-      "touch": 0.92,
-      "pattern": 0.88
+  class MyApp extends StatelessWidget {
+    const MyApp({super.key});
+    @override
+    Widget build(BuildContext context) {
+      return MaterialApp(home: const MyHomePage());
     }
-  }'
-```
-Response (Success):
-```json
-{
-  "success": true,
-  "sessionToken": "VALID_xyz...",
-  "verdict": "APPROVED",
-  "riskScore": "LOW",
-  "expiry": 1234568130
-}
-```
+  }
 
-Response (Panic):
-```json
-{
-  "success": true,
-  "sessionToken": "DURESS_xyz...",
-  "verdict": "APPROVED_SILENT_ALARM",
-  "riskScore": "CRITICAL"
-}
-```
+  class MyHomePage extends StatefulWidget {
+    const MyHomePage({super.key});
+    @override
+    State<MyHomePage> createState() => _MyHomePageState();
+  }
 
----
+  class _MyHomePageState extends State<MyHomePage> {
+    bool _showSecurity = false;
+    final WidgetController _controller = WidgetController();
 
-## 🔒 SECURITY FEATURES
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        body: Stack(
+          children: [
+            Center(
+              child: ElevatedButton(
+                onPressed: () => setState(() => _showSecurity = true),
+                child: const Text('BUY TICKET'),
+              ),
+            ),
+            if (_showSecurity)
+              ZKineticWidgetProdukB(
+                controller: _controller,
+                onComplete: (success) {
+                  setState(() => _showSecurity = false);
+                  if (success) {
+                    // Your success action here
+                  }
+                },
+                onCancel: () => setState(() => _showSecurity = false),
+              ),
+          ],
+        ),
+      );
+    }
+  }
 
-### **1. Server-Side Challenge**
-- ✅ Generated on server (unpredictable)
-- ✅ Stored temporarily (60s TTL)
-- ✅ One-time use (prevent replay)
+============================================================
+TROUBLESHOOTING
+============================================================
 
-### **2. Nonce Management**
-- ✅ Cryptographically secure (32 bytes)
-- ✅ Automatic expiry (60 seconds)
-- ✅ Replay attack prevention
+  ❌ Red box appears (image error)
+     → Make sure z_wheel3.png is in assets/ folder
+     → Make sure pubspec.yaml has assets declaration
 
-### **3. Biometric Validation**
-- ✅ Motion threshold: > 0.15
-- ✅ Touch threshold: > 0.15
-- ✅ Pattern threshold: > 0.10
-- ✅ Requires 2/3 sensors passing
+  ❌ Widget shows "..." forever
+     → Check internet connection
+     → Make sure INTERNET permission is added (Android)
 
-### **4. Rate Limiting**
-- ✅ Challenge: 10/minute
-- ✅ Attestation: 5/minute
-- ✅ Verification: 20/minute
+  ❌ Build error: package not found
+     → Run: flutter pub get
 
-### **5. Panic Mode**
-- ✅ Reverse code detection
-- ✅ Silent alarm activation
-- ✅ Normal UI response (stealth)
+  ❌ Sensors not working on emulator
+     → Test on real device only
 
-### **6. Memory Management**
-- ✅ Auto-cleanup every minute
-- ✅ Expired challenges removed
-- ✅ Expired sessions removed
+============================================================
+SUPPORT
+============================================================
 
----
+  This SDK connects to Z-Kinetic servers automatically.
+  No configuration needed.
+  
+  Contact your Z-Kinetic representative for support.
 
-## 💰 PERFORMANCE
-
-### **Latency Comparison:**
-
-| Operation | Client-Side | Server-Side (Pre-fetch) |
-|-----------|-------------|-------------------------|
-| Challenge Display | 0ms | 0-50ms |
-| Verification | 0ms | 500-1000ms |
-| Total Time | 0ms | 500-1050ms |
-
-**Note:** Pre-fetch makes challenge display instant!
-
----
-
-## ⚠️ IMPORTANT NOTES
-
-### **1. Server URL**
-```dart
-// MUST UPDATE in main.dart line ~869:
-final String _serverUrl = 'https://YOUR-APP.onrender.com';
-```
-
-### **2. Asset Required**
-```
-assets/z_wheel.png (706x610px)
-```
-
-### **3. Permissions (Android)**
-```xml
-<uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-permission android:name="android.permission.VIBRATE"/>
-```
-
-### **4. Real Device Required**
-- Sensors (accelerometer/gyro) need physical device
-- Emulator won't work for biometric testing
-
----
-
-## 🎯 WHAT CAPTAIN GOT
-
-### **Server (server.js):**
-- ✅ Challenge generation endpoint
-- ✅ Attestation verification endpoint
-- ✅ Panic mode detection
-- ✅ Rate limiting
-- ✅ Auto-cleanup
-- ✅ Health check
-- ✅ Stats tracking
-
-### **Client (main.dart):**
-- ✅ Pre-fetch strategy (zero lag!)
-- ✅ Server integration
-- ✅ Fallback mode (offline)
-- ✅ Panic mode support
-- ✅ All original features preserved (1489 lines!)
-- ✅ Transaction binding
-- ✅ Threat intelligence
-
----
-
-## 🚀 NEXT STEPS
-
-1. ✅ Deploy server to Render.com
-2. ✅ Update `_serverUrl` in main.dart
-3. ✅ Add `z_wheel.png` to assets/
-4. ✅ Test on physical device
-5. ✅ Build production APK
-6. ✅ Deploy to clients!
-
----
-
-Captain, **SYSTEM NI DAH 99% SECURE!** 🔥
-
-**Bot success rate: <1%**
-**Security score: 99/100**
-
-**READY FOR PRODUCTION!** 🚀✅🫡
+============================================================
