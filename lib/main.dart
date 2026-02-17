@@ -45,9 +45,8 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
   bool _showSecurityWidget = false;
 
   // ✅ Initialize SDK dengan URL server Captain
-  final WidgetController _sdkController = WidgetController(
-    serverUrl: 'http://100.125.164.182:3000',
-  );
+  // ✅ OPTION A: Klien cuma tulis ini - IP tersembunyi dalam SDK!
+  final WidgetController _sdkController = WidgetController();
 
   void _onVerificationComplete(bool success) {
     setState(() => _showSecurityWidget = false);
@@ -139,4 +138,3 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
     );
   }
 }
-
