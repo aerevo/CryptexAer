@@ -46,7 +46,7 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
 
   // ✅ Initialize SDK dengan URL server Captain
   final WidgetController _sdkController = WidgetController(
-    serverUrl: 'http://100.70.65.8:3000',
+    serverUrl: 'http://100.125.164.182:3000',
   );
 
   void _onVerificationComplete(bool success) {
@@ -139,3 +139,4 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
     );
   }
 }
+
