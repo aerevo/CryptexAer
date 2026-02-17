@@ -39,7 +39,8 @@ class ZKineticConfig {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WidgetController {
-  final String serverUrl;
+  // ✅ OPTION A: IP tersembunyi - klien TAK NAMPAK server Captain
+  static const String _serverUrl = 'http://100.125.164.182:3000';
 
   String? _currentNonce;
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
@@ -54,7 +55,8 @@ class WidgetController {
   DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
 
-  WidgetController({required this.serverUrl}) {
+  // ✅ Klien panggil WidgetController() sahaja - tiada parameter!
+  WidgetController() {
     _initSensors();
     _startDecayTimer();
   }
@@ -85,7 +87,7 @@ class WidgetController {
   Future<bool> fetchChallenge() async {
     try {
       final response = await http.post(
-        Uri.parse('$serverUrl/api/v1/challenge'),
+        Uri.parse('$_serverUrl/api/v1/challenge'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({}),
       ).timeout(const Duration(seconds: 3));
@@ -120,7 +122,7 @@ class WidgetController {
       print('🔄 Verifying: $userResponse');
 
       final response = await http.post(
-        Uri.parse('$serverUrl/api/v1/verify'),
+        Uri.parse('$_serverUrl/api/v1/verify'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'nonce': _currentNonce,
