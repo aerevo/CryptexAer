@@ -70,7 +70,7 @@ class ZKineticProdukBDemo extends StatefulWidget {
 }
 
 class _ZKineticProdukBDemoState extends State<ZKineticProdukBDemo> {
-  bool _showWidget = false;
+  bool _showWidget = true;  // ✅ FIXED: Start with widget visible (skip intro)
   late WidgetController _controller;
 
   @override
@@ -81,30 +81,27 @@ class _ZKineticProdukBDemoState extends State<ZKineticProdukBDemo> {
     );
   }
 
-  void _onPurchaseClick() {
-    setState(() => _showWidget = true);
-  }
-
   void _onVerificationComplete(bool success) {
     setState(() => _showWidget = false);
     
     if (success) {
-      _showDialog('✅ Verified!', 'Human verified. Processing purchase...');
+      _showDialog('✅ Verified!', 'User verified. Processing purchase...', true);
     } else {
-      _showDialog('🚫 Bot Detected', 'Purchase blocked for security.');
+      _showDialog('🚫 Bot Detected', 'Purchase blocked for security.', false);
     }
   }
 
-  void _showDialog(String title, String message) {
+  void _showDialog(String title, String message, bool success) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
+        backgroundColor: success ? Colors.green.shade800 : Colors.red.shade800,  // ✅ Green for success
+        title: Text(title, style: const TextStyle(color: Colors.white)),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -115,52 +112,13 @@ class _ZKineticProdukBDemoState extends State<ZKineticProdukBDemo> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.confirmation_number, size: 80, color: Colors.orange),
-                const SizedBox(height: 20),
-                const Text(
-                  'Concert Tickets',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'BTS World Tour 2026',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-                const SizedBox(height: 40),
-                const Text(
-                  'RM 299',
-                  style: TextStyle(fontSize: 48, color: Colors.green, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 40),
-                ElevatedButton(
-                  onPressed: _onPurchaseClick,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 20),
-                  ),
-                  child: const Text(
-                    'BUY TICKET',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          if (_showWidget)
-            ZKineticWidgetProdukB(
+      body: _showWidget
+          ? ZKineticWidgetProdukB(
               controller: _controller,
               onComplete: _onVerificationComplete,
               onCancel: () => setState(() => _showWidget = false),
-            ),
-        ],
-      ),
+            )
+          : const SizedBox.shrink(),  // Empty when widget hidden
     );
   }
 }
@@ -543,8 +501,8 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // ✅ 1. Kurangkan margin supaya kotak lebih LEBAR
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      // ✅ FIXED: Even WIDER box (margin 15 instead of 20)
+      margin: const EdgeInsets.symmetric(horizontal: 15),
       height: 50,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.8),
@@ -598,7 +556,7 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
       fontSize: 28,
       fontWeight: FontWeight.bold,
       fontFamily: 'Courier',
-      letterSpacing: 10,  // ✅ 3. Jarakkan guna ini, lebih kemas
+      letterSpacing: 8,  // ✅ FIXED: Tighter spacing (8 instead of 10)
       color: color,
     );
   }
