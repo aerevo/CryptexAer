@@ -45,8 +45,11 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
   bool _showSecurityWidget = false;
 
   // ✅ Initialize SDK dengan URL server Captain
-  // ✅ OPTION A: Klien cuma tulis ini - IP tersembunyi dalam SDK!
-  final WidgetController _sdkController = WidgetController();
+  // ✅ Klien guna API Key yang Captain bagi
+  // Tukar 'zk_live_XXXX' dengan API Key sebenar dari Captain
+  final WidgetController _sdkController = WidgetController(
+    apiKey: 'zk_live_MASUKKAN_API_KEY_DI_SINI',
+  );
 
   void _onVerificationComplete(bool success) {
     setState(() => _showSecurityWidget = false);
