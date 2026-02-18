@@ -42,6 +42,9 @@ class WidgetController {
   // ✅ OPTION A: IP tersembunyi - klien TAK NAMPAK server Captain
   static const String _serverUrl = 'http://100.125.164.182:3000';
 
+  // ✅ API Key - klien wajib pass ni
+  final String apiKey;
+
   String? _currentNonce;
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
   final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
@@ -55,8 +58,8 @@ class WidgetController {
   DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
 
-  // ✅ Klien panggil WidgetController() sahaja - tiada parameter!
-  WidgetController() {
+  // ✅ Klien pass API Key mereka - server Captain hidden!
+  WidgetController({required this.apiKey}) {
     _initSensors();
     _startDecayTimer();
   }
@@ -88,7 +91,10 @@ class WidgetController {
     try {
       final response = await http.post(
         Uri.parse('$_serverUrl/api/v1/challenge'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,  // ✅ Hantar API Key
+        },
         body: json.encode({}),
       ).timeout(const Duration(seconds: 3));
 
@@ -123,7 +129,10 @@ class WidgetController {
 
       final response = await http.post(
         Uri.parse('$_serverUrl/api/v1/verify'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,  // ✅ Hantar API Key
+        },
         body: json.encode({
           'nonce': _currentNonce,
           'userResponse': userResponse,
