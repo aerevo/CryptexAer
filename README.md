@@ -7,13 +7,14 @@ WHAT YOU RECEIVE:
   ✅ z_kinetic_sdk.dart   (Security Engine)
   ✅ assets/z_wheel3.png  (Required Image)
   ✅ README.txt           (This file)
+  ✅ API Key              (Provided separately by Z-Kinetic)
 
 ============================================================
 STEP 1: COPY FILES INTO YOUR PROJECT
 ============================================================
 
   Your Flutter project structure:
-  
+
   my_app/
   ├── lib/
   │   ├── main.dart          ← Your existing file
@@ -60,12 +61,12 @@ STEP 4: USE IN YOUR APP
 
     import 'z_kinetic_sdk.dart';
 
-  In your StatefulWidget:
+  Initialize controller with your API Key:
 
-    bool _showSecurity = false;
-
-    // Initialize controller (ONE LINE!)
-    final WidgetController _controller = WidgetController();
+    // ⚠️ IMPORTANT: Replace with YOUR API Key from Z-Kinetic
+    final WidgetController _controller = WidgetController(
+      apiKey: 'zk_live_YOUR_API_KEY_HERE',
+    );
 
   In your build method:
 
@@ -82,7 +83,6 @@ STEP 4: USE IN YOUR APP
               setState(() => _showSecurity = false);
               if (success) {
                 // ✅ User verified - proceed with your action
-                // e.g. process payment, open door, etc.
               } else {
                 // ❌ Bot detected - block action
               }
@@ -94,98 +94,44 @@ STEP 4: USE IN YOUR APP
       ],
     )
 
-  To trigger the security check:
-
-    ElevatedButton(
-      onPressed: () => setState(() => _showSecurity = true),
-      child: Text('BUY NOW'),
-    )
-
 ============================================================
-FULL EXAMPLE (main.dart)
+API KEY INFORMATION
 ============================================================
 
-  import 'package:flutter/material.dart';
-  import 'package:flutter/services.dart';
-  import 'z_kinetic_sdk.dart';
+  Your API Key is unique to your account.
+  DO NOT share your API Key with anyone.
+  DO NOT expose your API Key in public repositories.
 
-  void main() {
-    WidgetsFlutterBinding.ensureInitialized();
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    runApp(const MyApp());
-  }
+  Your key determines:
+  → Monthly verification limit
+  → Subscription validity
+  → Account status
 
-  class MyApp extends StatelessWidget {
-    const MyApp({super.key});
-    @override
-    Widget build(BuildContext context) {
-      return MaterialApp(home: const MyHomePage());
-    }
-  }
-
-  class MyHomePage extends StatefulWidget {
-    const MyHomePage({super.key});
-    @override
-    State<MyHomePage> createState() => _MyHomePageState();
-  }
-
-  class _MyHomePageState extends State<MyHomePage> {
-    bool _showSecurity = false;
-    final WidgetController _controller = WidgetController();
-
-    @override
-    Widget build(BuildContext context) {
-      return Scaffold(
-        body: Stack(
-          children: [
-            Center(
-              child: ElevatedButton(
-                onPressed: () => setState(() => _showSecurity = true),
-                child: const Text('BUY TICKET'),
-              ),
-            ),
-            if (_showSecurity)
-              ZKineticWidgetProdukB(
-                controller: _controller,
-                onComplete: (success) {
-                  setState(() => _showSecurity = false);
-                  if (success) {
-                    // Your success action here
-                  }
-                },
-                onCancel: () => setState(() => _showSecurity = false),
-              ),
-          ],
-        ),
-      );
-    }
-  }
+  Contact Z-Kinetic support to:
+  → Renew subscription
+  → Upgrade plan
+  → Report issues
 
 ============================================================
 TROUBLESHOOTING
 ============================================================
 
+  ❌ Error: "Invalid API Key"
+     → Check your API Key is correct
+     → Contact Z-Kinetic support
+
+  ❌ Error: "Subscription expired"
+     → Contact Z-Kinetic to renew
+
+  ❌ Error: "Monthly limit reached"
+     → Upgrade your plan
+
   ❌ Red box appears (image error)
      → Make sure z_wheel3.png is in assets/ folder
-     → Make sure pubspec.yaml has assets declaration
+     → Check pubspec.yaml assets declaration
 
   ❌ Widget shows "..." forever
      → Check internet connection
-     → Make sure INTERNET permission is added (Android)
-
-  ❌ Build error: package not found
-     → Run: flutter pub get
-
-  ❌ Sensors not working on emulator
-     → Test on real device only
-
-============================================================
-SUPPORT
-============================================================
-
-  This SDK connects to Z-Kinetic servers automatically.
-  No configuration needed.
-  
-  Contact your Z-Kinetic representative for support.
+     → Ensure INTERNET permission added (Android)
 
 ============================================================
