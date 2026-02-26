@@ -1,9 +1,5 @@
-// 🛡️ Z-KINETIC V3.2 (FIREBASE BLACK BOX CLIENT)
-// Location: lib/services/firebase_blackbox_client.dart
-// Status: REPAIR FIXED ✅ | PRODUCTION READY
-// Features: Debug Logs, Emulator Standby, Confidence Scoring
-
-import 'package:cloud_functions/cloud_functions.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../cryptex_lock/src/motion_models.dart';
 
@@ -12,192 +8,108 @@ import '../cryptex_lock/src/motion_models.dart';
 // ============================================
 class BlackBoxVerdict {
   final bool allowed;
-  final String reason;
-  final double confidence; // ✅ DITAMBAH: Tahap keyakinan AI (0.0 - 1.0)
-  final Map<String, dynamic>? rawData;
+  final String verdict;
+  final double confidence;
+  final String riskScore;
 
   BlackBoxVerdict({
     required this.allowed,
-    required this.reason,
+    required this.verdict,
     required this.confidence,
-    this.rawData,
+    required this.riskScore,
   });
 
-  factory BlackBoxVerdict.fromJson(dynamic json) {
-    if (json == null || json is! Map) {
-      return BlackBoxVerdict.offlineFallback();
-    }
-    
-    // Pastikan confidence diparsing sebagai double walaupun server bagi int
-    double confidenceValue = 0.0;
-    if (json['confidence'] != null) {
-      confidenceValue = (json['confidence'] as num).toDouble();
-    }
-
+  factory BlackBoxVerdict.fromJson(Map<String, dynamic> json) {
     return BlackBoxVerdict(
       allowed: json['allowed'] == true,
-      reason: json['reason']?.toString() ?? 'UNKNOWN_RESPONSE',
-      confidence: confidenceValue,
-      rawData: Map<String, dynamic>.from(json),
+      verdict: json['verdict']?.toString() ?? 'UNKNOWN',
+      confidence: double.tryParse(json['confidence']?.toString() ?? '0.0') ?? 0.0,
+      riskScore: json['riskScore']?.toString() ?? 'MEDIUM',
     );
   }
 
-  factory BlackBoxVerdict.denied(String reason) {
-    return BlackBoxVerdict(
-      allowed: false, 
-      reason: reason, 
-      confidence: 0.0
-    );
-  }
-
-  factory BlackBoxVerdict.offlineFallback() {
-    return BlackBoxVerdict(
-      allowed: false, 
-      reason: 'SYSTEM_OFFLINE',
-      confidence: 0.0
-    );
-  }
-
-  @override
-  String toString() => 'Verdict(allowed: $allowed, reason: $reason, confidence: $confidence)';
+  factory BlackBoxVerdict.offline() => BlackBoxVerdict(
+    allowed: false, 
+    verdict: 'OFFLINE_ERR', 
+    confidence: 0.0, 
+    riskScore: 'HIGH'
+  );
 }
 
 // ============================================
-// INCIDENT RECEIPT MODEL
-// ============================================
-class IncidentReceipt {
-  final String incidentId;
-  final DateTime timestamp;
-  final String status;
-
-  IncidentReceipt({
-    required this.incidentId,
-    required this.timestamp,
-    required this.status,
-  });
-
-  factory IncidentReceipt.fromJson(Map<String, dynamic> json) {
-    return IncidentReceipt(
-      incidentId: json['incidentId'] ?? 'UNKNOWN',
-      timestamp: DateTime.now(),
-      status: json['status'] ?? 'PROCESSED',
-    );
-  }
-}
-
-// ============================================
-// FIREBASE CLIENT SERVICE
+// FIREBASE REST CLIENT (GEN 2)
 // ============================================
 class FirebaseBlackBoxClient {
-  late final FirebaseFunctions _functions;
+  // 🚀 URL SERVER BARU KITA!
+  final String baseUrl = "https://asia-southeast1-z-kinetic.cloudfunctions.net/api";
+  
+  // 🔑 API KEY (Pastikan sama dengan yang ada kat Firestore nanti)
+  final String apiKey = "zk_live_AEREVO_2026"; 
 
-  FirebaseBlackBoxClient() {
-    // 🇸🇬 Region: Singapore (asia-southeast1)
-    _functions = FirebaseFunctions.instanceFor(region: 'asia-southeast1');
-    
-    // 🛠️ EMULATOR PLACEHOLDER
-    // if (kDebugMode) {
-    //   _functions.useFunctionsEmulator('10.0.2.2', 5001);
-    // }
+  /// 1. MINTA CABARAN (Get Challenge)
+  Future<Map<String, dynamic>?> getChallenge(String deviceId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/challenge'),
+        headers: {'Content-Type': 'application/json', 'x-api-key': apiKey},
+        body: jsonEncode({'deviceId': deviceId}),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) print('❌ Challenge Error: $e');
+      return null;
+    }
   }
 
-  /// Menghantar data telemetri ke Cloud untuk dianalisis AI
-  Future<BlackBoxVerdict> analyze({
-    required String deviceId,
-    required BiometricSession biometric,
-    required String sessionId,
+  /// 2. SAHKAN BIOMETRIK (Verify)
+  Future<BlackBoxVerdict> verify({
     required String nonce,
-    required int timestamp,
-  }) async {
-    
-    if (kDebugMode) {
-      print('🔥 [DEBUG] Calling Firebase Function (analyzeBlackBox)...');
-      print('   Device ID: $deviceId');
-      print('   Session ID: $sessionId');
-    }
-    
-    try {
-      final result = await _functions
-          .httpsCallable('analyzeBlackBox')
-          .call({
-            'deviceId': deviceId,
-            'biometric': _serializeBiometric(biometric),
-            'sessionId': sessionId,
-            'nonce': nonce,
-            'timestamp': timestamp,
-          })
-          .timeout(const Duration(seconds: 15));
-      
-      if (kDebugMode) {
-        print('✅ [DEBUG] Response Received: ${result.data}');
-      }
-      
-      return BlackBoxVerdict.fromJson(result.data);
-      
-    } on FirebaseFunctionsException catch (e) {
-      if (kDebugMode) {
-        print('❌ [DEBUG] Firebase Function Error:');
-        print('   Code: ${e.code}');
-        print('   Message: ${e.message}');
-      }
-      
-      if (e.code == 'unauthenticated') {
-        return BlackBoxVerdict.denied('AUTH_REQUIRED');
-      }
-      return BlackBoxVerdict.offlineFallback();
-      
-    } catch (e) {
-      if (kDebugMode) {
-        print('💥 [DEBUG] Unknown Connection Error: $e');
-      }
-      return BlackBoxVerdict.offlineFallback();
-    }
-  }
-
-  /// Melaporkan insiden keselamatan ke Firebase Cloud
-  Future<IncidentReceipt> reportIncident({
+    required List<int> userResponse,
+    required BiometricSession biometric,
     required String deviceId,
-    required String incidentId,
-    required Map<String, dynamic> threatIntel,
-    Map<String, dynamic>? securityContext,
   }) async {
     try {
-      if (kDebugMode) print('🛡️ [DEBUG] Reporting Incident: $incidentId');
-      
-      final result = await _functions
-          .httpsCallable('reportIncident')
-          .call({
-            'incidentId': incidentId,
-            'deviceId': deviceId,
-            'threatIntel': threatIntel,
-            'securityContext': securityContext ?? {},
-          });
-          
-      return IncidentReceipt.fromJson(Map<String, dynamic>.from(result.data));
+      if (kDebugMode) print('🧠 Sending AI Analysis to Gen 2 Server...');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/verify'),
+        headers: {'Content-Type': 'application/json', 'x-api-key': apiKey},
+        body: jsonEncode({
+          'nonce': nonce,
+          'userResponse': userResponse,
+          'deviceId': deviceId,
+          'biometricData': _serializeBiometric(biometric), // ⬅️ AI Data kat sini
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return BlackBoxVerdict.fromJson(data);
+      } else {
+        return BlackBoxVerdict.offline();
+      }
     } catch (e) {
-      if (kDebugMode) print('⚠️ Failed to report incident: $e');
-      rethrow;
+      if (kDebugMode) print('💥 Verification Crash: $e');
+      return BlackBoxVerdict.offline();
     }
   }
 
-  /// Menukar objek BiometricSession kepada struktur JSON yang faham oleh Firebase
+  /// Tukar data sensor jadi JSON (AI Ready)
   Map<String, dynamic> _serializeBiometric(BiometricSession session) {
     return {
-      'motion_events': session.motionEvents.map((e) => {
+      'motion': session.motionEvents.map((e) => {
         'm': e.magnitude,
         't': e.timestamp.millisecondsSinceEpoch,
-        'dx': e.deltaX,
-        'dy': e.deltaY,
-        'dz': e.deltaZ,
       }).toList(),
-      'touch_events': session.touchEvents.map((e) => {
-        't': e.timestamp.millisecondsSinceEpoch,
+      'touch': session.touchEvents.map((e) => {
         'p': e.pressure,
-        'vx': e.velocityX,
-        'vy': e.velocityY,
+        'v': (e.velocityX + e.velocityY) / 2, // Velocity average
       }).toList(),
-      'duration_ms': session.duration.inMilliseconds,
-      'session_id': session.sessionId,
+      'duration': session.duration.inMilliseconds,
     };
   }
 }
