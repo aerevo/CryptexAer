@@ -44,7 +44,7 @@ class FirebaseBlackBoxClient {
   final String baseUrl = "https://asia-southeast1-z-kinetic.cloudfunctions.net/api";
   
   // 🔑 API KEY (Pastikan sama dengan yang ada kat Firestore nanti)
-  final String apiKey = "zk_live_AEREVO_2026"; 
+  final String apiKey = "zk_live_f9cd989306b3597e15f3974d053f85ee";
 
   /// 1. MINTA CABARAN (Get Challenge)
   Future<Map<String, dynamic>?> getChallenge(String deviceId) async {
