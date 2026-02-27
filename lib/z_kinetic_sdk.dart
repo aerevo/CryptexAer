@@ -1,18 +1,30 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:async';
+import 'dart:math';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// CONFIGURATION
+// Z-KINETIC SDK v1.0 - GRADE AAA ENGINE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Fail ini adalah PRODUK sebenar. Bagi kepada client.
+// ✅ Negative number fix (visual + logic)
+// ✅ Local fallback verify (bila server down)
+// ✅ RGB Glitch animation
+// ✅ Slot machine intro + respin
+// ✅ Drift + opacity pulse animations
+// ✅ Biometric tracking (motion/touch/pattern)
+// ✅ Compact Grade AAA layout
+// ✅ Server: Captain set dari main.dart
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ZKineticConfig {
   static const double imageWidth3 = 712.0;
   static const double imageHeight3 = 600.0;
 
+  // ✅ Captain's exact coordinates
   static const List<List<double>> coords3 = [
     [165, 155, 257, 380],
     [309, 155, 402, 380],
@@ -27,12 +39,10 @@ class ZKineticConfig {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WidgetController {
-  static const String _serverUrl =
-      'https://asia-southeast1-z-kinetic.cloudfunctions.net/api';
-  final String apiKey;
+  final String serverUrl;
 
   String? _currentNonce;
-  final ValueNotifier<List<int>> challengeCode = ValueNotifier([0, 0, 0]);
+  final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
   final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
 
   final ValueNotifier<double> motionScore = ValueNotifier(0.0);
@@ -44,7 +54,7 @@ class WidgetController {
   DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
 
-  WidgetController({required this.apiKey}) {
+  WidgetController({required this.serverUrl}) {
     _initSensors();
     _startDecayTimer();
   }
@@ -53,8 +63,8 @@ class WidgetController {
     _accelSub = accelerometerEventStream(
       samplingPeriod: const Duration(milliseconds: 100),
     ).listen((event) {
-      double magnitude =
-          sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+      double magnitude = sqrt(
+          event.x * event.x + event.y * event.y + event.z * event.z);
       double delta = (magnitude - _lastMagnitude).abs();
       if (delta > 0.3) {
         motionScore.value = (delta / 3.0).clamp(0.0, 1.0);
@@ -65,51 +75,54 @@ class WidgetController {
   }
 
   void _startDecayTimer() {
-    _decayTimer?.cancel();
-    _decayTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      final elapsed = DateTime.now().difference(_lastMotionTime).inSeconds;
-      if (elapsed > 1) {
+    _decayTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (DateTime.now().difference(_lastMotionTime).inMilliseconds > 500) {
         motionScore.value = (motionScore.value - 0.05).clamp(0.0, 1.0);
       }
     });
   }
 
-  Future<void> getChallenge() async {
+  Future<bool> fetchChallenge() async {
     try {
       final response = await http.post(
-        Uri.parse('$_serverUrl/challenge'),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-      ).timeout(const Duration(seconds: 5));
+        Uri.parse('$serverUrl/api/v1/challenge'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({}),
+      ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['challengeCode'] != null) {
           _currentNonce = data['nonce'];
-          challengeCode.value = List<int>.from(data['challengeCode']);
+          List<dynamic> rawCode = data['challengeCode'];
+          challengeCode.value = rawCode.map((e) => e as int).toList();
+          print('✅ Challenge from server: ${challengeCode.value}');
+          return true;
         }
       }
+      return false;
     } catch (e) {
-      _currentNonce = 'local_${DateTime.now().millisecondsSinceEpoch}';
+      // ✅ LOCAL FALLBACK: Bila server down, jana challenge sendiri
       challengeCode.value = List.generate(3, (_) => Random().nextInt(10));
+      _currentNonce = 'LOCAL_${Random().nextInt(99999)}';
+      print('⚠️ Server down. Local fallback: ${challengeCode.value}');
+      return true;
     }
   }
 
-  Future<Map<String, dynamic>> verifyChallenge(List<int> userResponse) async {
-    if (_currentNonce == null) {
+  Future<Map<String, dynamic>> verify(List<int> userResponse) async {
+    // Safety check
+    if (challengeCode.value.isEmpty) {
       return {'allowed': false, 'error': 'No active challenge'};
     }
 
     try {
+      print('🔄 Verifying: $userResponse');
+
       final response = await http.post(
-        Uri.parse('$_serverUrl/verify'),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-        body: jsonEncode({
+        Uri.parse('$serverUrl/api/v1/verify'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
           'nonce': _currentNonce,
           'userResponse': userResponse,
           'biometricData': {
@@ -117,19 +130,37 @@ class WidgetController {
             'touch': touchScore.value,
             'pattern': patternScore.value,
           },
-          'deviceId': 'flutter_device_${apiKey.substring(8, 16)}'
         }),
       ).timeout(const Duration(seconds: 3));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return {'allowed': data['allowed'] ?? false};
+        final data = json.decode(response.body);
+        print('✅ Server verdict: ${data['allowed']}');
+        return data;
       }
-      return {'allowed': false};
+
+      // Server error → fallback ke local check
+      throw Exception('Server error ${response.statusCode}');
+
     } catch (e) {
-      return {
-        'allowed': userResponse.join() == challengeCode.value.join()
-      };
+      print('⚠️ Network error ($e). Switching to LOCAL VERIFICATION.');
+
+      // ✅ LOCAL FALLBACK VERIFY: Check manual jika server down
+      if (_currentNonce != null && _currentNonce!.startsWith('LOCAL_')) {
+        bool isMatch = userResponse.length == challengeCode.value.length;
+        if (isMatch) {
+          for (int i = 0; i < userResponse.length; i++) {
+            if (userResponse[i] != challengeCode.value[i]) {
+              isMatch = false;
+              break;
+            }
+          }
+        }
+        print(isMatch ? '✅ LOCAL CHECK: SUCCESS' : '❌ LOCAL CHECK: WRONG');
+        return {'allowed': isMatch, 'method': 'local_fallback'};
+      }
+
+      return {'allowed': false, 'error': 'Network error'};
     }
   }
 
@@ -154,314 +185,549 @@ class WidgetController {
 
 class ZKineticWidgetProdukB extends StatefulWidget {
   final WidgetController controller;
-  final Function(bool) onComplete;
-  final VoidCallback? onCancel;
+  final Function(bool success) onComplete;
+  final VoidCallback onCancel;
 
   const ZKineticWidgetProdukB({
     super.key,
     required this.controller,
     required this.onComplete,
-    this.onCancel,
+    required this.onCancel,
   });
 
   @override
   State<ZKineticWidgetProdukB> createState() => _ZKineticWidgetProdukBState();
 }
 
-class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-  late Animation<double> _fadeAnimation;
-
-  final List<FixedExtentScrollController> _scrollControllers = [];
-  final List<int> _userSelection = [0, 0, 0];
-  bool _isLoading = false;
+class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 300));
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeIn),
-    );
-    for (int i = 0; i < 3; i++) {
-      _scrollControllers.add(FixedExtentScrollController(initialItem: 0));
-    }
-    _animController.forward();
-    _loadChallenge();
+    _initialize();
   }
 
-  @override
-  void dispose() {
-    _animController.dispose();
-    for (var c in _scrollControllers) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  Future<void> _loadChallenge() async {
-    setState(() => _isLoading = true);
-    await widget.controller.getChallenge();
-    setState(() => _isLoading = false);
-  }
-
-  Future<void> _onButtonTap() async {
-    widget.controller.registerTouch();
-    setState(() => _isLoading = true);
-    final result = await widget.controller.verifyChallenge(_userSelection);
-    setState(() => _isLoading = false);
-    widget.onComplete(result['allowed'] == true);
+  Future<void> _initialize() async {
+    await widget.controller.fetchChallenge();
+    if (mounted) setState(() => _loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final maxCardHeight = screenSize.height * 0.88;
-
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Material(
-        color: Colors.black.withOpacity(0.85),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-              constraints: BoxConstraints(maxHeight: maxCardHeight),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF5722),
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  )
-                ],
+    return Container(
+      color: Colors.black.withOpacity(0.95),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.only(top: 20, bottom: 12, left: 16, right: 16),
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF5722),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 30,
+                spreadRadius: 5,
+                offset: const Offset(0, 10),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Row: Title + Close button ─────────────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Z-KINETIC',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                      ),
-                      if (widget.onCancel != null)
-                        GestureDetector(
-                          onTap: widget.onCancel,
-                          child: const Icon(Icons.close,
-                              color: Colors.white70, size: 24),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-
-                  // ── Badge ─────────────────────────────────────────
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.verified_user,
-                            color: Colors.greenAccent, size: 14),
-                        SizedBox(width: 6),
-                        Text(
-                          'INTELLIGENT-GRADE BIOMETRIC LOCK',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              letterSpacing: 0.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Challenge Code Display ─────────────────────────
-                  ValueListenableBuilder<List<int>>(
-                    valueListenable: widget.controller.challengeCode,
-                    builder: (ctx, code, _) => Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 28, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.35),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        code.join('  '),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Please match the code',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Wheel Image ────────────────────────────────────
-                  FittedBox(
-                    fit: BoxFit.contain,
-                    child: SizedBox(
-                      width: ZKineticConfig.imageWidth3,
-                      height: ZKineticConfig.imageHeight3,
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: Image.asset(
-                              'assets/z_wheel3.png',
-                              fit: BoxFit.fill,
-                            ),
-                          ),
-                          ...List.generate(3, (i) {
-                            final coords = ZKineticConfig.coords3[i];
-                            final h = coords[3] - coords[1];
-                            return Positioned(
-                              left: coords[0],
-                              top: coords[1],
-                              width: coords[2] - coords[0],
-                              height: h,
-                              child: NotificationListener<ScrollNotification>(
-                                onNotification: (n) {
-                                  if (n is ScrollUpdateNotification) {
-                                    widget.controller.registerScroll();
-                                  }
-                                  return false;
-                                },
-                                child: _buildWheel(i, h),
-                              ),
-                            );
-                          }),
-                          Positioned(
-                            left: ZKineticConfig.btnCoords3[0],
-                            top: ZKineticConfig.btnCoords3[1],
-                            width: ZKineticConfig.btnCoords3[2] -
-                                ZKineticConfig.btnCoords3[0],
-                            height: ZKineticConfig.btnCoords3[3] -
-                                ZKineticConfig.btnCoords3[1],
-                            child: _isLoading
-                                ? const Center(
-                                    child: CircularProgressIndicator(
-                                        color: Colors.white))
-                                : GestureDetector(
-                                    onTap: _onButtonTap,
-                                    child:
-                                        Container(color: Colors.transparent),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Sensor Indicators ─────────────────────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildSensorIcon(Icons.sensors, 'MOTION',
-                          widget.controller.motionScore),
-                      const SizedBox(width: 32),
-                      _buildSensorIcon(Icons.touch_app, 'TOUCH',
-                          widget.controller.touchScore),
-                      const SizedBox(width: 32),
-                      _buildSensorIcon(Icons.fingerprint, 'PATTERN',
-                          widget.controller.patternScore),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // ── Cancel text ───────────────────────────────────
-                  if (widget.onCancel != null)
-                    TextButton(
-                      onPressed: widget.onCancel,
-                      child: const Text('Cancel',
-                          style:
-                              TextStyle(color: Colors.white70, fontSize: 14)),
-                    ),
-                ],
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Z-KINETIC',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 3,
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_user, color: Colors.greenAccent, size: 14),
+                    SizedBox(width: 6),
+                    Text(
+                      'INTELLIGENT-GRADE BIOMETRIC LOCK',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: Colors.white,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              UltimateRGBGlitchDisplay(controller: widget.controller),
+              const SizedBox(height: 12),
+              const Text(
+                'Please match the code',
+                style: TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 0.8),
+              ),
+              const SizedBox(height: 8),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(40.0),
+                  child: CircularProgressIndicator(color: Colors.white),
+                )
+              else
+                ValueListenableBuilder<int>(
+                  valueListenable: widget.controller.randomizeTrigger,
+                  builder: (context, trigger, _) {
+                    return UltimateCryptexLock(
+                      key: ValueKey(trigger),
+                      controller: widget.controller,
+                      onSuccess: (isPanic) => widget.onComplete(true),
+                      onFail: () => widget.onComplete(false),
+                    );
+                  },
+                ),
+              const SizedBox(height: 10),
+              UltimateBiometricPanel(controller: widget.controller),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: widget.onCancel,
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 4)),
+                child: const Text('Cancel', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildWheel(int index, double height) {
-    return ListWheelScrollView.useDelegate(
-      controller: _scrollControllers[index],
-      itemExtent: height / 3,
-      diameterRatio: 1.5,
-      physics: const FixedExtentScrollPhysics(),
-      onSelectedItemChanged: (val) {
-        _userSelection[index] = val % 10;
-        widget.controller.registerScroll();
-      },
-      childDelegate: ListWheelChildLoopingListDelegate(
-        children: List.generate(
-          10,
-          (i) => Center(
-            child: Text(
-              '$i',
-              style: const TextStyle(
-                fontSize: 38,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                shadows: [Shadow(color: Colors.black, blurRadius: 10)],
-              ),
-            ),
-          ),
-        ),
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// RGB GLITCH DISPLAY
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class UltimateRGBGlitchDisplay extends StatefulWidget {
+  final WidgetController controller;
+  const UltimateRGBGlitchDisplay({super.key, required this.controller});
+
+  @override
+  State<UltimateRGBGlitchDisplay> createState() =>
+      _UltimateRGBGlitchDisplayState();
+}
+
+class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
+  Timer? _glitchTimer;
+  double _xOffset = 0;
+  double _yOffset = 0;
+  bool _isGlitching = false;
+  final Random _rnd = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _glitchTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (_rnd.nextDouble() > 0.3) {
+        setState(() {
+          _isGlitching = true;
+          _xOffset = (_rnd.nextDouble() - 0.5) * 10;
+          _yOffset = (_rnd.nextDouble() - 0.5) * 8;
+        });
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted) setState(() => _isGlitching = false);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _glitchTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 15),
+      height: 50,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.6), width: 2),
+        boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 10)],
+      ),
+      child: ValueListenableBuilder<List<int>>(
+        valueListenable: widget.controller.challengeCode,
+        builder: (context, code, _) {
+          if (code.isEmpty) {
+            return const Center(
+              child: Text('...', style: TextStyle(color: Colors.white, fontSize: 28)),
+            );
+          }
+          String codeStr = code.join('');
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              if (_isGlitching)
+                Transform.translate(
+                  offset: Offset(_xOffset + 2, _yOffset),
+                  child: Text(codeStr, style: _glitchStyle(Colors.cyan)),
+                ),
+              if (_isGlitching)
+                Transform.translate(
+                  offset: Offset(-_xOffset - 2, -_yOffset),
+                  child: Text(codeStr, style: _glitchStyle(const Color(0xFFFF00FF))),
+                ),
+              Text(codeStr, style: _glitchStyle(Colors.white)),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildSensorIcon(
-      IconData icon, String label, ValueNotifier<double> notifier) {
+  TextStyle _glitchStyle(Color color) {
+    return TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.bold,
+      fontFamily: 'Courier',
+      letterSpacing: 8,  // ✅ Spacing rapat sikit (Captain request)
+      color: color,
+    );
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BIOMETRIC PANEL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class UltimateBiometricPanel extends StatelessWidget {
+  final WidgetController controller;
+  const UltimateBiometricPanel({super.key, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF5722),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildIndicator(icon: Icons.sensors, label: 'MOTION', notifier: controller.motionScore),
+          _buildIndicator(icon: Icons.touch_app, label: 'TOUCH', notifier: controller.touchScore),
+          _buildIndicator(icon: Icons.fingerprint, label: 'PATTERN', notifier: controller.patternScore),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIndicator({required IconData icon, required String label, required ValueNotifier<double> notifier}) {
     return ValueListenableBuilder<double>(
       valueListenable: notifier,
-      builder: (ctx, val, _) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              color: val > 0.3 ? Colors.greenAccent : Colors.white38,
-              size: 22),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: val > 0.3 ? Colors.greenAccent : Colors.white38,
-              fontSize: 10,
-            ),
+      builder: (context, value, _) {
+        bool isActive = value > 0.5;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: isActive ? Colors.greenAccent : Colors.white30),
+            const SizedBox(height: 3),
+            Text(label, style: TextStyle(fontSize: 7, color: isActive ? Colors.greenAccent : Colors.white30, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CRYPTEX LOCK (WHEELS + BUTTON)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class UltimateCryptexLock extends StatefulWidget {
+  final WidgetController controller;
+  final Function(bool) onSuccess;
+  final VoidCallback onFail;
+
+  const UltimateCryptexLock({
+    super.key,
+    required this.controller,
+    required this.onSuccess,
+    required this.onFail,
+  });
+
+  @override
+  State<UltimateCryptexLock> createState() => _UltimateCryptexLockState();
+}
+
+class _UltimateCryptexLockState extends State<UltimateCryptexLock>
+    with TickerProviderStateMixin {
+  static const double imageWidth = ZKineticConfig.imageWidth3;
+  static const double imageHeight = ZKineticConfig.imageHeight3;
+  static const List<List<double>> wheelCoords = ZKineticConfig.coords3;
+  static const List<double> buttonCoords = ZKineticConfig.btnCoords3;
+
+  late List<FixedExtentScrollController> _scrollControllers;
+  int? _activeWheelIndex;
+  Timer? _wheelActiveTimer;
+  bool _isButtonPressed = false;
+  final Random _random = Random();
+  late Timer _driftTimer;
+  late List<Offset> _textDriftOffsets;
+  late List<AnimationController> _opacityControllers;
+  late List<Animation<double>> _opacityAnimations;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ✅ Random init position
+    _scrollControllers = List.generate(
+        3, (i) => FixedExtentScrollController(initialItem: _random.nextInt(10)));
+    _textDriftOffsets = List.generate(3, (_) => Offset.zero);
+
+    // ✅ Drift animation
+    _driftTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (mounted && _activeWheelIndex == null) {
+        setState(() {
+          for (int i = 0; i < 3; i++) {
+            _textDriftOffsets[i] = Offset(
+              (_random.nextDouble() - 0.5) * 2.0,
+              (_random.nextDouble() - 0.5) * 2.0,
+            );
+          }
+        });
+      }
+    });
+
+    // ✅ Opacity pulse animation
+    _opacityControllers = List.generate(3, (i) {
+      final c = AnimationController(
+          vsync: this,
+          duration: Duration(milliseconds: 1800 + _random.nextInt(400)));
+      Future.delayed(Duration(milliseconds: _random.nextInt(1000)), () {
+        if (mounted) c.repeat(reverse: true);
+      });
+      return c;
+    });
+    _opacityAnimations = _opacityControllers
+        .map((c) => Tween<double>(begin: 0.75, end: 1.0)
+            .animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)))
+        .toList();
+
+    // ✅ Slot machine intro
+    WidgetsBinding.instance.addPostFrameCallback((_) => _playSlotMachineIntro());
+  }
+
+  void _playSlotMachineIntro() {
+    for (int i = 0; i < 3; i++) {
+      Future.delayed(Duration(milliseconds: 200 + (i * 300)), () {
+        if (!mounted) return;
+        int target = 20 + _random.nextInt(10);
+        _scrollControllers[i].animateToItem(
+          target,
+          duration: const Duration(milliseconds: 1200),
+          curve: Curves.elasticOut,
+        );
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          if (mounted) HapticFeedback.heavyImpact();
+        });
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    for (var c in _scrollControllers) c.dispose();
+    for (var c in _opacityControllers) c.dispose();
+    _wheelActiveTimer?.cancel();
+    _driftTimer.cancel();
+    super.dispose();
+  }
+
+  void _onWheelScrollStart(int index) {
+    setState(() => _activeWheelIndex = index);
+    _wheelActiveTimer?.cancel();
+    HapticFeedback.selectionClick();
+    widget.controller.registerTouch();
+  }
+
+  void _onWheelScrollEnd(int index) {
+    _wheelActiveTimer?.cancel();
+    _wheelActiveTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _activeWheelIndex = null);
+    });
+  }
+
+  Future<void> _onButtonTap() async {
+    setState(() => _isButtonPressed = true);
+    HapticFeedback.mediumImpact();
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (mounted) setState(() => _isButtonPressed = false);
+
+    List<int> currentCode = [];
+    for (var c in _scrollControllers) {
+      // ✅ CRITICAL FIX: Paksa positif 0-9 (handle negative scroll)
+      int raw = c.selectedItem;
+      int digit = (raw % 10 + 10) % 10;
+      currentCode.add(digit);
+    }
+    print('📤 Sending Code: $currentCode');
+
+    final result = await widget.controller.verify(currentCode);
+
+    if (result['allowed']) {
+      widget.onSuccess(false);
+    } else {
+      // ✅ No SnackBar - just vibrate + respin
+      HapticFeedback.heavyImpact();
+      await widget.controller.fetchChallenge();
+      _playSlotMachineIntro();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        double w = constraints.maxWidth;
+        double h = w / (imageWidth / imageHeight);
+        return SizedBox(
+          width: w,
+          height: h,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/z_wheel3.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: Colors.red, child: const Icon(Icons.error, color: Colors.white, size: 60)),
+                ),
+              ),
+              ..._buildWheelOverlays(w, h),
+              _buildGlowingButton(w, h),
+            ],
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  List<Widget> _buildWheelOverlays(double sw, double sh) {
+    return List.generate(wheelCoords.length, (i) {
+      double left = wheelCoords[i][0] * (sw / imageWidth);
+      double top = wheelCoords[i][1] * (sh / imageHeight);
+      double width = (wheelCoords[i][2] - wheelCoords[i][0]) * (sw / imageWidth);
+      double height = (wheelCoords[i][3] - wheelCoords[i][1]) * (sh / imageHeight);
+
+      return Positioned(
+        left: left, top: top, width: width, height: height,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (n) {
+            if (n is ScrollStartNotification) {
+              if (_scrollControllers[i].position == n.metrics) _onWheelScrollStart(i);
+            } else if (n is ScrollUpdateNotification) {
+              widget.controller.registerScroll();
+            } else if (n is ScrollEndNotification) {
+              _onWheelScrollEnd(i);
+            }
+            return false;
+          },
+          child: _buildWheel(i, height),
+        ),
+      );
+    });
+  }
+
+  Widget _buildWheel(int index, double wheelHeight) {
+    bool isActive = _activeWheelIndex == index;
+    return GestureDetector(
+      onTapDown: (_) => _onWheelScrollStart(index),
+      onTapUp: (_) => _onWheelScrollEnd(index),
+      onTapCancel: () => _onWheelScrollEnd(index),
+      behavior: HitTestBehavior.opaque,
+      child: ListWheelScrollView.useDelegate(
+        controller: _scrollControllers[index],
+        itemExtent: wheelHeight * 0.40,
+        perspective: 0.001,
+        diameterRatio: 1.5,
+        physics: const FixedExtentScrollPhysics(),
+        onSelectedItemChanged: (_) => HapticFeedback.selectionClick(),
+        childDelegate: ListWheelChildBuilderDelegate(
+          builder: (context, idx) {
+            // ✅ VISUAL FIX: Handle negative idx
+            int displayNumber = (idx % 10 + 10) % 10;
+            return Center(
+              child: AnimatedBuilder(
+                animation: _opacityAnimations[index],
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: isActive ? Offset.zero : _textDriftOffsets[index],
+                    child: Opacity(
+                      opacity: isActive ? 1.0 : _opacityAnimations[index].value,
+                      child: Text(
+                        '$displayNumber',
+                        style: TextStyle(
+                          fontSize: wheelHeight * 0.30,
+                          fontWeight: FontWeight.w900,
+                          color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
+                          height: 1.0,
+                          shadows: isActive
+                              ? [Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20)]
+                              : [
+                                  Shadow(offset: const Offset(1, 1), blurRadius: 1, color: Colors.white.withOpacity(0.4)),
+                                  Shadow(offset: const Offset(-1, -1), blurRadius: 1, color: Colors.black.withOpacity(0.6)),
+                                ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlowingButton(double sw, double sh) {
+    double left = buttonCoords[0] * (sw / imageWidth);
+    double top = buttonCoords[1] * (sh / imageHeight);
+    double width = (buttonCoords[2] - buttonCoords[0]) * (sw / imageWidth);
+    double height = (buttonCoords[3] - buttonCoords[1]) * (sh / imageHeight);
+
+    return Positioned(
+      left: left, top: top, width: width, height: height,
+      child: GestureDetector(
+        onTap: _onButtonTap,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          children: [
+            Container(color: Colors.transparent),
+            if (_isButtonPressed)
+              IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [BoxShadow(color: const Color(0xFFFF5722).withOpacity(0.6), blurRadius: 30, spreadRadius: 5)],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
