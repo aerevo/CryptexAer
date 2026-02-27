@@ -7,24 +7,20 @@ import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Z-KINETIC SDK v1.0 - GRADE AAA ENGINE
+// Z-KINETIC SDK v2.0 - GRADE AAA ENGINE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Fail ini adalah PRODUK sebenar. Bagi kepada client.
+// ✅ UI lama dikekal (RGB glitch, slot machine, drift, opacity pulse)
+// ✅ API baru: Firebase Functions + apiKey header
 // ✅ Negative number fix (visual + logic)
 // ✅ Local fallback verify (bila server down)
-// ✅ RGB Glitch animation
-// ✅ Slot machine intro + respin
-// ✅ Drift + opacity pulse animations
-// ✅ Biometric tracking (motion/touch/pattern)
-// ✅ Compact Grade AAA layout
-// ✅ Server: Captain set dari main.dart
+// ✅ FittedBox scaling (seragam semua screen)
+// ✅ Bug fix: onSuccess(true) betul
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ZKineticConfig {
   static const double imageWidth3 = 712.0;
   static const double imageHeight3 = 600.0;
 
-  // ✅ Captain's exact coordinates
   static const List<List<double>> coords3 = [
     [165, 155, 257, 380],
     [309, 155, 402, 380],
@@ -35,11 +31,16 @@ class ZKineticConfig {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// WIDGET CONTROLLER
+// WIDGET CONTROLLER (API BARU: apiKey + Firebase)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WidgetController {
-  final String serverUrl;
+  // ✅ Firebase Functions URL (hardcoded dalam SDK)
+  static const String _serverUrl =
+      'https://asia-southeast1-z-kinetic.cloudfunctions.net/api';
+
+  // ✅ API Key dari client (main.dart)
+  final String apiKey;
 
   String? _currentNonce;
   final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
@@ -54,7 +55,7 @@ class WidgetController {
   DateTime _lastMotionTime = DateTime.now();
   Timer? _decayTimer;
 
-  WidgetController({required this.serverUrl}) {
+  WidgetController({required this.apiKey}) {
     _initSensors();
     _startDecayTimer();
   }
@@ -63,8 +64,8 @@ class WidgetController {
     _accelSub = accelerometerEventStream(
       samplingPeriod: const Duration(milliseconds: 100),
     ).listen((event) {
-      double magnitude = sqrt(
-          event.x * event.x + event.y * event.y + event.z * event.z);
+      double magnitude =
+          sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
       double delta = (magnitude - _lastMagnitude).abs();
       if (delta > 0.3) {
         motionScore.value = (delta / 3.0).clamp(0.0, 1.0);
@@ -82,13 +83,17 @@ class WidgetController {
     });
   }
 
+  // ✅ fetchChallenge — nama lama dikekal supaya widget lama compatible
   Future<bool> fetchChallenge() async {
     try {
       final response = await http.post(
-        Uri.parse('$serverUrl/api/v1/challenge'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('$_serverUrl/challenge'),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey, // ✅ API Key header baru
+        },
         body: json.encode({}),
-      ).timeout(const Duration(seconds: 3));
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -96,13 +101,13 @@ class WidgetController {
           _currentNonce = data['nonce'];
           List<dynamic> rawCode = data['challengeCode'];
           challengeCode.value = rawCode.map((e) => e as int).toList();
-          print('✅ Challenge from server: ${challengeCode.value}');
+          print('✅ Challenge dari server: ${challengeCode.value}');
           return true;
         }
       }
       return false;
     } catch (e) {
-      // ✅ LOCAL FALLBACK: Bila server down, jana challenge sendiri
+      // ✅ LOCAL FALLBACK
       challengeCode.value = List.generate(3, (_) => Random().nextInt(10));
       _currentNonce = 'LOCAL_${Random().nextInt(99999)}';
       print('⚠️ Server down. Local fallback: ${challengeCode.value}');
@@ -110,18 +115,36 @@ class WidgetController {
     }
   }
 
+  // ✅ verify — nama lama dikekal, endpoint + header baru
   Future<Map<String, dynamic>> verify(List<int> userResponse) async {
-    // Safety check
     if (challengeCode.value.isEmpty) {
       return {'allowed': false, 'error': 'No active challenge'};
+    }
+
+    // ✅ Local fallback verify
+    if (_currentNonce != null && _currentNonce!.startsWith('LOCAL_')) {
+      bool isMatch = userResponse.length == challengeCode.value.length;
+      if (isMatch) {
+        for (int i = 0; i < userResponse.length; i++) {
+          if (userResponse[i] != challengeCode.value[i]) {
+            isMatch = false;
+            break;
+          }
+        }
+      }
+      print(isMatch ? '✅ LOCAL CHECK: SUCCESS' : '❌ LOCAL CHECK: WRONG');
+      return {'allowed': isMatch, 'method': 'local_fallback'};
     }
 
     try {
       print('🔄 Verifying: $userResponse');
 
       final response = await http.post(
-        Uri.parse('$serverUrl/api/v1/verify'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('$_serverUrl/verify'),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey, // ✅ API Key header baru
+        },
         body: json.encode({
           'nonce': _currentNonce,
           'userResponse': userResponse,
@@ -130,6 +153,7 @@ class WidgetController {
             'touch': touchScore.value,
             'pattern': patternScore.value,
           },
+          'deviceId': 'flutter_device_${apiKey.substring(8, 16)}',
         }),
       ).timeout(const Duration(seconds: 3));
 
@@ -139,28 +163,11 @@ class WidgetController {
         return data;
       }
 
-      // Server error → fallback ke local check
       throw Exception('Server error ${response.statusCode}');
-
     } catch (e) {
-      print('⚠️ Network error ($e). Switching to LOCAL VERIFICATION.');
-
-      // ✅ LOCAL FALLBACK VERIFY: Check manual jika server down
-      if (_currentNonce != null && _currentNonce!.startsWith('LOCAL_')) {
-        bool isMatch = userResponse.length == challengeCode.value.length;
-        if (isMatch) {
-          for (int i = 0; i < userResponse.length; i++) {
-            if (userResponse[i] != challengeCode.value[i]) {
-              isMatch = false;
-              break;
-            }
-          }
-        }
-        print(isMatch ? '✅ LOCAL CHECK: SUCCESS' : '❌ LOCAL CHECK: WRONG');
-        return {'allowed': isMatch, 'method': 'local_fallback'};
-      }
-
-      return {'allowed': false, 'error': 'Network error'};
+      print('⚠️ Network error ($e). Local verify fallback.');
+      final match = userResponse.join() == challengeCode.value.join();
+      return {'allowed': match, 'method': 'local_fallback'};
     }
   }
 
@@ -180,19 +187,19 @@ class WidgetController {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// MAIN WIDGET (OVERLAY)
+// MAIN WIDGET (OVERLAY) — UI LAMA DIKEKAL
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ZKineticWidgetProdukB extends StatefulWidget {
   final WidgetController controller;
   final Function(bool success) onComplete;
-  final VoidCallback onCancel;
+  final VoidCallback? onCancel; // ✅ Optional (compatible dengan main.dart baru)
 
   const ZKineticWidgetProdukB({
     super.key,
     required this.controller,
     required this.onComplete,
-    required this.onCancel,
+    this.onCancel,
   });
 
   @override
@@ -218,91 +225,108 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
     return Container(
       color: Colors.black.withOpacity(0.95),
       child: Center(
-        child: Container(
-          padding: const EdgeInsets.only(top: 20, bottom: 12, left: 16, right: 16),
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFF5722),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 30,
-                spreadRadius: 5,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Z-KINETIC',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 3,
+        child: SingleChildScrollView(
+          // ✅ SingleChildScrollView: prevent overflow pada screen kecil
+          child: Container(
+            padding: const EdgeInsets.only(top: 20, bottom: 12, left: 16, right: 16),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF5722),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                  offset: const Offset(0, 10),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Title ──────────────────────────────────────────
+                const Text(
+                  'Z-KINETIC',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 3,
+                  ),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.verified_user, color: Colors.greenAccent, size: 14),
-                    SizedBox(width: 6),
-                    Text(
-                      'INTELLIGENT-GRADE BIOMETRIC LOCK',
-                      style: TextStyle(
-                        fontSize: 8,
-                        color: Colors.white,
-                        letterSpacing: 0.8,
-                        fontWeight: FontWeight.w700,
+                const SizedBox(height: 8),
+
+                // ── Badge ──────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_user, color: Colors.greenAccent, size: 14),
+                      SizedBox(width: 6),
+                      Text(
+                        'INTELLIGENT-GRADE BIOMETRIC LOCK',
+                        style: TextStyle(
+                          fontSize: 8,
+                          color: Colors.white,
+                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              UltimateRGBGlitchDisplay(controller: widget.controller),
-              const SizedBox(height: 12),
-              const Text(
-                'Please match the code',
-                style: TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 0.8),
-              ),
-              const SizedBox(height: 8),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: CircularProgressIndicator(color: Colors.white),
-                )
-              else
-                ValueListenableBuilder<int>(
-                  valueListenable: widget.controller.randomizeTrigger,
-                  builder: (context, trigger, _) {
-                    return UltimateCryptexLock(
-                      key: ValueKey(trigger),
-                      controller: widget.controller,
-                      onSuccess: (isPanic) => widget.onComplete(true),
-                      onFail: () => widget.onComplete(false),
-                    );
-                  },
+                const SizedBox(height: 18),
+
+                // ── RGB Glitch Code Display ────────────────────────
+                UltimateRGBGlitchDisplay(controller: widget.controller),
+                const SizedBox(height: 12),
+                const Text(
+                  'Please match the code',
+                  style: TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 0.8),
                 ),
-              const SizedBox(height: 10),
-              UltimateBiometricPanel(controller: widget.controller),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: widget.onCancel,
-                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 4)),
-                child: const Text('Cancel', style: TextStyle(color: Colors.white70, fontSize: 13)),
-              ),
-            ],
+                const SizedBox(height: 8),
+
+                // ── Wheels ─────────────────────────────────────────
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.all(40.0),
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
+                else
+                  ValueListenableBuilder<int>(
+                    valueListenable: widget.controller.randomizeTrigger,
+                    builder: (context, trigger, _) {
+                      return UltimateCryptexLock(
+                        key: ValueKey(trigger),
+                        controller: widget.controller,
+                        onSuccess: (isPanic) => widget.onComplete(true),
+                        onFail: () => widget.onComplete(false),
+                      );
+                    },
+                  ),
+                const SizedBox(height: 10),
+
+                // ── Biometric Panel ────────────────────────────────
+                UltimateBiometricPanel(controller: widget.controller),
+                const SizedBox(height: 8),
+
+                // ── Cancel ─────────────────────────────────────────
+                if (widget.onCancel != null)
+                  TextButton(
+                    onPressed: widget.onCancel,
+                    style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 4)),
+                    child: const Text('Cancel',
+                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -399,7 +423,7 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
       fontSize: 28,
       fontWeight: FontWeight.bold,
       fontFamily: 'Courier',
-      letterSpacing: 8,  // ✅ Spacing rapat sikit (Captain request)
+      letterSpacing: 8,
       color: color,
     );
   }
@@ -433,7 +457,11 @@ class UltimateBiometricPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildIndicator({required IconData icon, required String label, required ValueNotifier<double> notifier}) {
+  Widget _buildIndicator({
+    required IconData icon,
+    required String label,
+    required ValueNotifier<double> notifier,
+  }) {
     return ValueListenableBuilder<double>(
       valueListenable: notifier,
       builder: (context, value, _) {
@@ -443,7 +471,15 @@ class UltimateBiometricPanel extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: isActive ? Colors.greenAccent : Colors.white30),
             const SizedBox(height: 3),
-            Text(label, style: TextStyle(fontSize: 7, color: isActive ? Colors.greenAccent : Colors.white30, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 7,
+                color: isActive ? Colors.greenAccent : Colors.white30,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
           ],
         );
       },
@@ -587,10 +623,10 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
 
     final result = await widget.controller.verify(currentCode);
 
-    if (result['allowed']) {
-      widget.onSuccess(false);
+    if (result['allowed'] == true) {
+      widget.onSuccess(false); // false = bukan panic mode
     } else {
-      // ✅ No SnackBar - just vibrate + respin
+      // ✅ Vibrate + respin (tanpa SnackBar)
       HapticFeedback.heavyImpact();
       await widget.controller.fetchChallenge();
       _playSlotMachineIntro();
@@ -599,45 +635,51 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        double w = constraints.maxWidth;
-        double h = w / (imageWidth / imageHeight);
-        return SizedBox(
-          width: w,
-          height: h,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/z_wheel3.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) =>
-                      Container(color: Colors.red, child: const Icon(Icons.error, color: Colors.white, size: 60)),
+    // ✅ FittedBox: scale seragam ikut lebar screen, tiada overflow
+    return FittedBox(
+      fit: BoxFit.contain,
+      child: SizedBox(
+        width: imageWidth,
+        height: imageHeight,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                'assets/z_wheel3.png',
+                fit: BoxFit.fill,
+                errorBuilder: (_, __, ___) => Container(
+                  color: Colors.red,
+                  child: const Icon(Icons.error, color: Colors.white, size: 60),
                 ),
               ),
-              ..._buildWheelOverlays(w, h),
-              _buildGlowingButton(w, h),
-            ],
-          ),
-        );
-      },
+            ),
+            ..._buildWheelOverlays(),
+            _buildGlowingButton(),
+          ],
+        ),
+      ),
     );
   }
 
-  List<Widget> _buildWheelOverlays(double sw, double sh) {
+  List<Widget> _buildWheelOverlays() {
     return List.generate(wheelCoords.length, (i) {
-      double left = wheelCoords[i][0] * (sw / imageWidth);
-      double top = wheelCoords[i][1] * (sh / imageHeight);
-      double width = (wheelCoords[i][2] - wheelCoords[i][0]) * (sw / imageWidth);
-      double height = (wheelCoords[i][3] - wheelCoords[i][1]) * (sh / imageHeight);
+      final coords = wheelCoords[i];
+      final double left = coords[0];
+      final double top = coords[1];
+      final double width = coords[2] - coords[0];
+      final double height = coords[3] - coords[1];
 
       return Positioned(
-        left: left, top: top, width: width, height: height,
+        left: left,
+        top: top,
+        width: width,
+        height: height,
         child: NotificationListener<ScrollNotification>(
           onNotification: (n) {
             if (n is ScrollStartNotification) {
-              if (_scrollControllers[i].position == n.metrics) _onWheelScrollStart(i);
+              if (_scrollControllers[i].position == n.metrics) {
+                _onWheelScrollStart(i);
+              }
             } else if (n is ScrollUpdateNotification) {
               widget.controller.registerScroll();
             } else if (n is ScrollEndNotification) {
@@ -682,13 +724,28 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
                         style: TextStyle(
                           fontSize: wheelHeight * 0.30,
                           fontWeight: FontWeight.w900,
-                          color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
+                          color: isActive
+                              ? const Color(0xFFFF5722)
+                              : const Color(0xFF263238),
                           height: 1.0,
                           shadows: isActive
-                              ? [Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20)]
+                              ? [
+                                  Shadow(
+                                    color: const Color(0xFFFF5722).withOpacity(0.8),
+                                    blurRadius: 20,
+                                  )
+                                ]
                               : [
-                                  Shadow(offset: const Offset(1, 1), blurRadius: 1, color: Colors.white.withOpacity(0.4)),
-                                  Shadow(offset: const Offset(-1, -1), blurRadius: 1, color: Colors.black.withOpacity(0.6)),
+                                  Shadow(
+                                    offset: const Offset(1, 1),
+                                    blurRadius: 1,
+                                    color: Colors.white.withOpacity(0.4),
+                                  ),
+                                  Shadow(
+                                    offset: const Offset(-1, -1),
+                                    blurRadius: 1,
+                                    color: Colors.black.withOpacity(0.6),
+                                  ),
                                 ],
                         ),
                       ),
@@ -703,14 +760,12 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     );
   }
 
-  Widget _buildGlowingButton(double sw, double sh) {
-    double left = buttonCoords[0] * (sw / imageWidth);
-    double top = buttonCoords[1] * (sh / imageHeight);
-    double width = (buttonCoords[2] - buttonCoords[0]) * (sw / imageWidth);
-    double height = (buttonCoords[3] - buttonCoords[1]) * (sh / imageHeight);
-
+  Widget _buildGlowingButton() {
     return Positioned(
-      left: left, top: top, width: width, height: height,
+      left: buttonCoords[0],
+      top: buttonCoords[1],
+      width: buttonCoords[2] - buttonCoords[0],
+      height: buttonCoords[3] - buttonCoords[1],
       child: GestureDetector(
         onTap: _onButtonTap,
         behavior: HitTestBehavior.opaque,
@@ -722,7 +777,13 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    boxShadow: [BoxShadow(color: const Color(0xFFFF5722).withOpacity(0.6), blurRadius: 30, spreadRadius: 5)],
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF5722).withOpacity(0.6),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      )
+                    ],
                   ),
                 ),
               ),
