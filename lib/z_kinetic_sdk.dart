@@ -13,7 +13,6 @@ class ZKineticConfig {
   static const double imageWidth3 = 712.0;
   static const double imageHeight3 = 600.0;
 
-  // Koordinat roda (telah dilaraskan)
   static const List<List<double>> coords3 = [
     [165, 155, 257, 380],
     [309, 155, 402, 380],
@@ -28,7 +27,8 @@ class ZKineticConfig {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WidgetController {
-  static const String _serverUrl = 'https://asia-southeast1-z-kinetic.cloudfunctions.net/api';
+  static const String _serverUrl =
+      'https://asia-southeast1-z-kinetic.cloudfunctions.net/api';
   final String apiKey;
 
   String? _currentNonce;
@@ -53,7 +53,8 @@ class WidgetController {
     _accelSub = accelerometerEventStream(
       samplingPeriod: const Duration(milliseconds: 100),
     ).listen((event) {
-      double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+      double magnitude =
+          sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
       double delta = (magnitude - _lastMagnitude).abs();
       if (delta > 0.3) {
         motionScore.value = (delta / 3.0).clamp(0.0, 1.0);
@@ -88,8 +89,6 @@ class WidgetController {
         if (data['success'] == true) {
           _currentNonce = data['nonce'];
           challengeCode.value = List<int>.from(data['challengeCode']);
-        } else {
-          throw Exception(data['error'] ?? 'Failed to get challenge');
         }
       }
     } catch (e) {
@@ -99,11 +98,8 @@ class WidgetController {
   }
 
   Future<Map<String, dynamic>> verifyChallenge(List<int> userResponse) async {
-    if (_currentNonce == null) return {'allowed': false, 'error': 'No active challenge'};
-
-    if (_currentNonce!.startsWith('local_')) {
-      final match = userResponse.join() == challengeCode.value.join();
-      return {'allowed': match, 'mode': 'local'};
+    if (_currentNonce == null) {
+      return {'allowed': false, 'error': 'No active challenge'};
     }
 
     try {
@@ -127,17 +123,13 @@ class WidgetController {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {
-          'allowed': data['allowed'] ?? false,
-          'riskScore': data['riskScore'] ?? 'UNKNOWN',
-          'confidence': data['confidence'] ?? 0.0,
-          'mode': 'server'
-        };
+        return {'allowed': data['allowed'] ?? false};
       }
-      return {'allowed': false, 'error': 'Server error'};
+      return {'allowed': false};
     } catch (e) {
-      final match = userResponse.join() == challengeCode.value.join();
-      return {'allowed': match, 'mode': 'local_fallback'};
+      return {
+        'allowed': userResponse.join() == challengeCode.value.join()
+      };
     }
   }
 
@@ -176,9 +168,11 @@ class ZKineticWidgetProdukB extends StatefulWidget {
   State<ZKineticWidgetProdukB> createState() => _ZKineticWidgetProdukBState();
 }
 
-class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> with SingleTickerProviderStateMixin {
+class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
+
   final List<FixedExtentScrollController> _scrollControllers = [];
   final List<int> _userSelection = [0, 0, 0];
   bool _isLoading = false;
@@ -186,7 +180,8 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> with Sing
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _animController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 300));
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeIn),
     );
@@ -200,7 +195,9 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> with Sing
   @override
   void dispose() {
     _animController.dispose();
-    for (var c in _scrollControllers) { c.dispose(); }
+    for (var c in _scrollControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -211,174 +208,261 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> with Sing
   }
 
   Future<void> _onButtonTap() async {
+    widget.controller.registerTouch();
     setState(() => _isLoading = true);
     final result = await widget.controller.verifyChallenge(_userSelection);
     setState(() => _isLoading = false);
-
-    if (result['allowed'] == true) {
-      widget.onComplete(true);
-    } else {
-      _showErrorDialog(result['error'] ?? 'Verification failed');
-    }
-  }
-
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.red.shade900,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('❌ Ralat Verifikasi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () { Navigator.pop(ctx); widget.onComplete(false); },
-            child: const Text('OK', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWheel(int wheelIndex, double height) {
-    return ValueListenableBuilder<int>(
-      valueListenable: widget.controller.randomizeTrigger,
-      builder: (context, trigger, child) {
-        return ListWheelScrollView.useDelegate(
-          controller: _scrollControllers[wheelIndex],
-          itemExtent: height / 3,
-          diameterRatio: 1.5,
-          physics: const FixedExtentScrollPhysics(),
-          onSelectedItemChanged: (index) {
-            _userSelection[wheelIndex] = index % 10;
-            widget.controller.registerScroll();
-          },
-          childDelegate: ListWheelChildLoopingListDelegate(
-            children: List.generate(10, (i) {
-              return Center(
-                child: Text(
-                  '$i',
-                  style: TextStyle(
-                    fontSize: 36, // Saiz diperkecil untuk muat dalam slot
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white.withOpacity(0.9),
-                    shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
-                  ),
-                ),
-              );
-            }),
-          ),
-        );
-      },
-    );
+    widget.onComplete(result['allowed'] == true);
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final maxCardHeight = screenSize.height * 0.88;
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Material(
         color: Colors.black.withOpacity(0.85),
-        child: Stack(
-          children: [
-            // TEKNIK KUNCI RATIO (AspectRatio + FittedBox)
-            Center(
-              child: AspectRatio(
-                aspectRatio: ZKineticConfig.imageWidth3 / ZKineticConfig.imageHeight3,
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: SizedBox(
-                    width: ZKineticConfig.imageWidth3,
-                    height: ZKineticConfig.imageHeight3,
-                    child: Stack(
-                      children: [
-                        // 1. Gambar Latar
-                        Positioned.fill(
-                          child: Image.asset(
-                            'assets/z_wheel3.png',
-                            fit: BoxFit.fill,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+              constraints: BoxConstraints(maxHeight: maxCardHeight),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF5722),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  )
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Row: Title + Close button ─────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Z-KINETIC',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 2,
                           ),
                         ),
+                      ),
+                      if (widget.onCancel != null)
+                        GestureDetector(
+                          onTap: widget.onCancel,
+                          child: const Icon(Icons.close,
+                              color: Colors.white70, size: 24),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
 
-                        // 2. Roda Nombor
-                        ...List.generate(3, (i) {
-                          final coords = ZKineticConfig.coords3[i];
-                          final height = coords[3] - coords[1];
-                          return Positioned(
-                            left: coords[0],
-                            top: coords[1],
-                            width: coords[2] - coords[0],
-                            height: height,
-                            child: _buildWheel(i, height),
-                          );
-                        }),
-
-                        // 3. Butang Verify
-                        Positioned(
-                          left: ZKineticConfig.btnCoords3[0],
-                          top: ZKineticConfig.btnCoords3[1],
-                          width: ZKineticConfig.btnCoords3[2] - ZKineticConfig.btnCoords3[0],
-                          height: ZKineticConfig.btnCoords3[3] - ZKineticConfig.btnCoords3[1],
-                          child: _isLoading
-                              ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                              : InkWell(
-                                  onTap: _onButtonTap,
-                                  child: Container(color: Colors.transparent),
-                                ),
+                  // ── Badge ─────────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.verified_user,
+                            color: Colors.greenAccent, size: 14),
+                        SizedBox(width: 6),
+                        Text(
+                          'INTELLIGENT-GRADE BIOMETRIC LOCK',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              letterSpacing: 0.5),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ),
-            ),
+                  const SizedBox(height: 16),
 
-            // Panel Biometrik
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildIndicator(icon: Icons.sensors, label: 'MOTION', notifier: widget.controller.motionScore),
-                  const SizedBox(width: 40),
-                  _buildIndicator(icon: Icons.touch_app, label: 'TOUCH', notifier: widget.controller.touchScore),
-                  const SizedBox(width: 40),
-                  _buildIndicator(icon: Icons.fingerprint, label: 'PATTERN', notifier: widget.controller.patternScore),
+                  // ── Challenge Code Display ─────────────────────────
+                  ValueListenableBuilder<List<int>>(
+                    valueListenable: widget.controller.challengeCode,
+                    builder: (ctx, code, _) => Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 28, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        code.join('  '),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Please match the code',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Wheel Image ────────────────────────────────────
+                  FittedBox(
+                    fit: BoxFit.contain,
+                    child: SizedBox(
+                      width: ZKineticConfig.imageWidth3,
+                      height: ZKineticConfig.imageHeight3,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: Image.asset(
+                              'assets/z_wheel3.png',
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                          ...List.generate(3, (i) {
+                            final coords = ZKineticConfig.coords3[i];
+                            final h = coords[3] - coords[1];
+                            return Positioned(
+                              left: coords[0],
+                              top: coords[1],
+                              width: coords[2] - coords[0],
+                              height: h,
+                              child: NotificationListener<ScrollNotification>(
+                                onNotification: (n) {
+                                  if (n is ScrollUpdateNotification) {
+                                    widget.controller.registerScroll();
+                                  }
+                                  return false;
+                                },
+                                child: _buildWheel(i, h),
+                              ),
+                            );
+                          }),
+                          Positioned(
+                            left: ZKineticConfig.btnCoords3[0],
+                            top: ZKineticConfig.btnCoords3[1],
+                            width: ZKineticConfig.btnCoords3[2] -
+                                ZKineticConfig.btnCoords3[0],
+                            height: ZKineticConfig.btnCoords3[3] -
+                                ZKineticConfig.btnCoords3[1],
+                            child: _isLoading
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                        color: Colors.white))
+                                : GestureDetector(
+                                    onTap: _onButtonTap,
+                                    child:
+                                        Container(color: Colors.transparent),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Sensor Indicators ─────────────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildSensorIcon(Icons.sensors, 'MOTION',
+                          widget.controller.motionScore),
+                      const SizedBox(width: 32),
+                      _buildSensorIcon(Icons.touch_app, 'TOUCH',
+                          widget.controller.touchScore),
+                      const SizedBox(width: 32),
+                      _buildSensorIcon(Icons.fingerprint, 'PATTERN',
+                          widget.controller.patternScore),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+
+                  // ── Cancel text ───────────────────────────────────
+                  if (widget.onCancel != null)
+                    TextButton(
+                      onPressed: widget.onCancel,
+                      child: const Text('Cancel',
+                          style:
+                              TextStyle(color: Colors.white70, fontSize: 14)),
+                    ),
                 ],
               ),
             ),
-
-            if (widget.onCancel != null)
-              Positioned(
-                top: 40,
-                right: 20,
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white, size: 32),
-                  onPressed: widget.onCancel,
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildIndicator({required IconData icon, required String label, required ValueNotifier<double> notifier}) {
+  Widget _buildWheel(int index, double height) {
+    return ListWheelScrollView.useDelegate(
+      controller: _scrollControllers[index],
+      itemExtent: height / 3,
+      diameterRatio: 1.5,
+      physics: const FixedExtentScrollPhysics(),
+      onSelectedItemChanged: (val) {
+        _userSelection[index] = val % 10;
+        widget.controller.registerScroll();
+      },
+      childDelegate: ListWheelChildLoopingListDelegate(
+        children: List.generate(
+          10,
+          (i) => Center(
+            child: Text(
+              '$i',
+              style: const TextStyle(
+                fontSize: 38,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                shadows: [Shadow(color: Colors.black, blurRadius: 10)],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSensorIcon(
+      IconData icon, String label, ValueNotifier<double> notifier) {
     return ValueListenableBuilder<double>(
       valueListenable: notifier,
-      builder: (context, value, child) {
-        final isActive = value > 0.3;
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: isActive ? Colors.greenAccent : Colors.grey, size: 24),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: isActive ? Colors.greenAccent : Colors.grey, fontSize: 10)),
-          ],
-        );
-      },
+      builder: (ctx, val, _) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon,
+              color: val > 0.3 ? Colors.greenAccent : Colors.white38,
+              size: 22),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: val > 0.3 ? Colors.greenAccent : Colors.white38,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
