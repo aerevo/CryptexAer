@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
-import '../cryptex_lock/src/motion_models.dart';
 
 // ============================================
 // VERDICT MODEL
