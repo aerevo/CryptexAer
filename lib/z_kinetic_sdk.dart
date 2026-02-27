@@ -42,7 +42,7 @@ class WidgetController {
   // ⚠️ UPDATE THIS! Replace with YOUR Firebase Functions URL
   // Format: https://YOUR-REGION-YOUR-PROJECT.cloudfunctions.net/api
   // Example: https://asia-southeast1-zkinetic-prod.cloudfunctions.net/api
-  static const String _serverUrl = 'https://YOUR-PROJECT-URL.cloudfunctions.net/api';
+  static const String _serverUrl = 'https://asia-southeast1-z-kinetic.cloudfunctions.net/api';
   
   // ✅ API Key - klien wajib pass ni
   final String apiKey;
