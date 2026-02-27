@@ -1,10 +1,3 @@
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Z-KINETIC SDK - Firebase Functions Edition
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Version: 3.0 AI-Powered
-// Updated: To use Firebase Cloud Functions backend
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -344,7 +337,7 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB>
                       child: Text(
                         '$i',
                         style: TextStyle(
-                          fontSize: 48,
+                          fontSize: 36, // ✅ FIXED: Changed from 48 to 36
                           fontWeight: FontWeight.bold,
                           color: Colors.white.withOpacity(0.9),
                           shadows: const [
@@ -411,7 +404,7 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB>
                       // Background image
                       Positioned.fill(
                         child: Image.asset('assets/z_wheel3.png',
-                            fit: BoxFit.contain),
+                            fit: BoxFit.fill), // ✅ FIXED: Changed from BoxFit.contain to BoxFit.fill
                       ),
 
                       // Wheels
@@ -458,7 +451,8 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB>
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(12),
-                                    color: Colors.transparent,
+                                    color: Colors.transparent, // ✅ Keep transparent for production
+                                    // For debugging, temporarily use: Colors.red.withOpacity(0.3)
                                   ),
                                 ),
                               ),
