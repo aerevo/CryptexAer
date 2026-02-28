@@ -1,0 +1,59 @@
+name: Build Z-Kinetic APK (Cache-Free)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔄 Checkout code
+        uses: actions/checkout@v3
+        with:
+          clean: true
+      
+      - name: 🧹 Nuclear cache clear
+        run: |
+          echo "Clearing ALL caches..."
+          rm -rf $HOME/.gradle
+          rm -rf $HOME/.pub-cache
+          rm -rf build/
+          rm -rf .dart_tool/
+          rm -rf android/.gradle/
+          echo "✅ Caches cleared!"
+      
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      
+      - name: 🎯 Setup Flutter (NO CACHE)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: false
+      
+      - name: 📦 Get dependencies
+        run: flutter pub get
+      
+      - name: 🧼 Flutter clean
+        run: flutter clean
+      
+      - name: 🔨 Build APK (release, no shrink)
+        run: flutter build apk --release --no-shrink
+      
+      - name: 🔎 Verify compiled URL (The Ultimate Check)
+        run: |
+          echo "Checking APK for URLs..."
+          unzip -p build/app/outputs/flutter-apk/app-release.apk classes.dex | strings | grep "run.app" && echo "✅ NEW URL FOUND!" || echo "❌ New URL not found"
+      
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
