@@ -35,7 +35,7 @@ class ZKineticConfig {
 
 class WidgetController {
   static const String _serverUrl =
-      'https://asia-southeast1-z-kinetic.cloudfunctions.net/api';
+      'https://api-dxtcyy6wma-as.a.run.app';
 
   final String apiKey;
 
