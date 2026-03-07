@@ -204,7 +204,7 @@ class WidgetController {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true && data['challengeCode'] != null) {
+        if (data['challengeCode'] != null && data['nonce'] != null) { 
           _currentNonce = data['nonce'];
           challengeCode.value =
               (data['challengeCode'] as List<dynamic>).map((e) => e as int).toList();
