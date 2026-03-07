@@ -9,18 +9,17 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Z-KINETIC SDK v5.0 - PRODUCTION GRADE CLEAN REBUILD
+// Z-KINETIC SDK v4.0 - PRODUCTION GRADE (OPTION B)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ✅ CLEAN layout (Row-based, no string tricks)
-// ✅ Proper glitch animation (simple & effective)
-// ✅ Backend-compatible JSON format
-// ✅ Device DNA fingerprinting
-// ✅ Raw behaviour data collection
-// ✅ Production security standard
+// 🔒 Server-side scoring (RAW data collection)
+// 🔒 Device DNA fingerprinting
+// 🔒 Solve time tracking
+// 🔒 Backend-compatible JSON format
+// 🔒 Production security standard
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ZKineticConfig {
-  static const double imageWidth3 = 712.0;
+  static const double imageWidth3  = 712.0;
   static const double imageHeight3 = 600.0;
 
   static const List<List<double>> coords3 = [
@@ -33,7 +32,7 @@ class ZKineticConfig {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// DEVICE DNA
+// DEVICE DNA - Hardware fingerprint
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class DeviceDNA {
@@ -48,16 +47,16 @@ class DeviceDNA {
   });
 
   Map<String, dynamic> toJson() => {
-        'model': model,
-        'osVersion': osVersion,
-        'screenRes': screenRes,
-      };
+    'model': model,
+    'osVersion': osVersion,
+    'screenRes': screenRes,
+  };
 
   static Future<DeviceDNA> collect(BuildContext context) async {
     final deviceInfo = DeviceInfoPlugin();
     String model = 'Unknown';
     String osVersion = 'Unknown';
-
+    
     try {
       if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
@@ -72,6 +71,7 @@ class DeviceDNA {
       debugPrint('⚠️ Device info error: $e');
     }
 
+    // Screen resolution
     final size = MediaQuery.of(context).size;
     final ratio = MediaQuery.of(context).devicePixelRatio;
     final width = (size.width * ratio).toInt();
@@ -87,7 +87,7 @@ class DeviceDNA {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RAW BEHAVIOUR DATA
+// RAW BEHAVIOUR DATA - Server calculates scores
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class RawBehaviourData {
@@ -102,10 +102,10 @@ class RawBehaviourData {
   });
 
   Map<String, dynamic> toJson() => {
-        'touchTimestamps': touchTimestamps,
-        'scrollVelocities': scrollVelocities,
-        'solveTimeMs': solveTimeMs,
-      };
+    'touchTimestamps': touchTimestamps,
+    'scrollVelocities': scrollVelocities,
+    'solveTimeMs': solveTimeMs,
+  };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -123,7 +123,7 @@ class GestureAudit {
   bool isTampered(List<FixedExtentScrollController> controllers) {
     for (int i = 0; i < controllers.length; i++) {
       if (!controllers[i].hasClients) continue;
-      final raw = controllers[i].selectedItem;
+      final raw   = controllers[i].selectedItem;
       final digit = (raw % 10 + 10) % 10;
       final wheelEvents = _events.where((e) => e.wheelIndex == i).toList();
       if (digit != 0 && wheelEvents.isEmpty) return true;
@@ -141,7 +141,7 @@ class _ScrollEvent {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// WIDGET CONTROLLER
+// WIDGET CONTROLLER - RAW DATA COLLECTION
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WidgetController {
@@ -155,10 +155,12 @@ class WidgetController {
 
   final GestureAudit gestureAudit = GestureAudit();
 
+  // ✅ RAW DATA COLLECTION (not scores!)
   final List<int> _touchTimestamps = [];
   final List<double> _scrollVelocities = [];
   DateTime? _challengeStartTime;
 
+  // Motion tracking (for display indicators only, raw data sent to server)
   StreamSubscription<AccelerometerEvent>? _accelSub;
   double _lastMagnitude = 9.8;
   DateTime _lastMotionTime = DateTime.now();
@@ -174,8 +176,7 @@ class WidgetController {
     _accelSub = accelerometerEventStream(
       samplingPeriod: const Duration(milliseconds: 100),
     ).listen((event) {
-      final magnitude =
-          sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+      final magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
       final delta = (magnitude - _lastMagnitude).abs();
       if (delta > 0.3) {
         motionScore.value = (delta / 3.0).clamp(0.0, 1.0);
@@ -203,30 +204,32 @@ class WidgetController {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['challengeCode'] != null && data['nonce'] != null) {
+        if (data['challengeCode'] != null && data['nonce'] != null) { 
           _currentNonce = data['nonce'];
-          challengeCode.value = (data['challengeCode'] as List<dynamic>)
-              .map((e) => e as int)
-              .toList();
-
+          challengeCode.value =
+              (data['challengeCode'] as List<dynamic>).map((e) => e as int).toList();
+          
+          // ✅ Reset tracking data for new challenge
           _touchTimestamps.clear();
           _scrollVelocities.clear();
           _challengeStartTime = DateTime.now();
           gestureAudit.clear();
-
+          
           debugPrint('✅ Challenge: ${challengeCode.value}');
           return true;
         }
       }
-
+      
       debugPrint('🔒 Server error - DENY');
       return false;
+      
     } catch (e) {
       debugPrint('🔒 Network error - DENY: $e');
       return false;
     }
   }
 
+  // ✅ VERIFY - Backend-compatible format
   Future<Map<String, dynamic>> verify(
     List<int> userAnswer,
     List<FixedExtentScrollController> controllers,
@@ -236,19 +239,18 @@ class WidgetController {
       return {'allowed': false, 'error': 'Tiada cabaran aktif.'};
     }
 
+    // Tamper check
     if (gestureAudit.isTampered(controllers)) {
       debugPrint('🚨 Tamper detected!');
-      return {
-        'allowed': false,
-        'error': 'Aktiviti mencurigakan.',
-        'reason': 'TAMPER_DETECTED'
-      };
+      return {'allowed': false, 'error': 'Aktiviti mencurigakan.', 'reason': 'TAMPER_DETECTED'};
     }
 
+    // ✅ Calculate solve time
     final solveTimeMs = _challengeStartTime != null
         ? DateTime.now().difference(_challengeStartTime!).inMilliseconds
         : 0;
 
+    // ✅ Build rawBehaviour data
     final rawBehaviour = RawBehaviourData(
       touchTimestamps: List.from(_touchTimestamps),
       scrollVelocities: List.from(_scrollVelocities),
@@ -256,6 +258,7 @@ class WidgetController {
     );
 
     try {
+      // ✅ EXACT backend format
       final requestBody = {
         'nonce': _currentNonce,
         'userAnswer': userAnswer,
@@ -266,7 +269,7 @@ class WidgetController {
       debugPrint('📤 Request: ${json.encode(requestBody)}');
 
       final response = await http.post(
-        Uri.parse('$_serverUrl/attest'),
+        Uri.parse('$_serverUrl/attest'), // ✅ Backend endpoint
         headers: {'Content-Type': 'application/json', 'x-api-key': apiKey},
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 3));
@@ -284,18 +287,27 @@ class WidgetController {
     }
   }
 
+  // ✅ RAW touch tracking (timestamps only, server calculates variance)
   void registerTouch() {
     if (_challengeStartTime != null) {
-      final elapsed =
-          DateTime.now().difference(_challengeStartTime!).inMilliseconds;
+      final elapsed = DateTime.now().difference(_challengeStartTime!).inMilliseconds;
       _touchTimestamps.add(elapsed);
-      if (_touchTimestamps.length > 20) _touchTimestamps.removeAt(0);
+      
+      // Keep last 20 touches
+      if (_touchTimestamps.length > 20) {
+        _touchTimestamps.removeAt(0);
+      }
     }
   }
 
+  // ✅ RAW scroll tracking (velocities only, server analyzes patterns)
   void registerScroll(double velocity) {
     _scrollVelocities.add(velocity);
-    if (_scrollVelocities.length > 20) _scrollVelocities.removeAt(0);
+    
+    // Keep last 20 velocities
+    if (_scrollVelocities.length > 20) {
+      _scrollVelocities.removeAt(0);
+    }
   }
 
   void randomizeWheels() => randomizeTrigger.value++;
@@ -341,9 +353,10 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
   }
 
   Future<void> _initialize() async {
+    // ✅ Collect device DNA
     _deviceDNA = await DeviceDNA.collect(context);
     debugPrint('📱 Device DNA: ${_deviceDNA!.toJson()}');
-
+    
     final success = await widget.controller.fetchChallenge();
     if (mounted) {
       setState(() {
@@ -364,7 +377,7 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
       child: Center(
         child: SingleChildScrollView(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: const EdgeInsets.only(top: 20, bottom: 12, left: 16, right: 16),
             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             decoration: BoxDecoration(
               color: const Color(0xFFFF5722),
@@ -384,16 +397,13 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
                 const Text(
                   'Z-KINETIC',
                   style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 3,
+                    fontSize: 28, fontWeight: FontWeight.w900,
+                    color: Colors.white, letterSpacing: 3,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -401,29 +411,26 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.verified_user,
-                          color: Colors.greenAccent, size: 12),
-                      SizedBox(width: 4),
+                      Icon(Icons.verified_user, color: Colors.greenAccent, size: 14),
+                      SizedBox(width: 6),
                       Text(
                         'INTELLIGENT-GRADE BIOMETRIC LOCK',
                         style: TextStyle(
-                          fontSize: 7,
-                          color: Colors.white,
-                          letterSpacing: 0.6,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 8, color: Colors.white,
+                          letterSpacing: 0.8, fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 18),
+                UltimateRGBGlitchDisplay(controller: widget.controller),
                 const SizedBox(height: 12),
-                CleanChallengeDisplay(controller: widget.controller),
-                const SizedBox(height: 8),
                 const Text(
                   'Please match the code',
-                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 18),
                 if (_deviceDNA != null)
                   UltimateCryptexLock(
                     controller: widget.controller,
@@ -431,19 +438,17 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
                     onSuccess: (success) => widget.onComplete(success),
                     onFail: () => widget.onComplete(false),
                   ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 18),
                 _buildBiometricPanel(),
-                if (widget.onCancel != null) ...[
-                  const SizedBox(height: 8),
+                const SizedBox(height: 12),
+                if (widget.onCancel != null)
                   TextButton(
                     onPressed: widget.onCancel,
                     child: const Text(
                       'Cancel',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
                     ),
                   ),
-                ],
-                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -462,23 +467,19 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
           decoration: BoxDecoration(
             color: const Color(0xFF263238),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-                color: Colors.redAccent.withOpacity(0.5), width: 2),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.5), width: 2),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_rounded,
-                  size: 80, color: Colors.redAccent),
+              const Icon(Icons.cloud_off_rounded, size: 80, color: Colors.redAccent),
               const SizedBox(height: 24),
               const Text(
                 'SAMBUNGAN DIPERLUKAN',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1,
+                  fontSize: 20, fontWeight: FontWeight.bold,
+                  color: Colors.white, letterSpacing: 1,
                 ),
               ),
               const SizedBox(height: 16),
@@ -501,16 +502,14 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF5722),
                   foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
               ),
               const SizedBox(height: 16),
               if (widget.onCancel != null)
                 TextButton(
                   onPressed: widget.onCancel,
-                  child: const Text('Kembali',
-                      style: TextStyle(color: Colors.white54)),
+                  child: const Text('Kembali', style: TextStyle(color: Colors.white54)),
                 ),
             ],
           ),
@@ -522,7 +521,7 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
   Widget _buildBiometricPanel() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFFF5722),
         borderRadius: BorderRadius.circular(10),
@@ -531,23 +530,16 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildIndicator(Icons.sensors, 'MOTION', widget.controller.motionScore),
-          _buildIndicator(
-              Icons.touch_app,
-              'TOUCH',
-              ValueNotifier(
-                  widget.controller._touchTimestamps.length > 3 ? 0.8 : 0.3)),
-          _buildIndicator(
-              Icons.fingerprint,
-              'PATTERN',
-              ValueNotifier(
-                  widget.controller._scrollVelocities.length > 3 ? 0.8 : 0.3)),
+          _buildIndicator(Icons.touch_app, 'TOUCH', 
+              ValueNotifier(widget.controller._touchTimestamps.length > 3 ? 0.8 : 0.3)),
+          _buildIndicator(Icons.fingerprint, 'PATTERN',
+              ValueNotifier(widget.controller._scrollVelocities.length > 3 ? 0.8 : 0.3)),
         ],
       ),
     );
   }
 
-  Widget _buildIndicator(
-      IconData icon, String label, ValueNotifier<double> notifier) {
+  Widget _buildIndicator(IconData icon, String label, ValueNotifier<double> notifier) {
     return ValueListenableBuilder<double>(
       valueListenable: notifier,
       builder: (context, value, _) {
@@ -555,17 +547,13 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 18,
-                color: isActive ? Colors.greenAccent : Colors.white30),
-            const SizedBox(height: 2),
+            Icon(icon, size: 20, color: isActive ? Colors.greenAccent : Colors.white30),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                fontSize: 6,
-                color: isActive ? Colors.greenAccent : Colors.white30,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.4,
+                fontSize: 7, color: isActive ? Colors.greenAccent : Colors.white30,
+                fontWeight: FontWeight.bold, letterSpacing: 0.5,
               ),
             ),
           ],
@@ -576,39 +564,45 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// CLEAN CHALLENGE DISPLAY - ROW LAYOUT (NO STRING TRICKS!)
+// RGB GLITCH DISPLAY
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class CleanChallengeDisplay extends StatefulWidget {
+class UltimateRGBGlitchDisplay extends StatefulWidget {
   final WidgetController controller;
-  const CleanChallengeDisplay({super.key, required this.controller});
+  const UltimateRGBGlitchDisplay({super.key, required this.controller});
 
   @override
-  State<CleanChallengeDisplay> createState() => _CleanChallengeDisplayState();
+  State<UltimateRGBGlitchDisplay> createState() => _UltimateRGBGlitchDisplayState();
 }
 
-class _CleanChallengeDisplayState extends State<CleanChallengeDisplay> {
+class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   Timer? _glitchTimer;
   bool _isGlitching = false;
+  double _xOffset = 0.0, _yOffset = 0.0;
   final Random _random = Random();
-  double _glitchOffset = 0.0;
+  int _noiseSeed = DateTime.now().millisecondsSinceEpoch;
+  Timer? _noiseTimer;
 
   @override
   void initState() {
     super.initState();
-    // Simple glitch animation
-    _glitchTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+    _glitchTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
       if (!mounted) return;
       setState(() {
         _isGlitching = _random.nextDouble() > 0.7;
-        _glitchOffset = _random.nextDouble() * 2 - 1; // -1 to 1
+        _xOffset = _random.nextDouble() * 3 - 1.5;
+        _yOffset = _random.nextDouble() * 2 - 1.0;
       });
+    });
+    _noiseTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (mounted) setState(() => _noiseSeed = DateTime.now().millisecondsSinceEpoch);
     });
   }
 
   @override
   void dispose() {
     _glitchTimer?.cancel();
+    _noiseTimer?.cancel();
     super.dispose();
   }
 
@@ -618,16 +612,10 @@ class _CleanChallengeDisplayState extends State<CleanChallengeDisplay> {
       height: 60,
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF3E2723),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.4), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.2),
-            blurRadius: 15,
-            spreadRadius: 1,
-          ),
-        ],
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.6), width: 2),
+        boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 10)],
       ),
       child: ValueListenableBuilder<List<int>>(
         valueListenable: widget.controller.challengeCode,
@@ -637,17 +625,27 @@ class _CleanChallengeDisplayState extends State<CleanChallengeDisplay> {
               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
             );
           }
-
-          // ✅ CLEAN: Each digit separate, Row layout
-          return Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          
+          final codeStr = code.join('');
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                _buildDigit(code[0]),
-                const SizedBox(width: 24), // Fixed spacing
-                _buildDigit(code[1]),
-                const SizedBox(width: 24), // Fixed spacing
-                _buildDigit(code[2]),
+                Positioned.fill(
+                  child: CustomPaint(painter: _NoisePainter(seed: _noiseSeed)),
+                ),
+                if (_isGlitching)
+                  Transform.translate(
+                    offset: Offset(_xOffset + 2, _yOffset),
+                    child: Text(codeStr, style: _glitchStyle(Colors.cyan)),
+                  ),
+                if (_isGlitching)
+                  Transform.translate(
+                    offset: Offset(-_xOffset - 2, -_yOffset),
+                    child: Text(codeStr, style: _glitchStyle(const Color(0xFFFF00FF))),
+                  ),
+                Text(codeStr, style: _glitchStyle(Colors.white)),
               ],
             ),
           );
@@ -656,61 +654,65 @@ class _CleanChallengeDisplayState extends State<CleanChallengeDisplay> {
     );
   }
 
-  // ✅ Single digit with glitch effect
-  Widget _buildDigit(int digit) {
-    return SizedBox(
-      width: 40,
-      height: 50,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Glitch layer (cyan - subtle)
-          if (_isGlitching)
-            Transform.translate(
-              offset: Offset(_glitchOffset * 2, 0),
-              child: Text(
-                '$digit',
-                style: _digitStyle(Colors.cyan.withOpacity(0.6)),
-              ),
-            ),
-          // Glitch layer (magenta - subtle)
-          if (_isGlitching)
-            Transform.translate(
-              offset: Offset(-_glitchOffset * 2, 0),
-              child: Text(
-                '$digit',
-                style: _digitStyle(const Color(0xFFFF00FF).withOpacity(0.6)),
-              ),
-            ),
-          // Main digit (white - always visible)
-          Text(
-            '$digit',
-            style: _digitStyle(Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-
-  TextStyle _digitStyle(Color color) {
+  TextStyle _glitchStyle(Color color) {
     return TextStyle(
-      fontSize: 32,
-      fontWeight: FontWeight.w900,
-      fontFamily: 'Courier',
-      color: color,
-      height: 1.0,
-      shadows: [
-        Shadow(
-          color: Colors.black.withOpacity(0.8),
-          blurRadius: 8,
-        ),
-      ],
+      fontSize: 28, fontWeight: FontWeight.bold,
+      fontFamily: 'Courier', letterSpacing: 8, color: color,
     );
   }
 }
 
+class _NoisePainter extends CustomPainter {
+  final int seed;
+  _NoisePainter({required this.seed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = Random(seed);
+    final paint = Paint()..strokeWidth = 0.8..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < 8; i++) {
+      paint.color = Colors.white.withOpacity(rng.nextDouble() * 0.12 + 0.03);
+      canvas.drawLine(
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        paint,
+      );
+    }
+
+    for (int g = 0; g < 3; g++) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: rng.nextInt(10).toString(),
+          style: TextStyle(
+            fontSize: 14 + rng.nextDouble() * 10,
+            color: Colors.white.withOpacity(rng.nextDouble() * 0.1 + 0.03),
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Courier',
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height));
+    }
+
+    final dotPaint = Paint()..style = PaintingStyle.fill;
+    for (int d = 0; d < 12; d++) {
+      dotPaint.color = Colors.white.withOpacity(rng.nextDouble() * 0.08 + 0.02);
+      canvas.drawCircle(
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        rng.nextDouble() * 1.5 + 0.3,
+        dotPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_NoisePainter old) => old.seed != seed;
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// CRYPTEX LOCK (same as before, working properly)
+// CRYPTEX LOCK - RAW velocity tracking
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class UltimateCryptexLock extends StatefulWidget {
@@ -755,13 +757,11 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   @override
   void initState() {
     super.initState();
-    _scrollControllers =
-        List.generate(3, (i) => FixedExtentScrollController(initialItem: 0));
+    _scrollControllers = List.generate(3, (i) => FixedExtentScrollController(initialItem: 0));
 
     _textOpacityControllers = List.generate(
       3,
-      (i) => AnimationController(
-          duration: const Duration(milliseconds: 800), vsync: this)
+      (i) => AnimationController(duration: const Duration(milliseconds: 800), vsync: this)
         ..repeat(reverse: true),
     );
     _textOpacityAnimations = _textOpacityControllers
@@ -770,8 +770,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
         .toList();
 
     _startDriftTimer();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _playSlotMachineIntro());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _playSlotMachineIntro());
   }
 
   void _startDriftTimer() {
@@ -805,12 +804,8 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
 
   @override
   void dispose() {
-    for (var c in _scrollControllers) {
-      c.dispose();
-    }
-    for (var c in _textOpacityControllers) {
-      c.dispose();
-    }
+    for (var c in _scrollControllers) c.dispose();
+    for (var c in _textOpacityControllers) c.dispose();
     _wheelActiveTimer?.cancel();
     _driftTimer?.cancel();
     super.dispose();
@@ -824,16 +819,18 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   }
 
   void _onWheelScrollUpdate(int index) {
+    // ✅ Calculate scroll velocity
     final now = DateTime.now();
     if (_lastScrollTime != null) {
       final deltaMs = now.difference(_lastScrollTime!).inMilliseconds;
       if (deltaMs > 0) {
-        final velocity = 100.0 / deltaMs;
+        final velocity = 100.0 / deltaMs; // Normalized velocity
         widget.controller.registerScroll(velocity);
       }
     }
     _lastScrollTime = now;
 
+    // Gesture audit
     final current = _scrollControllers[index].selectedItem;
     if (current != _prevItems[index]) {
       widget.controller.gestureAudit.recordScroll(
@@ -865,12 +862,13 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
       userAnswer.add((raw % 10 + 10) % 10);
     }
 
+    // ✅ Call verify with deviceDNA
     final result = await widget.controller.verify(
       userAnswer,
       _scrollControllers,
       widget.deviceDNA,
     );
-
+    
     widget.onSuccess(result['allowed'] == true);
   }
 
@@ -897,8 +895,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
               ),
             ),
           ),
-          for (int i = 0; i < 3; i++)
-            _buildWheel(i, containerWidth, containerHeight),
+          for (int i = 0; i < 3; i++) _buildWheel(i, containerWidth, containerHeight),
           _buildGlowingButton(containerWidth, containerHeight),
         ],
       ),
@@ -910,8 +907,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     final wheelLeft = (coords[0] / imageWidth) * containerWidth;
     final wheelTop = (coords[1] / imageHeight) * containerHeight;
     final wheelWidth = ((coords[2] - coords[0]) / imageWidth) * containerWidth;
-    final wheelHeight =
-        ((coords[3] - coords[1]) / imageHeight) * containerHeight;
+    final wheelHeight = ((coords[3] - coords[1]) / imageHeight) * containerHeight;
     final isActive = _activeWheelIndex == index;
 
     return Positioned(
@@ -953,23 +949,18 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
                       return Transform.translate(
                         offset: isActive ? Offset.zero : _textDriftOffsets[index],
                         child: Opacity(
-                          opacity: isActive
-                              ? 1.0
-                              : _textOpacityAnimations[index].value,
+                          opacity: isActive ? 1.0 : _textOpacityAnimations[index].value,
                           child: Text(
                             '$displayNumber',
                             style: TextStyle(
                               fontSize: wheelHeight * 0.30,
                               fontWeight: FontWeight.w900,
-                              color: isActive
-                                  ? const Color(0xFFFF5722)
-                                  : const Color(0xFF263238),
+                              color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
                               height: 1.0,
                               shadows: isActive
                                   ? [
                                       Shadow(
-                                        color: const Color(0xFFFF5722)
-                                            .withOpacity(0.8),
+                                        color: const Color(0xFFFF5722).withOpacity(0.8),
                                         blurRadius: 20,
                                       ),
                                     ]
@@ -995,14 +986,11 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     );
   }
 
-  Widget _buildGlowingButton(
-      double containerWidth, double containerHeight) {
+  Widget _buildGlowingButton(double containerWidth, double containerHeight) {
     final btnLeft = (buttonCoords[0] / imageWidth) * containerWidth;
     final btnTop = (buttonCoords[1] / imageHeight) * containerHeight;
-    final btnWidth =
-        ((buttonCoords[2] - buttonCoords[0]) / imageWidth) * containerWidth;
-    final btnHeight =
-        ((buttonCoords[3] - buttonCoords[1]) / imageHeight) * containerHeight;
+    final btnWidth = ((buttonCoords[2] - buttonCoords[0]) / imageWidth) * containerWidth;
+    final btnHeight = ((buttonCoords[3] - buttonCoords[1]) / imageHeight) * containerHeight;
 
     return Positioned(
       left: btnLeft,
