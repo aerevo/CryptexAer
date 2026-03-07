@@ -2,18 +2,20 @@ import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Z-KINETIC SDK v3.0 - PRODUCTION GRADE
+// Z-KINETIC SDK v4.0 - PRODUCTION GRADE (OPTION B)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 🔒 OFFLINE = TOTAL LOCKDOWN (no demo mode, no fallback)
-// ✅ GestureAudit: tamper detect
-// ✅ Visual noise: anti-OCR RGB glitch
-// ✅ Real biometric tracking
-// ✅ Production security standard
+// 🔒 Server-side scoring (RAW data collection)
+// 🔒 Device DNA fingerprinting
+// 🔒 Solve time tracking
+// 🔒 Backend-compatible JSON format
+// 🔒 Production security standard
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ZKineticConfig {
@@ -30,7 +32,84 @@ class ZKineticConfig {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// GESTURE AUDIT — detect memory injection attacks
+// DEVICE DNA - Hardware fingerprint
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class DeviceDNA {
+  final String model;
+  final String osVersion;
+  final String screenRes;
+
+  DeviceDNA({
+    required this.model,
+    required this.osVersion,
+    required this.screenRes,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'model': model,
+    'osVersion': osVersion,
+    'screenRes': screenRes,
+  };
+
+  static Future<DeviceDNA> collect(BuildContext context) async {
+    final deviceInfo = DeviceInfoPlugin();
+    String model = 'Unknown';
+    String osVersion = 'Unknown';
+    
+    try {
+      if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        model = '${androidInfo.manufacturer} ${androidInfo.model}';
+        osVersion = 'Android ${androidInfo.version.release}';
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        model = iosInfo.model;
+        osVersion = 'iOS ${iosInfo.systemVersion}';
+      }
+    } catch (e) {
+      debugPrint('⚠️ Device info error: $e');
+    }
+
+    // Screen resolution
+    final size = MediaQuery.of(context).size;
+    final ratio = MediaQuery.of(context).devicePixelRatio;
+    final width = (size.width * ratio).toInt();
+    final height = (size.height * ratio).toInt();
+    final screenRes = '${width}x$height';
+
+    return DeviceDNA(
+      model: model,
+      osVersion: osVersion,
+      screenRes: screenRes,
+    );
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// RAW BEHAVIOUR DATA - Server calculates scores
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class RawBehaviourData {
+  final List<int> touchTimestamps;
+  final List<double> scrollVelocities;
+  final int solveTimeMs;
+
+  RawBehaviourData({
+    required this.touchTimestamps,
+    required this.scrollVelocities,
+    required this.solveTimeMs,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'touchTimestamps': touchTimestamps,
+    'scrollVelocities': scrollVelocities,
+    'solveTimeMs': solveTimeMs,
+  };
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// GESTURE AUDIT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class GestureAudit {
@@ -52,17 +131,6 @@ class GestureAudit {
     return false;
   }
 
-  double get scrollEntropy {
-    if (_events.length < 3) return 0.5;
-    final intervals = <int>[];
-    for (int i = 1; i < _events.length; i++) {
-      intervals.add(_events[i].at.difference(_events[i - 1].at).inMilliseconds);
-    }
-    final avg      = intervals.reduce((a, b) => a + b) / intervals.length;
-    final variance = intervals.map((i) => (i - avg).abs()).reduce((a, b) => a + b) / intervals.length;
-    return (variance / avg).clamp(0.0, 1.0);
-  }
-
   void clear() => _events.clear();
 }
 
@@ -73,7 +141,7 @@ class _ScrollEvent {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// WIDGET CONTROLLER
+// WIDGET CONTROLLER - RAW DATA COLLECTION
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WidgetController {
@@ -82,25 +150,22 @@ class WidgetController {
   final String apiKey;
 
   String? _currentNonce;
-  final ValueNotifier<List<int>> challengeCode  = ValueNotifier([]);
-  final ValueNotifier<int>       randomizeTrigger = ValueNotifier(0);
-
-  final ValueNotifier<double> motionScore  = ValueNotifier(0.0);
-  final ValueNotifier<double> touchScore   = ValueNotifier(0.0);
-  final ValueNotifier<double> patternScore = ValueNotifier(0.0);
+  final ValueNotifier<List<int>> challengeCode = ValueNotifier([]);
+  final ValueNotifier<int> randomizeTrigger = ValueNotifier(0);
 
   final GestureAudit gestureAudit = GestureAudit();
 
-  StreamSubscription<AccelerometerEvent>? _accelSub;
-  double   _lastMagnitude  = 9.8;
-  DateTime _lastMotionTime = DateTime.now();
-  Timer?   _decayTimer;
-
-  DateTime? _lastTouchTime;
-  final List<int> _touchIntervals = [];
-
+  // ✅ RAW DATA COLLECTION (not scores!)
+  final List<int> _touchTimestamps = [];
   final List<double> _scrollVelocities = [];
-  DateTime? _lastScrollTime;
+  DateTime? _challengeStartTime;
+
+  // Motion tracking (for display indicators only, raw data sent to server)
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+  double _lastMagnitude = 9.8;
+  DateTime _lastMotionTime = DateTime.now();
+  Timer? _decayTimer;
+  final ValueNotifier<double> motionScore = ValueNotifier(0.0);
 
   WidgetController({required this.apiKey}) {
     _initSensors();
@@ -112,10 +177,10 @@ class WidgetController {
       samplingPeriod: const Duration(milliseconds: 100),
     ).listen((event) {
       final magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-      final delta     = (magnitude - _lastMagnitude).abs();
+      final delta = (magnitude - _lastMagnitude).abs();
       if (delta > 0.3) {
         motionScore.value = (delta / 3.0).clamp(0.0, 1.0);
-        _lastMotionTime   = DateTime.now();
+        _lastMotionTime = DateTime.now();
       }
       _lastMagnitude = magnitude;
     });
@@ -129,7 +194,6 @@ class WidgetController {
     });
   }
 
-  // 🔒 PRODUCTION: Offline = FAIL (no demo mode, no fallback)
   Future<bool> fetchChallenge() async {
     try {
       final response = await http.post(
@@ -144,8 +208,14 @@ class WidgetController {
           _currentNonce = data['nonce'];
           challengeCode.value =
               (data['challengeCode'] as List<dynamic>).map((e) => e as int).toList();
+          
+          // ✅ Reset tracking data for new challenge
+          _touchTimestamps.clear();
+          _scrollVelocities.clear();
+          _challengeStartTime = DateTime.now();
           gestureAudit.clear();
-          debugPrint('✅ Challenge from server: ${challengeCode.value}');
+          
+          debugPrint('✅ Challenge: ${challengeCode.value}');
           return true;
         }
       }
@@ -154,15 +224,16 @@ class WidgetController {
       return false;
       
     } catch (e) {
-      // 🔒 OFFLINE = TOTAL LOCKDOWN
       debugPrint('🔒 Network error - DENY: $e');
       return false;
     }
   }
 
+  // ✅ VERIFY - Backend-compatible format
   Future<Map<String, dynamic>> verify(
-    List<int> userResponse,
+    List<int> userAnswer,
     List<FixedExtentScrollController> controllers,
+    DeviceDNA deviceDNA,
   ) async {
     if (challengeCode.value.isEmpty || _currentNonce == null) {
       return {'allowed': false, 'error': 'Tiada cabaran aktif.'};
@@ -174,70 +245,69 @@ class WidgetController {
       return {'allowed': false, 'error': 'Aktiviti mencurigakan.', 'reason': 'TAMPER_DETECTED'};
     }
 
+    // ✅ Calculate solve time
+    final solveTimeMs = _challengeStartTime != null
+        ? DateTime.now().difference(_challengeStartTime!).inMilliseconds
+        : 0;
+
+    // ✅ Build rawBehaviour data
+    final rawBehaviour = RawBehaviourData(
+      touchTimestamps: List.from(_touchTimestamps),
+      scrollVelocities: List.from(_scrollVelocities),
+      solveTimeMs: solveTimeMs,
+    );
+
     try {
+      // ✅ EXACT backend format
+      final requestBody = {
+        'nonce': _currentNonce,
+        'userAnswer': userAnswer,
+        'deviceDNA': deviceDNA.toJson(),
+        'rawBehaviour': rawBehaviour.toJson(),
+      };
+
+      debugPrint('📤 Request: ${json.encode(requestBody)}');
+
       final response = await http.post(
-        Uri.parse('$_serverUrl/verify'),
+        Uri.parse('$_serverUrl/attest'), // ✅ Backend endpoint
         headers: {'Content-Type': 'application/json', 'x-api-key': apiKey},
-        body: json.encode({
-          'nonce'       : _currentNonce,
-          'userResponse': userResponse,
-          'biometricData': {
-            'motion' : motionScore.value,
-            'touch'  : touchScore.value,
-            'pattern': (patternScore.value + gestureAudit.scrollEntropy) / 2.0,
-          },
-          'deviceId': 'flutter_device_${apiKey.substring(8, 16)}',
-        }),
+        body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 3));
 
-      if (response.statusCode == 200) return json.decode(response.body);
+      if (response.statusCode == 200) {
+        final result = json.decode(response.body);
+        debugPrint('✅ Response: ${json.encode(result)}');
+        return result;
+      }
 
       return {'allowed': false, 'error': 'Server error ${response.statusCode}.'};
     } catch (e) {
+      debugPrint('🔒 Network error: $e');
       return {'allowed': false, 'error': 'Tiada sambungan. Cuba semula.'};
     }
   }
 
+  // ✅ RAW touch tracking (timestamps only, server calculates variance)
   void registerTouch() {
-    final now = DateTime.now();
-    if (_lastTouchTime != null) {
-      final interval = now.difference(_lastTouchTime!).inMilliseconds;
-      _touchIntervals.add(interval);
-      if (_touchIntervals.length > 5) _touchIntervals.removeAt(0);
-
-      if (_touchIntervals.length >= 3) {
-        final avg      = _touchIntervals.reduce((a, b) => a + b) / _touchIntervals.length;
-        final variance = _touchIntervals.map((i) => (i - avg).abs()).reduce((a, b) => a + b) / _touchIntervals.length;
-        touchScore.value =
-            ((variance / avg).clamp(0.0, 1.0) * 0.6 + ((avg > 200 && avg < 800) ? 1.0 : 0.3) * 0.4)
-                .clamp(0.3, 1.0);
-      } else {
-        touchScore.value = 0.5;
+    if (_challengeStartTime != null) {
+      final elapsed = DateTime.now().difference(_challengeStartTime!).inMilliseconds;
+      _touchTimestamps.add(elapsed);
+      
+      // Keep last 20 touches
+      if (_touchTimestamps.length > 20) {
+        _touchTimestamps.removeAt(0);
       }
     }
-    _lastTouchTime = now;
   }
 
-  void registerScroll() {
-    final now = DateTime.now();
-    if (_lastScrollTime != null) {
-      final timeDelta        = now.difference(_lastScrollTime!).inMilliseconds;
-      final velocityEstimate = timeDelta > 0 ? (100.0 / timeDelta) : 0.0;
-      _scrollVelocities.add(velocityEstimate.clamp(0.0, 10.0));
-      if (_scrollVelocities.length > 5) _scrollVelocities.removeAt(0);
-
-      if (_scrollVelocities.length >= 3) {
-        final changes = <double>[];
-        for (int i = 1; i < _scrollVelocities.length; i++) {
-          changes.add((_scrollVelocities[i] - _scrollVelocities[i - 1]).abs());
-        }
-        patternScore.value =
-            (1.0 - (changes.reduce((a, b) => a + b) / changes.length / 5.0)).clamp(0.3, 1.0);
-      } else {
-        patternScore.value = 0.5;
-      }
+  // ✅ RAW scroll tracking (velocities only, server analyzes patterns)
+  void registerScroll(double velocity) {
+    _scrollVelocities.add(velocity);
+    
+    // Keep last 20 velocities
+    if (_scrollVelocities.length > 20) {
+      _scrollVelocities.removeAt(0);
     }
-    _lastScrollTime = now;
   }
 
   void randomizeWheels() => randomizeTrigger.value++;
@@ -248,8 +318,6 @@ class WidgetController {
     challengeCode.dispose();
     randomizeTrigger.dispose();
     motionScore.dispose();
-    touchScore.dispose();
-    patternScore.dispose();
   }
 }
 
@@ -276,6 +344,7 @@ class ZKineticWidgetProdukB extends StatefulWidget {
 class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
   bool _loading = true;
   bool _networkError = false;
+  DeviceDNA? _deviceDNA;
 
   @override
   void initState() {
@@ -284,23 +353,25 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
   }
 
   Future<void> _initialize() async {
+    // ✅ Collect device DNA
+    _deviceDNA = await DeviceDNA.collect(context);
+    debugPrint('📱 Device DNA: ${_deviceDNA!.toJson()}');
+    
     final success = await widget.controller.fetchChallenge();
     if (mounted) {
       setState(() {
         _loading = false;
-        _networkError = !success; // 🔒 Track if network failed
+        _networkError = !success;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 🔒 OFFLINE = SHOW ERROR SCREEN ONLY
     if (_networkError) {
       return _buildNetworkErrorScreen();
     }
 
-    // Normal UI (only if server connection successful)
     return Container(
       color: Colors.black.withOpacity(0.95),
       child: Center(
@@ -360,13 +431,15 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 const SizedBox(height: 18),
-                UltimateCryptexLock(
-                  controller: widget.controller,
-                  onSuccess: (success) => widget.onComplete(success),
-                  onFail: () => widget.onComplete(false),
-                ),
+                if (_deviceDNA != null)
+                  UltimateCryptexLock(
+                    controller: widget.controller,
+                    deviceDNA: _deviceDNA!,
+                    onSuccess: (success) => widget.onComplete(success),
+                    onFail: () => widget.onComplete(false),
+                  ),
                 const SizedBox(height: 18),
-                UltimateBiometricPanel(controller: widget.controller),
+                _buildBiometricPanel(),
                 const SizedBox(height: 12),
                 if (widget.onCancel != null)
                   TextButton(
@@ -384,7 +457,6 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
     );
   }
 
-  // 🔒 NETWORK ERROR SCREEN (offline = total lockdown)
   Widget _buildNetworkErrorScreen() {
     return Container(
       color: Colors.black.withOpacity(0.95),
@@ -400,31 +472,21 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.cloud_off_rounded,
-                size: 80,
-                color: Colors.redAccent,
-              ),
+              const Icon(Icons.cloud_off_rounded, size: 80, color: Colors.redAccent),
               const SizedBox(height: 24),
               const Text(
                 'SAMBUNGAN DIPERLUKAN',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1,
+                  fontSize: 20, fontWeight: FontWeight.bold,
+                  color: Colors.white, letterSpacing: 1,
                 ),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Z-Kinetic memerlukan sambungan internet untuk pengesahan selamat.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white70,
-                  height: 1.5,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.5),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -447,10 +509,7 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
               if (widget.onCancel != null)
                 TextButton(
                   onPressed: widget.onCancel,
-                  child: const Text(
-                    'Kembali',
-                    style: TextStyle(color: Colors.white54),
-                  ),
+                  child: const Text('Kembali', style: TextStyle(color: Colors.white54)),
                 ),
             ],
           ),
@@ -458,10 +517,54 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
       ),
     );
   }
+
+  Widget _buildBiometricPanel() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF5722),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildIndicator(Icons.sensors, 'MOTION', widget.controller.motionScore),
+          _buildIndicator(Icons.touch_app, 'TOUCH', 
+              ValueNotifier(widget.controller._touchTimestamps.length > 3 ? 0.8 : 0.3)),
+          _buildIndicator(Icons.fingerprint, 'PATTERN',
+              ValueNotifier(widget.controller._scrollVelocities.length > 3 ? 0.8 : 0.3)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIndicator(IconData icon, String label, ValueNotifier<double> notifier) {
+    return ValueListenableBuilder<double>(
+      valueListenable: notifier,
+      builder: (context, value, _) {
+        final isActive = value > 0.5;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: isActive ? Colors.greenAccent : Colors.white30),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 7, color: isActive ? Colors.greenAccent : Colors.white30,
+                fontWeight: FontWeight.bold, letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RGB GLITCH DISPLAY — anti-OCR visual noise
+// RGB GLITCH DISPLAY
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class UltimateRGBGlitchDisplay extends StatefulWidget {
@@ -474,10 +577,9 @@ class UltimateRGBGlitchDisplay extends StatefulWidget {
 
 class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   Timer? _glitchTimer;
-  bool   _isGlitching = false;
+  bool _isGlitching = false;
   double _xOffset = 0.0, _yOffset = 0.0;
   final Random _random = Random();
-
   int _noiseSeed = DateTime.now().millisecondsSinceEpoch;
   Timer? _noiseTimer;
 
@@ -488,8 +590,8 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
       if (!mounted) return;
       setState(() {
         _isGlitching = _random.nextDouble() > 0.7;
-        _xOffset     = _random.nextDouble() * 3 - 1.5;
-        _yOffset     = _random.nextDouble() * 2 - 1.0;
+        _xOffset = _random.nextDouble() * 3 - 1.5;
+        _yOffset = _random.nextDouble() * 2 - 1.0;
       });
     });
     _noiseTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
@@ -531,9 +633,7 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
               alignment: Alignment.center,
               children: [
                 Positioned.fill(
-                  child: CustomPaint(
-                    painter: _NoisePainter(seed: _noiseSeed),
-                  ),
+                  child: CustomPaint(painter: _NoisePainter(seed: _noiseSeed)),
                 ),
                 if (_isGlitching)
                   Transform.translate(
@@ -568,7 +668,7 @@ class _NoisePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rng   = Random(seed);
+    final rng = Random(seed);
     final paint = Paint()..strokeWidth = 0.8..style = PaintingStyle.stroke;
 
     for (int i = 0; i < 8; i++) {
@@ -583,20 +683,17 @@ class _NoisePainter extends CustomPainter {
     for (int g = 0; g < 3; g++) {
       final tp = TextPainter(
         text: TextSpan(
-          text : rng.nextInt(10).toString(),
+          text: rng.nextInt(10).toString(),
           style: TextStyle(
-            fontSize   : 14 + rng.nextDouble() * 10,
-            color      : Colors.white.withOpacity(rng.nextDouble() * 0.1 + 0.03),
-            fontWeight : FontWeight.bold,
-            fontFamily : 'Courier',
+            fontSize: 14 + rng.nextDouble() * 10,
+            color: Colors.white.withOpacity(rng.nextDouble() * 0.1 + 0.03),
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Courier',
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, Offset(
-        rng.nextDouble() * size.width,
-        rng.nextDouble() * size.height,
-      ));
+      tp.paint(canvas, Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height));
     }
 
     final dotPaint = Paint()..style = PaintingStyle.fill;
@@ -615,74 +712,19 @@ class _NoisePainter extends CustomPainter {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// BIOMETRIC PANEL
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-class UltimateBiometricPanel extends StatelessWidget {
-  final WidgetController controller;
-  const UltimateBiometricPanel({super.key, required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF5722),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildIndicator(icon: Icons.sensors,     label: 'MOTION',  notifier: controller.motionScore),
-          _buildIndicator(icon: Icons.touch_app,   label: 'TOUCH',   notifier: controller.touchScore),
-          _buildIndicator(icon: Icons.fingerprint, label: 'PATTERN', notifier: controller.patternScore),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIndicator({
-    required IconData icon,
-    required String label,
-    required ValueNotifier<double> notifier,
-  }) {
-    return ValueListenableBuilder<double>(
-      valueListenable: notifier,
-      builder: (context, value, _) {
-        final isActive = value > 0.5;
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 20, color: isActive ? Colors.greenAccent : Colors.white30),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 7,
-                color: isActive ? Colors.greenAccent : Colors.white30,
-                fontWeight: FontWeight.bold, letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// CRYPTEX LOCK
+// CRYPTEX LOCK - RAW velocity tracking
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class UltimateCryptexLock extends StatefulWidget {
   final WidgetController controller;
+  final DeviceDNA deviceDNA;
   final Function(bool) onSuccess;
   final VoidCallback onFail;
 
   const UltimateCryptexLock({
     super.key,
     required this.controller,
+    required this.deviceDNA,
     required this.onSuccess,
     required this.onFail,
   });
@@ -693,35 +735,34 @@ class UltimateCryptexLock extends StatefulWidget {
 
 class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     with TickerProviderStateMixin {
-  static const double imageWidth   = ZKineticConfig.imageWidth3;
-  static const double imageHeight  = ZKineticConfig.imageHeight3;
-  static const List<List<double>> wheelCoords  = ZKineticConfig.coords3;
-  static const List<double>       buttonCoords = ZKineticConfig.btnCoords3;
+  static const double imageWidth = ZKineticConfig.imageWidth3;
+  static const double imageHeight = ZKineticConfig.imageHeight3;
+  static const List<List<double>> wheelCoords = ZKineticConfig.coords3;
+  static const List<double> buttonCoords = ZKineticConfig.btnCoords3;
 
   late List<FixedExtentScrollController> _scrollControllers;
   final List<int> _prevItems = [0, 0, 0];
+  DateTime? _lastScrollTime;
 
-  int?   _activeWheelIndex;
+  int? _activeWheelIndex;
   Timer? _wheelActiveTimer;
-  bool   _isButtonPressed = false;
+  bool _isButtonPressed = false;
   final Random _random = Random();
 
   late List<AnimationController> _textOpacityControllers;
-  late List<Animation<double>>   _textOpacityAnimations;
+  late List<Animation<double>> _textOpacityAnimations;
   final List<Offset> _textDriftOffsets = [Offset.zero, Offset.zero, Offset.zero];
   Timer? _driftTimer;
 
   @override
   void initState() {
     super.initState();
-    _scrollControllers = List.generate(
-      3, (i) => FixedExtentScrollController(initialItem: 0),
-    );
+    _scrollControllers = List.generate(3, (i) => FixedExtentScrollController(initialItem: 0));
 
     _textOpacityControllers = List.generate(
-      3, (i) => AnimationController(
-        duration: const Duration(milliseconds: 800), vsync: this,
-      )..repeat(reverse: true),
+      3,
+      (i) => AnimationController(duration: const Duration(milliseconds: 800), vsync: this)
+        ..repeat(reverse: true),
     );
     _textOpacityAnimations = _textOpacityControllers
         .map((c) => Tween<double>(begin: 0.75, end: 1.0)
@@ -778,11 +819,25 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   }
 
   void _onWheelScrollUpdate(int index) {
-    widget.controller.registerScroll();
+    // ✅ Calculate scroll velocity
+    final now = DateTime.now();
+    if (_lastScrollTime != null) {
+      final deltaMs = now.difference(_lastScrollTime!).inMilliseconds;
+      if (deltaMs > 0) {
+        final velocity = 100.0 / deltaMs; // Normalized velocity
+        widget.controller.registerScroll(velocity);
+      }
+    }
+    _lastScrollTime = now;
+
+    // Gesture audit
     final current = _scrollControllers[index].selectedItem;
     if (current != _prevItems[index]) {
       widget.controller.gestureAudit.recordScroll(
-        index, _prevItems[index], current, DateTime.now(),
+        index,
+        _prevItems[index],
+        current,
+        DateTime.now(),
       );
       _prevItems[index] = current;
     }
@@ -801,20 +856,26 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     await Future.delayed(const Duration(milliseconds: 100));
     if (mounted) setState(() => _isButtonPressed = false);
 
-    final currentCode = <int>[];
+    final userAnswer = <int>[];
     for (var c in _scrollControllers) {
       final raw = c.selectedItem;
-      currentCode.add((raw % 10 + 10) % 10);
+      userAnswer.add((raw % 10 + 10) % 10);
     }
 
-    final result = await widget.controller.verify(currentCode, _scrollControllers);
+    // ✅ Call verify with deviceDNA
+    final result = await widget.controller.verify(
+      userAnswer,
+      _scrollControllers,
+      widget.deviceDNA,
+    );
+    
     widget.onSuccess(result['allowed'] == true);
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final maxWidth    = screenWidth - 80;
+    final maxWidth = screenWidth - 80;
     final aspectRatio = imageWidth / imageHeight;
     final containerWidth = maxWidth.clamp(300.0, 600.0);
     final containerHeight = containerWidth / aspectRatio;
@@ -842,12 +903,12 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   }
 
   Widget _buildWheel(int index, double containerWidth, double containerHeight) {
-    final coords      = wheelCoords[index];
-    final wheelLeft   = (coords[0] / imageWidth)  * containerWidth;
-    final wheelTop    = (coords[1] / imageHeight) * containerHeight;
-    final wheelWidth  = ((coords[2] - coords[0]) / imageWidth)  * containerWidth;
+    final coords = wheelCoords[index];
+    final wheelLeft = (coords[0] / imageWidth) * containerWidth;
+    final wheelTop = (coords[1] / imageHeight) * containerHeight;
+    final wheelWidth = ((coords[2] - coords[0]) / imageWidth) * containerWidth;
     final wheelHeight = ((coords[3] - coords[1]) / imageHeight) * containerHeight;
-    final isActive    = _activeWheelIndex == index;
+    final isActive = _activeWheelIndex == index;
 
     return Positioned(
       left: wheelLeft,
@@ -877,9 +938,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
             perspective: 0.001,
             diameterRatio: 1.5,
             physics: const FixedExtentScrollPhysics(),
-            onSelectedItemChanged: (_) {
-              HapticFeedback.selectionClick();
-            },
+            onSelectedItemChanged: (_) => HapticFeedback.selectionClick(),
             childDelegate: ListWheelChildBuilderDelegate(
               builder: (context, idx) {
                 final displayNumber = (idx % 10 + 10) % 10;
@@ -896,9 +955,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
                             style: TextStyle(
                               fontSize: wheelHeight * 0.30,
                               fontWeight: FontWeight.w900,
-                              color: isActive
-                                  ? const Color(0xFFFF5722)
-                                  : const Color(0xFF263238),
+                              color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
                               height: 1.0,
                               shadows: isActive
                                   ? [
@@ -930,9 +987,9 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   }
 
   Widget _buildGlowingButton(double containerWidth, double containerHeight) {
-    final btnLeft   = (buttonCoords[0] / imageWidth)  * containerWidth;
-    final btnTop    = (buttonCoords[1] / imageHeight) * containerHeight;
-    final btnWidth  = ((buttonCoords[2] - buttonCoords[0]) / imageWidth)  * containerWidth;
+    final btnLeft = (buttonCoords[0] / imageWidth) * containerWidth;
+    final btnTop = (buttonCoords[1] / imageHeight) * containerHeight;
+    final btnWidth = ((buttonCoords[2] - buttonCoords[0]) / imageWidth) * containerWidth;
     final btnHeight = ((buttonCoords[3] - buttonCoords[1]) / imageHeight) * containerHeight;
 
     return Positioned(
