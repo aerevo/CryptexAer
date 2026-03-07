@@ -570,35 +570,51 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   bool _isGlitching = false;
   double _xOffset = 0.0, _yOffset = 0.0;
   final Random _random = Random();
+  int _noiseSeed = DateTime.now().millisecondsSinceEpoch;
+  Timer? _noiseTimer;
 
   @override
   void initState() {
     super.initState();
+    // ✅ Glitch animation every 80ms
     _glitchTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
       if (!mounted) return;
       setState(() {
-        _isGlitching = _random.nextDouble() > 0.7;
-        _xOffset = _random.nextDouble() * 2 - 1.0;
-        _yOffset = _random.nextDouble() * 1.5 - 0.75;
+        _isGlitching = _random.nextDouble() > 0.65; // More frequent
+        _xOffset = _random.nextDouble() * 3 - 1.5;
+        _yOffset = _random.nextDouble() * 2 - 1.0;
       });
+    });
+    
+    // ✅ Noise refresh every 400ms
+    _noiseTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (mounted) setState(() => _noiseSeed = DateTime.now().millisecondsSinceEpoch);
     });
   }
 
   @override
   void dispose() {
     _glitchTimer?.cancel();
+    _noiseTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 55, // ✅ Slightly smaller height
+      height: 60, // ✅ Fixed height
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: const Color(0xFF3E2723), // Brown background
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.5), width: 1.5),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.2),
+            blurRadius: 15,
+            spreadRadius: 1,
+          ),
+        ],
       ),
       child: ValueListenableBuilder<List<int>>(
         valueListenable: widget.controller.challengeCode,
@@ -609,34 +625,48 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
             );
           }
 
-          final codeStr = '${code[0]}  ${code[1]}  ${code[2]}';
+          // ✅ PROPER spacing with non-breaking spaces
+          final codeStr = '${code[0]}    ${code[1]}    ${code[2]}';
           
-          // ✅ FIXED: Clean layout, no noise painter overlay on digits
-          return Center(
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12),
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // RGB glitch layers (subtle, behind main text)
-                if (_isGlitching)
+                // ✅ Background noise layer (behind everything)
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _NoisePainter(seed: _noiseSeed),
+                  ),
+                ),
+                
+                // ✅ RGB Glitch layers (animated!)
+                if (_isGlitching) ...[
+                  // Cyan layer (offset right/up)
                   Transform.translate(
-                    offset: Offset(_xOffset + 1, _yOffset),
+                    offset: Offset(_xOffset + 2, _yOffset),
                     child: Text(
                       codeStr,
-                      style: _glitchStyle(Colors.cyan.withOpacity(0.5)),
+                      style: _glitchStyle(Colors.cyan.withOpacity(0.7)),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                if (_isGlitching)
+                  // Magenta layer (offset left/down)
                   Transform.translate(
-                    offset: Offset(-_xOffset - 1, -_yOffset),
+                    offset: Offset(-_xOffset - 2, -_yOffset),
                     child: Text(
                       codeStr,
-                      style: _glitchStyle(const Color(0xFFFF00FF).withOpacity(0.5)),
+                      style: _glitchStyle(const Color(0xFFFF00FF).withOpacity(0.7)),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                // Main clean digits (clear and readable)
+                ],
+                
+                // ✅ Main white text (always visible, on top)
                 Text(
                   codeStr,
                   style: _glitchStyle(Colors.white),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -648,19 +678,56 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
 
   TextStyle _glitchStyle(Color color) {
     return TextStyle(
-      fontSize: 26, // ✅ Slightly smaller for better fit
+      fontSize: 32, // ✅ Larger, clearer
       fontWeight: FontWeight.w900,
       fontFamily: 'Courier',
-      letterSpacing: 6,
+      letterSpacing: 8, // ✅ Proper spacing
       color: color,
+      height: 1.0, // ✅ Tight line height
       shadows: [
         Shadow(
           color: Colors.black.withOpacity(0.8),
-          blurRadius: 8,
+          blurRadius: 10,
         ),
       ],
     );
   }
+}
+
+// ✅ Subtle noise painter (background only)
+class _NoisePainter extends CustomPainter {
+  final int seed;
+  _NoisePainter({required this.seed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = Random(seed);
+    final paint = Paint()..strokeWidth = 0.5..style = PaintingStyle.stroke;
+
+    // ✅ Very subtle lines (won't interfere with digits)
+    for (int i = 0; i < 5; i++) {
+      paint.color = Colors.white.withOpacity(rng.nextDouble() * 0.08 + 0.02);
+      canvas.drawLine(
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        paint,
+      );
+    }
+
+    // ✅ Tiny dots (background decoration)
+    final dotPaint = Paint()..style = PaintingStyle.fill;
+    for (int d = 0; d < 8; d++) {
+      dotPaint.color = Colors.white.withOpacity(rng.nextDouble() * 0.06 + 0.01);
+      canvas.drawCircle(
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        rng.nextDouble() * 1.0 + 0.2,
+        dotPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_NoisePainter old) => old.seed != seed;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
