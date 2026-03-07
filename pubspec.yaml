@@ -15,6 +15,7 @@ dependencies:
   safe_device: ^1.1.8
   geolocator: ^11.0.0
   crypto: ^3.0.3
+  device_info_plus: ^9.1.1
 
 dev_dependencies:
   flutter_test:
@@ -27,4 +28,5 @@ flutter:
   assets:
     - assets/z_wheel.png
     - assets/z_wheel3.png
+
 
