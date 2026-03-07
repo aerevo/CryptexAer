@@ -7,13 +7,13 @@ import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Z-KINETIC SDK v2.2 - HARDENED
+// Z-KINETIC SDK v3.0 - PRODUCTION GRADE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ✅ UI asal kekal 100% (tiada perubahan visual)
-// ✅ GestureAudit: tamper detect (digit tukar tanpa scroll = block)
-// ✅ Visual noise dalam RGB glitch display (anti-OCR)
-// ✅ OFFLINE = DENY (buang local fallback berbahaya)
-// ✅ REAL touch timing + scroll pattern tracking
+// 🔒 OFFLINE = TOTAL LOCKDOWN (no demo mode, no fallback)
+// ✅ GestureAudit: tamper detect
+// ✅ Visual noise: anti-OCR RGB glitch
+// ✅ Real biometric tracking
+// ✅ Production security standard
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ZKineticConfig {
@@ -30,7 +30,7 @@ class ZKineticConfig {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// GESTURE AUDIT — detect bot yang set digit terus dalam memory
+// GESTURE AUDIT — detect memory injection attacks
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class GestureAudit {
@@ -41,7 +41,6 @@ class GestureAudit {
     if (_events.length > 50) _events.removeAt(0);
   }
 
-  /// Jika digit bukan posisi awal tapi tiada scroll event — kemungkinan bot
   bool isTampered(List<FixedExtentScrollController> controllers) {
     for (int i = 0; i < controllers.length; i++) {
       if (!controllers[i].hasClients) continue;
@@ -53,7 +52,6 @@ class GestureAudit {
     return false;
   }
 
-  /// Entropy scroll — variance tinggi = lebih manusia
   double get scrollEntropy {
     if (_events.length < 3) return 0.5;
     final intervals = <int>[];
@@ -91,22 +89,18 @@ class WidgetController {
   final ValueNotifier<double> touchScore   = ValueNotifier(0.0);
   final ValueNotifier<double> patternScore = ValueNotifier(0.0);
 
-  // Gesture audit (tamper detect)
   final GestureAudit gestureAudit = GestureAudit();
 
-  // Motion
   StreamSubscription<AccelerometerEvent>? _accelSub;
   double   _lastMagnitude  = 9.8;
   DateTime _lastMotionTime = DateTime.now();
   Timer?   _decayTimer;
 
-  // Touch timing
-  DateTime?       _lastTouchTime;
+  DateTime? _lastTouchTime;
   final List<int> _touchIntervals = [];
 
-  // Scroll pattern
   final List<double> _scrollVelocities = [];
-  DateTime?          _lastScrollTime;
+  DateTime? _lastScrollTime;
 
   WidgetController({required this.apiKey}) {
     _initSensors();
@@ -135,6 +129,7 @@ class WidgetController {
     });
   }
 
+  // 🔒 PRODUCTION: Offline = FAIL (no demo mode, no fallback)
   Future<bool> fetchChallenge() async {
     try {
       final response = await http.post(
@@ -149,14 +144,18 @@ class WidgetController {
           _currentNonce = data['nonce'];
           challengeCode.value =
               (data['challengeCode'] as List<dynamic>).map((e) => e as int).toList();
-          gestureAudit.clear(); // reset audit untuk challenge baru
+          gestureAudit.clear();
+          debugPrint('✅ Challenge from server: ${challengeCode.value}');
           return true;
         }
       }
+      
+      debugPrint('🔒 Server error - DENY');
       return false;
+      
     } catch (e) {
-      // ✅ OFFLINE = DENY — tiada local fallback
-      debugPrint('⚠️ Network error: $e');
+      // 🔒 OFFLINE = TOTAL LOCKDOWN
+      debugPrint('🔒 Network error - DENY: $e');
       return false;
     }
   }
@@ -169,7 +168,7 @@ class WidgetController {
       return {'allowed': false, 'error': 'Tiada cabaran aktif.'};
     }
 
-    // ✅ TAMPER CHECK — block sebelum hantar ke server
+    // Tamper check
     if (gestureAudit.isTampered(controllers)) {
       debugPrint('🚨 Tamper detected!');
       return {'allowed': false, 'error': 'Aktiviti mencurigakan.', 'reason': 'TAMPER_DETECTED'};
@@ -193,10 +192,8 @@ class WidgetController {
 
       if (response.statusCode == 200) return json.decode(response.body);
 
-      // ✅ Server error = DENY, bukan fallback
       return {'allowed': false, 'error': 'Server error ${response.statusCode}.'};
     } catch (e) {
-      // ✅ Network gagal = DENY
       return {'allowed': false, 'error': 'Tiada sambungan. Cuba semula.'};
     }
   }
@@ -257,7 +254,7 @@ class WidgetController {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// MAIN WIDGET — UI asal kekal sama
+// MAIN WIDGET
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ZKineticWidgetProdukB extends StatefulWidget {
@@ -278,6 +275,7 @@ class ZKineticWidgetProdukB extends StatefulWidget {
 
 class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
   bool _loading = true;
+  bool _networkError = false;
 
   @override
   void initState() {
@@ -286,12 +284,23 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
   }
 
   Future<void> _initialize() async {
-    await widget.controller.fetchChallenge();
-    if (mounted) setState(() => _loading = false);
+    final success = await widget.controller.fetchChallenge();
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _networkError = !success; // 🔒 Track if network failed
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // 🔒 OFFLINE = SHOW ERROR SCREEN ONLY
+    if (_networkError) {
+      return _buildNetworkErrorScreen();
+    }
+
+    // Normal UI (only if server connection successful)
     return Container(
       color: Colors.black.withOpacity(0.95),
       child: Center(
@@ -344,40 +353,28 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                // ✅ RGB Glitch Display dengan visual noise
                 UltimateRGBGlitchDisplay(controller: widget.controller),
                 const SizedBox(height: 12),
                 const Text(
                   'Please match the code',
-                  style: TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 0.8),
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
-                const SizedBox(height: 8),
-                if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.all(40.0),
-                    child: CircularProgressIndicator(color: Colors.white),
-                  )
-                else
-                  ValueListenableBuilder<int>(
-                    valueListenable: widget.controller.randomizeTrigger,
-                    builder: (context, trigger, _) {
-                      return UltimateCryptexLock(
-                        key: ValueKey(trigger),
-                        controller: widget.controller,
-                        onSuccess: (isPanic) => widget.onComplete(true),
-                        onFail: () => widget.onComplete(false),
-                      );
-                    },
-                  ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 18),
+                UltimateCryptexLock(
+                  controller: widget.controller,
+                  onSuccess: (success) => widget.onComplete(success),
+                  onFail: () => widget.onComplete(false),
+                ),
+                const SizedBox(height: 18),
                 UltimateBiometricPanel(controller: widget.controller),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 if (widget.onCancel != null)
                   TextButton(
                     onPressed: widget.onCancel,
-                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 4)),
-                    child: const Text('Cancel',
-                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
                   ),
               ],
             ),
@@ -386,10 +383,85 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
       ),
     );
   }
+
+  // 🔒 NETWORK ERROR SCREEN (offline = total lockdown)
+  Widget _buildNetworkErrorScreen() {
+    return Container(
+      color: Colors.black.withOpacity(0.95),
+      child: Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: const Color(0xFF263238),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.5), width: 2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.cloud_off_rounded,
+                size: 80,
+                color: Colors.redAccent,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'SAMBUNGAN DIPERLUKAN',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Z-Kinetic memerlukan sambungan internet untuk pengesahan selamat.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white70,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  setState(() {
+                    _loading = true;
+                    _networkError = false;
+                  });
+                  await _initialize();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Cuba Semula'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF5722),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (widget.onCancel != null)
+                TextButton(
+                  onPressed: widget.onCancel,
+                  child: const Text(
+                    'Kembali',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RGB GLITCH DISPLAY + VISUAL NOISE (anti-OCR)
+// RGB GLITCH DISPLAY — anti-OCR visual noise
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class UltimateRGBGlitchDisplay extends StatefulWidget {
@@ -402,34 +474,26 @@ class UltimateRGBGlitchDisplay extends StatefulWidget {
 
 class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   Timer? _glitchTimer;
-  Timer? _noiseTimer;
-  double _xOffset   = 0;
-  double _yOffset   = 0;
   bool   _isGlitching = false;
-  int    _noiseSeed = 0; // berubah untuk noise dinamik
-  final Random _rnd = Random();
+  double _xOffset = 0.0, _yOffset = 0.0;
+  final Random _random = Random();
+
+  int _noiseSeed = DateTime.now().millisecondsSinceEpoch;
+  Timer? _noiseTimer;
 
   @override
   void initState() {
     super.initState();
-
-    // Glitch effect (sama seperti asal)
-    _glitchTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
-      if (_rnd.nextDouble() > 0.3) {
-        setState(() {
-          _isGlitching = true;
-          _xOffset = (_rnd.nextDouble() - 0.5) * 10;
-          _yOffset = (_rnd.nextDouble() - 0.5) * 8;
-        });
-        Future.delayed(const Duration(milliseconds: 50), () {
-          if (mounted) setState(() => _isGlitching = false);
-        });
-      }
+    _glitchTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
+      if (!mounted) return;
+      setState(() {
+        _isGlitching = _random.nextDouble() > 0.7;
+        _xOffset     = _random.nextDouble() * 3 - 1.5;
+        _yOffset     = _random.nextDouble() * 2 - 1.0;
+      });
     });
-
-    // ✅ Noise tick — ghost digits & lines berubah setiap 400ms
     _noiseTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
-      if (mounted) setState(() => _noiseSeed = _rnd.nextInt(99999));
+      if (mounted) setState(() => _noiseSeed = DateTime.now().millisecondsSinceEpoch);
     });
   }
 
@@ -443,10 +507,10 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 15),
-      height: 50,
+      height: 60,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.8),
+        color: Colors.black.withOpacity(0.6),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.orangeAccent.withOpacity(0.6), width: 2),
         boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 10)],
@@ -456,22 +520,21 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
         builder: (context, code, _) {
           if (code.isEmpty) {
             return const Center(
-              child: Text('...', style: TextStyle(color: Colors.white, fontSize: 28)),
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
             );
           }
+          
           final codeStr = code.join('');
           return ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // ✅ LAYER 1: Visual noise (anti-OCR) — CustomPaint di belakang
                 Positioned.fill(
                   child: CustomPaint(
                     painter: _NoisePainter(seed: _noiseSeed),
                   ),
                 ),
-                // Layer 2: RGB glitch (sama seperti asal)
                 if (_isGlitching)
                   Transform.translate(
                     offset: Offset(_xOffset + 2, _yOffset),
@@ -482,7 +545,6 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
                     offset: Offset(-_xOffset - 2, -_yOffset),
                     child: Text(codeStr, style: _glitchStyle(const Color(0xFFFF00FF))),
                   ),
-                // Layer 3: Digit sebenar (foreground jelas)
                 Text(codeStr, style: _glitchStyle(Colors.white)),
               ],
             ),
@@ -500,7 +562,6 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
   }
 }
 
-// ✅ Noise painter — random lines + ghost digits, seed berubah setiap 400ms
 class _NoisePainter extends CustomPainter {
   final int seed;
   _NoisePainter({required this.seed});
@@ -510,7 +571,6 @@ class _NoisePainter extends CustomPainter {
     final rng   = Random(seed);
     final paint = Paint()..strokeWidth = 0.8..style = PaintingStyle.stroke;
 
-    // Random lines
     for (int i = 0; i < 8; i++) {
       paint.color = Colors.white.withOpacity(rng.nextDouble() * 0.12 + 0.03);
       canvas.drawLine(
@@ -520,7 +580,6 @@ class _NoisePainter extends CustomPainter {
       );
     }
 
-    // Ghost digits
     for (int g = 0; g < 3; g++) {
       final tp = TextPainter(
         text: TextSpan(
@@ -540,7 +599,6 @@ class _NoisePainter extends CustomPainter {
       ));
     }
 
-    // Noise dots
     final dotPaint = Paint()..style = PaintingStyle.fill;
     for (int d = 0; d < 12; d++) {
       dotPaint.color = Colors.white.withOpacity(rng.nextDouble() * 0.08 + 0.02);
@@ -557,7 +615,7 @@ class _NoisePainter extends CustomPainter {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// BIOMETRIC PANEL — sama seperti asal
+// BIOMETRIC PANEL
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class UltimateBiometricPanel extends StatelessWidget {
@@ -614,7 +672,7 @@ class UltimateBiometricPanel extends StatelessWidget {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// CRYPTEX LOCK — sama seperti asal + tamper detect
+// CRYPTEX LOCK
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class UltimateCryptexLock extends StatefulWidget {
@@ -641,78 +699,74 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   static const List<double>       buttonCoords = ZKineticConfig.btnCoords3;
 
   late List<FixedExtentScrollController> _scrollControllers;
-  // Track posisi sebelum untuk GestureAudit
   final List<int> _prevItems = [0, 0, 0];
 
   int?   _activeWheelIndex;
   Timer? _wheelActiveTimer;
   bool   _isButtonPressed = false;
   final Random _random = Random();
-  late Timer _driftTimer;
-  late List<Offset> _textDriftOffsets;
-  late List<AnimationController> _opacityControllers;
-  late List<Animation<double>> _opacityAnimations;
+
+  late List<AnimationController> _textOpacityControllers;
+  late List<Animation<double>>   _textOpacityAnimations;
+  final List<Offset> _textDriftOffsets = [Offset.zero, Offset.zero, Offset.zero];
+  Timer? _driftTimer;
 
   @override
   void initState() {
     super.initState();
-
     _scrollControllers = List.generate(
-        3, (i) => FixedExtentScrollController(initialItem: _random.nextInt(10)));
-    _textDriftOffsets = List.generate(3, (_) => Offset.zero);
+      3, (i) => FixedExtentScrollController(initialItem: 0),
+    );
 
-    _driftTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      if (mounted && _activeWheelIndex == null) {
+    _textOpacityControllers = List.generate(
+      3, (i) => AnimationController(
+        duration: const Duration(milliseconds: 800), vsync: this,
+      )..repeat(reverse: true),
+    );
+    _textOpacityAnimations = _textOpacityControllers
+        .map((c) => Tween<double>(begin: 0.75, end: 1.0)
+            .animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)))
+        .toList();
+
+    _startDriftTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _playSlotMachineIntro());
+  }
+
+  void _startDriftTimer() {
+    _driftTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (mounted) {
         setState(() {
           for (int i = 0; i < 3; i++) {
             _textDriftOffsets[i] = Offset(
-              (_random.nextDouble() - 0.5) * 2.0,
-              (_random.nextDouble() - 0.5) * 2.0,
+              (_random.nextDouble() - 0.5) * 1.5,
+              (_random.nextDouble() - 0.5) * 1.5,
             );
           }
         });
       }
     });
-
-    _opacityControllers = List.generate(3, (i) {
-      final c = AnimationController(
-          vsync: this,
-          duration: Duration(milliseconds: 1800 + _random.nextInt(400)));
-      Future.delayed(Duration(milliseconds: _random.nextInt(1000)), () {
-        if (mounted) c.repeat(reverse: true);
-      });
-      return c;
-    });
-    _opacityAnimations = _opacityControllers
-        .map((c) => Tween<double>(begin: 0.75, end: 1.0)
-            .animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)))
-        .toList();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => _playSlotMachineIntro());
   }
 
   void _playSlotMachineIntro() {
     for (int i = 0; i < 3; i++) {
       Future.delayed(Duration(milliseconds: 200 + (i * 300)), () {
         if (!mounted) return;
+        final target = 20 + _random.nextInt(10);
         _scrollControllers[i].animateToItem(
-          20 + _random.nextInt(10),
+          target,
           duration: const Duration(milliseconds: 1200),
           curve: Curves.elasticOut,
         );
-        Future.delayed(const Duration(milliseconds: 1000), () {
-          if (mounted) HapticFeedback.heavyImpact();
-        });
       });
     }
   }
 
   @override
   void dispose() {
-    for (final c in _scrollControllers) c.dispose();
-    for (final c in _opacityControllers) c.dispose();
+    for (var c in _scrollControllers) c.dispose();
+    for (var c in _textOpacityControllers) c.dispose();
     _wheelActiveTimer?.cancel();
-    _driftTimer.cancel();
+    _driftTimer?.cancel();
     super.dispose();
   }
 
@@ -723,19 +777,22 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     widget.controller.registerTouch();
   }
 
+  void _onWheelScrollUpdate(int index) {
+    widget.controller.registerScroll();
+    final current = _scrollControllers[index].selectedItem;
+    if (current != _prevItems[index]) {
+      widget.controller.gestureAudit.recordScroll(
+        index, _prevItems[index], current, DateTime.now(),
+      );
+      _prevItems[index] = current;
+    }
+  }
+
   void _onWheelScrollEnd(int index) {
     _wheelActiveTimer?.cancel();
     _wheelActiveTimer = Timer(const Duration(milliseconds: 500), () {
       if (mounted) setState(() => _activeWheelIndex = null);
     });
-  }
-
-  // ✅ Rekod scroll untuk GestureAudit
-  void _onItemChanged(int index, int newItem) {
-    widget.controller.gestureAudit.recordScroll(
-      index, _prevItems[index], newItem, DateTime.now(),
-    );
-    _prevItems[index] = newItem;
   }
 
   Future<void> _onButtonTap() async {
@@ -745,158 +802,160 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     if (mounted) setState(() => _isButtonPressed = false);
 
     final currentCode = <int>[];
-    for (final c in _scrollControllers) {
-      currentCode.add((c.selectedItem % 10 + 10) % 10);
+    for (var c in _scrollControllers) {
+      final raw = c.selectedItem;
+      currentCode.add((raw % 10 + 10) % 10);
     }
 
-    // ✅ Hantar controllers untuk tamper check
     final result = await widget.controller.verify(currentCode, _scrollControllers);
-
-    if (result['allowed'] == true) {
-      widget.onSuccess(false);
-    } else {
-      HapticFeedback.heavyImpact();
-      // Reset audit dan fetch challenge baru
-      widget.controller.gestureAudit.clear();
-      await widget.controller.fetchChallenge();
-      _playSlotMachineIntro();
-      widget.onFail();
-    }
+    widget.onSuccess(result['allowed'] == true);
   }
 
   @override
   Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.contain,
-      child: SizedBox(
-        width: imageWidth,
-        height: imageHeight,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.asset(
-                'assets/z_wheel3.png',
-                fit: BoxFit.fill,
-                errorBuilder: (_, __, ___) => Container(
-                  color: Colors.red,
-                  child: const Icon(Icons.error, color: Colors.white, size: 60),
-                ),
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxWidth    = screenWidth - 80;
+    final aspectRatio = imageWidth / imageHeight;
+    final containerWidth = maxWidth.clamp(300.0, 600.0);
+    final containerHeight = containerWidth / aspectRatio;
+
+    return SizedBox(
+      width: containerWidth,
+      height: containerHeight,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/z_wheel3.png',
+              fit: BoxFit.fill,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey,
+                child: const Icon(Icons.broken_image, size: 60, color: Colors.white),
               ),
             ),
-            ..._buildWheelOverlays(),
-            _buildGlowingButton(),
-          ],
-        ),
+          ),
+          for (int i = 0; i < 3; i++) _buildWheel(i, containerWidth, containerHeight),
+          _buildGlowingButton(containerWidth, containerHeight),
+        ],
       ),
     );
   }
 
-  List<Widget> _buildWheelOverlays() {
-    return List.generate(wheelCoords.length, (i) {
-      final coords = wheelCoords[i];
-      return Positioned(
-        left  : coords[0],
-        top   : coords[1],
-        width : coords[2] - coords[0],
-        height: coords[3] - coords[1],
-        child : NotificationListener<ScrollNotification>(
-          onNotification: (n) {
-            if (n is ScrollStartNotification) {
-              if (_scrollControllers[i].position == n.metrics) _onWheelScrollStart(i);
-            } else if (n is ScrollUpdateNotification) {
-              widget.controller.registerScroll();
-            } else if (n is ScrollEndNotification) {
-              _onWheelScrollEnd(i);
-            }
-            return false;
-          },
-          child: _buildWheel(i, coords[3] - coords[1]),
-        ),
-      );
-    });
-  }
+  Widget _buildWheel(int index, double containerWidth, double containerHeight) {
+    final coords      = wheelCoords[index];
+    final wheelLeft   = (coords[0] / imageWidth)  * containerWidth;
+    final wheelTop    = (coords[1] / imageHeight) * containerHeight;
+    final wheelWidth  = ((coords[2] - coords[0]) / imageWidth)  * containerWidth;
+    final wheelHeight = ((coords[3] - coords[1]) / imageHeight) * containerHeight;
+    final isActive    = _activeWheelIndex == index;
 
-  Widget _buildWheel(int index, double wheelHeight) {
-    final isActive = _activeWheelIndex == index;
-    return GestureDetector(
-      onTapDown  : (_) => _onWheelScrollStart(index),
-      onTapUp    : (_) => _onWheelScrollEnd(index),
-      onTapCancel: ()  => _onWheelScrollEnd(index),
-      behavior   : HitTestBehavior.opaque,
-      child: ListWheelScrollView.useDelegate(
-        controller : _scrollControllers[index],
-        itemExtent : wheelHeight * 0.40,
-        perspective: 0.001,
-        diameterRatio: 1.5,
-        physics: const FixedExtentScrollPhysics(),
-        onSelectedItemChanged: (newItem) {
-          HapticFeedback.selectionClick();
-          _onItemChanged(index, newItem); // ✅ rekod untuk tamper detect
-        },
-        childDelegate: ListWheelChildBuilderDelegate(
-          builder: (context, idx) {
-            final displayNumber = (idx % 10 + 10) % 10;
-            return Center(
-              child: AnimatedBuilder(
-                animation: _opacityAnimations[index],
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: isActive ? Offset.zero : _textDriftOffsets[index],
-                    child: Opacity(
-                      opacity: isActive ? 1.0 : _opacityAnimations[index].value,
-                      child: Text(
-                        '$displayNumber',
-                        style: TextStyle(
-                          fontSize  : wheelHeight * 0.30,
-                          fontWeight: FontWeight.w900,
-                          color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
-                          height: 1.0,
-                          shadows: isActive
-                              ? [Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20)]
-                              : [
-                                  Shadow(offset: const Offset(1, 1), blurRadius: 1, color: Colors.white.withOpacity(0.4)),
-                                  Shadow(offset: const Offset(-1, -1), blurRadius: 1, color: Colors.black.withOpacity(0.6)),
-                                ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGlowingButton() {
     return Positioned(
-      left  : buttonCoords[0],
-      top   : buttonCoords[1],
-      width : buttonCoords[2] - buttonCoords[0],
-      height: buttonCoords[3] - buttonCoords[1],
-      child : GestureDetector(
-        onTap    : _onButtonTap,
-        behavior : HitTestBehavior.opaque,
-        child: Stack(
-          children: [
-            Container(color: Colors.transparent),
-            if (_isButtonPressed)
-              IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF5722).withOpacity(0.6),
-                        blurRadius: 30, spreadRadius: 5,
-                      ),
-                    ],
+      left: wheelLeft,
+      top: wheelTop,
+      width: wheelWidth,
+      height: wheelHeight,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          if (n is ScrollStartNotification) {
+            if (_scrollControllers[index].position == n.metrics) {
+              _onWheelScrollStart(index);
+            }
+          } else if (n is ScrollUpdateNotification) {
+            _onWheelScrollUpdate(index);
+          } else if (n is ScrollEndNotification) {
+            _onWheelScrollEnd(index);
+          }
+          return false;
+        },
+        child: GestureDetector(
+          onTapDown: (_) => _onWheelScrollStart(index),
+          onTapUp: (_) => _onWheelScrollEnd(index),
+          behavior: HitTestBehavior.opaque,
+          child: ListWheelScrollView.useDelegate(
+            controller: _scrollControllers[index],
+            itemExtent: wheelHeight * 0.40,
+            perspective: 0.001,
+            diameterRatio: 1.5,
+            physics: const FixedExtentScrollPhysics(),
+            onSelectedItemChanged: (_) {
+              HapticFeedback.selectionClick();
+            },
+            childDelegate: ListWheelChildBuilderDelegate(
+              builder: (context, idx) {
+                final displayNumber = (idx % 10 + 10) % 10;
+                return Center(
+                  child: AnimatedBuilder(
+                    animation: _textOpacityAnimations[index],
+                    builder: (context, child) {
+                      return Transform.translate(
+                        offset: isActive ? Offset.zero : _textDriftOffsets[index],
+                        child: Opacity(
+                          opacity: isActive ? 1.0 : _textOpacityAnimations[index].value,
+                          child: Text(
+                            '$displayNumber',
+                            style: TextStyle(
+                              fontSize: wheelHeight * 0.30,
+                              fontWeight: FontWeight.w900,
+                              color: isActive
+                                  ? const Color(0xFFFF5722)
+                                  : const Color(0xFF263238),
+                              height: 1.0,
+                              shadows: isActive
+                                  ? [
+                                      Shadow(
+                                        color: const Color(0xFFFF5722).withOpacity(0.8),
+                                        blurRadius: 20,
+                                      ),
+                                    ]
+                                  : [
+                                      const Shadow(
+                                        offset: Offset(1, 1),
+                                        color: Colors.black26,
+                                        blurRadius: 2,
+                                      ),
+                                    ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-              ),
-          ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlowingButton(double containerWidth, double containerHeight) {
+    final btnLeft   = (buttonCoords[0] / imageWidth)  * containerWidth;
+    final btnTop    = (buttonCoords[1] / imageHeight) * containerHeight;
+    final btnWidth  = ((buttonCoords[2] - buttonCoords[0]) / imageWidth)  * containerWidth;
+    final btnHeight = ((buttonCoords[3] - buttonCoords[1]) / imageHeight) * containerHeight;
+
+    return Positioned(
+      left: btnLeft,
+      top: btnTop,
+      width: btnWidth,
+      height: btnHeight,
+      child: GestureDetector(
+        onTap: _onButtonTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.transparent,
+            boxShadow: _isButtonPressed
+                ? []
+                : [
+                    BoxShadow(
+                      color: const Color(0xFFFF5722).withOpacity(0.5),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+          ),
         ),
       ),
     );
