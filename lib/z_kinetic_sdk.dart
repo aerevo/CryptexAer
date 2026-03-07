@@ -197,7 +197,7 @@ class WidgetController {
   Future<bool> fetchChallenge() async {
     try {
       final response = await http.post(
-        Uri.parse('$_serverUrl/challenge'),
+        Uri.parse('$_serverUrl/getChallenge'),
         headers: {'Content-Type': 'application/json', 'x-api-key': apiKey},
         body: json.encode({}),
       ).timeout(const Duration(seconds: 5));
