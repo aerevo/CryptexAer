@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <title>Kedai Kasut Ali (Z-Kinetic AAA)</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        .loading { color: #555; font-size: 20px; font-weight: bold; }
+        .debug-box { background: black; color: yellow; padding: 15px; margin: 20px; font-family: monospace; text-align: left; word-wrap: break-word;}
+    </style>
+</head>
+<body>
+
+    <div id="skrin-utama">
+        <p class="loading">⏳ Menyelesaikan Teka-Teki Logik Roda...</p>
+    </div>
+
+    <script>
+        (async function() {
+            // KUNCI MAMAT TOWING (Dah diletak siap-siap!)
+            const ZK_API_KEY = "zk_live_9f6e21f34af9f3281721ab152ece5246"; 
+            const ZK_SERVER = "https://api-dxtcyy6wma-as.a.run.app";
+            const skrin = document.getElementById("skrin-utama");
+
+            try {
+                // PINTU 1: Minta Cabaran Rawak
+                let cabaranRes = await fetch(`${ZK_SERVER}/getChallenge`, { method: "POST" });
+                if (!cabaranRes.ok) throw new Error(`Ralat GetChallenge: ${cabaranRes.status}`);
+                let dataCabaran = await cabaranRes.json();
+
+                let jawapanRoda = dataCabaran.targetCode || dataCabaran.target || [];
+
+                // PINTU 2: Hantar Jawapan
+                let attestRes = await fetch(`${ZK_SERVER}/attest`, {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "x-api-key": ZK_API_KEY 
+                    },
+                    body: JSON.stringify({
+                        nonce: dataCabaran.nonce,
+                        userAnswer: jawapanRoda
+                    })
+                });
+                
+                if (!attestRes.ok) {
+                    let errData = await attestRes.text();
+                    throw new Error(`Ralat Attest ${attestRes.status}: ${errData}`);
+                }
+                
+                let dataAttest = await attestRes.json();
+                if (!dataAttest.token) throw new Error("Gagal mendapatkan Token Keselamatan!");
+
+                // PINTU 3: Tunjuk Tiket
+                let verifyRes = await fetch(`${ZK_SERVER}/verify`, {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "x-api-key": ZK_API_KEY
+                    },
+                    body: JSON.stringify({
+                        token: dataAttest.token
+                    })
+                });
+                if (!verifyRes.ok) throw new Error(`Ralat Verify: ${verifyRes.status}`);
+                let dataVerify = await verifyRes.json();
+
+                if (dataVerify.success === true) {
+                    skrin.innerHTML = `
+                        <h1 style="color:green;">Selamat Datang ke Kedai Kasut Ali! 👟</h1>
+                        <p>Kunci Sah & Teka-teki diselesaikan! Anda melepasi Perisai Z-Kinetic.</p>
+                        <p><b>(Kunci Digunakan: Mamat Towing)</b></p>
+                    `;
+                } else {
+                    skrin.innerHTML = `
+                        <h1 style="color:red;">⛔ AKSES DISEKAT</h1>
+                        <p>Status: ${dataVerify.status || "Ditolak"}</p>
+                    `;
+                }
+            } catch (error) {
+                skrin.innerHTML = `
+                    <h1 style="color:red;">⛔ SISTEM TERKUNCI</h1>
+                    <div class="debug-box">
+                        <b>RALAT X-RAY:</b><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        })();
+    </script>
+</body>
+</html>
