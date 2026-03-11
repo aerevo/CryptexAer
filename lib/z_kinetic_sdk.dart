@@ -133,7 +133,7 @@ class _ScrollEvent {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WidgetController {
-  static const String _serverUrl = 'https://api-dxtcyy6wma-as.a.run.app';
+  static const String _serverUrl = 'https://zticketapp-dxtcyy6wma-as.a.run.app';
   static const _storage = FlutterSecureStorage();
 
   // ✅ appId sahaja — boleh nampak dalam APK, tak bahaya
