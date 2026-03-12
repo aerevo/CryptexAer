@@ -809,6 +809,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   late List<Animation<double>>   _textOpacityAnimations;
   final List<Offset> _textDriftOffsets = [Offset.zero, Offset.zero, Offset.zero];
   Timer? _driftTimer;
+  int _percubaanSalah = 0; // Kaunter 3 Nyawa
 
   @override
   void initState() {
@@ -909,7 +910,42 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
       userAnswer, _scrollControllers, widget.deviceDNA,
     );
 
-    widget.onSuccess(result['allowed'] == true);
+    if (result['allowed'] == true) {
+      // 🎉 LULUS! Reset nyawa dan benarkan masuk
+      _percubaanSalah = 0;
+      widget.onSuccess(true);
+    } else {
+      // ❌ SALAH! Tolak nyawa
+      setState(() {
+        _percubaanSalah++;
+      });
+
+      if (_percubaanSalah >= 3) {
+        // ⛔ HABIS 3 NYAWA: Halau keluar
+        _percubaanSalah = 0; // Reset untuk cabaran akan datang
+        widget.onFail(); // Panggil dialog Access Denied (Merah) di main.dart
+      } else {
+        // 🔄 BAGI PELUANG (PUSING RAWAK)
+        int bakiNyawa = 3 - _percubaanSalah;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Akses Ditolak! Padanan kod salah. Baki peluang: $bakiNyawa',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        HapticFeedback.heavyImpact(); // Gegar fon
+
+        // Panggil fungsi intro ni untuk rawakkan roda (susahkan bot!)
+        _playSlotMachineIntro();
+      }
+    }
   }
 
   @override
