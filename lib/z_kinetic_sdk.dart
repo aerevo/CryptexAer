@@ -753,11 +753,12 @@ Widget ZKineticWidgetProdukB({
   void Function(bool)? onComplete,
   void Function(bool)? onSuccess,
   VoidCallback? onFail,
+  VoidCallback? onCancel,
 }) {
   return ZKineticWidget(
     controller: controller,
     deviceDNA: deviceDNA,
     onSuccess: onComplete ?? onSuccess ?? (bool result) {},
-    onFail: onFail ?? () {},
+    onFail: onFail ?? onCancel ?? () {},
   );
 }
