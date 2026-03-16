@@ -1086,60 +1086,61 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
           }
         },
         child: NotificationListener<ScrollNotification>(
-        onNotification: (n) {
-          if (n is ScrollStartNotification) {
-            if (_scrollControllers[index].position == n.metrics) _onWheelScrollStart(index);
-          } else if (n is ScrollUpdateNotification) {
-            _onWheelScrollUpdate(index);
-          } else if (n is ScrollEndNotification) {
-            _onWheelScrollEnd(index);
-          }
-          return false;
-        },
-        child: GestureDetector(
-          onTapDown  : (_) => _onWheelScrollStart(index),
-          onTapUp    : (_) => _onWheelScrollEnd(index),
-          behavior   : HitTestBehavior.opaque,
-          child: ListWheelScrollView.useDelegate(
-            controller   : _scrollControllers[index],
-            itemExtent   : height * 0.40,
-            perspective  : 0.001,
-            diameterRatio: 1.5,
-            physics      : const FixedExtentScrollPhysics(),
-            onSelectedItemChanged: (_) => HapticFeedback.selectionClick(),
-            childDelegate: ListWheelChildBuilderDelegate(
-              builder: (context, idx) {
-                final displayNumber = (idx % 10 + 10) % 10;
-                return Center(
-                  child: AnimatedBuilder(
-                    animation: _textOpacityAnimations[index],
-                    builder: (context, child) {
-                      return Transform.translate(
-                        offset: isActive ? Offset.zero : _textDriftOffsets[index],
-                        child: Opacity(
-                          opacity: isActive ? 1.0 : _textOpacityAnimations[index].value,
-                          child: Text(
-                            '$displayNumber',
-                            style: TextStyle(
-                              fontSize  : height * 0.30,
-                              fontWeight: FontWeight.w900,
-                              color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
-                              height: 1.0,
-                              shadows: isActive
-                                  ? [Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20)]
-                                  : [const Shadow(offset: Offset(1, 1), color: Colors.black26, blurRadius: 2)],
+          onNotification: (n) {
+            if (n is ScrollStartNotification) {
+              if (_scrollControllers[index].position == n.metrics) _onWheelScrollStart(index);
+            } else if (n is ScrollUpdateNotification) {
+              _onWheelScrollUpdate(index);
+            } else if (n is ScrollEndNotification) {
+              _onWheelScrollEnd(index);
+            }
+            return false;
+          },
+          child: GestureDetector(
+            onTapDown  : (_) => _onWheelScrollStart(index),
+            onTapUp    : (_) => _onWheelScrollEnd(index),
+            behavior   : HitTestBehavior.opaque,
+            child: ListWheelScrollView.useDelegate(
+              controller   : _scrollControllers[index],
+              itemExtent   : height * 0.40,
+              perspective  : 0.001,
+              diameterRatio: 1.5,
+              physics      : const FixedExtentScrollPhysics(),
+              onSelectedItemChanged: (_) => HapticFeedback.selectionClick(),
+              childDelegate: ListWheelChildBuilderDelegate(
+                builder: (context, idx) {
+                  final displayNumber = (idx % 10 + 10) % 10;
+                  return Center(
+                    child: AnimatedBuilder(
+                      animation: _textOpacityAnimations[index],
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: isActive ? Offset.zero : _textDriftOffsets[index],
+                          child: Opacity(
+                            opacity: isActive ? 1.0 : _textOpacityAnimations[index].value,
+                            child: Text(
+                              '$displayNumber',
+                              style: TextStyle(
+                                fontSize  : height * 0.30,
+                                fontWeight: FontWeight.w900,
+                                color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
+                                height: 1.0,
+                                shadows: isActive
+                                    ? [Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20)]
+                                    : [const Shadow(offset: Offset(1, 1), color: Colors.black26, blurRadius: 2)],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ),   // Listener
+        ),       // NotificationListener
+      ),         // Listener
     );
   }
 
