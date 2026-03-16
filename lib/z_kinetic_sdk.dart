@@ -750,13 +750,14 @@ class _ZKineticWidgetState extends State<ZKineticWidget>
 Widget ZKineticWidgetProdukB({
   required WidgetController controller,
   required DeviceDNA deviceDNA,
-  required void Function(bool) onSuccess,
-  required VoidCallback onFail,
+  void Function(bool)? onComplete,
+  void Function(bool)? onSuccess,
+  VoidCallback? onFail,
 }) {
   return ZKineticWidget(
     controller: controller,
     deviceDNA: deviceDNA,
-    onSuccess: onSuccess,
-    onFail: onFail,
+    onSuccess: onComplete ?? onSuccess ?? (bool result) {},
+    onFail: onFail ?? () {},
   );
 }
