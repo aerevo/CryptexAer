@@ -747,18 +747,77 @@ class _ZKineticWidgetState extends State<ZKineticWidget>
 // BACKWARD COMPATIBILITY - Nama lama untuk main.dart
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+class _ZKineticWidgetProdukBWrapper extends StatefulWidget {
+  final WidgetController controller;
+  final DeviceDNA? deviceDNA;
+  final void Function(bool)? onComplete;
+  final void Function(bool)? onSuccess;
+  final VoidCallback? onFail;
+  final VoidCallback? onCancel;
+
+  const _ZKineticWidgetProdukBWrapper({
+    required this.controller,
+    this.deviceDNA,
+    this.onComplete,
+    this.onSuccess,
+    this.onFail,
+    this.onCancel,
+  });
+
+  @override
+  State<_ZKineticWidgetProdukBWrapper> createState() => _ZKineticWidgetProdukBWrapperState();
+}
+
+class _ZKineticWidgetProdukBWrapperState extends State<_ZKineticWidgetProdukBWrapper> {
+  DeviceDNA? _deviceDNA;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeviceDNA();
+  }
+
+  Future<void> _initDeviceDNA() async {
+    if (widget.deviceDNA != null) {
+      _deviceDNA = widget.deviceDNA;
+    } else {
+      _deviceDNA = await DeviceDNA.collect(context);
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading || _deviceDNA == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ZKineticWidget(
+      controller: widget.controller,
+      deviceDNA: _deviceDNA!,
+      onSuccess: widget.onComplete ?? widget.onSuccess ?? (bool result) {},
+      onFail: widget.onFail ?? widget.onCancel ?? () {},
+    );
+  }
+}
+
 Widget ZKineticWidgetProdukB({
   required WidgetController controller,
-  required DeviceDNA deviceDNA,
+  DeviceDNA? deviceDNA,
   void Function(bool)? onComplete,
   void Function(bool)? onSuccess,
   VoidCallback? onFail,
   VoidCallback? onCancel,
 }) {
-  return ZKineticWidget(
+  return _ZKineticWidgetProdukBWrapper(
     controller: controller,
     deviceDNA: deviceDNA,
-    onSuccess: onComplete ?? onSuccess ?? (bool result) {},
-    onFail: onFail ?? onCancel ?? () {},
+    onComplete: onComplete,
+    onSuccess: onSuccess,
+    onFail: onFail,
+    onCancel: onCancel,
   );
 }
