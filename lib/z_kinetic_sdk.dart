@@ -742,3 +742,21 @@ class _ZKineticWidgetState extends State<ZKineticWidget>
     );
   }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BACKWARD COMPATIBILITY - Nama lama untuk main.dart
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Widget ZKineticWidgetProdukB({
+  required WidgetController controller,
+  required DeviceDNA deviceDNA,
+  required void Function(bool) onSuccess,
+  required VoidCallback onFail,
+}) {
+  return ZKineticWidget(
+    controller: controller,
+    deviceDNA: deviceDNA,
+    onSuccess: onSuccess,
+    onFail: onFail,
+  );
+}
