@@ -245,69 +245,131 @@ class WidgetController {
       ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        _sessionToken = data['token'] as String;
+        final data   = json.decode(response.body);
+        final token  = data['token']  as String?;
+        final expMs  = data['expiry'] as int?;
 
-        // 4. Simpan token & expiry time dalam secure storage
-        final expiry = DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch;
-        await _storage.write(key: 'zk_token_$appId',  value: _sessionToken);
-        await _storage.write(key: 'zk_expiry_$appId', value: expiry.toString());
-
-        debugPrint('✅ Token baru diterima & disimpan: ${_sessionToken!.substring(0, 16)}...');
-        return true;
+        if (token != null && expMs != null) {
+          // 4. Simpan dalam secure storage (encrypted)
+          await _storage.write(key: 'zk_token_$appId',  value: token);
+          await _storage.write(key: 'zk_expiry_$appId', value: expMs.toString());
+          _sessionToken = token;
+          debugPrint('✅ Token baru disimpan');
+          return true;
+        }
       }
 
-      debugPrint('❌ Bootstrap gagal: ${response.statusCode}');
+      debugPrint('🔒 Bootstrap gagal: ${response.statusCode}');
       return false;
 
     } catch (e) {
-      debugPrint('❌ Bootstrap error: $e');
+      debugPrint('🔒 Bootstrap error: $e');
       return false;
     }
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // FETCH CHALLENGE — panggil selepas bootstrap
+  // FETCH CHALLENGE
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Future<void> fetchChallenge() async {
+  Future<bool> fetchChallenge() async {
     if (_sessionToken == null) {
-      debugPrint('❌ fetchChallenge: token takde — panggil bootstrap dulu');
-      return;
+      debugPrint('🔒 Tiada session token');
+      return false;
     }
-
     try {
       final response = await http.post(
-        Uri.parse('$_serverUrl/challenge'),
+        Uri.parse('$_serverUrl/getChallenge'),
         headers: {
-          'Content-Type' : 'application/json',
-          'Authorization': 'Bearer $_sessionToken',
+          'Content-Type'   : 'application/json',
+          'x-session-token': _sessionToken!,
         },
-      ).timeout(const Duration(seconds: 8));
+        body: json.encode({}),
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _currentNonce = data['nonce'] as String;
-        final digitList = (data['digits'] as List).cast<int>();
-
-        challengeCode.value = digitList;
-        _challengeStartTime = DateTime.now();
-        gestureAudit.clear();
-        _touchTimestamps.clear();
-        _scrollVelocities.clear();
-
-        debugPrint('✅ Challenge: $digitList (nonce: $_currentNonce)');
-      } else {
-        debugPrint('❌ fetchChallenge gagal: ${response.statusCode}');
+        if (data['challengeCode'] != null && data['nonce'] != null) {
+          _currentNonce = data['nonce'];
+          challengeCode.value =
+              (data['challengeCode'] as List<dynamic>).map((e) => e as int).toList();
+          _touchTimestamps.clear();
+          _scrollVelocities.clear();
+          _challengeStartTime = DateTime.now();
+          gestureAudit.clear();
+          return true;
+        }
       }
+
+      // Token expired — clear dan perlu bootstrap semula
+      if (response.statusCode == 401) {
+        await _storage.delete(key: 'zk_token_$appId');
+        await _storage.delete(key: 'zk_expiry_$appId');
+        _sessionToken = null;
+      }
+
+      return false;
     } catch (e) {
-      debugPrint('❌ fetchChallenge error: $e');
+      debugPrint('🔒 Network error - DENY: $e');
+      return false;
+    }
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // VERIFY
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Future<Map<String, dynamic>> verify(
+    List<int> userAnswer,
+    List<FixedExtentScrollController> controllers,
+    DeviceDNA deviceDNA,
+  ) async {
+    if (_sessionToken == null) {
+      return {'allowed': false, 'error': 'Tiada sesi aktif.'};
+    }
+    if (challengeCode.value.isEmpty || _currentNonce == null) {
+      return {'allowed': false, 'error': 'Tiada cabaran aktif.'};
+    }
+    if (gestureAudit.isTampered(controllers)) {
+      debugPrint('🚨 Tamper detected!');
+      return {'allowed': false, 'error': 'Aktiviti mencurigakan.', 'reason': 'TAMPER_DETECTED'};
+    }
+
+    final solveTimeMs = _challengeStartTime != null
+        ? DateTime.now().difference(_challengeStartTime!).inMilliseconds : 0;
+
+    final rawBehaviour = RawBehaviourData(
+      touchTimestamps : List.from(_touchTimestamps),
+      scrollVelocities: List.from(_scrollVelocities),
+      solveTimeMs     : solveTimeMs,
+    );
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_serverUrl/attest'),
+        headers: {
+          'Content-Type'   : 'application/json',
+          'x-session-token': _sessionToken!,
+        },
+        body: json.encode({
+          'nonce'       : _currentNonce,
+          'userAnswer'  : userAnswer,
+          'deviceDNA'   : deviceDNA.toJson(),
+          'rawBehaviour': rawBehaviour.toJson(),
+        }),
+      ).timeout(const Duration(seconds: 3));
+
+      if (response.statusCode == 200) return json.decode(response.body);
+      return {'allowed': false, 'error': 'Server error ${response.statusCode}.'};
+    } catch (e) {
+      return {'allowed': false, 'error': 'Tiada sambungan. Cuba semula.'};
     }
   }
 
   void registerTouch() {
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    _touchTimestamps.add(ts);
-    if (_touchTimestamps.length > 20) _touchTimestamps.removeAt(0);
+    if (_challengeStartTime != null) {
+      final elapsed = DateTime.now().difference(_challengeStartTime!).inMilliseconds;
+      _touchTimestamps.add(elapsed);
+      if (_touchTimestamps.length > 20) _touchTimestamps.removeAt(0);
+    }
   }
 
   void registerScroll(double velocity) {
@@ -315,75 +377,407 @@ class WidgetController {
     if (_scrollVelocities.length > 20) _scrollVelocities.removeAt(0);
   }
 
-  Future<Map<String, dynamic>> verify(
-    List<int> userAnswer,
-    List<FixedExtentScrollController> controllers,
-    DeviceDNA deviceDNA,
-  ) async {
-    if (_sessionToken == null || _currentNonce == null) {
-      return {'allowed': false, 'error': 'Session tidak valid'};
-    }
-
-    try {
-      final solveTimeMs = _challengeStartTime != null
-          ? DateTime.now().difference(_challengeStartTime!).inMilliseconds
-          : 0;
-
-      final rawData = RawBehaviourData(
-        touchTimestamps : _touchTimestamps,
-        scrollVelocities: _scrollVelocities,
-        solveTimeMs     : solveTimeMs,
-      );
-
-      final tampered = gestureAudit.isTampered(controllers);
-
-      final response = await http.post(
-        Uri.parse('$_serverUrl/verify'),
-        headers: {
-          'Content-Type' : 'application/json',
-          'Authorization': 'Bearer $_sessionToken',
-        },
-        body: json.encode({
-          'nonce'      : _currentNonce,
-          'userAnswer' : userAnswer,
-          'rawData'    : rawData.toJson(),
-          'deviceDNA'  : deviceDNA.toJson(),
-          'tampered'   : tampered,
-          'motionScore': motionScore.value,
-        }),
-      ).timeout(const Duration(seconds: 8));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        debugPrint('✅ verify: ${data['allowed']}');
-        return data;
-      } else {
-        debugPrint('❌ verify gagal: ${response.statusCode}');
-        return {'allowed': false, 'error': 'Server tolak'};
-      }
-    } catch (e) {
-      debugPrint('❌ verify error: $e');
-      return {'allowed': false, 'error': e.toString()};
-    }
-  }
+  void randomizeWheels() => randomizeTrigger.value++;
 
   void dispose() {
     _accelSub?.cancel();
     _decayTimer?.cancel();
+    challengeCode.dispose();
+    randomizeTrigger.dispose();
+    motionScore.dispose();
   }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// WIDGET
+// MAIN WIDGET
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-class ZKineticWidget extends StatefulWidget {
+class ZKineticWidgetProdukB extends StatefulWidget {
+  final WidgetController controller;
+  final Function(bool success) onComplete;
+  final VoidCallback? onCancel;
+
+  const ZKineticWidgetProdukB({
+    super.key,
+    required this.controller,
+    required this.onComplete,
+    this.onCancel,
+  });
+
+  @override
+  State<ZKineticWidgetProdukB> createState() => _ZKineticWidgetProdukBState();
+}
+
+class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
+  bool _loading = true;
+  bool _networkError = false;
+  DeviceDNA? _deviceDNA;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    // Bootstrap dulu — dapatkan session token
+    final bootstrapOk = await widget.controller.bootstrap();
+    if (!bootstrapOk) {
+      if (mounted) setState(() { _loading = false; _networkError = true; });
+      return;
+    }
+
+    _deviceDNA = await DeviceDNA.collect(context);
+    final success = await widget.controller.fetchChallenge();
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _networkError = !success;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_networkError) return _buildNetworkErrorScreen();
+
+    return Container(
+      color: Colors.black.withOpacity(0.95),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.only(top: 14, bottom: 8, left: 16, right: 16),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF5722),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 30, spreadRadius: 5, offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Z-KINETIC',
+                  style: TextStyle(
+                    fontSize: 28, fontWeight: FontWeight.w900,
+                    color: Colors.white, letterSpacing: 3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_user, color: Colors.greenAccent, size: 14),
+                      SizedBox(width: 6),
+                      Text(
+                        'INTELLIGENT-GRADE BIOMETRIC LOCK',
+                        style: TextStyle(
+                          fontSize: 8, color: Colors.white,
+                          letterSpacing: 0.8, fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                UltimateRGBGlitchDisplay(controller: widget.controller),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please match the code',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                const SizedBox(height: 10),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.all(40.0),
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
+                else if (_deviceDNA != null)
+                  UltimateCryptexLock(
+                    controller: widget.controller,
+                    deviceDNA: _deviceDNA!,
+                    onSuccess: (success) => widget.onComplete(success),
+                    onFail: () => widget.onComplete(false),
+                  ),
+                const SizedBox(height: 10),
+                _buildBiometricPanel(),
+                const SizedBox(height: 6),
+                if (widget.onCancel != null)
+                  TextButton(
+                    onPressed: widget.onCancel,
+                    child: const Text('Cancel',
+                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNetworkErrorScreen() {
+    return Container(
+      color: Colors.black.withOpacity(0.95),
+      child: Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: const Color(0xFF263238),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.5), width: 2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 80, color: Colors.redAccent),
+              const SizedBox(height: 24),
+              const Text(
+                'SAMBUNGAN DIPERLUKAN',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.bold,
+                  color: Colors.white, letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Z-Kinetic memerlukan sambungan internet untuk pengesahan selamat.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  setState(() { _loading = true; _networkError = false; });
+                  await _initialize();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Cuba Semula'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF5722),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (widget.onCancel != null)
+                TextButton(
+                  onPressed: widget.onCancel,
+                  child: const Text('Kembali', style: TextStyle(color: Colors.white54)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBiometricPanel() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF5722),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildIndicator(Icons.sensors, 'MOTION', widget.controller.motionScore),
+          _buildIndicator(Icons.touch_app, 'TOUCH',
+              ValueNotifier(widget.controller._touchTimestamps.length > 3 ? 0.8 : 0.3)),
+          _buildIndicator(Icons.fingerprint, 'PATTERN',
+              ValueNotifier(widget.controller._scrollVelocities.length > 3 ? 0.8 : 0.3)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIndicator(IconData icon, String label, ValueNotifier<double> notifier) {
+    return ValueListenableBuilder<double>(
+      valueListenable: notifier,
+      builder: (context, value, _) {
+        final isActive = value > 0.5;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: isActive ? Colors.greenAccent : Colors.white30),
+            const SizedBox(height: 3),
+            Text(label, style: TextStyle(
+              fontSize: 7, color: isActive ? Colors.greenAccent : Colors.white30,
+              fontWeight: FontWeight.bold, letterSpacing: 0.5,
+            )),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// RGB GLITCH DISPLAY
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class UltimateRGBGlitchDisplay extends StatefulWidget {
+  final WidgetController controller;
+  const UltimateRGBGlitchDisplay({super.key, required this.controller});
+
+  @override
+  State<UltimateRGBGlitchDisplay> createState() => _UltimateRGBGlitchDisplayState();
+}
+
+class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
+  Timer? _glitchTimer;
+  Timer? _noiseTimer;
+  bool   _isGlitching = false;
+  double _xOffset = 0.0, _yOffset = 0.0;
+  int    _noiseSeed = DateTime.now().millisecondsSinceEpoch;
+  final Random _random = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _glitchTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
+      if (!mounted) return;
+      setState(() {
+        _isGlitching = _random.nextDouble() > 0.7;
+        _xOffset = _random.nextDouble() * 3 - 1.5;
+        _yOffset = _random.nextDouble() * 2 - 1.0;
+      });
+    });
+    _noiseTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (mounted) setState(() => _noiseSeed = DateTime.now().millisecondsSinceEpoch);
+    });
+  }
+
+  @override
+  void dispose() {
+    _glitchTimer?.cancel();
+    _noiseTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      margin: EdgeInsets.zero,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.6), width: 2),
+        boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 10)],
+      ),
+      child: ValueListenableBuilder<List<int>>(
+        valueListenable: widget.controller.challengeCode,
+        builder: (context, code, _) {
+          if (code.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            );
+          }
+          final codeStr = code.join('');
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(child: CustomPaint(painter: _NoisePainter(seed: _noiseSeed))),
+                if (_isGlitching)
+                  Transform.translate(
+                    offset: Offset(_xOffset + 2, _yOffset),
+                    child: Text(codeStr, style: _glitchStyle(Colors.cyan)),
+                  ),
+                if (_isGlitching)
+                  Transform.translate(
+                    offset: Offset(-_xOffset - 2, -_yOffset),
+                    child: Text(codeStr, style: _glitchStyle(const Color(0xFFFF00FF))),
+                  ),
+                Text(codeStr, style: _glitchStyle(Colors.white)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  TextStyle _glitchStyle(Color color) => TextStyle(
+    fontSize: 28, fontWeight: FontWeight.bold,
+    fontFamily: 'Courier', letterSpacing: 8, color: color,
+  );
+}
+
+class _NoisePainter extends CustomPainter {
+  final int seed;
+  _NoisePainter({required this.seed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng   = Random(seed);
+    final paint = Paint()..strokeWidth = 0.8..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < 8; i++) {
+      paint.color = Colors.white.withOpacity(rng.nextDouble() * 0.12 + 0.03);
+      canvas.drawLine(
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        paint,
+      );
+    }
+    for (int g = 0; g < 3; g++) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: rng.nextInt(10).toString(),
+          style: TextStyle(
+            fontSize: 14 + rng.nextDouble() * 10,
+            color: Colors.white.withOpacity(rng.nextDouble() * 0.1 + 0.03),
+            fontWeight: FontWeight.bold, fontFamily: 'Courier',
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height));
+    }
+    final dotPaint = Paint()..style = PaintingStyle.fill;
+    for (int d = 0; d < 12; d++) {
+      dotPaint.color = Colors.white.withOpacity(rng.nextDouble() * 0.08 + 0.02);
+      canvas.drawCircle(
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        rng.nextDouble() * 1.5 + 0.3,
+        dotPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_NoisePainter old) => old.seed != seed;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CRYPTEX LOCK
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class UltimateCryptexLock extends StatefulWidget {
   final WidgetController controller;
   final DeviceDNA deviceDNA;
-  final void Function(bool) onSuccess;
+  final Function(bool) onSuccess;
   final VoidCallback onFail;
 
-  const ZKineticWidget({
+  const UltimateCryptexLock({
     super.key,
     required this.controller,
     required this.deviceDNA,
@@ -392,49 +786,45 @@ class ZKineticWidget extends StatefulWidget {
   });
 
   @override
-  State<ZKineticWidget> createState() => _ZKineticWidgetState();
+  State<UltimateCryptexLock> createState() => _UltimateCryptexLockState();
 }
 
-class _ZKineticWidgetState extends State<ZKineticWidget>
+class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     with TickerProviderStateMixin {
-  final _random = Random();
   static const double imageWidth  = ZKineticConfig.imageWidth3;
   static const double imageHeight = ZKineticConfig.imageHeight3;
-  static const wheelCoords        = ZKineticConfig.coords3;
-  static const buttonCoords       = ZKineticConfig.btnCoords3;
+  static const List<List<double>> wheelCoords  = ZKineticConfig.coords3;
+  static const List<double>       buttonCoords = ZKineticConfig.btnCoords3;
 
-  final List<FixedExtentScrollController> _scrollControllers = [];
-  final List<AnimationController> _textOpacityControllers    = [];
-  final List<Animation<double>>   _textOpacityAnimations     = [];
-  final List<Offset>              _textDriftOffsets          = [Offset.zero, Offset.zero, Offset.zero];
-  final List<int>                 _prevItems                 = [0, 0, 0];
-
-  int? _activeWheelIndex;
-  Timer? _wheelActiveTimer;
-  Timer? _driftTimer;
+  late List<FixedExtentScrollController> _scrollControllers;
+  final List<int> _prevItems = [0, 0, 0];
   DateTime? _lastScrollTime;
-  bool _isButtonPressed = false;
-  int _percubaanSalah = 0;
 
-  // 🎯 TRACKING PAN UNTUK DETECT KELUAR DARI KAWASAN RODA
-  bool _isPanning = false;
-  int? _panningWheelIndex;
+  int?   _activeWheelIndex;
+  Timer? _wheelActiveTimer;
+  bool   _isButtonPressed = false;
+  final Random _random = Random();
+
+  late List<AnimationController> _textOpacityControllers;
+  late List<Animation<double>>   _textOpacityAnimations;
+  final List<Offset> _textDriftOffsets = [Offset.zero, Offset.zero, Offset.zero];
+  Timer? _driftTimer;
+  int _percubaanSalah = 0; // Kaunter 3 Nyawa
 
   @override
   void initState() {
     super.initState();
-    for (int i = 0; i < 3; i++) {
-      _scrollControllers.add(FixedExtentScrollController(initialItem: 5));
-      _prevItems[i] = 5;
+    _scrollControllers = List.generate(3, (i) => FixedExtentScrollController(initialItem: 0));
 
-      final controller = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 500),
-      )..repeat(reverse: true);
+    _textOpacityControllers = List.generate(3, (i) =>
+      AnimationController(duration: const Duration(milliseconds: 800), vsync: this)
+        ..repeat(reverse: true));
 
-      _textOpacityControllers.add(controller);
-      _textOpacityAnimations.add(Tween<double>(begin: 0.3, end: 0.8).animate(controller));
-    }
+    _textOpacityAnimations = _textOpacityControllers
+        .map((c) => Tween<double>(begin: 0.75, end: 1.0)
+            .animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)))
+        .toList();
+
     _startDriftTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) => _playSlotMachineIntro());
   }
@@ -505,62 +895,18 @@ class _ZKineticWidgetState extends State<ZKineticWidget>
     });
   }
 
-  // 🎯 DETECT BILA JARI KELUAR DARI KAWASAN RODA
-  bool _isInsideWheel(int wheelIndex, Offset localPosition) {
-    final coords = wheelCoords[wheelIndex];
-    final left   = coords[0];
-    final top    = coords[1];
-    final right  = coords[2];
-    final bottom = coords[3];
+void _forceStopWheel(int index) {
+  final controller = _scrollControllers[index];
 
-    return localPosition.dx >= left &&
-           localPosition.dx <= right &&
-           localPosition.dy >= top &&
-           localPosition.dy <= bottom;
-  }
+  if (!controller.hasClients) return;
 
-  void _handlePanStart(int wheelIndex, DragStartDetails details) {
-    _isPanning = true;
-    _panningWheelIndex = wheelIndex;
-    _onWheelScrollStart(wheelIndex);
-  }
+  final position = controller.position;
 
-  void _handlePanUpdate(int wheelIndex, DragUpdateDetails details, RenderBox box) {
-    if (!_isPanning || _panningWheelIndex != wheelIndex) return;
+  position.jumpTo(position.pixels);
+  position.hold(() {});
+}
 
-    // Convert global position to local position dalam Stack
-    final localPosition = box.globalToLocal(details.globalPosition);
-
-    // Check sama ada masih dalam kawasan roda
-    if (!_isInsideWheel(wheelIndex, localPosition)) {
-      // 🛑 JARI DAH KELUAR! Hentikan scroll dengan settle
-      _forceStopWheel(wheelIndex);
-      _isPanning = false;
-      _panningWheelIndex = null;
-    }
-  }
-
-  void _handlePanEnd(int wheelIndex, DragEndDetails details) {
-    _isPanning = false;
-    _panningWheelIndex = null;
-    _onWheelScrollEnd(wheelIndex);
-  }
-
-  void _forceStopWheel(int wheelIndex) {
-    // Force settle to nearest item dengan animasi halus
-    if (_scrollControllers[wheelIndex].hasClients) {
-      final currentItem = _scrollControllers[wheelIndex].selectedItem;
-      _scrollControllers[wheelIndex].animateToItem(
-        currentItem,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-      HapticFeedback.lightImpact();
-    }
-    _onWheelScrollEnd(wheelIndex);
-  }
-
-  Future<void> _onButtonTap() async {
+ Future<void> _onButtonTap() async {
     setState(() => _isButtonPressed = true);
     HapticFeedback.mediumImpact();
     await Future.delayed(const Duration(milliseconds: 100));
@@ -640,184 +986,100 @@ class _ZKineticWidgetState extends State<ZKineticWidget>
     );
   }
 
-  Widget _buildWheel(int index) {
-    final coords      = wheelCoords[index];
-    final double left   = coords[0];
-    final double top    = coords[1];
-    final double width  = coords[2] - coords[0];
-    final double height = coords[3] - coords[1];
-    final isActive    = _activeWheelIndex == index;
+Widget _buildWheel(int index) {
+  final coords = wheelCoords[index];
 
-    return Positioned(
-      left: left, top: top, width: width, height: height,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (n) {
-          if (n is ScrollStartNotification) {
-            if (_scrollControllers[index].position == n.metrics) _onWheelScrollStart(index);
-          } else if (n is ScrollUpdateNotification) {
-            _onWheelScrollUpdate(index);
-          } else if (n is ScrollEndNotification) {
-            _onWheelScrollEnd(index);
-          }
-          return false;
-        },
-        child: GestureDetector(
-          onTapDown: (_) => _onWheelScrollStart(index),
-          onTapUp: (_) => _onWheelScrollEnd(index),
-          // 🎯 TAMBAH PAN DETECTION UNTUK TRACK BILA KELUAR KAWASAN
-          onPanStart: (details) => _handlePanStart(index, details),
-          onPanUpdate: (details) {
-            // Dapatkan RenderBox untuk convert koordinat
-            final RenderBox? box = context.findRenderObject() as RenderBox?;
-            if (box != null) {
-              _handlePanUpdate(index, details, box);
+  final double left   = coords[0];
+  final double top    = coords[1];
+  final double width  = coords[2] - coords[0];
+  final double height = coords[3] - coords[1];
+
+  final isActive = _activeWheelIndex == index;
+
+  return Positioned(
+    left: left,
+    top: top,
+    width: width,
+    height: height,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        return Listener(
+          onPointerDown: (_) {
+            _onWheelScrollStart(index);
+          },
+
+          onPointerMove: (event) {
+            final local = event.localPosition;
+
+            final inside =
+                local.dx >= 0 &&
+                local.dy >= 0 &&
+                local.dx <= constraints.maxWidth &&
+                local.dy <= constraints.maxHeight;
+
+            if (!inside) {
+              _forceStopWheel(index);
+              _onWheelScrollEnd(index);
             }
           },
-          onPanEnd: (details) => _handlePanEnd(index, details),
-          behavior: HitTestBehavior.opaque,
-          child: ListWheelScrollView.useDelegate(
-            controller: _scrollControllers[index],
-            itemExtent: height * 0.40,
-            perspective: 0.001,
-            diameterRatio: 1.5,
-            physics: const FixedExtentScrollPhysics(),
-            onSelectedItemChanged: (_) => HapticFeedback.selectionClick(),
-            childDelegate: ListWheelChildBuilderDelegate(
-              builder: (context, idx) {
-                final displayNumber = (idx % 10 + 10) % 10;
-                return Center(
-                  child: AnimatedBuilder(
-                    animation: _textOpacityAnimations[index],
-                    builder: (context, child) {
-                      return Transform.translate(
-                        offset: isActive ? Offset.zero : _textDriftOffsets[index],
-                        child: Opacity(
-                          opacity: isActive ? 1.0 : _textOpacityAnimations[index].value,
-                          child: Text(
-                            '$displayNumber',
-                            style: TextStyle(
-                              fontSize: height * 0.30,
-                              fontWeight: FontWeight.w900,
-                              color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
-                              height: 1.0,
-                              shadows: isActive
-                                  ? [Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20)]
-                                  : [const Shadow(offset: Offset(1, 1), color: Colors.black26, blurRadius: 2)],
+
+          onPointerUp: (_) {
+            _onWheelScrollEnd(index);
+          },
+
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n is ScrollUpdateNotification) {
+                _onWheelScrollUpdate(index);
+              }
+              return false;
+            },
+
+            child: ListWheelScrollView.useDelegate(
+              controller: _scrollControllers[index],
+              itemExtent: height * 0.40,
+              perspective: 0.001,
+              diameterRatio: 2.0,
+              
+              physics: const FixedExtentScrollPhysics(),
+
+              childDelegate: ListWheelChildBuilderDelegate(
+                builder: (context, i) {
+
+                  final displayNumber = (i % 10 + 10) % 10;
+
+                  return Center(
+                    child: AnimatedBuilder(
+                      animation: _textOpacityAnimations[index],
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: isActive
+                              ? Offset.zero
+                              : _textDriftOffsets[index],
+                          child: Opacity(
+                            opacity: isActive
+                                ? 1.0
+                                : _textOpacityAnimations[index].value,
+                            child: Text(
+                              '$displayNumber',
+                              style: TextStyle(
+                                fontSize: height * 0.18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGlowingButton() {
-    return Positioned(
-      left  : buttonCoords[0],
-      top   : buttonCoords[1],
-      width : buttonCoords[2] - buttonCoords[0],
-      height: buttonCoords[3] - buttonCoords[1],
-      child : GestureDetector(
-        onTap: _onButtonTap,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: Colors.transparent,
-            boxShadow: _isButtonPressed
-                ? []
-                : [BoxShadow(
-                    color: const Color(0xFFFF5722).withOpacity(0.5),
-                    blurRadius: 20, spreadRadius: 2,
-                  )],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// BACKWARD COMPATIBILITY - Nama lama untuk main.dart
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-class _ZKineticWidgetProdukBWrapper extends StatefulWidget {
-  final WidgetController controller;
-  final DeviceDNA? deviceDNA;
-  final void Function(bool)? onComplete;
-  final void Function(bool)? onSuccess;
-  final VoidCallback? onFail;
-  final VoidCallback? onCancel;
-
-  const _ZKineticWidgetProdukBWrapper({
-    required this.controller,
-    this.deviceDNA,
-    this.onComplete,
-    this.onSuccess,
-    this.onFail,
-    this.onCancel,
-  });
-
-  @override
-  State<_ZKineticWidgetProdukBWrapper> createState() => _ZKineticWidgetProdukBWrapperState();
-}
-
-class _ZKineticWidgetProdukBWrapperState extends State<_ZKineticWidgetProdukBWrapper> {
-  DeviceDNA? _deviceDNA;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _initDeviceDNA();
-  }
-
-  Future<void> _initDeviceDNA() async {
-    if (widget.deviceDNA != null) {
-      _deviceDNA = widget.deviceDNA;
-    } else {
-      _deviceDNA = await DeviceDNA.collect(context);
-    }
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading || _deviceDNA == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return ZKineticWidget(
-      controller: widget.controller,
-      deviceDNA: _deviceDNA!,
-      onSuccess: widget.onComplete ?? widget.onSuccess ?? (bool result) {},
-      onFail: widget.onFail ?? widget.onCancel ?? () {},
-    );
-  }
-}
-
-Widget ZKineticWidgetProdukB({
-  required WidgetController controller,
-  DeviceDNA? deviceDNA,
-  void Function(bool)? onComplete,
-  void Function(bool)? onSuccess,
-  VoidCallback? onFail,
-  VoidCallback? onCancel,
-}) {
-  return _ZKineticWidgetProdukBWrapper(
-    controller: controller,
-    deviceDNA: deviceDNA,
-    onComplete: onComplete,
-    onSuccess: onSuccess,
-    onFail: onFail,
-    onCancel: onCancel,
+        );
+      },
+    ),
   );
 }
+
