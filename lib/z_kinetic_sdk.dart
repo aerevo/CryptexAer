@@ -639,25 +639,24 @@ class UltimateRGBGlitchDisplay extends StatefulWidget {
   State<UltimateRGBGlitchDisplay> createState() => _UltimateRGBGlitchDisplayState();
 }
 
-class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
-  Timer? _glitchTimer;
+class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay>
+    with SingleTickerProviderStateMixin {
   Timer? _noiseTimer;
-  bool   _isGlitching = false;
-  double _xOffset = 0.0, _yOffset = 0.0;
   int    _noiseSeed = DateTime.now().millisecondsSinceEpoch;
-  final Random _random = Random();
+
+  // Pulse animation — mirrors zk-np keyframe (1.8s ease-in-out infinite)
+  late AnimationController _pulseCtrl;
+  late Animation<double>   _pulseAnim;
 
   @override
   void initState() {
     super.initState();
-    _glitchTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
-      if (!mounted) return;
-      setState(() {
-        _isGlitching = _random.nextDouble() > 0.7;
-        _xOffset = _random.nextDouble() * 3 - 1.5;
-        _yOffset = _random.nextDouble() * 2 - 1.0;
-      });
-    });
+    _pulseCtrl = AnimationController(
+      duration: const Duration(milliseconds: 1800),
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnim = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
+
     _noiseTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
       if (mounted) setState(() => _noiseSeed = DateTime.now().millisecondsSinceEpoch);
     });
@@ -665,48 +664,79 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
 
   @override
   void dispose() {
-    _glitchTimer?.cancel();
+    _pulseCtrl.dispose();
     _noiseTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      margin: EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.6), width: 2),
-        boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 10)],
-      ),
+    return AnimatedBuilder(
+      animation: _pulseAnim,
+      builder: (context, child) {
+        final t = _pulseAnim.value; // 0.0 → 1.0 → 0.0
+
+        // Mirror zk-np: 0%/100% = dim, 50% = bright
+        final innerBlur   = 18.0 + (30.0 - 18.0) * t;
+        final innerAlpha  = 0.40 + (0.70 - 0.40) * t;
+        final outerBlur   = 35.0 + (60.0 - 35.0) * t;
+        final outerAlpha  = 0.20 + (0.40 - 0.20) * t;
+        final borderAlpha = 0.55 + (0.85 - 0.55) * t;
+
+        return Container(
+          height: 72,                                              // ~60px web equiv.
+          margin: const EdgeInsets.symmetric(horizontal: 40),     // margin: 0 40px 8px
+          decoration: BoxDecoration(
+            color: const Color(0xFF3E2723),                       // dark brown bg
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Color.fromRGBO(255, 140, 0, borderAlpha),    // orange border pulse
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(                                           // inner orange glow
+                color: Color.fromRGBO(255, 100, 0, innerAlpha),
+                blurRadius: innerBlur,
+              ),
+              BoxShadow(                                           // outer red-orange glow
+                color: Color.fromRGBO(255, 60, 0, outerAlpha),
+                blurRadius: outerBlur,
+                spreadRadius: -4,
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
       child: ValueListenableBuilder<List<int>>(
         valueListenable: widget.controller.challengeCode,
         builder: (context, code, _) {
-          if (code.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-            );
-          }
-          final codeStr = code.join('');
           return ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Positioned.fill(child: CustomPaint(painter: _NoisePainter(seed: _noiseSeed))),
-                if (_isGlitching)
-                  Transform.translate(
-                    offset: Offset(_xOffset + 2, _yOffset),
-                    child: Text(codeStr, style: _glitchStyle(Colors.cyan)),
+                // Layer 0 — noise canvas (z-index:0)
+                Positioned.fill(
+                  child: CustomPaint(painter: _NoisePainter(seed: _noiseSeed)),
+                ),
+                // Layer 1 — scanline overlay (::after pseudo-element)
+                Positioned.fill(
+                  child: CustomPaint(painter: _ScanlinePainter()),
+                ),
+                // Layer 2 — digits (z-index:3)
+                if (code.isEmpty)
+                  const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                else
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (int i = 0; i < code.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 10),     // gap: 10px
+                        _buildDigit(code[i]),
+                      ],
+                    ],
                   ),
-                if (_isGlitching)
-                  Transform.translate(
-                    offset: Offset(-_xOffset - 2, -_yOffset),
-                    child: Text(codeStr, style: _glitchStyle(const Color(0xFFFF00FF))),
-                  ),
-                Text(codeStr, style: _glitchStyle(Colors.white)),
               ],
             ),
           );
@@ -715,10 +745,34 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
     );
   }
 
-  TextStyle _glitchStyle(Color color) => TextStyle(
-    fontSize: 28, fontWeight: FontWeight.bold,
-    fontFamily: 'Courier', letterSpacing: 8, color: color,
-  );
+  // Digit kotak — font default Flutter, neon glow 4-layer dari JS
+  Widget _buildDigit(int digit) {
+    return SizedBox(
+      width: 40,
+      height: 50,
+      child: Center(
+        child: Text(
+          '$digit',
+          style: const TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            height: 1.0,
+            shadows: [
+              // text-shadow layer 1 — white core glow
+              Shadow(color: Color.fromRGBO(255, 255, 255, 0.95), blurRadius: 6),
+              // text-shadow layer 2 — amber glow
+              Shadow(color: Color.fromRGBO(255, 160, 0, 0.85),  blurRadius: 14),
+              // text-shadow layer 3 — orange mid glow
+              Shadow(color: Color.fromRGBO(255, 100, 0, 0.60),  blurRadius: 28),
+              // text-shadow layer 4 — red-orange far glow
+              Shadow(color: Color.fromRGBO(255, 60,  0, 0.30),  blurRadius: 50),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _NoisePainter extends CustomPainter {
@@ -765,6 +819,32 @@ class _NoisePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_NoisePainter old) => old.seed != seed;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SCANLINE OVERLAY PAINTER
+// Mirrors .zk-codebox::after — repeating-linear-gradient(0deg)
+// transparent 2px / rgba(255,255,255,0.018) 1px, repeat every 3px
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class _ScanlinePainter extends CustomPainter {
+  const _ScanlinePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color.fromRGBO(255, 255, 255, 0.018)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    // 1 visible line per 3px — matches CSS repeating-linear-gradient
+    for (double y = 2.0; y < size.height; y += 3.0) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScanlinePainter old) => false;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -975,6 +1055,18 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     );
   }
 
+  // Snap roda ke item terdekat — dipanggil bila jari keluar dari kawasan roda
+  void _snapWheelToStop(int index) {
+    if (!_scrollControllers[index].hasClients) return;
+    final current = _scrollControllers[index].selectedItem;
+    _scrollControllers[index].animateToItem(
+      current,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+    _onWheelScrollEnd(index);
+  }
+
   Widget _buildWheel(int index) {
     final coords      = wheelCoords[index];
     final double left   = coords[0];
@@ -985,7 +1077,15 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
 
     return Positioned(
       left: left, top: top, width: width, height: height,
-      child: NotificationListener<ScrollNotification>(
+      child: Listener(
+        // Bila jari bergerak keluar dari sempadan Y roda → mula berhenti
+        onPointerMove: (event) {
+          final dy = event.localPosition.dy;
+          if (dy < 0 || dy > height) {
+            _snapWheelToStop(index);
+          }
+        },
+        child: NotificationListener<ScrollNotification>(
         onNotification: (n) {
           if (n is ScrollStartNotification) {
             if (_scrollControllers[index].position == n.metrics) _onWheelScrollStart(index);
@@ -1039,7 +1139,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
             ),
           ),
         ),
-      ),
+      ),   // Listener
     );
   }
 
