@@ -145,6 +145,11 @@ class WidgetController {
   final ValueNotifier<int> randomizeTrigger    = ValueNotifier(0);
   final GestureAudit gestureAudit = GestureAudit();
 
+  // ── Bio latch: hijau kekal selepas trigger sekali ──────────────────────
+  final ValueNotifier<bool> motionLatched  = ValueNotifier(false);
+  final ValueNotifier<bool> touchLatched   = ValueNotifier(false);
+  final ValueNotifier<bool> patternLatched = ValueNotifier(false);
+
   final List<int>    _touchTimestamps  = [];
   final List<double> _scrollVelocities = [];
   DateTime? _challengeStartTime;
@@ -168,6 +173,7 @@ class WidgetController {
       final delta = (magnitude - _lastMagnitude).abs();
       if (delta > 0.3) {
         motionScore.value = (delta / 3.0).clamp(0.0, 1.0);
+        motionLatched.value = true; // latch — kekal hijau
         _lastMotionTime = DateTime.now();
       }
       _lastMagnitude = magnitude;
@@ -369,12 +375,14 @@ class WidgetController {
       final elapsed = DateTime.now().difference(_challengeStartTime!).inMilliseconds;
       _touchTimestamps.add(elapsed);
       if (_touchTimestamps.length > 20) _touchTimestamps.removeAt(0);
+      touchLatched.value = true; // latch — kekal hijau selepas sentuh pertama
     }
   }
 
   void registerScroll(double velocity) {
     _scrollVelocities.add(velocity);
     if (_scrollVelocities.length > 20) _scrollVelocities.removeAt(0);
+    patternLatched.value = true; // latch — kekal hijau selepas scroll pertama
   }
 
   void randomizeWheels() => randomizeTrigger.value++;
@@ -385,6 +393,9 @@ class WidgetController {
     challengeCode.dispose();
     randomizeTrigger.dispose();
     motionScore.dispose();
+    motionLatched.dispose();
+    touchLatched.dispose();
+    patternLatched.dispose();
   }
 }
 
@@ -596,21 +607,18 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildIndicator(Icons.sensors, 'MOTION', widget.controller.motionScore),
-          _buildIndicator(Icons.touch_app, 'TOUCH',
-              ValueNotifier(widget.controller._touchTimestamps.length > 3 ? 0.8 : 0.3)),
-          _buildIndicator(Icons.fingerprint, 'PATTERN',
-              ValueNotifier(widget.controller._scrollVelocities.length > 3 ? 0.8 : 0.3)),
+          _buildIndicator(Icons.sensors,     'MOTION',  widget.controller.motionLatched),
+          _buildIndicator(Icons.touch_app,   'TOUCH',   widget.controller.touchLatched),
+          _buildIndicator(Icons.fingerprint, 'PATTERN', widget.controller.patternLatched),
         ],
       ),
     );
   }
 
-  Widget _buildIndicator(IconData icon, String label, ValueNotifier<double> notifier) {
-    return ValueListenableBuilder<double>(
+  Widget _buildIndicator(IconData icon, String label, ValueNotifier<bool> notifier) {
+    return ValueListenableBuilder<bool>(
       valueListenable: notifier,
-      builder: (context, value, _) {
-        final isActive = value > 0.5;
+      builder: (context, isActive, _) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -758,7 +766,7 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     for (int i = 0; i < code.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 10),
+                      if (i > 0) const SizedBox(width: 2),
                       _buildGlitchDigit('${code[i]}', i),
                     ],
                   ],
@@ -783,7 +791,7 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay>
       child: Transform.scale(
         scale: _scale[idx],
         child: SizedBox(
-          width: 40, height: 50,
+          width: 28, height: 50,
           child: Center(
             child: Text(
               digit,
