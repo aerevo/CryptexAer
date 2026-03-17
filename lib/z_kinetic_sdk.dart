@@ -811,6 +811,11 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   Timer? _driftTimer;
   int _percubaanSalah = 0; // Kaunter 3 Nyawa
 
+  // ─── FIX: Manual drag tracking untuk swipe terhad dalam kawasan roda ───
+  final List<double> _dragAccumulators = [0.0, 0.0, 0.0];
+  final List<bool>   _isDraggingWheel  = [false, false, false];
+  // ────────────────────────────────────────────────────────────────────────
+
   @override
   void initState() {
     super.initState();
@@ -895,18 +900,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     });
   }
 
-void _forceStopWheel(int index) {
-  final controller = _scrollControllers[index];
-
-  if (!controller.hasClients) return;
-
-  final position = controller.position;
-
-  position.jumpTo(position.pixels);
-  position.hold(() {});
-}
-
- Future<void> _onButtonTap() async {
+  Future<void> _onButtonTap() async {
     setState(() => _isButtonPressed = true);
     HapticFeedback.mediumImpact();
     await Future.delayed(const Duration(milliseconds: 100));
@@ -986,100 +980,152 @@ void _forceStopWheel(int index) {
     );
   }
 
-Widget _buildWheel(int index) {
-  final coords = wheelCoords[index];
+  // ─────────────────────────────────────────────────────────────────────────
+  // FIX: Swipe hanya berfungsi dalam kawasan roda sahaja.
+  //
+  // Pendekatan lama: ListWheelScrollView guna physics sendiri → Flutter track
+  // pointer secara global selepas drag start → scroll terus walaupun jari
+  // dah keluar dari kawasan roda.
+  //
+  // Pendekatan baru:
+  //   1. ListWheelScrollView pakai NeverScrollableScrollPhysics (disable scroll sendiri)
+  //   2. GestureDetector intercept semua drag secara manual
+  //   3. Dalam onVerticalDragUpdate, semak details.localPosition — kalau jari
+  //      keluar dari batas [0..width] × [0..height], terus stop dan snap ke
+  //      item semasa. Tidak terima sebarang update lagi sehingga drag baru.
+  // ─────────────────────────────────────────────────────────────────────────
+  Widget _buildWheel(int index) {
+    final coords      = wheelCoords[index];
+    final double left   = coords[0];
+    final double top    = coords[1];
+    final double width  = coords[2] - coords[0];
+    final double height = coords[3] - coords[1];
+    final isActive    = _activeWheelIndex == index;
+    final double itemExtent = height * 0.40;
 
-  final double left   = coords[0];
-  final double top    = coords[1];
-  final double width  = coords[2] - coords[0];
-  final double height = coords[3] - coords[1];
+    return Positioned(
+      left: left, top: top, width: width, height: height,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
 
-  final isActive = _activeWheelIndex == index;
+        onVerticalDragStart: (details) {
+          _isDraggingWheel[index]  = true;
+          _dragAccumulators[index] = 0.0;
+          _onWheelScrollStart(index);
+        },
 
-  return Positioned(
-    left: left,
-    top: top,
-    width: width,
-    height: height,
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        return Listener(
-          onPointerDown: (_) {
-            _onWheelScrollStart(index);
-          },
+        onVerticalDragUpdate: (details) {
+          // Abaikan kalau drag dah dibatalkan (jari keluar kawasan sebelum ni)
+          if (!_isDraggingWheel[index]) return;
 
-          onPointerMove: (event) {
-            final local = event.localPosition;
-
-            final inside =
-                local.dx >= 0 &&
-                local.dy >= 0 &&
-                local.dx <= constraints.maxWidth &&
-                local.dy <= constraints.maxHeight;
-
-            if (!inside) {
-              _forceStopWheel(index);
-              _onWheelScrollEnd(index);
-            }
-          },
-
-          onPointerUp: (_) {
+          // ── Semak sempadan: jika jari keluar dari kawasan roda, stop terus ──
+          final lp = details.localPosition;
+          if (lp.dx < 0 || lp.dx > width || lp.dy < 0 || lp.dy > height) {
+            _isDraggingWheel[index] = false;
+            // Snap ke item semasa dengan lembut
+            _scrollControllers[index].animateToItem(
+              _scrollControllers[index].selectedItem,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+            );
             _onWheelScrollEnd(index);
-          },
+            return;
+          }
 
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (n) {
-              if (n is ScrollUpdateNotification) {
-                _onWheelScrollUpdate(index);
-              }
-              return false;
-            },
+          // ── Scroll manual: kumpul delta → tukar item bila cukup satu langkah ──
+          _dragAccumulators[index] += details.delta.dy;
+          while (_dragAccumulators[index].abs() >= itemExtent) {
+            if (_dragAccumulators[index] > 0) {
+              _dragAccumulators[index] -= itemExtent;
+              _scrollControllers[index].jumpToItem(
+                _scrollControllers[index].selectedItem - 1,
+              );
+            } else {
+              _dragAccumulators[index] += itemExtent;
+              _scrollControllers[index].jumpToItem(
+                _scrollControllers[index].selectedItem + 1,
+              );
+            }
+          }
+          _onWheelScrollUpdate(index);
+        },
 
-            child: ListWheelScrollView.useDelegate(
-              controller: _scrollControllers[index],
-              itemExtent: height * 0.40,
-              perspective: 0.001,
-              diameterRatio: 2.0,
-              
-              physics: const FixedExtentScrollPhysics(),
+        onVerticalDragEnd: (_) {
+          if (!_isDraggingWheel[index]) return;
+          _isDraggingWheel[index] = false;
+          _onWheelScrollEnd(index);
+        },
 
-              childDelegate: ListWheelChildBuilderDelegate(
-                builder: (context, i) {
+        onVerticalDragCancel: () {
+          _isDraggingWheel[index] = false;
+          _onWheelScrollEnd(index);
+        },
 
-                  final displayNumber = (i % 10 + 10) % 10;
-
-                  return Center(
-                    child: AnimatedBuilder(
-                      animation: _textOpacityAnimations[index],
-                      builder: (context, child) {
-                        return Transform.translate(
-                          offset: isActive
-                              ? Offset.zero
-                              : _textDriftOffsets[index],
-                          child: Opacity(
-                            opacity: isActive
-                                ? 1.0
-                                : _textOpacityAnimations[index].value,
-                            child: Text(
-                              '$displayNumber',
-                              style: TextStyle(
-                                fontSize: height * 0.18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
+        child: ListWheelScrollView.useDelegate(
+          controller   : _scrollControllers[index],
+          itemExtent   : itemExtent,
+          perspective  : 0.001,
+          diameterRatio: 1.5,
+          // NeverScrollableScrollPhysics: disable scroll dalaman —
+          // semua pergerakan dikawal sepenuhnya oleh GestureDetector di atas
+          physics      : const NeverScrollableScrollPhysics(),
+          onSelectedItemChanged: (_) => HapticFeedback.selectionClick(),
+          childDelegate: ListWheelChildBuilderDelegate(
+            builder: (context, idx) {
+              final displayNumber = (idx % 10 + 10) % 10;
+              return Center(
+                child: AnimatedBuilder(
+                  animation: _textOpacityAnimations[index],
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: isActive ? Offset.zero : _textDriftOffsets[index],
+                      child: Opacity(
+                        opacity: isActive ? 1.0 : _textOpacityAnimations[index].value,
+                        child: Text(
+                          '$displayNumber',
+                          style: TextStyle(
+                            fontSize  : height * 0.30,
+                            fontWeight: FontWeight.w900,
+                            color: isActive ? const Color(0xFFFF5722) : const Color(0xFF263238),
+                            height: 1.0,
+                            shadows: isActive
+                                ? [Shadow(color: const Color(0xFFFF5722).withOpacity(0.8), blurRadius: 20)]
+                                : [const Shadow(offset: Offset(1, 1), color: Colors.black26, blurRadius: 2)],
                           ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
-        );
-      },
-    ),
-  );
-}
+        ),
+      ),
+    );
+  }
 
+  Widget _buildGlowingButton() {
+    return Positioned(
+      left  : buttonCoords[0],
+      top   : buttonCoords[1],
+      width : buttonCoords[2] - buttonCoords[0],
+      height: buttonCoords[3] - buttonCoords[1],
+      child : GestureDetector(
+        onTap: _onButtonTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.transparent,
+            boxShadow: _isButtonPressed
+                ? []
+                : [BoxShadow(
+                    color: const Color(0xFFFF5722).withOpacity(0.5),
+                    blurRadius: 20, spreadRadius: 2,
+                  )],
+          ),
+        ),
+      ),
+    );
+  }
+}
