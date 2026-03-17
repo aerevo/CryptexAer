@@ -811,10 +811,9 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   Timer? _driftTimer;
   int _percubaanSalah = 0; // Kaunter 3 Nyawa
 
-  // ─── FIX: Manual drag tracking untuk swipe terhad dalam kawasan roda ───
-  final List<double> _dragAccumulators = [0.0, 0.0, 0.0];
-  final List<bool>   _isDraggingWheel  = [false, false, false];
-  // ────────────────────────────────────────────────────────────────────────
+  // ─── Manual drag tracking: swipe terhad dalam kawasan roda + momentum iOS ───
+  final List<bool> _isDraggingWheel = [false, false, false];
+  // ──────────────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -981,26 +980,49 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // FIX: Swipe hanya berfungsi dalam kawasan roda sahaja.
+  // iOS-like smooth wheel: pixel scroll semasa drag + momentum fling on release
   //
-  // Pendekatan lama: ListWheelScrollView guna physics sendiri → Flutter track
-  // pointer secara global selepas drag start → scroll terus walaupun jari
-  // dah keluar dari kawasan roda.
-  //
-  // Pendekatan baru:
-  //   1. ListWheelScrollView pakai NeverScrollableScrollPhysics (disable scroll sendiri)
-  //   2. GestureDetector intercept semua drag secara manual
-  //   3. Dalam onVerticalDragUpdate, semak details.localPosition — kalau jari
-  //      keluar dari batas [0..width] × [0..height], terus stop dan snap ke
-  //      item semasa. Tidak terima sebarang update lagi sehingga drag baru.
+  // Cara kerja:
+  //   1. NeverScrollableScrollPhysics → disable physics dalaman ListWheel
+  //   2. onVerticalDragUpdate → jumpTo(offset - delta.dy) secara piksel
+  //      Sempadan check: jika localPosition keluar kawasan roda → stop + snap
+  //   3. onVerticalDragEnd → _snapWithMomentum() kira inertia dari primaryVelocity
+  //      dan animateToItem dengan Curves.decelerate (rasa iOS calendar)
   // ─────────────────────────────────────────────────────────────────────────
+
+  /// Snap ke item terdekat dengan momentum inertia.
+  /// [velocity] = pixels/sec dari primaryVelocity (+ = jari turun = scroll naik)
+  void _snapWithMomentum(int index, double velocity) {
+    final ctrl = _scrollControllers[index];
+    if (!ctrl.hasClients) return;
+
+    final coords     = wheelCoords[index];
+    final itemExtent = (coords[3] - coords[1]) * 0.40;
+
+    // Momentum: berapa item patut scroll lagi selepas lepas jari.
+    // Factor 0.25 = rasa iOS calendar (longgar tapi tak terlalu laju).
+    // Velocity positif = jari turun = offset kurang = item kurang (scroll naik).
+    final momentumItems = (velocity * 0.25 / itemExtent).round();
+    final targetItem    = ctrl.selectedItem - momentumItems;
+
+    // Tempoh animasi bergantung pada jarak — lebih jauh, lebih lama (max 550ms)
+    final itemDistance = (ctrl.selectedItem - targetItem).abs();
+    final duration = Duration(milliseconds: (200 + itemDistance * 40).clamp(200, 550));
+
+    ctrl.animateToItem(
+      targetItem,
+      duration: duration,
+      curve   : Curves.decelerate,
+    );
+  }
+
   Widget _buildWheel(int index) {
-    final coords      = wheelCoords[index];
-    final double left   = coords[0];
-    final double top    = coords[1];
-    final double width  = coords[2] - coords[0];
-    final double height = coords[3] - coords[1];
-    final isActive    = _activeWheelIndex == index;
+    final coords    = wheelCoords[index];
+    final double left       = coords[0];
+    final double top        = coords[1];
+    final double width      = coords[2] - coords[0];
+    final double height     = coords[3] - coords[1];
+    final isActive          = _activeWheelIndex == index;
     final double itemExtent = height * 0.40;
 
     return Positioned(
@@ -1009,55 +1031,43 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
         behavior: HitTestBehavior.opaque,
 
         onVerticalDragStart: (details) {
-          _isDraggingWheel[index]  = true;
-          _dragAccumulators[index] = 0.0;
+          _isDraggingWheel[index] = true;
           _onWheelScrollStart(index);
         },
 
         onVerticalDragUpdate: (details) {
-          // Abaikan kalau drag dah dibatalkan (jari keluar kawasan sebelum ni)
           if (!_isDraggingWheel[index]) return;
 
-          // ── Semak sempadan: jika jari keluar dari kawasan roda, stop terus ──
+          // ── Sempadan: jari keluar kawasan roda → snap + stop ──
           final lp = details.localPosition;
           if (lp.dx < 0 || lp.dx > width || lp.dy < 0 || lp.dy > height) {
             _isDraggingWheel[index] = false;
-            // Snap ke item semasa dengan lembut
-            _scrollControllers[index].animateToItem(
-              _scrollControllers[index].selectedItem,
-              duration: const Duration(milliseconds: 150),
-              curve: Curves.easeOut,
-            );
+            _snapWithMomentum(index, 0); // snap ke item terdekat tanpa momentum
             _onWheelScrollEnd(index);
             return;
           }
 
-          // ── Scroll manual: kumpul delta → tukar item bila cukup satu langkah ──
-          _dragAccumulators[index] += details.delta.dy;
-          while (_dragAccumulators[index].abs() >= itemExtent) {
-            if (_dragAccumulators[index] > 0) {
-              _dragAccumulators[index] -= itemExtent;
-              _scrollControllers[index].jumpToItem(
-                _scrollControllers[index].selectedItem - 1,
-              );
-            } else {
-              _dragAccumulators[index] += itemExtent;
-              _scrollControllers[index].jumpToItem(
-                _scrollControllers[index].selectedItem + 1,
-              );
-            }
+          // ── Scroll piksel terus (smooth, ikut jari) ──
+          final ctrl = _scrollControllers[index];
+          if (ctrl.hasClients) {
+            ctrl.jumpTo(
+              (ctrl.offset - details.delta.dy).clamp(0.0, double.infinity),
+            );
           }
           _onWheelScrollUpdate(index);
         },
 
-        onVerticalDragEnd: (_) {
+        onVerticalDragEnd: (details) {
           if (!_isDraggingWheel[index]) return;
           _isDraggingWheel[index] = false;
+          // primaryVelocity: pixels/sec. Positif = jari turun.
+          _snapWithMomentum(index, details.primaryVelocity ?? 0);
           _onWheelScrollEnd(index);
         },
 
         onVerticalDragCancel: () {
           _isDraggingWheel[index] = false;
+          _snapWithMomentum(index, 0);
           _onWheelScrollEnd(index);
         },
 
@@ -1066,8 +1076,6 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
           itemExtent   : itemExtent,
           perspective  : 0.001,
           diameterRatio: 1.5,
-          // NeverScrollableScrollPhysics: disable scroll dalaman —
-          // semua pergerakan dikawal sepenuhnya oleh GestureDetector di atas
           physics      : const NeverScrollableScrollPhysics(),
           onSelectedItemChanged: (_) => HapticFeedback.selectionClick(),
           childDelegate: ListWheelChildBuilderDelegate(
