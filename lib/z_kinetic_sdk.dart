@@ -639,48 +639,103 @@ class UltimateRGBGlitchDisplay extends StatefulWidget {
   State<UltimateRGBGlitchDisplay> createState() => _UltimateRGBGlitchDisplayState();
 }
 
-class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
+class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay>
+    with SingleTickerProviderStateMixin {
+
   Timer? _glitchTimer;
-  Timer? _noiseTimer;
-  bool   _isGlitching = false;
-  double _xOffset = 0.0, _yOffset = 0.0;
   int    _noiseSeed = DateTime.now().millisecondsSinceEpoch;
-  final Random _random = Random();
+  final  Random _random = Random();
+
+  // ── Neon pulse animation (1.8s ease-in-out loop) ──────────────────────
+  late AnimationController _pulseCtrl;
+  late Animation<double>   _pulseAnim;
+
+  // ── Per-digit independent glitch state ────────────────────────────────
+  // Setiap digit jitter, scale, chromatic aberration berbeza — ikut JS
+  final List<Offset> _jitter    = List.filled(3, Offset.zero);
+  final List<double> _scale     = List.filled(3, 1.0);
+  final List<double> _roOffset  = List.filled(3, 0.0); // red shadow x-offset
+  final List<double> _coOffset  = List.filled(3, 0.0); // cyan shadow x-offset
+  final List<double> _intensity = List.filled(3, 1.0); // shadow strength (p)
 
   @override
   void initState() {
     super.initState();
-    _glitchTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
+
+    // Neon pulse: box-shadow + border animate 1.8s ease-in-out infinite
+    _pulseCtrl = AnimationController(
+      duration: const Duration(milliseconds: 1800),
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnim = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
+
+    // Glitch + noise: 120ms — matching JS "ts - lastNoise > 120"
+    _glitchTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
       if (!mounted) return;
       setState(() {
-        _isGlitching = _random.nextDouble() > 0.7;
-        _xOffset = _random.nextDouble() * 3 - 1.5;
-        _yOffset = _random.nextDouble() * 2 - 1.0;
+        for (int i = 0; i < 3; i++) {
+          // Sama nilai JS: jx/jy ±2.5, sc 0.93-1.07, ro ±3, co ±2.5, p 0.75-1.0
+          _jitter[i]    = Offset(
+            (_random.nextDouble() - 0.5) * 5,
+            (_random.nextDouble() - 0.5) * 5,
+          );
+          _scale[i]     = 0.93 + _random.nextDouble() * 0.14;
+          _roOffset[i]  = (_random.nextDouble() - 0.5) * 6;
+          _coOffset[i]  = (_random.nextDouble() - 0.5) * 5;
+          _intensity[i] = 0.75 + _random.nextDouble() * 0.25;
+        }
+        _noiseSeed = DateTime.now().millisecondsSinceEpoch;
       });
-    });
-    _noiseTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
-      if (mounted) setState(() => _noiseSeed = DateTime.now().millisecondsSinceEpoch);
     });
   }
 
   @override
   void dispose() {
     _glitchTimer?.cancel();
-    _noiseTimer?.cancel();
+    _pulseCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      margin: EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.6), width: 2),
-        boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.3), blurRadius: 10)],
-      ),
+    return AnimatedBuilder(
+      animation: _pulseAnim,
+      builder: (context, child) {
+        final t = _pulseAnim.value;
+        // Border lerp: rgba(255,140,0,.55) → rgba(255,200,0,.85)
+        final borderColor = Color.lerp(
+          const Color(0xFFFF8C00).withOpacity(0.55),
+          const Color(0xFFFFC800).withOpacity(0.85),
+          t,
+        )!;
+        // BoxShadow glow lerp — 2 layer seperti JS zk-np keyframe
+        final glow1Opacity = 0.4  + 0.3  * t; // 0.4 → 0.7
+        final glow2Opacity = 0.2  + 0.2  * t; // 0.2 → 0.4
+        final blur1        = 18.0 + 12.0 * t; // 18 → 30
+        final blur2        = 35.0 + 25.0 * t; // 35 → 60
+
+        return Container(
+          height: 60,
+          // JS: margin: 0 40px 8px  →  horizontal 40
+          margin: const EdgeInsets.symmetric(horizontal: 40),
+          decoration: BoxDecoration(
+            color        : const Color(0xFF3E2723),
+            borderRadius : BorderRadius.circular(12),
+            border       : Border.all(color: borderColor, width: 1.5),
+            boxShadow    : [
+              BoxShadow(
+                color     : const Color(0xFFFF6400).withOpacity(glow1Opacity),
+                blurRadius: blur1,
+              ),
+              BoxShadow(
+                color     : const Color(0xFFFF3C00).withOpacity(glow2Opacity),
+                blurRadius: blur2,
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
       child: ValueListenableBuilder<List<int>>(
         valueListenable: widget.controller.challengeCode,
         builder: (context, code, _) {
@@ -689,24 +744,25 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
             );
           }
-          final codeStr = code.join('');
           return ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             child: Stack(
               alignment: Alignment.center,
               children: [
+                // Layer 1: noise (40 lines, 4 ghost digits, 20 dots — ikut JS)
                 Positioned.fill(child: CustomPaint(painter: _NoisePainter(seed: _noiseSeed))),
-                if (_isGlitching)
-                  Transform.translate(
-                    offset: Offset(_xOffset + 2, _yOffset),
-                    child: Text(codeStr, style: _glitchStyle(Colors.cyan)),
-                  ),
-                if (_isGlitching)
-                  Transform.translate(
-                    offset: Offset(-_xOffset - 2, -_yOffset),
-                    child: Text(codeStr, style: _glitchStyle(const Color(0xFFFF00FF))),
-                  ),
-                Text(codeStr, style: _glitchStyle(Colors.white)),
+                // Layer 2: scanlines overlay (CSS ::after repeating-linear-gradient)
+                Positioned.fill(child: CustomPaint(painter: _ScanlinePainter())),
+                // Layer 3: digit row — 3 digit berasingan, glitch independent
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (int i = 0; i < code.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 10),
+                      _buildGlitchDigit('${code[i]}', i),
+                    ],
+                  ],
+                ),
               ],
             ),
           );
@@ -715,49 +771,105 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay> {
     );
   }
 
-  TextStyle _glitchStyle(Color color) => TextStyle(
-    fontSize: 28, fontWeight: FontWeight.bold,
-    fontFamily: 'Courier', letterSpacing: 8, color: color,
-  );
+  // Satu digit dengan jitter + scale + chromatic aberration text shadow
+  // Font style KEKAL sama seperti Dart asal — hanya shadow yang bertukar per-frame
+  Widget _buildGlitchDigit(String digit, int idx) {
+    final p  = _intensity[idx];
+    final ro = _roOffset[idx];
+    final co = _coOffset[idx];
+
+    return Transform.translate(
+      offset: _jitter[idx],
+      child: Transform.scale(
+        scale: _scale[idx],
+        child: SizedBox(
+          width: 40, height: 50,
+          child: Center(
+            child: Text(
+              digit,
+              style: TextStyle(
+                fontSize  : 28,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Courier',
+                color     : Colors.white,
+                shadows   : [
+                  // Red chromatic aberration (ro px ke kanan)
+                  Shadow(
+                    offset    : Offset(ro, 0),
+                    color     : const Color(0xFFFF1E50).withOpacity(0.7 * p),
+                    blurRadius: 0,
+                  ),
+                  // Cyan chromatic aberration (co px ke kiri)
+                  Shadow(
+                    offset    : Offset(-co, 0),
+                    color     : const Color(0xFF00DCFF).withOpacity(0.65 * p),
+                    blurRadius: 0,
+                  ),
+                  // White core glow
+                  Shadow(
+                    color     : Colors.white.withOpacity(0.9 * p),
+                    blurRadius: 6 + _random.nextDouble() * 5,
+                  ),
+                  // Orange outer glow
+                  Shadow(
+                    color     : const Color(0xFFFF8C00).withOpacity(0.8 * p),
+                    blurRadius: 12 + _random.nextDouble() * 8,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
+// ── Noise painter (padankan JS: 40 lines, 4 ghost digits, 20 dots) ────────
 class _NoisePainter extends CustomPainter {
   final int seed;
   _NoisePainter({required this.seed});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rng   = Random(seed);
-    final paint = Paint()..strokeWidth = 0.8..style = PaintingStyle.stroke;
+    final rng = Random(seed);
+    final linePaint = Paint()..style = PaintingStyle.stroke;
 
-    for (int i = 0; i < 8; i++) {
-      paint.color = Colors.white.withOpacity(rng.nextDouble() * 0.12 + 0.03);
+    // 40 random lines (JS: for i < 40)
+    for (int i = 0; i < 40; i++) {
+      linePaint.color      = Colors.white.withOpacity(rng.nextDouble() * 0.1 + 0.02);
+      linePaint.strokeWidth = rng.nextDouble() * 1.2 + 0.3;
       canvas.drawLine(
         Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
         Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
-        paint,
+        linePaint,
       );
     }
-    for (int g = 0; g < 3; g++) {
+
+    // 4 ghost digits (JS: for g < 4)
+    for (int g = 0; g < 4; g++) {
       final tp = TextPainter(
         text: TextSpan(
           text: rng.nextInt(10).toString(),
           style: TextStyle(
-            fontSize: 14 + rng.nextDouble() * 10,
-            color: Colors.white.withOpacity(rng.nextDouble() * 0.1 + 0.03),
-            fontWeight: FontWeight.bold, fontFamily: 'Courier',
+            fontSize  : 16 + rng.nextDouble() * 12,
+            color     : Colors.white.withOpacity(rng.nextDouble() * 0.07 + 0.02),
+            fontWeight: FontWeight.w900,
+            fontFamily: 'Courier',
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height));
     }
+
+    // 20 dots (JS: for d < 20)
     final dotPaint = Paint()..style = PaintingStyle.fill;
-    for (int d = 0; d < 12; d++) {
-      dotPaint.color = Colors.white.withOpacity(rng.nextDouble() * 0.08 + 0.02);
+    for (int d = 0; d < 20; d++) {
+      dotPaint.color = Colors.white.withOpacity(rng.nextDouble() * 0.05 + 0.01);
       canvas.drawCircle(
         Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
-        rng.nextDouble() * 1.5 + 0.3,
+        rng.nextDouble() * 1.2 + 0.2,
         dotPaint,
       );
     }
@@ -765,6 +877,26 @@ class _NoisePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_NoisePainter old) => old.seed != seed;
+}
+
+// ── Scanlines painter (CSS ::after repeating-linear-gradient) ────────────
+// Garis mendatar nipis setiap 3px — bagi rasa CRT/terminal
+class _ScanlinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color       = Colors.white.withOpacity(0.018)
+      ..strokeWidth = 1.0
+      ..style       = PaintingStyle.stroke;
+
+    // Lukis garis tiap 3px — padankan CSS: transparent 2px, rgba(.018) 1px
+    for (double y = 0; y < size.height; y += 3) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScanlinePainter old) => false; // statik, takde perlu repaint
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
