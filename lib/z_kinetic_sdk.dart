@@ -400,6 +400,63 @@ class WidgetController {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ANTI-SCREENSHOT
+// Guna MethodChannel 'zkinetic/security'.
+//
+// Android — tambah dalam MainActivity.kt:
+//   val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "zkinetic/security")
+//   ch.setMethodCallHandler { call, result ->
+//     if (call.method == "setSecureFlag") {
+//       val secure = call.argument<Boolean>("secure") ?: false
+//       if (secure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+//       else        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+//       result.success(null)
+//     } else result.notImplemented()
+//   }
+//
+// iOS — tambah dalam AppDelegate.swift:
+//   let ch = FlutterMethodChannel(name: "zkinetic/security",
+//                                 binaryMessenger: controller.binaryMessenger)
+//   ch.setMethodCallHandler { call, result in
+//     if call.method == "setSecureFlag" {
+//       let secure = (call.arguments as? [String:Any])?["secure"] as? Bool ?? false
+//       self.window?.makeKeyAndVisible()
+//       if let field = self.window?.subviews.first(where: { $0 is UITextField }) as? UITextField {
+//         field.isSecureTextEntry = secure
+//       } else if secure {
+//         let tf = UITextField(); tf.isSecureTextEntry = true
+//         tf.frame = .zero; self.window?.addSubview(tf)
+//         self.window?.layer.superlayer?.addSublayer(tf.layer)
+//         tf.layer.sublayers?.first?.addSublayer(self.window!.layer)
+//       }
+//       result(nil)
+//     } else { result(FlutterMethodNotImplemented) }
+//   }
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class _AntiScreenshot {
+  static const _ch = MethodChannel('zkinetic/security');
+
+  static Future<void> enable() async {
+    try {
+      await _ch.invokeMethod('setSecureFlag', {'secure': true});
+      debugPrint('🔒 Anti-screenshot: ACTIVE');
+    } catch (e) {
+      debugPrint('⚠️ Anti-screenshot enable error: $e');
+    }
+  }
+
+  static Future<void> disable() async {
+    try {
+      await _ch.invokeMethod('setSecureFlag', {'secure': false});
+      debugPrint('🔓 Anti-screenshot: DISABLED');
+    } catch (e) {
+      debugPrint('⚠️ Anti-screenshot disable error: $e');
+    }
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MAIN WIDGET
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -427,7 +484,14 @@ class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> {
   @override
   void initState() {
     super.initState();
+    _AntiScreenshot.enable();
     _initialize();
+  }
+
+  @override
+  void dispose() {
+    _AntiScreenshot.disable();
+    super.dispose();
   }
 
   Future<void> _initialize() async {
@@ -724,8 +788,7 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay>
 
         return Container(
           height: 60,
-          // JS: margin: 0 40px 8px  →  horizontal 40
-          margin: const EdgeInsets.symmetric(horizontal: 40),
+          margin: EdgeInsets.zero,
           decoration: BoxDecoration(
             color        : const Color(0xFF3E2723),
             borderRadius : BorderRadius.circular(12),
