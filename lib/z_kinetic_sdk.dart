@@ -9,7 +9,6 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
-import 'package:screen_protector/screen_protector.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Z-KINETIC SDK v4.1 - PRODUCTION GRADE (OPTION B)
@@ -401,26 +400,64 @@ class WidgetController {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ANTI-SCREENSHOT
-// Guna package: screen_protector ^1.5.1 (dah ada dalam pubspec.yaml)
-// Android : FLAG_SECURE — screen hitam dalam recent apps + screenshot gagal
-// iOS     : blur overlay semasa app background / screenshot attempt
-// Tiada perlu native code tambahan — package handle sendiri.
+// ANTI-SCREENSHOT — Zero package dependency
+// Guna MethodChannel 'zkinetic/security' → native handler dalam MainActivity.kt
+//
+// Android (MainActivity.kt) — tambah dalam configureFlutterEngine():
+//
+//   MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "zkinetic/security")
+//     .setMethodCallHandler { call, result ->
+//       if (call.method == "setSecureFlag") {
+//         val on = call.argument<Boolean>("secure") ?: false
+//         if (on) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+//         else    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+//         result.success(null)
+//       } else result.notImplemented()
+//     }
+//
+// iOS (AppDelegate.swift) — tambah dalam application(_:didFinishLaunchingWithOptions:):
+//
+//   let ctrl = window?.rootViewController as! FlutterViewController
+//   FlutterMethodChannel(name: "zkinetic/security",
+//                        binaryMessenger: ctrl.binaryMessenger)
+//     .setMethodCallHandler { call, result in
+//       if call.method == "setSecureFlag" {
+//         // iOS: TextField trick untuk block screenshot
+//         let secure = (call.arguments as? [String:Any])?["secure"] as? Bool ?? false
+//         DispatchQueue.main.async {
+//           if secure {
+//             let tf = UITextField()
+//             tf.isSecureTextEntry = true
+//             self.window?.addSubview(tf)
+//             self.window?.layer.superlayer?.addSublayer(tf.layer)
+//             tf.layer.sublayers?.last?.addSublayer(self.window!.layer)
+//           } else {
+//             self.window?.subviews
+//               .filter { $0 is UITextField }
+//               .forEach { $0.removeFromSuperview() }
+//           }
+//         }
+//         result(nil)
+//       } else { result(FlutterMethodNotImplemented) }
+//     }
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _AntiScreenshot {
+  static const _ch = MethodChannel('zkinetic/security');
+
   static Future<void> enable() async {
     try {
-      await ScreenProtector.preventScreenshotOn();
+      await _ch.invokeMethod('setSecureFlag', {'secure': true});
       debugPrint('🔒 Anti-screenshot: ACTIVE');
     } catch (e) {
-      debugPrint('⚠️ Anti-screenshot enable error: $e');
+      // Gagal senyap jika native handler belum dipasang
+      debugPrint('⚠️ Anti-screenshot enable error (native handler missing?): $e');
     }
   }
 
   static Future<void> disable() async {
     try {
-      await ScreenProtector.preventScreenshotOff();
+      await _ch.invokeMethod('setSecureFlag', {'secure': false});
       debugPrint('🔓 Anti-screenshot: DISABLED');
     } catch (e) {
       debugPrint('⚠️ Anti-screenshot disable error: $e');
