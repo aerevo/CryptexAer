@@ -787,8 +787,10 @@ class _UltimateRGBGlitchDisplayState extends State<UltimateRGBGlitchDisplay>
         final blur2        = 35.0 + 25.0 * t; // 35 → 60
 
         return Container(
-          height: 60,
-          margin: EdgeInsets.zero,
+          height: 46,
+          // Negative margin: kotak tebas keluar dari card padding (16px tiap sisi)
+          // supaya lebih lebar tanpa ganggu jarak digit
+          margin: const EdgeInsets.symmetric(horizontal: -14),
           decoration: BoxDecoration(
             color        : const Color(0xFF3E2723),
             borderRadius : BorderRadius.circular(12),
@@ -1087,12 +1089,16 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
       if (deltaMs > 0) widget.controller.registerScroll(100.0 / deltaMs);
     }
     _lastScrollTime = now;
+  }
 
-    final current = _scrollControllers[index].selectedItem;
-    if (current != _prevItems[index]) {
-      widget.controller.gestureAudit.recordScroll(index, _prevItems[index], current, now);
-      _prevItems[index] = current;
-    }
+  // Dipanggil oleh onSelectedItemChanged — fire untuk SEMUA perubahan item
+  // termasuk animasi intro (_playSlotMachineIntro) dan manual drag.
+  // Ini fix root cause reject: intro animateToItem() tukar digit tapi
+  // _onWheelScrollUpdate tak dipanggil → audit kosong → isTampered() = true.
+  void _onItemChanged(int index, int newItem) {
+    widget.controller.gestureAudit.recordScroll(index, _prevItems[index], newItem, DateTime.now());
+    _prevItems[index] = newItem;
+    HapticFeedback.selectionClick();
   }
 
   void _onWheelScrollEnd(int index) {
@@ -1280,7 +1286,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
           perspective  : 0.001,
           diameterRatio: 1.5,
           physics      : const NeverScrollableScrollPhysics(),
-          onSelectedItemChanged: (_) => HapticFeedback.selectionClick(),
+          onSelectedItemChanged: (item) => _onItemChanged(index, item),
           childDelegate: ListWheelChildBuilderDelegate(
             builder: (context, idx) {
               final displayNumber = (idx % 10 + 10) % 10;
