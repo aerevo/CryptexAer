@@ -9,6 +9,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
+import 'package:screen_protector/screen_protector.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Z-KINETIC SDK v4.1 - PRODUCTION GRADE (OPTION B)
@@ -401,45 +402,16 @@ class WidgetController {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ANTI-SCREENSHOT
-// Guna MethodChannel 'zkinetic/security'.
-//
-// Android — tambah dalam MainActivity.kt:
-//   val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "zkinetic/security")
-//   ch.setMethodCallHandler { call, result ->
-//     if (call.method == "setSecureFlag") {
-//       val secure = call.argument<Boolean>("secure") ?: false
-//       if (secure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-//       else        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-//       result.success(null)
-//     } else result.notImplemented()
-//   }
-//
-// iOS — tambah dalam AppDelegate.swift:
-//   let ch = FlutterMethodChannel(name: "zkinetic/security",
-//                                 binaryMessenger: controller.binaryMessenger)
-//   ch.setMethodCallHandler { call, result in
-//     if call.method == "setSecureFlag" {
-//       let secure = (call.arguments as? [String:Any])?["secure"] as? Bool ?? false
-//       self.window?.makeKeyAndVisible()
-//       if let field = self.window?.subviews.first(where: { $0 is UITextField }) as? UITextField {
-//         field.isSecureTextEntry = secure
-//       } else if secure {
-//         let tf = UITextField(); tf.isSecureTextEntry = true
-//         tf.frame = .zero; self.window?.addSubview(tf)
-//         self.window?.layer.superlayer?.addSublayer(tf.layer)
-//         tf.layer.sublayers?.first?.addSublayer(self.window!.layer)
-//       }
-//       result(nil)
-//     } else { result(FlutterMethodNotImplemented) }
-//   }
+// Guna package: screen_protector ^1.5.1 (dah ada dalam pubspec.yaml)
+// Android : FLAG_SECURE — screen hitam dalam recent apps + screenshot gagal
+// iOS     : blur overlay semasa app background / screenshot attempt
+// Tiada perlu native code tambahan — package handle sendiri.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _AntiScreenshot {
-  static const _ch = MethodChannel('zkinetic/security');
-
   static Future<void> enable() async {
     try {
-      await _ch.invokeMethod('setSecureFlag', {'secure': true});
+      await ScreenProtector.preventScreenshotOn();
       debugPrint('🔒 Anti-screenshot: ACTIVE');
     } catch (e) {
       debugPrint('⚠️ Anti-screenshot enable error: $e');
@@ -448,7 +420,7 @@ class _AntiScreenshot {
 
   static Future<void> disable() async {
     try {
-      await _ch.invokeMethod('setSecureFlag', {'secure': false});
+      await ScreenProtector.preventScreenshotOff();
       debugPrint('🔓 Anti-screenshot: DISABLED');
     } catch (e) {
       debugPrint('⚠️ Anti-screenshot disable error: $e');
