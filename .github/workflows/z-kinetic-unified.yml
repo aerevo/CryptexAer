@@ -88,11 +88,19 @@ jobs:
           }
           EOF
 
-      - name: "🚀 Build APK (Release Mode)"
-        run: flutter build apk --release --no-tree-shake-icons
+      # 🔒 KOD RAHSIA: Build APK dengan Obfuscation
+      - name: "🚀 Build APK (Release Mode + Obfuscate)"
+        run: |
+          flutter build apk --release \
+          --obfuscate \
+          --split-debug-info=build/app/outputs/symbols \
+          --no-tree-shake-icons
 
-      - name: "📤 Upload Z-Kinetic Artifact"
+      # 📤 UPLOAD: Tarik sekali folder 'symbols' sebagai backup Peta Rahsia kau
+      - name: "📤 Upload Z-Kinetic Artifact & Symbols"
         uses: actions/upload-artifact@v4
         with:
-          name: z-kinetic-v3-build
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: z-kinetic-v4-obfuscated
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/symbols
