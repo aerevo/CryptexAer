@@ -1180,15 +1180,26 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset(
-                'assets/z_wheel3.png',
+              child: Image.network(
+                'https://z-kinetic.web.app/z_wheel3.png',
                 fit: BoxFit.fill,
-                errorBuilder: (_, __, ___) => Container(
-                  color: Colors.grey,
-                  child: const Icon(Icons.broken_image, size: 60, color: Colors.white),
-                ),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: const Color(0xFFFF5722),
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(Icons.wifi_off, color: Colors.grey, size: 40),
+                  );
+                },
               ),
-            ),
             for (int i = 0; i < 3; i++) _buildWheel(i),
             _buildGlowingButton(),
           ],
