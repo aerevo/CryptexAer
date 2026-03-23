@@ -13,6 +13,15 @@ import 'z_kinetic_sdk.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+  // ✅ Wajib panggil ini SEBELUM runApp()
+  // appId = public identifier yang Captain bagi kepada klien
+  // Secret API Key TIDAK diletakkan di sini — ia kekal di server sahaja
+  ZKinetic.initialize(
+    appId: 'zk_live_37c3756c7c5466c3a606e051907acecd',
+    // customServerUrl: 'https://onprem.your-server.com', // optional untuk on-premise
+  );
+
   runApp(const MyApp());
 }
 
@@ -44,12 +53,9 @@ class ClientAppDemo extends StatefulWidget {
 class _ClientAppDemoState extends State<ClientAppDemo> {
   bool _showSecurityWidget = false;
 
-  // ✅ Initialize SDK dengan URL server Captain
-  // ✅ Klien guna API Key yang Captain bagi
-  // Tukar 'zk_live_XXXX' dengan API Key sebenar dari Captain
-  final WidgetController _sdkController = WidgetController(
-    appId: 'zk_live_37c3756c7c5466c3a606e051907acecd',
-  );
+  // ✅ WidgetController() — tiada appId di sini
+  // appId diambil secara automatik dari ZKinetic.initialize() di atas
+  final WidgetController _sdkController = WidgetController();
 
   void _onVerificationComplete(bool success) {
     setState(() => _showSecurityWidget = false);
@@ -58,7 +64,6 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          // ✅ GREEN dialog untuk success
           backgroundColor: Colors.green.shade800,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text(
@@ -141,7 +146,3 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
     );
   }
 }
-
-
-
-
