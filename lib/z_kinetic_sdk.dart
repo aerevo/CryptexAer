@@ -9,6 +9,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Z-KINETIC SDK v5.0 - ENVELOPE VALIDATOR EDITION
@@ -299,6 +300,73 @@ class _ScrollEvent {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DEVICE INTEGRITY CHECK
+//
+// Semak sama ada device rooted/jailbroken atau dalam developer mode
+// sebelum bootstrap dibenarkan.
+//
+// pubspec.yaml — tambah dependency:
+//   flutter_jailbreak_detection: ^1.10.0
+//
+// iOS — tambah dalam Info.plist (kalau perlu LSApplicationQueriesSchemes)
+// Android — tiada setup tambahan diperlukan
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class DeviceIntegrity {
+  /// Return true = device SELAMAT, false = device terkompromi
+  static Future<DeviceIntegrityResult> check() async {
+    bool isJailbroken   = false;
+    bool isDeveloperMode = false;
+
+    try {
+      isJailbroken    = await FlutterJailbreakDetection.jailbroken;
+      isDeveloperMode = await FlutterJailbreakDetection.developerMode;
+    } catch (e) {
+      // Kalau plugin gagal (emulator lama, platform luar biasa),
+      // fail-safe: anggap terkompromi
+      debugPrint('⚠️ DeviceIntegrity check error: $e');
+      return DeviceIntegrityResult(
+        isClean      : false,
+        reason       : 'integrity_check_failed',
+        isJailbroken : false,
+        isDeveloperMode: true,
+      );
+    }
+
+    final isClean = !isJailbroken && !isDeveloperMode;
+
+    if (!isClean) {
+      debugPrint('🚨 DeviceIntegrity: jailbroken=$isJailbroken | devMode=$isDeveloperMode');
+    } else {
+      debugPrint('✅ DeviceIntegrity: Device bersih');
+    }
+
+    return DeviceIntegrityResult(
+      isClean       : isClean,
+      reason        : isJailbroken ? 'rooted_or_jailbroken'
+                    : isDeveloperMode ? 'developer_mode_active'
+                    : null,
+      isJailbroken  : isJailbroken,
+      isDeveloperMode: isDeveloperMode,
+    );
+  }
+}
+
+class DeviceIntegrityResult {
+  final bool    isClean;
+  final String? reason;
+  final bool    isJailbroken;
+  final bool    isDeveloperMode;
+
+  const DeviceIntegrityResult({
+    required this.isClean,
+    required this.isJailbroken,
+    required this.isDeveloperMode,
+    this.reason,
+  });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // WIDGET CONTROLLER
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -362,6 +430,13 @@ class WidgetController {
 
   // ── BOOTSTRAP ──────────────────────────────────────────────
   Future<bool> bootstrap() async {
+    // ── Semak integriti device sebelum apa-apa ─────────────
+    final integrity = await DeviceIntegrity.check();
+    if (!integrity.isClean) {
+      debugPrint('🚨 Bootstrap ditolak — device terkompromi (${integrity.reason})');
+      return false;
+    }
+
     try {
       final cached = await _storage.read(key: 'zk_token_$_appId');
       final expiry = await _storage.read(key: 'zk_expiry_$_appId');
