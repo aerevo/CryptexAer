@@ -11,7 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Z-KINETIC SDK v5.0 - ENVELOPE VALIDATOR EDITION
 // [+] Replace RawBehaviourData → EnvelopeValidator (math-based)
 // [+] Zero behavioral data stored atau dihantar ke server
