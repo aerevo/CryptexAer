@@ -9,9 +9,8 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
-import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Z-KINETIC SDK v5.0 - ENVELOPE VALIDATOR EDITION
 // [+] Replace RawBehaviourData → EnvelopeValidator (math-based)
 // [+] Zero behavioral data stored atau dihantar ke server
@@ -302,52 +301,92 @@ class _ScrollEvent {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // DEVICE INTEGRITY CHECK
 //
-// Semak sama ada device rooted/jailbroken atau dalam developer mode
-// sebelum bootstrap dibenarkan.
+// Zero dependency baru — guna device_info_plus yang dah sedia ada.
 //
-// pubspec.yaml — tambah dependency:
-//   flutter_jailbreak_detection: ^1.10.0
+// Semakan:
+//   Android → isPhysicalDevice (emulator = false)
+//             + fingerprint/build tag emulator heuristics
+//   iOS     → isPhysicalDevice (simulator = false)
 //
-// iOS — tambah dalam Info.plist (kalau perlu LSApplicationQueriesSchemes)
-// Android — tiada setup tambahan diperlukan
+// Nota: Lebih lemah dari flutter_jailbreak_detection (tak detect
+// root secara mendalam), tapi cukup untuk halang emulator/simulator
+// automation yang digunakan oleh bot scraper biasa.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class DeviceIntegrity {
   /// Return true = device SELAMAT, false = device terkompromi
   static Future<DeviceIntegrityResult> check() async {
-    bool isJailbroken   = false;
-    bool isDeveloperMode = false;
+    final deviceInfo = DeviceInfoPlugin();
+    bool isEmulator  = false;
+    bool isSuspect   = false;
+    String reason    = '';
 
     try {
-      isJailbroken    = await FlutterJailbreakDetection.jailbroken;
-      isDeveloperMode = await FlutterJailbreakDetection.developerMode;
+      if (Platform.isAndroid) {
+        final info = await deviceInfo.androidInfo;
+
+        // Semakan 1: Flag isPhysicalDevice (paling asas)
+        if (!info.isPhysicalDevice) {
+          isEmulator = true;
+          reason     = 'android_emulator';
+        }
+
+        // Semakan 2: Build fingerprint heuristic
+        // Emulator biasanya ada 'generic', 'unknown', atau 'sdk' dalam fingerprint
+        final fp = (info.fingerprint).toLowerCase();
+        if (!isEmulator &&
+            (fp.contains('generic') ||
+             fp.contains('unknown') ||
+             fp.contains('sdk_gphone') ||
+             fp.contains('emulator') ||
+             fp.contains('vbox') ||
+             fp.contains('test-keys'))) {
+          isSuspect = true;
+          reason    = 'suspicious_build_fingerprint';
+        }
+
+        // Semakan 3: Hardware model heuristic
+        final model = (info.model).toLowerCase();
+        if (!isEmulator && !isSuspect &&
+            (model.contains('sdk') ||
+             model.contains('emulator') ||
+             model.contains('android sdk'))) {
+          isSuspect = true;
+          reason    = 'suspicious_device_model';
+        }
+
+      } else if (Platform.isIOS) {
+        final info = await deviceInfo.iosInfo;
+
+        if (!info.isPhysicalDevice) {
+          isEmulator = true;
+          reason     = 'ios_simulator';
+        }
+      }
     } catch (e) {
-      // Kalau plugin gagal (emulator lama, platform luar biasa),
-      // fail-safe: anggap terkompromi
       debugPrint('⚠️ DeviceIntegrity check error: $e');
+      // Fail-open: biarkan teruskan, jangan block kalau check sendiri crash
       return DeviceIntegrityResult(
-        isClean      : false,
-        reason       : 'integrity_check_failed',
-        isJailbroken : false,
-        isDeveloperMode: true,
+        isClean   : true,
+        reason    : null,
+        isEmulator: false,
+        isSuspect : false,
       );
     }
 
-    final isClean = !isJailbroken && !isDeveloperMode;
+    final isClean = !isEmulator && !isSuspect;
 
     if (!isClean) {
-      debugPrint('🚨 DeviceIntegrity: jailbroken=$isJailbroken | devMode=$isDeveloperMode');
+      debugPrint('🚨 DeviceIntegrity: isEmulator=$isEmulator | isSuspect=$isSuspect | reason=$reason');
     } else {
       debugPrint('✅ DeviceIntegrity: Device bersih');
     }
 
     return DeviceIntegrityResult(
-      isClean       : isClean,
-      reason        : isJailbroken ? 'rooted_or_jailbroken'
-                    : isDeveloperMode ? 'developer_mode_active'
-                    : null,
-      isJailbroken  : isJailbroken,
-      isDeveloperMode: isDeveloperMode,
+      isClean   : isClean,
+      reason    : isClean ? null : reason,
+      isEmulator: isEmulator,
+      isSuspect : isSuspect,
     );
   }
 }
@@ -355,13 +394,13 @@ class DeviceIntegrity {
 class DeviceIntegrityResult {
   final bool    isClean;
   final String? reason;
-  final bool    isJailbroken;
-  final bool    isDeveloperMode;
+  final bool    isEmulator;
+  final bool    isSuspect;
 
   const DeviceIntegrityResult({
     required this.isClean,
-    required this.isJailbroken,
-    required this.isDeveloperMode,
+    required this.isEmulator,
+    required this.isSuspect,
     this.reason,
   });
 }
