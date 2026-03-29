@@ -18,9 +18,9 @@ void main() {
   // appId = public identifier yang Captain bagi kepada klien
   // Secret API Key TIDAK diletakkan di sini — ia kekal di server sahaja
   ZKinetic.initialize(
-    appId: 'zk_live_37c3756c7c5466c3a606e051907acecd',
-    // customServerUrl: 'https://onprem.your-server.com', // optional untuk on-premise
-  );
+  appId: 'zk_live_37c3756c7c5466c3a606e051907acecd',
+  customImageUrl: 'https://z-kinetic.web.app/sdk/z_wheel3.png', // TAMBAH SINI
+);
 
   runApp(const MyApp());
 }
