@@ -25,11 +25,13 @@ import 'package:crypto/crypto.dart';
 class ZKinetic {
   static late final String _appId;
   static late final String _serverUrl;
+  static late final String _imageUrl;
   static bool _isInitialized = false;
 
   static void initialize({
     required String appId,
     String? customServerUrl,
+    String? customImageUrl,
   }) {
     if (_isInitialized) {
       debugPrint('⚠️ ZKinetic: Sudah diinisialisasi. Panggilan ini diabaikan.');
@@ -37,6 +39,9 @@ class ZKinetic {
     }
     _appId     = appId;
     _serverUrl = customServerUrl ?? 'https://zticketapp-dxtcyy6wma-as.a.run.app';
+    // [PATCH] Asingkan URL gambar dari URL API
+    // Gambar ada di Firebase Hosting, bukan Cloud Functions
+    _imageUrl  = customImageUrl  ?? 'https://z-kinetic.web.app/sdk/z_wheel3.png';
     _isInitialized = true;
     debugPrint('✅ ZKinetic: Initialized. appId=$appId | server=$_serverUrl');
   }
@@ -49,6 +54,11 @@ class ZKinetic {
   static String get serverUrl {
     if (!_isInitialized) throw StateError('🛑 ZKinetic: Panggil ZKinetic.initialize() dahulu!');
     return _serverUrl;
+  }
+
+  static String get imageUrl {
+    if (!_isInitialized) throw StateError('🛑 ZKinetic: Panggil ZKinetic.initialize() dahulu!');
+    return _imageUrl;
   }
 }
 
@@ -1206,7 +1216,8 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
 
   int?   _activeWheelIndex;
   Timer? _wheelActiveTimer;
-  bool   _isButtonPressed = false;
+  bool   _isButtonPressed    = false;
+  bool   _showEmeraldSuccess = false;
   final  Random _random   = Random();
 
   late List<AnimationController> _textOpacityControllers;
@@ -1318,7 +1329,10 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
 
     if (result['allowed'] == true) {
       _percubaanSalah = 0;
-      widget.onSuccess(true);
+      // [PATCH] Tunjuk Emerald success card 1.5 saat sebelum tutup
+      setState(() => _showEmeraldSuccess = true);
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (mounted) widget.onSuccess(true);
     } else {
       setState(() { _percubaanSalah++; });
 
@@ -1355,7 +1369,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
           children: [
             Positioned.fill(
               child: Image.network(
-                'https://z-kinetic.web.app/z_wheel3.png',
+                ZKinetic.imageUrl, // [PATCH] Hosting URL, bukan Cloud Functions
                 fit: BoxFit.fill,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
@@ -1377,6 +1391,8 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
             ),
             for (int i = 0; i < 3; i++) _buildWheel(i),
             _buildGlowingButton(),
+            // [PATCH] Emerald success overlay
+            if (_showEmeraldSuccess) _buildEmeraldOverlay(),
           ],
         ),
       ),
@@ -1510,6 +1526,61 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
                     blurRadius : 20, spreadRadius: 2,
                   )],
           ),
+        ),
+      ),
+    );
+  }
+
+  // [PATCH] Emerald success overlay — tindih atas cryptex selepas verify berjaya
+  Widget _buildEmeraldOverlay() {
+    return Positioned.fill(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: const RadialGradient(
+            center: Alignment.center,
+            radius: 1.2,
+            colors: [Color(0xFF065F46), Color(0xFF022C22)],
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 90, height: 90,
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color     : const Color(0xFF10B981).withOpacity(0.6),
+                    blurRadius: 40, spreadRadius: 8,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.check_rounded, color: Colors.white, size: 55),
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'PENGESAHAN BERJAYA',
+              style: TextStyle(
+                color      : Color(0xFF34D399),
+                fontSize   : 22,
+                fontWeight : FontWeight.w900,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Identiti manusia disahkan.\nMeneruskan transaksi selamat...',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color   : const Color(0xFFA7F3D0).withOpacity(0.85),
+                fontSize: 14,
+                height  : 1.6,
+              ),
+            ),
+          ],
         ),
       ),
     );
