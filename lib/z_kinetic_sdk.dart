@@ -97,141 +97,83 @@ class _EnvelopeRange {
   const _EnvelopeRange(this.min, this.max);
 }
 
-class EnvelopeValidator {
-  // ── Default envelope — Tuan boleh override via loadConfig() ──
-  static Map<String, _EnvelopeRange> _envelope = {
-    'solveTimeMs'   : const _EnvelopeRange(1500,  120000),  // 1.5s – 2min
-    'touchCount'    : const _EnvelopeRange(1,     30),      // bilangan sentuhan
-    'velMin'        : const _EnvelopeRange(80,    2200),    // px/s — ada velocity dalam julat manusia
-    'velCV'         : const _EnvelopeRange(0.03,  0.90),    // coefficient of variation — bukan seragam
-    'microPauses'   : const _EnvelopeRange(0,     15),      // natural hesitations
-  };
 
-  static const double _humanThreshold = 0.60; // 60% checks mesti lulus
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TELEMETRY COLLECTOR (v6.0)
+//
+// Gantikan EnvelopeValidator.
+// Kumpul titik mentah {x, y, t} dan hantar ke server.
+// Server kira physics — klien hanya record dan hantar.
+// envelopeScore kekal sebagai fallback untuk server lama (v5.x).
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  final List<double> _velocities = [];
-  final List<int>    _touchTimes = [];
-  DateTime? _start;
+class _TPoint {
+  final int x, y, t;
+  const _TPoint(this.x, this.y, this.t);
+  Map<String, int> toJson() => {'x': x, 'y': y, 't': t};
+}
 
-  /// Mula sesi baru — buang semua data lama
+class TelemetryCollector {
+  final List<_TPoint> _points  = [];
+  int                 _touches = 0;
+  DateTime?           _start;
+
+  static const int _maxPoints = 200;
+
   void start() {
-    _velocities.clear();
-    _touchTimes.clear();
-    _start = DateTime.now();
+    _points.clear();
+    _touches = 0;
+    _start   = DateTime.now();
   }
 
-  /// Rekod velocity — dipanggil semasa scroll, TIDAK disimpan selepas validate
-  void addVelocity(double v) {
-    _velocities.add(v.abs());
-    if (_velocities.length > 30) _velocities.removeAt(0);
+  void recordTouch() { _touches++; }
+
+  void recordMove(double x, double y) {
+    if (_start == null || _points.length >= _maxPoints) return;
+    _points.add(_TPoint(x.round(), y.round(), DateTime.now().millisecondsSinceEpoch));
   }
 
-  /// Rekod masa sentuhan — hanya timestamp relatif, bukan absolut
-  void addTouch() {
-    if (_start == null) return;
-    _touchTimes.add(DateTime.now().difference(_start!).inMilliseconds);
-    if (_touchTimes.length > 20) _touchTimes.removeAt(0);
-  }
-
-  /// Validate dan buang semua data — kembalikan score sahaja
-  EnvelopeResult validate() {
-    if (_start == null) return const EnvelopeResult(0.0, false);
-
-    final solveMs = DateTime.now().difference(_start!).inMilliseconds.toDouble();
-    int passed = 0;
-    int total  = 0;
-
-    // ── Check 1: Masa penyelesaian ──────────────────────────────
-    total++;
-    if (_inRange('solveTimeMs', solveMs)) passed++;
-
-    // ── Check 2: Bilangan sentuhan ──────────────────────────────
-    total++;
-    if (_touchTimes.length >= _envelope['touchCount']!.min.toInt()) passed++;
-
-    if (_velocities.isNotEmpty) {
-      // ── Check 3: Ada velocity dalam julat manusia ─────────────
-      total++;
-      if (_velocities.any((v) => _inRange('velMin', v))) passed++;
-
-      // ── Check 4: Variance velocity (bukan bot linear) ─────────
-      if (_velocities.length >= 3) {
-        total++;
-        final mean = _velocities.reduce((a, b) => a + b) / _velocities.length;
-        if (mean > 0) {
-          final cv = _velocities
-              .map((v) => (v - mean).abs())
-              .reduce((a, b) => a + b) / _velocities.length / mean;
-          if (_inRange('velCV', cv)) passed++;
-        }
-      }
-
-      // ── Check 5: Micro-pauses (jeda semula jadi) ──────────────
-      if (_velocities.length >= 4) {
-        total++;
-        int pauses = 0;
-        for (int i = 1; i < _velocities.length; i++) {
-          if (_velocities[i] < _velocities[i - 1] * 0.3) pauses++;
-        }
-        if (_inRange('microPauses', pauses.toDouble())) passed++;
-      }
+  // Fallback score — server lama (v5.x) guna ini
+  double _fallbackScore() {
+    if (_points.length < 3 || _start == null) return 0.5;
+    final solveMs = DateTime.now().difference(_start!).inMilliseconds;
+    final vels = <double>[];
+    for (int i = 1; i < _points.length; i++) {
+      final dt = _points[i].t - _points[i-1].t;
+      if (dt <= 0 || dt >= 2000) continue;
+      final dx = (_points[i].x - _points[i-1].x).toDouble();
+      final dy = (_points[i].y - _points[i-1].y).toDouble();
+      vels.add((sqrt(dx*dx + dy*dy) / dt) * 1000);
     }
-
-    // ── Buang semua data selepas validate ─────────────────────
-    _velocities.clear();
-    _touchTimes.clear();
-
-    final score = total > 0 ? passed / total : 0.0;
-    debugPrint('🧮 EnvelopeScore: ${score.toStringAsFixed(2)} ($passed/$total checks)');
-    return EnvelopeResult(score, score >= _humanThreshold);
+    final vAvg = vels.isEmpty ? 0.0 : vels.reduce((a, b) => a + b) / vels.length;
+    double score = 1.0;
+    if (solveMs < 800 || solveMs > 120000) score -= 0.3;
+    if (vAvg < 50 || vAvg > 3500) score -= 0.3;
+    if (_touches < 1) score -= 0.2;
+    return score.clamp(0.0, 1.0);
   }
 
-  void reset() {
-    _velocities.clear();
-    _touchTimes.clear();
-    _start = null;
+  // Ambil payload dan buang data
+  Map<String, dynamic> getPayload() {
+    final result = {
+      'rawTelemetry' : _points.map((p) => p.toJson()).toList(),
+      'solveTimeMs'  : _start != null
+          ? DateTime.now().difference(_start!).inMilliseconds : 0,
+      'touchCount'   : _touches,
+      'envelopeScore': _fallbackScore(),
+    };
+    _points.clear();
+    _touches = 0;
+    return result;
   }
 
-  bool _inRange(String key, double val) {
-    final r = _envelope[key];
-    if (r == null) return false;
-    return val >= r.min && val <= r.max;
-  }
+  void reset() { _points.clear(); _touches = 0; _start = null; }
 
-  /// Update envelope dari JSON config (tanpa redeploy)
-  ///
-  /// Format JSON:
-  /// {
-  ///   "solveTimeMs"  : {"min": 1500, "max": 120000},
-  ///   "touchCount"   : {"min": 1,    "max": 30},
-  ///   "velMin"       : {"min": 80,   "max": 2200},
-  ///   "velCV"        : {"min": 0.03, "max": 0.90},
-  ///   "microPauses"  : {"min": 0,    "max": 15}
-  /// }
-  static void loadConfig(String jsonString) {
-    try {
-      final Map<String, dynamic> raw = json.decode(jsonString);
-      final updated = Map<String, _EnvelopeRange>.from(_envelope);
-      raw.forEach((key, val) {
-        if (val is Map) {
-          updated[key] = _EnvelopeRange(
-            (val['min'] as num).toDouble(),
-            (val['max'] as num).toDouble(),
-          );
-        }
-      });
-      _envelope = updated;
-      debugPrint('✅ EnvelopeValidator: Config dikemaskini (${raw.keys.join(', ')})');
-    } catch (e) {
-      debugPrint('⚠️ EnvelopeValidator.loadConfig error: $e');
-    }
+  static void loadConfig(String _) {
+    debugPrint('ℹ️ TelemetryCollector: server kira sendiri dalam v6.0');
   }
 }
 
-class EnvelopeResult {
-  final double score;
-  final bool   isHuman;
-  const EnvelopeResult(this.score, this.isHuman);
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -431,7 +373,7 @@ class WidgetController {
   final ValueNotifier<List<int>> challengeCode    = ValueNotifier([]);
   final ValueNotifier<int>       randomizeTrigger = ValueNotifier(0);
   final GestureAudit             gestureAudit     = GestureAudit();
-  final EnvelopeValidator        _envelope        = EnvelopeValidator();
+  final TelemetryCollector       _telemetry       = TelemetryCollector();
 
   final ValueNotifier<bool> motionLatched  = ValueNotifier(false);
   final ValueNotifier<bool> touchLatched   = ValueNotifier(false);
@@ -575,7 +517,7 @@ class WidgetController {
           challengeCode.value =
               (data['challengeCode'] as List<dynamic>).map((e) => e as int).toList();
           gestureAudit.clear();
-          _envelope.start(); // ← mulakan envelope timer
+          _telemetry.start(); // ← mula kumpul telemetry
           return true;
         }
       }
@@ -611,12 +553,9 @@ class WidgetController {
       return {'allowed': false, 'error': 'Aktiviti mencurigakan.', 'reason': 'TAMPER_DETECTED'};
     }
 
-    // ── Validate envelope on-device, buang data ────────────
-    final envResult = _envelope.validate();
-    if (!envResult.isHuman) {
-      debugPrint('🚨 Envelope gagal: score=${envResult.score.toStringAsFixed(2)}');
-      return {'allowed': false, 'error': 'Corak tidak manusiawi.', 'reason': 'ENVELOPE_FAIL'};
-    }
+    // ── Ambil telemetry payload, hantar ke server ─────────
+    // Server kira physics — klien tidak buat keputusan
+    final telPayload = _telemetry.getPayload();
 
     try {
       final response = await http.post(
@@ -629,9 +568,14 @@ class WidgetController {
           'nonce'        : _currentNonce,
           'userAnswer'   : userAnswer,
           'deviceDNA'    : deviceDNA.toJson(),
-          'envelopeScore': envResult.score, // ← score sahaja, bukan raw data
+          // v6.0: raw telemetry untuk server-side physics
+          'rawTelemetry' : telPayload['rawTelemetry'],
+          'solveTimeMs'  : telPayload['solveTimeMs'],
+          'touchCount'   : telPayload['touchCount'],
+          // Fallback untuk server lama
+          'envelopeScore': telPayload['envelopeScore'],
         }),
-      ).timeout(const Duration(seconds: 3));
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) return json.decode(response.body);
       return {'allowed': false, 'error': 'Server error ${response.statusCode}.'};
@@ -641,12 +585,14 @@ class WidgetController {
   }
 
   void registerTouch() {
-    _envelope.addTouch();
+    _telemetry.recordTouch();
     touchLatched.value = true;
   }
 
   void registerScroll(double velocity) {
-    _envelope.addVelocity(velocity);
+    // v6.0: convert velocity ke movement record
+    // x=0 kerana kita track masa dan magnitude, bukan koordinat mutlak
+    _telemetry.recordMove(0, velocity);
     patternLatched.value = true;
   }
 
