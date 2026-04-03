@@ -1238,7 +1238,7 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     final now = DateTime.now();
     if (_lastScrollTime != null) {
       final deltaMs = now.difference(_lastScrollTime!).inMilliseconds;
-      widget.controller.registerScroll(controllers[index].offset);
+      widget.controller.registerScroll(_scrollControllers[index].offset);
     }
     _lastScrollTime = now;
   }
