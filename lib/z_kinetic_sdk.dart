@@ -15,10 +15,11 @@ import 'package:crypto/crypto.dart';
 // [+] Gantikan EnvelopeValidator → TelemetryCollector (Server-Side Physics)
 // [+] Kumpul titik mentah {x, y, t} dan hantar ke server
 // [+] envelopeScore kekal sebagai fallback
+// [+] UI & Widget Dipulihkan Sepenuhnya
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// GLOBAL CONFIG (IMMUTABLE SINGLETON)
+// Z-KINETIC GLOBAL CONFIG (IMMUTABLE SINGLETON)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ZKinetic {
@@ -78,10 +79,6 @@ class ZKineticConfig {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TELEMETRY COLLECTOR (v6.0)
-//
-// Kumpul titik mentah {x, y, t} dan hantar ke server.
-// Server kira physics — klien hanya record dan hantar.
-// envelopeScore kekal sebagai fallback untuk server lama (v5.x).
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _TPoint {
@@ -362,7 +359,6 @@ class WidgetController {
     return Hmac(sha256, key).convert(body).toString();
   }
 
-  // ── BOOTSTRAP ──────────────────────────────────────────────
   Future<bool> bootstrap() async {
     final integrity = await DeviceIntegrity.check();
     if (!integrity.isClean) {
@@ -436,7 +432,6 @@ class WidgetController {
     }
   }
 
-  // ── FETCH CHALLENGE ────────────────────────────────────────
   Future<bool> fetchChallenge() async {
     if (_sessionToken == null) {
       debugPrint('🔒 Tiada session token');
@@ -474,7 +469,6 @@ class WidgetController {
     }
   }
 
-  // ── VERIFY ────────────────────────────────────────────────
   Future<Map<String, dynamic>> verify(
     List<int> userAnswer,
     List<FixedExtentScrollController> controllers,
@@ -523,8 +517,8 @@ class WidgetController {
     touchLatched.value = true;
   }
 
+  // ✅ PERBAIKAN MATEMATIK: Terima Posisi Mutlak (Offset), Bukan Kelajuan (Velocity)
   void registerScroll(double offsetPixels) {
-    // v6.0: Mesti hantar kedudukan mutlak piksel (offset), BUKAN kelajuan (velocity)
     _telemetry.recordMove(0, offsetPixels);
     patternLatched.value = true;
   }
@@ -565,5 +559,297 @@ class _AntiScreenshot {
     } catch (e) {
       debugPrint('⚠️ Anti-screenshot disable error: $e');
     }
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// UI: WIDGET PRODUK B (WHEEL OVERLAY)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class ZKineticWidgetProdukB extends StatefulWidget {
+  final WidgetController controller;
+  final Function(bool) onComplete;
+  final VoidCallback onCancel;
+
+  const ZKineticWidgetProdukB({
+    super.key,
+    required this.controller,
+    required this.onComplete,
+    required this.onCancel,
+  });
+
+  @override
+  State<ZKineticWidgetProdukB> createState() => _ZKineticWidgetProdukBState();
+}
+
+class _ZKineticWidgetProdukBState extends State<ZKineticWidgetProdukB> with TickerProviderStateMixin {
+  int _uiState = 0; // 0=Loading, 1=Main UI, 2=Verifying, 3=Success, 4=Fail
+  String _errorMsg = '';
+  late DeviceDNA _dna;
+
+  final List<FixedExtentScrollController> _wheelControllers = [
+    FixedExtentScrollController(initialItem: 10),
+    FixedExtentScrollController(initialItem: 10),
+    FixedExtentScrollController(initialItem: 10),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _AntiScreenshot.enable();
+    _initFlow();
+  }
+
+  @override
+  void dispose() {
+    _AntiScreenshot.disable();
+    for (var c in _wheelControllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _initFlow() async {
+    setState(() => _uiState = 0);
+    _dna = await DeviceDNA.collect(context);
+    bool ok = await widget.controller.bootstrap();
+    if (!ok) {
+      setState(() { _uiState = 4; _errorMsg = 'Sistem Keselamatan Gagal Dimuatkan.'; });
+      return;
+    }
+    ok = await widget.controller.fetchChallenge();
+    if (!ok) {
+      setState(() { _uiState = 4; _errorMsg = 'Ralat Rangkaian / Challenge Gagal.'; });
+      return;
+    }
+    if (mounted) setState(() => _uiState = 1);
+  }
+
+  Future<void> _submit() async {
+    setState(() => _uiState = 2);
+    List<int> answers = _wheelControllers.map((c) => (c.selectedItem % 10 + 10) % 10).toList();
+    
+    final res = await widget.controller.verify(answers, _wheelControllers, _dna);
+    
+    if (res['allowed'] == true) {
+      setState(() => _uiState = 3);
+      await Future.delayed(const Duration(milliseconds: 1800));
+      widget.onComplete(true);
+    } else {
+      setState(() {
+        _uiState = 4;
+        _errorMsg = res['error'] ?? 'Akses Disekat.';
+      });
+      await Future.delayed(const Duration(milliseconds: 2000));
+      widget.onComplete(false);
+    }
+  }
+
+  bool _onScrollNotification(ScrollNotification notification, int index) {
+    if (notification is ScrollUpdateNotification) {
+      widget.controller.registerTouch();
+      // ✅ Pembaikan v6: Hantar Scroll Offset (Piksel Mutlak)
+      widget.controller.registerScroll(notification.metrics.pixels);
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          GestureDetector(
+            onTap: widget.onCancel,
+            child: Container(color: Colors.black.withOpacity(0.85)),
+          ),
+          Center(
+            child: Container(
+              width: 340,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF1E293B)),
+                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 20)],
+              ),
+              child: _buildStateContent(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStateContent() {
+    switch (_uiState) {
+      case 0:
+        return const Padding(
+          padding: EdgeInsets.all(40.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Colors.blueAccent),
+              SizedBox(height: 20),
+              Text('Mengesahkan Persekitaran...', style: TextStyle(color: Colors.white70)),
+            ],
+          ),
+        );
+      case 1:
+        return _buildBiometricPanel();
+      case 2:
+        return const Padding(
+          padding: EdgeInsets.all(40.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Colors.greenAccent),
+              SizedBox(height: 20),
+              Text('Menganalisis Biometrik...', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        );
+      case 3:
+        return Padding(
+          padding: const EdgeInsets.all(40.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 70, height: 70,
+                decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle),
+                child: const Icon(Icons.check, color: Colors.black, size: 40),
+              ),
+              const SizedBox(height: 20),
+              const Text('PENGESAHAN BERJAYA', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 10),
+              const Text('Identiti manusia disahkan.\nMeneruskan transaksi...', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+            ],
+          ),
+        );
+      case 4:
+      default:
+        return Padding(
+          padding: const EdgeInsets.all(40.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 60),
+              const SizedBox(height: 20),
+              const Text('AKSES DISEKAT', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 10),
+              Text(_errorMsg, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B)),
+                onPressed: widget.onCancel,
+                child: const Text('TUTUP', style: TextStyle(color: Colors.white)),
+              )
+            ],
+          ),
+        );
+    }
+  }
+
+  Widget _buildBiometricPanel() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white54),
+              onPressed: widget.onCancel,
+            ),
+          ],
+        ),
+        const Text('PENGESAHAN BIOMETRIK', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 5),
+        const Text('Putar roda untuk memadankan kod di bawah.', style: TextStyle(color: Colors.white54, fontSize: 12)),
+        const SizedBox(height: 20),
+        
+        ValueListenableBuilder<List<int>>(
+          valueListenable: widget.controller.challengeCode,
+          builder: (context, codeList, _) {
+            if (codeList.isEmpty) return const SizedBox(height: 40);
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: codeList.map((c) => Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF334155))
+                ),
+                child: Text('$c', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              )).toList(),
+            );
+          }
+        ),
+
+        const SizedBox(height: 20),
+        Container(
+          height: 150,
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF1E293B)),
+            boxShadow: const [BoxShadow(color: Colors.black87, inset: true, blurRadius: 10)],
+          ),
+          child: Stack(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(3, (index) => Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notif) => _onScrollNotification(notif, index),
+                    child: ListWheelScrollView.useDelegate(
+                      controller: _wheelControllers[index],
+                      itemExtent: 50,
+                      physics: const FixedExtentScrollPhysics(),
+                      overAndUnderCenterOpacity: 0.3,
+                      childDelegate: ListWheelChildBuilderDelegate(
+                        builder: (context, i) {
+                          final digit = (i % 10 + 10) % 10;
+                          return Center(
+                            child: Text(
+                              '$digit',
+                              style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                )),
+              ),
+              Center(
+                child: Container(
+                  height: 2,
+                  color: Colors.blueAccent.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          child: ElevatedButton(
+            onPressed: _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueAccent,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('SAHKAN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+        ),
+      ],
+    );
   }
 }
