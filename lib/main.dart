@@ -89,17 +89,17 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
           backgroundColor: Colors.red.shade900,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text(
-            '🚫 Access Denied',
+            '⚠️ Pengesahan Gagal',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: const Text(
-            'Bot detected. Purchase blocked.',
+            'Terlalu banyak percubaan tidak berjaya. Sila cuba semula.',
             style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK', style: TextStyle(color: Colors.white)),
+              child: const Text('Cuba Semula', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
