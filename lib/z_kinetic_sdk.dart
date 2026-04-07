@@ -587,10 +587,11 @@ class WidgetController {
     touchLatched.value = true;
   }
 
-  void registerScroll(double offsetPixels) {
-    // v6.0: hantar pixel offset sebenar supaya server boleh kira dy
-    // Server expect perbezaan kedudukan (dy), bukan velocity
-    _telemetry.recordMove(0, offsetPixels);
+  void registerScroll(double offsetPixels, {double dragX = 0.0}) {
+    // v6.0 Fasa 2: hantar x sebenar dari GestureDetector.localPosition.dx
+    // dx != 0 bermakna server boleh kira 2D velocity: sqrt(dx²+dy²)
+    // Dart wheel scroll adalah menegak, jadi y = offsetPixels
+    _telemetry.recordMove(dragX, offsetPixels);
     patternLatched.value = true;
   }
 
@@ -1234,11 +1235,16 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
     widget.controller.registerTouch();
   }
 
+  // Simpan lastDragX supaya boleh dihantar ke registerScroll
+  double _lastDragX = 0.0;
+
   void _onWheelScrollUpdate(int index) {
     final now = DateTime.now();
     if (_lastScrollTime != null) {
-      final deltaMs = now.difference(_lastScrollTime!).inMilliseconds;
-      widget.controller.registerScroll(_scrollControllers[index].offset);
+      widget.controller.registerScroll(
+        _scrollControllers[index].offset,
+        dragX: _lastDragX,   // hantar x sebenar dari drag — Fasa 2 fix
+      );
     }
     _lastScrollTime = now;
   }
@@ -1386,6 +1392,9 @@ class _UltimateCryptexLockState extends State<UltimateCryptexLock>
             _onWheelScrollEnd(index);
             return;
           }
+
+          // [Fasa 2] Simpan x sebenar dari drag untuk telemetry 2D
+          _lastDragX = lp.dx;
 
           final ctrl = _scrollControllers[index];
           if (ctrl.hasClients) {
