@@ -3,24 +3,25 @@ import 'package:flutter/services.dart';
 import 'z_kinetic_sdk.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// MAIN.DART - CLIENT APP (DEMO)
+// MAIN.DART - Z-KINETIC CLIENT APP (ENTERPRISE EDITION)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Fail ini adalah contoh cara client guna SDK.
-// Tak perlu tahu pasal sensor, server, atau logic.
-// Panggil ZKineticWidgetProdukB je!
+// Fail ini telah dikonfigurasikan untuk berhubung terus ke 
+// Pelayan Utama (Fasa 2) menggunakan protokol keselamatan HMAC.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Mengunci orientasi peranti untuk kestabilan sensor fizik
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  // ✅ Wajib panggil ini SEBELUM runApp()
-  // appId = public identifier yang Captain bagi kepada klien
-  // Secret API Key TIDAK diletakkan di sini — ia kekal di server sahaja
+  // ✅ INITIALIZATION KELAS-S (ADMIN PRIVILEGE)
+  // Konfigurasi ini menyelaraskan Flutter dengan ekosistem Web Tuan
   ZKinetic.initialize(
-  appId: 'zk_live_37c3756c7c5466c3a606e051907acecd',
-  customImageUrl: 'https://z-kinetic.web.app/sdk/z_wheel3.png', // TAMBAH SINI
-);
+    appId: 'admin_aer', 
+    serverUrl: 'https://zticketapp-dxtcyy6wma-as.a.run.app',
+    customImageUrl: 'https://z-kinetic.web.app/sdk/z_wheel3.png',
+  );
 
   runApp(const MyApp());
 }
@@ -32,76 +33,44 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'Z-KINETIC SECURITY',
       theme: ThemeData(
         brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.black,
-        primaryColor: const Color(0xFFFF5722),
-        useMaterial3: true,
       ),
-      home: const ClientAppDemo(),
+      home: const MyHomePage(),
     );
   }
 }
 
-class ClientAppDemo extends StatefulWidget {
-  const ClientAppDemo({super.key});
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key});
 
   @override
-  State<ClientAppDemo> createState() => _ClientAppDemoState();
+  State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _ClientAppDemoState extends State<ClientAppDemo> {
+class _MyHomePageState extends State<MyHomePage> {
+  final ZKineticController _sdkController = ZKineticController();
   bool _showSecurityWidget = false;
 
-  // ✅ WidgetController() — tiada appId di sini
-  // appId diambil secara automatik dari ZKinetic.initialize() di atas
-  final WidgetController _sdkController = WidgetController();
-
-  void _onVerificationComplete(bool success) {
+  void _onVerificationComplete(double physicsScore) {
     setState(() => _showSecurityWidget = false);
-
-    if (success) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: Colors.green.shade800,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            '✅ User Verified!',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'Access granted. Processing...',
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('PROCEED', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+    
+    // Protokol maklum balas selepas pengesahan biometrik
+    if (physicsScore >= 0.4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PENGESAHAN LULUS: Skor Fizik $physicsScore'),
+          backgroundColor: Colors.emerald(600),
         ),
       );
     } else {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: Colors.red.shade900,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            '⚠️ Pengesahan Gagal',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'Terlalu banyak percubaan tidak berjaya. Sila cuba semula.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cuba Semula', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PENGESAHAN GAGAL: Aktiviti Bot Dikesan'),
+          backgroundColor: Colors.red(600),
         ),
       );
     }
@@ -113,28 +82,56 @@ class _ClientAppDemoState extends State<ClientAppDemo> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // ─── CLIENT APP UI ───────────────────────────────────
-          Center(
-            child: ElevatedButton(
-              onPressed: () => setState(() => _showSecurityWidget = true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF5722),
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-              ),
-              child: const Text(
-                'LAUNCH SECURITY CHECK',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
-                ),
+          // ─── BACKGROUND LAYER (CITADEL) ─────────────────────
+          Container(
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                colors: [Color(0xFF1E293B), Colors.black],
+                center: Alignment.center,
+                radius: 1.2,
               ),
             ),
           ),
 
-          // ─── Z-KINETIC SDK OVERLAY ───────────────────────────
+          // ─── INTERFACE UTAMA ────────────────────────────────
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.shield_outlined, size: 80, color: Color(0xFF0EA5E9)),
+                const SizedBox(height: 20),
+                const Text(
+                  'Z-KINETIC PROTECTED',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                ElevatedButton(
+                  onPressed: () => setState(() => _showSecurityWidget = true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0EA5E9),
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 10,
+                  ),
+                  child: const Text(
+                    'JALANKAN UJIAN BIOMETRIK',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ─── Z-KINETIC SDK OVERLAY (THE CRYPTEX) ────────────
           if (_showSecurityWidget)
             ZKineticWidgetProdukB(
               controller: _sdkController,
