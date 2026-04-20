@@ -5,8 +5,8 @@ import 'z_kinetic_sdk.dart';
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MAIN.DART - Z-KINETIC CLIENT APP (ENTERPRISE EDITION)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Fail ini telah dikonfigurasikan untuk berhubung terus ke 
-// Pelayan Utama (Fasa 2) menggunakan protokol keselamatan HMAC.
+// Fail ini telah dicuci daripada ralat sintaks dan diselaraskan
+// mengikut struktur mutlak z_kinetic_sdk.dart sedia ada.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 void main() {
@@ -16,10 +16,10 @@ void main() {
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   // ✅ INITIALIZATION KELAS-S (ADMIN PRIVILEGE)
-  // Konfigurasi ini menyelaraskan Flutter dengan ekosistem Web Tuan
+  // NOTA: Tuan WAJIB menukar URL pelayan di dalam fail 'z_kinetic_sdk.dart' 
+  // kerana fungsi initialize ini tidak menerima parameter serverUrl.
   ZKinetic.initialize(
     appId: 'admin_aer', 
-    serverUrl: 'https://zticketapp-dxtcyy6wma-as.a.run.app',
     customImageUrl: 'https://z-kinetic.web.app/sdk/z_wheel3.png',
   );
 
@@ -52,25 +52,25 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final ZKineticController _sdkController = ZKineticController();
   bool _showSecurityWidget = false;
 
-  void _onVerificationComplete(double physicsScore) {
+  // SDK Tuan menjangkakan pulangan bool (True/False), bukan double.
+  void _onVerificationComplete(bool isSuccess) {
     setState(() => _showSecurityWidget = false);
     
     // Protokol maklum balas selepas pengesahan biometrik
-    if (physicsScore >= 0.4) {
+    if (isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('PENGESAHAN LULUS: Skor Fizik $physicsScore'),
-          backgroundColor: Colors.emerald(600),
+        const SnackBar(
+          content: Text('PENGESAHAN LULUS: Manusia Disahkan'),
+          backgroundColor: Colors.teal, // Ditukar dari emerald untuk keserasian
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PENGESAHAN GAGAL: Aktiviti Bot Dikesan'),
-          backgroundColor: Colors.red(600),
+        SnackBar(
+          content: const Text('PENGESAHAN GAGAL: Aktiviti Bot Dikesan'),
+          backgroundColor: Colors.red[600], // Ditukar kepada sintaks yang betul
         ),
       );
     }
@@ -134,7 +134,7 @@ class _MyHomePageState extends State<MyHomePage> {
           // ─── Z-KINETIC SDK OVERLAY (THE CRYPTEX) ────────────
           if (_showSecurityWidget)
             ZKineticWidgetProdukB(
-              controller: _sdkController,
+              // Parameter 'controller' dibuang kerana SDK tidak memerlukannya
               onComplete: _onVerificationComplete,
               onCancel: () => setState(() => _showSecurityWidget = false),
             ),
